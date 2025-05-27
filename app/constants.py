@@ -24,6 +24,21 @@ EMPLOYEE_STATUS = [
         ('On Leave', 'On Leave'),
         ('Retired', 'Retired')
     ]
+PURCHASE_ORDER_OPTIONS = [
+    ('PENDING', 'Pending'), 
+    ('RECEIVED', 'Received')
+    ]
+
+SALE_ORDER_OPTIONS = [
+    ('PENDING', 'Pending'), 
+    ('FULFILLED', 'Fulfilled')
+    ]
+
+STOCK_MOVEMENT_OPTIONS = [
+    ('IN', 'In'), 
+    ('OUT', 'Out'), 
+    ('TRANSFER', 'Transfer')
+]
 
 PAYMENT_METHODS = [
     ('Cash', 'Cash'),

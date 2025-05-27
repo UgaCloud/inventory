@@ -1,9 +1,6 @@
 from django.db import models
 import uuid
 
-# -----------------------------
-# Core Product Models
-# -----------------------------
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -14,8 +11,8 @@ class Category(models.Model):
 
 
 class UnitOfMeasure(models.Model):
-    name = models.CharField(max_length=50, unique=True)  # e.g., "Box"
-    abbreviation = models.CharField(max_length=10)        # e.g., "bx"
+    name = models.CharField(max_length=50, unique=True)  # e.g., "Kilogram"
+    abbreviation = models.CharField(max_length=10)        # e.g., "kg"
 
     def __str__(self):
         return self.name
@@ -35,20 +32,29 @@ class Product(models.Model):
         return self.name
 
     @property
-    def total_stock(self):
-        return sum(i.quantity_in_stock for i in self.inventory_set.all())
+    def total_stock(self): # Total units across all stores
+        return sum(item.quantity_in_stock for item in self.inventory_set.all())
 
+    
     @property
     def default_price(self):
         unit = self.unit_prices.order_by('id').first()
         return unit.price if unit else None
 
+    @property
+    def total_sales_quantity(self): # All sales across orders
+        return sum(item.quantity for item in self.salesorderitem_set.all())
+
+    @property
+    def total_purchase_quantity(self): # All purchases across orders
+        return sum(item.quantity for item in self.purchaseorderitem_set.all())
+
 
 class ProductUnitPrice(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="unit_prices")
     unit = models.ForeignKey(UnitOfMeasure, on_delete=models.CASCADE)
-    conversion_factor = models.FloatField(default=1.0)  # base unit = 1.0
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    conversion_factor = models.FloatField(default=1.0) 
+    price = models.DecimalField(max_digits=10, decimal_places=0)
 
     class Meta:
         unique_together = ('product', 'unit')
@@ -57,10 +63,6 @@ class ProductUnitPrice(models.Model):
         return f"{self.product.name} - {self.unit.name} (${self.price})"
 
 
-# -----------------------------
-# Inventory and Store Models
-# -----------------------------
-
 class StoreLocation(models.Model):
     name = models.CharField(max_length=100)
     address = models.TextField(blank=True)
@@ -68,6 +70,14 @@ class StoreLocation(models.Model):
 
     def __str__(self):
         return self.name
+    
+    @property
+    def total_products(self): # Count of products with stock at the store
+        return self.inventory_set.count()
+
+    @property
+    def total_stock_items(self): # Sum of stock levels for all products
+        return sum(inv.quantity_in_stock for inv in self.inventory_set.all())
 
 
 class Inventory(models.Model):
@@ -86,78 +96,3 @@ class Inventory(models.Model):
     def is_below_reorder(self):
         return self.quantity_in_stock <= self.reorder_level
 
-
-# -----------------------------
-# Order Models
-# -----------------------------
-
-class Supplier(models.Model):
-    name = models.CharField(max_length=255)
-    contact_info = models.TextField(blank=True)
-
-    def __str__(self):
-        return self.name
-
-
-class PurchaseOrder(models.Model):
-    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
-    order_date = models.DateField(auto_now_add=True)
-    expected_date = models.DateField(null=True, blank=True)
-    is_fulfilled = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"PO-{self.id} ({self.supplier.name})"
-
-
-class PurchaseOrderItem(models.Model):
-    order = models.ForeignKey(PurchaseOrder, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    unit = models.ForeignKey(UnitOfMeasure, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
-    cost_price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    def get_total_cost(self):
-        return self.quantity * self.cost_price
-
-
-class Customer(models.Model):
-    name = models.CharField(max_length=255)
-    contact_info = models.TextField(blank=True)
-
-    def __str__(self):
-        return self.name
-
-
-class SalesOrder(models.Model):
-    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True)
-    order_date = models.DateField(auto_now_add=True)
-    store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f"SO-{self.id} ({self.customer.name if self.customer else 'Walk-in'})"
-
-
-class SalesOrderItem(models.Model):
-    order = models.ForeignKey(SalesOrder, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    unit = models.ForeignKey(UnitOfMeasure, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
-    sale_price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    def get_total_price(self):
-        return self.quantity * self.sale_price
-
-
-# -----------------------------
-# Stock Transfer (Optional)
-# -----------------------------
-
-class StockTransfer(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    from_store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE, related_name='outgoing_transfers')
-    to_store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE, related_name='incoming_transfers')
-    quantity = models.PositiveIntegerField()
-    transfer_date = models.DateField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.product.name}: {self.from_store.name} → {self.to_store.name}"
