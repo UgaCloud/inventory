@@ -54,7 +54,6 @@ class Sales(models.Model):
         return sum(item.get_total_price() for item in self.items.all())
 
 
-
 class SalesItem(models.Model):
     order = models.ForeignKey("app.Sales", related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
