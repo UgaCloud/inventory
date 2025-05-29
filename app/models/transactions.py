@@ -28,7 +28,7 @@ class PurchaseOrderItem(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     unit = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=0)
 
     @property
     def cost(self):
@@ -60,7 +60,7 @@ class SalesItem(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     unit = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
-    sale_price = models.DecimalField(max_digits=10, decimal_places=2)
+    sale_price = models.DecimalField(max_digits=10, decimal_places=0)
 
     def get_total_price(self):
         return self.quantity * self.sale_price
