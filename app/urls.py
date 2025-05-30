@@ -6,5 +6,6 @@ from .views.product_views import manage_product_view
 
 urlpatterns = [
     path('', index_view, name='index_page'),
-    path('products/', manage_product_view, name='manage_products_page')
+    path('products/', manage_product_view, name='manage_products_page'),
+
 ]
