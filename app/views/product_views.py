@@ -12,7 +12,7 @@ def manage_product_view(request):
         'form': product_form,
         'products': products
     }
-    return render(request, 'products/manage_products.html', context)
+    return render(request, 'products.html', context)
 
 def update_products_view(request):
     pass

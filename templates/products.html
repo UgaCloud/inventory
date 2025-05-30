@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-
+{% load static %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,11 +15,11 @@
     -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600">
     <!-- https://fonts.google.com/specimen/Open+Sans -->
-    <link rel="stylesheet" href="css/fontawesome.min.css">
+    <link rel="stylesheet" href="{% static 'css/fontawesome.min.css' %}">
     <!-- https://fontawesome.com/ -->
-    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <!-- https://getbootstrap.com/ -->
-    <link rel="stylesheet" href="css/tooplate.css">
+    <link rel="stylesheet" href="{% static 'css/tooplate.css' %}">
 </head>
 
 <body id="reportsPage" class="bg02">
@@ -40,7 +40,7 @@
                         <div class="collapse navbar-collapse" id="navbarSupportedContent">
                             <ul class="navbar-nav mx-auto">
                                 <li class="nav-item">
-                                    <a class="nav-link" href="index.html">Dashboard
+                                    <a class="nav-link" href="{% url 'index_page' %}">Dashboard
                                         <span class="sr-only">(current)</span>
                                     </a>
                                 </li>
@@ -277,9 +277,9 @@
             </footer>
         </div>
     </div>
-    <script src="js/jquery-3.3.1.min.js"></script>
+    <script src="/static/js/jquery-3.3.1.min.js"></script>
     <!-- https://jquery.com/download/ -->
-    <script src="js/bootstrap.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
     <!-- https://getbootstrap.com/ -->
     <script>
         $(function () {

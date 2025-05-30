@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 {% load static %}
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -58,11 +60,11 @@
                                     </div>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" href="products.html">Products</a>
+                                    <a class="nav-link" href="{% url 'products_page' %}">Products</a>
                                 </li>
 
                                 <li class="nav-item">
-                                    <a class="nav-link" href="accounts.html">Accounts</a>
+                                    <a class="nav-link" href="{% url 'accounts_page' %}">Accounts</a>
                                 </li>
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true"
@@ -186,18 +188,18 @@
             </footer>
         </div>
     </div>
-    <script src="js/jquery-3.3.1.min.js"></script>
+    <script src="static/js/jquery-3.3.1.min.js"></script>
     <!-- https://jquery.com/download/ -->
-    <script src="js/moment.min.js"></script>
+    <script src="static/js/moment.min.js"></script>
     <!-- https://momentjs.com/ -->
-    <script src="js/utils.js"></script>
-    <script src="js/Chart.min.js"></script>
+    <script src="static/js/utils.js"></script>
+    <script src="static/js/Chart.min.js"></script>
     <!-- http://www.chartjs.org/docs/latest/ -->
-    <script src="js/fullcalendar.min.js"></script>
+    <script src="static/js/fullcalendar.min.js"></script>
     <!-- https://fullcalendar.io/ -->
-    <script src="js/bootstrap.min.js"></script>
+    <script src="static/js/bootstrap.min.js"></script>
     <!-- https://getbootstrap.com/ -->
-    <script src="js/tooplate-scripts.js"></script>
+    <script src="static/js/tooplate-scripts.js"></script>
     <script>
         let ctxLine,
             ctxBar,
