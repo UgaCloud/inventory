@@ -80,7 +80,7 @@
                             </ul>
                             <ul class="navbar-nav">
                                 <li class="nav-item">
-                                    <a class="nav-link d-flex" href="login.html">
+                                    <a class="nav-link d-flex" href="{% url 'login_page' %}">
                                         <i class="far fa-user mr-2 tm-logout-icon"></i>
                                         <span>Logout</span>
                                     </a>
@@ -118,7 +118,7 @@
 
                             </div>
                             <div class="col-4 text-right">
-                                <a href="products.html" class="tm-link-black">View All</a>
+                                <a href="{% url 'products_page' %}" class="tm-link-black">View All</a>
                             </div>
                         </div>
                         <ol class="tm-list-group tm-list-group-alternate-color tm-list-group-pad-big">
@@ -188,18 +188,18 @@
             </footer>
         </div>
     </div>
-    <script src="static/js/jquery-3.3.1.min.js"></script>
+    <script src="/static/js/jquery-3.3.1.min.js"></script>
     <!-- https://jquery.com/download/ -->
-    <script src="static/js/moment.min.js"></script>
+    <script src="/static/js/moment.min.js"></script>
     <!-- https://momentjs.com/ -->
-    <script src="static/js/utils.js"></script>
-    <script src="static/js/Chart.min.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/Chart.min.js"></script>
     <!-- http://www.chartjs.org/docs/latest/ -->
-    <script src="static/js/fullcalendar.min.js"></script>
+    <script src="/static/js/fullcalendar.min.js"></script>
     <!-- https://fullcalendar.io/ -->
-    <script src="static/js/bootstrap.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
     <!-- https://getbootstrap.com/ -->
-    <script src="static/js/tooplate-scripts.js"></script>
+    <script src="/static/js/tooplate-scripts.js"></script>
     <script>
         let ctxLine,
             ctxBar,

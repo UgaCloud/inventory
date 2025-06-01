@@ -1,8 +1,9 @@
 from django.shortcuts import render, redirect
 
 from app.forms.product_forms import ProductForm
-from app.selectors.product_selectors import get_all_products
+from app.selectors.product_selectors import get_all_products, get_product_by_id
 from app.selectors.category_selectors import get_all_categories
+
 
 
 def manage_product_view(request):
@@ -35,8 +36,7 @@ def add_product_view(request):
 
     return render(request, 'add_product.html', context)
 
-def delete_product_view(request, category_id):
-    pass
-
-def update_products_view(request):
-    pass
+def delete_product_view(request, product_id):
+    product = get_product_by_id(product_id)
+    product.delete()
+    return redirect(manage_product_view)
