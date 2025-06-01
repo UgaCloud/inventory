@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 {% load static%}
+{% load crispy_forms_tags %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Add Product - Dashboard Admin Template</title>
+    <title>Add Category - Dashboard Admin Template</title>
     <!--
 
     Template 2108 Dashboard
@@ -53,15 +54,15 @@
                                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                                     <a class="dropdown-item" href="#">Daily Report</a>
                                     <a class="dropdown-item" href="#">Weekly Report</a>
-                                    <a class="dropdown-item" href="index.html">Yearly Report</a>
+                                    <a class="dropdown-item" href="{% url 'index_page' %}">Yearly Report</a>
                                 </div>
                             </li>
                             <li class="nav-item active">
-                                <a class="nav-link" href="products.html">Products</a>
+                                <a class="nav-link" href="{% url 'products_page' %}">Products</a>
                             </li>
 
                             <li class="nav-item">
-                                <a class="nav-link" href="accounts.html">Accounts</a>
+                                <a class="nav-link" href="{% url 'accounts_page' %}">Accounts</a>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true"
@@ -93,90 +94,22 @@
                 <div class="bg-white tm-block">
                     <div class="row">
                         <div class="col-12">
-                            <h2 class="tm-block-title d-inline-block">Add Product</h2>
+                            <h2 class="tm-block-title d-inline-block">Add Category</h2>
                         </div>
                     </div>
                     <div class="row mt-4 tm-edit-product-row">
                         <div class="col-xl-7 col-lg-7 col-md-12">
 
                             <form action="" method = "POST" class="tm-edit-product-form">
-                            {% csrf_token %}
-                                <div class="input-group mb-3">
-                                    <label for="name" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 col-form-label">Product
-                                        Name
-                                    </label>
-                                    <input id="name" name="name" type="text" class="form-control validate col-xl-9 col-lg-8 col-md-8 col-sm-7">
-                                </div>
-
-                                <div class="input-group mb-3">
-                                    <label for="name" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 col-form-label">Sku
-                                    
-                                    </label>
-                                    <input id="name" name="sku" type="text" class="form-control validate col-xl-9 col-lg-8 col-md-8 col-sm-7">
-                                </div>
-
-                                <div class="input-group mb-3">
-                                    <label for="description" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 mb-2">Description</label>
-                                    <textarea nama = 'description' class="form-control validate col-xl-9 col-lg-8 col-md-8 col-sm-7" rows="3" required></textarea>
-                                </div>
-
-                                <div class="input-group mb-3">
-                                    <label for="name" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 col-form-label">Barcode
-                                    
-                                    </label>
-                                    <input id="name" name="barcode" type="text" class="form-control validate col-xl-9 col-lg-8 col-md-8 col-sm-7">
-                                </div>
-                                
-                                <div class="input-group mb-3">
-                                    <label for="name" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 col-form-label">UUID code
-                                        
-                                    </label>
-                                    <input id="name" name="uuid_code" type="text" class="form-control validate col-xl-9 col-lg-8 col-md-8 col-sm-7">
-                                </div>
-
-                                <div class="input-group mb-3">
-                                    <label for="category" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 col-form-label">Category</label>
-                                    <select class="custom-select col-xl-9 col-lg-8 col-md-8 col-sm-7" id="category">
-                                        <option selected>Select one</option>
-                                        <option value="1">Cras efficitur lacus</option>
-                                        <option value="2">Pellentesque molestie</option>
-                                        <option value="3">Sed feugiat nulla</option>
-                                    </select>
-                                </div>
-
-                                <div class="input-group mb-3">
-                                    <label for="category" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 col-form-label">Is Active</label>
-                                    <select class="custom-select col-xl-9 col-lg-8 col-md-8 col-sm-7" id="is_active">
-                                        <option selected>Select one</option>
-                                        <option value="1">True</option>
-                                        <option value="2">False</option>
-
-                                    </select>
-                                </div>
-
-                                <div class="input-group mb-3">
-                                    <label for="expire_date" class="col-xl-4 col-lg-4 col-md-4 col-sm-5 col-form-label">Date of Creation
-                                    </label>
-                                    <input id="expire_date" name="created_at" type="text" class="form-control validate col-xl-9 col-lg-8 col-md-8 col-sm-7"
-                                        data-large-mode="true">
-                                </div>
-                                <div class="input-group mb-3">
-                                    <div class="ml-auto col-xl-8 col-lg-8 col-md-8 col-sm-7 pl-0">
-                                        <button type="submit" class="btn btn-primary">Add
-                                        </button>
-                                    </div>
-                                </div>
+                                {% csrf_token %}
+                                {{form|crispy}}
+                                <input type = "Submit">
+                            
                             </form>
+
+
                         </div>
-                        <div class="col-xl-4 col-lg-4 col-md-12 mx-auto mb-4">
-                            <div class="tm-product-img-dummy mx-auto">
-                                <i class="fas fa-5x fa-cloud-upload-alt" onclick="document.getElementById('fileInput').click();"></i>
-                            </div>
-                            <div class="custom-file mt-3 mb-3">
-                                <input id="fileInput" type="file" style="display:none;" />
-                                <input type="button" class="btn btn-primary d-block mx-auto" value="Upload ..." onclick="document.getElementById('fileInput').click();"
-                                />
-                            </div>
+                        
                         </div>
                     </div>
                 </div>
