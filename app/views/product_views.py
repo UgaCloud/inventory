@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from app.forms.product_forms import ProductForm
 from app.selectors.product_selectors import get_all_products, get_product_by_id
 from app.selectors.category_selectors import get_all_categories
+from app.models import Inventory
 
 
 
@@ -40,3 +41,21 @@ def delete_product_view(request, product_id):
     product = get_product_by_id(product_id)
     product.delete()
     return redirect(manage_product_view)
+
+def edit_product_view(request, product_id):
+
+    product = get_product_by_id(product_id)
+
+    if request.method == "POST":
+        edit_form = ProductForm(request.POST, instance = product)
+        
+        if edit_form.is_valid():
+            edit_form.save()
+            return redirect(manage_product_view)
+    else:
+        edit_form = ProductForm(instance = product)
+
+    context = {
+        'edit_form':edit_form
+    }
+    return render(request, 'edit_product.html', context)

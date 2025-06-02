@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Login Page - Dashboard Admin Template</title>
+    <title>Sign Up Page - Dashboard Admin Template</title>
     <!--
 
     Template 2108 Dashboard
@@ -31,7 +31,7 @@
                     <div class="row">
                         <div class="col-12 text-center">
                             <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
-                            <h2 class="tm-block-title mt-3">Login</h2>
+                            <h2 class="tm-block-title mt-3">Sign Up</h2>
                         </div>
                     </div>
                     <div class="row mt-2">
@@ -40,9 +40,10 @@
                             
                             <form action="" method="post" class="tm-login-form">
                             {% csrf_token %}
-                                   {{form|crispy}}                                 
-                                <button type = 'submit'>Login</button>
-                                <div alignment = 'center'><a href="{% url 'sign_up_page' %}">Sign up</a></div>
+                                   {{form|crispy}}
+                                   {{message}}
+                                   <button type="submit">Sign Up</button>
+                                   <div><a href="{% url 'login_page' %}">Login</a></div>
                             </form>
 
 

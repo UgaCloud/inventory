@@ -2,10 +2,10 @@ from django.contrib import admin
 from django.urls import path
 
 from .views.general_views import index_view
-from .views.product_views import manage_product_view, add_product_view, delete_product_view
+from .views.product_views import manage_product_view, add_product_view, delete_product_view, edit_product_view
 from .views.accounts_views import manage_accounts_view
 from .views.category_views import add_category_view, delete_category_view
-from .views.general_views import login_view
+from .views.general_views import login_view, sign_up_view
 
 
 urlpatterns = [
@@ -17,5 +17,7 @@ urlpatterns = [
     path('delete_products/<int:product_id>/', delete_product_view, name = 'delete_product'),
     path('delete_category/<int:category_id>/',delete_category_view, name = 'delete_category'),
     path('login/', login_view, name = 'login_page'),
+    path('sign_up/', sign_up_view, name = 'sign_up_page'),
+    path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page')
 
 ]

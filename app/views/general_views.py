@@ -1,11 +1,16 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib import messages
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from app.selectors.product_selectors import get_all_products
+
 
 
 def index_view(request):
-    return render(request, 'index.html')
+    products = get_all_products()
+    context = {
+        'products':products
+    }
+    return render(request, 'index.html', context)
 
 def login_view(request):
 
@@ -25,3 +30,21 @@ def login_view(request):
     }
 
     return render(request, 'registration/login.html', context)
+
+def sign_up_view(request):
+    message = ''
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
+
+        if form.is_valid():
+            form.save()
+            message = 'Data has been succeefully stored in the database'
+            return redirect(login_view)
+    else:
+        form = UserCreationForm()
+
+    context = {
+        'form':form,
+        'message':message
+    }
+    return render(request, 'registration/sign_up.html', context)
