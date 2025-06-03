@@ -95,4 +95,3 @@ class Inventory(models.Model):
     @property
     def is_below_reorder(self):
         return self.quantity_in_stock <= self.reorder_level
-

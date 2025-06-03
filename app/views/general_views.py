@@ -1,4 +1,50 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.contrib.auth import login
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from app.selectors.product_selectors import get_all_products
+
+
 
 def index_view(request):
-    return render(request, 'index.html')
+    products = get_all_products()
+    context = {
+        'products':products
+    }
+    return render(request, 'index.html', context)
+
+def login_view(request):
+
+    if request.method == "POST":
+        form = AuthenticationForm(request, data=request.POST)
+
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            return redirect(index_view)
+
+    else:
+        form = AuthenticationForm()
+
+    context = {
+        'form':form
+    }
+
+    return render(request, 'registration/login.html', context)
+
+def sign_up_view(request):
+    message = ''
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
+
+        if form.is_valid():
+            form.save()
+            message = 'Data has been succeefully stored in the database'
+            return redirect(login_view)
+    else:
+        form = UserCreationForm()
+
+    context = {
+        'form':form,
+        'message':message
+    }
+    return render(request, 'registration/sign_up.html', context)
