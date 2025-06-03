@@ -1,0 +1,5 @@
+0000000000000000000000000000000000000000 08818283136e55d0e4633482b711747907d34573 mayanjer <mayanjer3@gmail.com> 1748710366 +0300	clone: from https://github.com/UgaCloud/inventory.git
+08818283136e55d0e4633482b711747907d34573 b2403eaf6e98c4c7becdfad633bbb5e7ece50aa4 mayanjer <mayanjer3@gmail.com> 1748765670 +0300	commit: created a table
+b2403eaf6e98c4c7becdfad633bbb5e7ece50aa4 e136768bc1e617333b187fcb77f29a5138e8371e mayanjer <mayanjer3@gmail.com> 1748778571 +0300	commit: worked on deleting links
+e136768bc1e617333b187fcb77f29a5138e8371e 3938187499fcbd2c4a701603c68472fa3efe59e3 mayanjer <mayanjer3@gmail.com> 1748791938 +0300	commit: added a login functionality
+3938187499fcbd2c4a701603c68472fa3efe59e3 4d0061462c0067d66c612405c423f797e2b0d6f7 mayanjer <mayanjer3@gmail.com> 1748850844 +0300	commit: done the update part of CRUD
