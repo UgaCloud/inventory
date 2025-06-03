@@ -9,7 +9,7 @@
                     <div class="row">
                         <div class="col-12 text-center">
                             <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
-                            <h2 class="tm-block-title mt-3">Units Of Measurement</h2>
+                            <h2 class="tm-block-title mt-3">Supplier Details</h2>
                         </div>
                     </div>
                     <div class="row mt-2">
@@ -27,29 +27,24 @@
                                 <thead>
                                     
                                     <tr class="tm-bg-gray">
-                                        <th scope="col">&nbsp;</th>
-                                        <th scope="col">&nbsp;</th>
-                                        <th scope="col" class="text-center">Unit Of Measurement</th>
-                                        <th scope="col">&nbsp;</th>
+
                                         
-                                        <th scope="col" class="text-center">Abbreviation</th>
+                                        <th scope="col" class="text-center">Name</th>
+                                        <th scope="col" class="text-center">Contact</th>
+                                        <th scope="col" class="text-center">Address</th>
                                                                               
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for unit_of_measurement in units_of_measurement %}
+                                    {% for supplier in suppliers %}
                                     <tr>
                                         
-                                        <td>{{unit_of_measurement.id}}. </td>
-                                        <th scope="row">
-                                            <td>{{unit_of_measurement.name}}</td>
-                                        </th>
+                                            <td>{{supplier.name}}</td>
 
-                                        <th scope="row">
-                                            <td>{{unit_of_measurement.abbreviation}}
-                                                <div><a href="#">Edit</a></div>
-                                            </td>
-                                        </th>
+                                            <td>{{supplier.phone}}</td>
+
+                                            <td>{{supplier.address}}</td>
+                                        
                                     </tr>
                                     {% endfor %}
                                 </tbody>
