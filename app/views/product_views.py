@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 
-from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm
+from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm, ProductUnitPriceForm
 from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement
 
 
@@ -35,11 +35,6 @@ def add_product_view(request):
     }
 
     return render(request, 'add_product.html', context)
-
-def delete_product_view(request, product_id):
-    product = get_product_by_id(product_id)
-    product.delete()
-    return redirect(manage_product_view)
 
 def edit_product_view(request, product_id):
 
@@ -97,6 +92,17 @@ def unit_of_measure_view(request):
         'units_of_measurement':units_of_measurement
     }
     
-    
-
     return render(request, 'unit_of_measure.html', context)
+
+def product_details_view(request):
+    if request.method == "POST":
+        form = ProductUnitPriceForm(request.POST)
+        if form.is_valid():
+            form.save()
+    else:
+        form = ProductUnitPriceForm()
+
+    context = {
+        'form':form
+    }
+    return render(request, 'product_details.html', context)

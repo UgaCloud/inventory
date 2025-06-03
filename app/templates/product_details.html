@@ -9,35 +9,52 @@
                     <div class="row">
                         <div class="col-12 text-center">
                             <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
-                            <h2 class="tm-block-title mt-3">Supplier Details</h2>
+                            <h2 class="tm-block-title mt-3">Product Details</h2>
                         </div>
                     </div>
                     <div class="row mt-2">
-                        <div class="col-12">                          
+                        <div class="col-12">
+
+                            
                             <form action="" method="post" class="tm-login-form">
                             {% csrf_token %}
                                    {{form|crispy}}                                 
                                 <input type = 'submit'></input>
                                 
-                            </form>                           
+                            </form>
+                            
                              <table class="table table-hover table-striped tm-table-striped-even mt-3">
-                                <thead>                                   
+                                <thead>
+                                    
                                     <tr class="tm-bg-gray">
-                                        <th scope="col" class="text-center">Name</th>
-                                        <th scope="col" class="text-center">Contact</th>
-                                        <th scope="col" class="text-center">Address</th>
+                                        <th scope="col">&nbsp;</th>
+                                        <th scope="col">&nbsp;</th>
+                                        <th scope="col" class="text-center">Unit</th>
+                                        
+                                        
+                                        <th scope="col" class="text-center">Price</th>
+                                        <th scope="col" class="text-center">Conversion Factor</th>
                                                                               
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for supplier in suppliers %}
+                                    {% for unit_of_measurement in units_of_measurement %}
                                     <tr>
-                                            <td>{{supplier.name}}</td>
-                                            <td>{{supplier.phone}}</td>
-                                            <td>{{supplier.address}}</td>    
+                                        
+                                        <td>{{unit_of_measurement.id}}. </td>
+                                        <th scope="row">
+                                            <td>{{unit_of_measurement.name}}</td>
+                                        </th>
+
+                                        <th scope="row">
+                                            <td>{{unit_of_measurement.abbreviation}}
+                                                <div><a href="#">Edit</a></div>
+                                            </td>
+                                        </th>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
+
                                 </form>
                             </table>
 
