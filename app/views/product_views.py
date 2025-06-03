@@ -1,9 +1,8 @@
 from django.shortcuts import render, redirect
 
-from app.forms.product_forms import ProductForm, CategoryForm
-from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories
+from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm
+from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement
 
-from app.models import Inventory
 
 
 
@@ -80,3 +79,24 @@ def delete_category_view(request, category_id):
     category = get_category_by_id(category_id)
     category.delete()
     return redirect(manage_product_view)
+
+def unit_of_measure_view(request):
+
+    if request.method == 'POST':
+        form = UnitOfMeasureForm(request.POST)
+
+        if form.is_valid():
+            form.save()
+    else:
+        form = UnitOfMeasureForm()
+
+    units_of_measurement = get_all_units_of_measurement()
+    
+    context = {
+        'form':form,
+        'units_of_measurement':units_of_measurement
+    }
+    
+    
+
+    return render(request, 'unit_of_measure.html', context)

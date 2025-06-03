@@ -1,5 +1,4 @@
 from django.forms import ModelForm
-from django import forms
 from app.models.products import Product, Category, UnitOfMeasure
 
 class UnitOfMeasureForm(ModelForm):
