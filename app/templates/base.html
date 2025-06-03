@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Accounts Page - Dashboard Template</title>
+    <title>Inventory</title>
     <!--
 
     Template 2108 Dashboard
@@ -43,22 +43,24 @@
                                 </a>
                             </li>
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="{% url 'index_page' %}" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true"
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true"
                                     aria-expanded="false">
-                                    Reports
+                                    Admin
                                 </a>
                                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                                    <a class="dropdown-item" href="#">Daily Report</a>
-                                    <a class="dropdown-item" href="#">Weekly Report</a>
-                                    <a class="dropdown-item" href="{% url 'index_page' %}">Yearly Report</a>
+                                    <a class="dropdown-item" href="#">Unit Of Measure</a>
+                                    <a class="dropdown-item" href="#">Store</a>
+                                    <a class="dropdown-item" href="{% url 'products_page' %}">Products</a>
+                                    <a class="dropdown-item" href="#">Suppliers</a>
+                                    <a class="dropdown-item" href="#">Customers</a>
                                 </div>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'products_page' %}">Products</a>
+                                <a class="nav-link" href="#">Transactions</a>
                             </li>
 
-                            <li class="nav-item active">
-                                <a class="nav-link" href="#">Accounts</a>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'accounts_page' %}">Accounts</a>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true"
@@ -93,6 +95,16 @@
     <!-- https://jquery.com/download/ -->
     <script src="/static/js/bootstrap.min.js"></script>
     <!-- https://getbootstrap.com/ -->
+
+    <footer class="row tm-mt-big">
+            <div class="col-12 font-weight-light">
+                <p class="d-inline-block tm-bg-black text-white py-2 px-4">
+                    Copyright &copy; 2018 Admin Dashboard . Created by
+                    <a rel="nofollow" href="https://www.tooplate.com" class="text-white tm-footer-link">Tooplate</a>
+                </p>
+            </div>
+        </footer>
+    </div>
 </body>
 
 </html>
