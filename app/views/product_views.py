@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
 
-from app.forms.product_forms import ProductForm
-from app.selectors.product_selectors import get_all_products, get_product_by_id
-from app.selectors.category_selectors import get_all_categories
+from app.forms.product_forms import ProductForm, CategoryForm
+from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories
+
 from app.models import Inventory
 
 
@@ -59,3 +59,24 @@ def edit_product_view(request, product_id):
         'edit_form':edit_form
     }
     return render(request, 'edit_product.html', context)
+
+def add_category_view(request):
+    if request.method == "POST":
+        form = CategoryForm(request.POST)
+
+        if form.is_valid():
+            form.save()
+            return redirect(manage_product_view)
+    else:
+        form = CategoryForm()
+
+    context = {
+        'form':form
+    }
+
+    return render(request, 'add_category.html', context)
+
+def delete_category_view(request, category_id):
+    category = get_category_by_id(category_id)
+    category.delete()
+    return redirect(manage_product_view)

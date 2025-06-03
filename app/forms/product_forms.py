@@ -1,6 +1,11 @@
 from django.forms import ModelForm
 from django import forms
-from app.models.products import Product, Category
+from app.models.products import Product, Category, UnitOfMeasure
+
+class UnitOfMeasureForm(ModelForm):
+    class Meta:
+        model = UnitOfMeasure
+        fields = ("__all__")
 
 class ProductForm(ModelForm):
     class Meta:
