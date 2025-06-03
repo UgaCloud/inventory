@@ -28,7 +28,7 @@
                                     
                                     <tr class="tm-bg-gray">
                                         <th scope="col">&nbsp;</th>
-                                        <th scope="col">&nbsp;</th>
+                                        
                                         <th scope="col" class="text-center">Unit</th>
                                         
                                         
@@ -38,19 +38,18 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for unit_of_measurement in units_of_measurement %}
+                                    {% for unit_price in unit_prices %}
                                     <tr>
+                                        <td scope="row">&nbsp;</td>
+                                        <td>{{unit_price.name}}</td>
                                         
-                                        <td>{{unit_of_measurement.id}}. </td>
-                                        <th scope="row">
-                                            <td>{{unit_of_measurement.name}}</td>
-                                        </th>
+                                            <td>{{unit_price.price}}</td>
+                                        
 
-                                        <th scope="row">
-                                            <td>{{unit_of_measurement.abbreviation}}
-                                                <div><a href="#">Edit</a></div>
+                                        
+                                            <td>{{unit_price.conversion_factor}}
                                             </td>
-                                        </th>
+                                        
                                     </tr>
                                     {% endfor %}
                                 </tbody>

@@ -1,4 +1,4 @@
-from app.models.products import Product, Category, UnitOfMeasure
+from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice
 
 #product selectors
 def get_all_products():
@@ -17,3 +17,6 @@ def get_all_categories():
 #unit of measurement selectors
 def get_all_units_of_measurement():
     return UnitOfMeasure.objects.all()
+
+def get_all_product_unit_prices():
+    return ProductUnitPrice.objects.all()

@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 
 from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm, ProductUnitPriceForm
-from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement
+from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement, get_all_product_unit_prices
 
 
 
@@ -102,7 +102,11 @@ def product_details_view(request):
     else:
         form = ProductUnitPriceForm()
 
+    unit_prices = get_all_product_unit_prices()
+    
+
     context = {
-        'form':form
+        'form':form,
+        'unit_prices': unit_prices,
     }
     return render(request, 'product_details.html', context)
