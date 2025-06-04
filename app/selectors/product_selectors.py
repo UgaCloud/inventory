@@ -18,5 +18,8 @@ def get_all_categories():
 def get_all_units_of_measurement():
     return UnitOfMeasure.objects.all()
 
+def get_unit_of_measurement_by_id(unit_id):
+    return UnitOfMeasure.objects.get(id = unit_id)
+
 def get_all_product_unit_prices():
     return ProductUnitPrice.objects.all()

@@ -38,20 +38,17 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for unit_price in unit_prices %}
+                                    {% for item in item_details %}
                                     <tr>
                                         <td scope="row">&nbsp;</td>
-                                        <td>{{unit_price.name}}</td>
+                                        <td scope="row">&nbsp;</td>
                                         
-                                            <td>{{unit_price.price}}</td>
-                                        
-
-                                        
-                                            <td>{{unit_price.conversion_factor}}
-                                            </td>
-                                        
+                                        <td>{{item.price}}</td>
+                                        <td>{{item.conversion_factor}}
+                                        </td>
                                     </tr>
                                     {% endfor %}
+                                    
                                 </tbody>
 
                                 </form>

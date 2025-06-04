@@ -33,7 +33,7 @@
                                         <td class = "text-center">{{product.total_stock}}</td>
                                         <th scope="row">
                                             <td>
-                                                <a href = "{% url 'product_details_page' %}" >Details</a> | 
+                                                <a href = "{% url 'product_details_page' product.id %}" >Details</a> | 
                                                 <a href = "{% url 'edit_product_page' product.id %}" > Edit</a>
                                             </td>
                                         </th>
