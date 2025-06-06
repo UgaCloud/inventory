@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 
 from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm, ProductUnitPriceForm
 from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement, get_all_product_unit_prices, get_unit_of_measurement_by_id
-from app.models.products import ProductUnitPrice
+from app.models.products import ProductUnitPrice, UnitOfMeasure
 
 
 
@@ -104,13 +104,10 @@ def product_details_view(request, _product_id):
         form = ProductUnitPriceForm()
 
     item = get_product_by_id(_product_id)
-    item_details = ProductUnitPrice.objects.filter(product_id = item.id)
-    
-    
-
+    item_details = ProductUnitPrice.objects.get(product_id = item.id) #I still dont understand how the unit was fetched from the UnitOfMeasure model
+        
     context = {
         'form':form,
-        'item_details':item_details
-        
+        'item_details':item_details    
     }
     return render(request, 'product_details.html', context)

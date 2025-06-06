@@ -38,16 +38,46 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for item in item_details %}
+                                    
                                     <tr>
                                         <td scope="row">&nbsp;</td>
-                                        <td scope="row">&nbsp;</td>
+                                        <td>{{item_details.unit.name}}</td><!--I dont understand how the unit is able to be referenced, i dont even know how django ia able to know what unit is-->
                                         
-                                        <td>{{item.price}}</td>
-                                        <td>{{item.conversion_factor}}
+                                        <td>{{item_details.price}}</td>
+                                        <td>{{item_details.conversion_factor}}
                                         </td>
                                     </tr>
-                                    {% endfor %}
+                                    
+                                    
+                                </tbody>
+
+                                </form>
+                            </table>
+
+                            <table class="table table-hover table-striped tm-table-striped-even mt-3">
+                                <thead>
+                                    
+                                    <tr class="tm-bg-gray">
+                                        <th scope="col">&nbsp;</th>
+                                        
+                                        <th scope="col" class="text-center">Store</th>
+                                        
+                                        
+                                        <th scope="col" class="text-center">In Stock</th>
+                                        <th scope="col" class="text-center">re-order level</th>
+                                                                              
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                    <tr>
+                                        <td scope="row">&nbsp;</td>
+                                        <td>item</td>
+                                    
+                                        <td>item</td>
+                                        <td>item</td>
+                                    </tr>
+                                    
                                     
                                 </tbody>
 
