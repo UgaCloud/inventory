@@ -55,7 +55,7 @@
                                     </a>
                                     <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                                         <a class="dropdown-item" href="{% url 'unit_of_measure_page' %}">Unit Of Measure</a>
-                                        <a class="dropdown-item" href="#">Store</a>
+                                        <a class="dropdown-item" href="{% url 'store_page' %}">Store</a>
                                         <a class="dropdown-item" href="{% url 'products_page' %}">Products</a>
                                         <a class="dropdown-item" href="{% url 'supplier_page' %}">Suppliers</a>
                                         <a class="dropdown-item" href="#">Customers</a>
@@ -100,12 +100,11 @@
                     </nav>
                 </div>
             </div>
-{% block content %}
+
+{% block content %}  {% endblock %}
 
 
-{% endblock %}
-
-    <script src="/static/js/jquery-3.3.1.min.js"></script>
+ <script src="/static/js/jquery-3.3.1.min.js"></script>
     <!-- https://jquery.com/download/ -->
     <script src="/static/js/bootstrap.min.js"></script>
     <!-- https://getbootstrap.com/ -->

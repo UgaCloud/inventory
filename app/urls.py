@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path
 
 from .views.general_views import index_view
-from .views.product_views import manage_product_view, delete_category_view, add_product_view,add_category_view, edit_product_view, unit_of_measure_view, product_details_view
+from .views.product_views import manage_product_view, delete_category_view, add_product_view,add_category_view, edit_product_view, unit_of_measure_view, product_details_view,inventory_view, store_view
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import login_view, sign_up_view
 from .views.supplier_views import supplier_view
@@ -21,6 +21,8 @@ urlpatterns = [
     path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
     path('unit_of_measure/', unit_of_measure_view, name = 'unit_of_measure_page'),
     path('supplier/', supplier_view, name = 'supplier_page'),
-    path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page')
+    path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
+    path('invenory/', inventory_view, name = 'inventory_page'),
+    path('store/', store_view, name = 'store_page'),
 
 ]

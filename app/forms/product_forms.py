@@ -1,5 +1,5 @@
 from django.forms import ModelForm
-from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice
+from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice, Inventory, StoreLocation
 
 class UnitOfMeasureForm(ModelForm):
     class Meta:
@@ -21,3 +21,12 @@ class ProductUnitPriceForm(ModelForm):
         model = ProductUnitPrice
         fields = ("__all__")
 
+class InventoryForm(ModelForm):
+    class Meta:
+        model = Inventory
+        fields = ("__all__")
+
+class StoreLocationForm(ModelForm):
+    class Meta:
+        model = StoreLocation
+        fields = ("__all__")
