@@ -9,7 +9,7 @@
                     <div class="row">
                         <div class="col-12 text-center">
                             <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
-                            <h2 class="tm-block-title mt-3">Inventory</h2>
+                            <h2 class="tm-block-title mt-3">Customers</h2>
                         </div>
                     </div>
                     <div class="row mt-2">
@@ -29,32 +29,30 @@
                                     <tr class="tm-bg-gray">
                                         <th scope="col">&nbsp;</th>
                                         
-                                        <th scope="col" class="text-center">Store</th>
+                                        <th scope="col" class="text-center">Name</th>
                                         
                                         
-                                        <th scope="col" class="text-center">In Stock</th>
-                                        <th scope="col" class="text-center">re-order level</th>
+                                        <th scope="col" class="text-center">Contact</th>
+                                        <th scope="col" class="text-center">Address</th>
                                                                               
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    
-                                    {% for product in product_details %}
+                                    {% for customer in customers %}
                                     <tr>
                                         <td scope="row">&nbsp;</td>
+                                        <td>{{customer.name}}</td>
                                         
-                                        <td>{{product.store.name}}</td>
-                                        <td>{{product.quantity_in_stock}}</td>
-                                        <td>{{product.reorder_level}}</td>
+                                        <td>{{customer.phone}}</td>
+                                        <td>{{customer.address}}</td>
                                     </tr>
-                                    {% endfor %} 
-                                    
+                                    {% endfor %}
                                     
                                 </tbody>
 
                                 </form>
                             </table>
-                            
+                           
                             
 
                                 </form>

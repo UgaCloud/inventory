@@ -24,6 +24,4 @@ def get_unit_of_measurement_by_id(unit_id):
 def get_all_product_unit_prices():
     return ProductUnitPrice.objects.all()
 
-# Inventory selectors
-def get_all_products_in_inventory():
-    return Inventory.objects.all()
+

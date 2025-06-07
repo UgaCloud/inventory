@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 
 from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm, ProductUnitPriceForm, InventoryForm, StoreLocationForm
-from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement, get_all_product_unit_prices, get_unit_of_measurement_by_id, get_all_products_in_inventory 
+from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement
 from app.models.products import ProductUnitPrice, StoreLocation, Inventory
 
 
@@ -130,7 +130,7 @@ def inventory_view(request):
 
     context = {
         'form':form,
-        'products_in_inventory':product_details,
+        'product_details':product_details,
     }
     return render(request, 'inventory.html', context)
 
