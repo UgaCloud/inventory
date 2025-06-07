@@ -22,7 +22,7 @@ urlpatterns = [
     path('unit_of_measure/', unit_of_measure_view, name = 'unit_of_measure_page'),
     path('supplier/', supplier_view, name = 'supplier_page'),
     path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
-    path('invenory/', inventory_view, name = 'inventory_page'),
+    path('inventory/', inventory_view, name = 'inventory_page'),
     path('store/', store_view, name = 'store_page'),
 
 ]

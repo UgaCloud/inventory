@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
 
 from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm, ProductUnitPriceForm, InventoryForm, StoreLocationForm
-from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement, get_all_product_unit_prices, get_unit_of_measurement_by_id
-from app.models.products import ProductUnitPrice
+from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement, get_all_product_unit_prices, get_unit_of_measurement_by_id, get_all_products_in_inventory 
+from app.models.products import ProductUnitPrice, StoreLocation, Inventory
 
 
 
@@ -120,9 +120,17 @@ def inventory_view(request):
             form.save()
     else:
         form = InventoryForm()
+    
+    product_details = []
+    for item_id in Inventory.objects.values_list('store_id', flat = True):
+        store_detail  = StoreLocation.objects.get(id = item_id)
+        product = Inventory.objects.get(id = store_detail.id)
+        product_details.append(product)
+    
 
     context = {
-        'form':form
+        'form':form,
+        'products_in_inventory':product_details,
     }
     return render(request, 'inventory.html', context)
 
@@ -134,7 +142,9 @@ def store_view(request):
             form.save()
     else:
         form = StoreLocationForm()
+
     context = {
-        'form':form
+        'form':form,
+        
     }
     return render(request, 'store.html', context)
