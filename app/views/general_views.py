@@ -52,6 +52,7 @@ def sign_up_view(request):
     }
     return render(request, 'registration/sign_up.html', context)
 
+#class based view to handle deletions from the supplier and stock transfer models
 class DeleteMultipleSuppliers(View):
     def post(self, request):
         selected_ids = request.POST.getlist('selected_items')
