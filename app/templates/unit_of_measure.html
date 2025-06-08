@@ -1,0 +1,65 @@
+{% extends './base.html' %}
+{% load crispy_forms_tags %}
+{% block content%}
+    <body class="bg03">
+    <div class="container">
+        <div class="row tm-mt-big">
+            <div class="col-12 mx-auto tm-login-col">
+                <div class="bg-white tm-block">
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
+                            <h2 class="tm-block-title mt-3">Units Of Measurement</h2>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+
+                            
+                            <form action="" method="post" class="tm-login-form">
+                            {% csrf_token %}
+                                   {{form|crispy}}                                 
+                                <input type = 'submit'></input>
+                                
+                            </form>
+                            
+                             <table class="table table-hover table-striped tm-table-striped-even mt-3">
+                                <thead>
+                                    
+                                    <tr class="tm-bg-gray">
+                                        <th scope="col">&nbsp;</th>
+                                        <th scope="col">&nbsp;</th>
+                                        <th scope="col" class="text-center">Unit Of Measurement</th>
+                                        <th scope="col">&nbsp;</th>
+                                        
+                                        <th scope="col" class="text-center">Abbreviation</th>
+                                                                              
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for unit_of_measurement in units_of_measurement %}
+                                    <tr>
+                                        
+                                        <td>{{unit_of_measurement.id}}. </td>
+                                        <th scope="row">
+                                            <td>{{unit_of_measurement.name}}</td>
+                                        </th>
+
+                                        <th scope="row">
+                                            <td>{{unit_of_measurement.abbreviation}}
+                                                <div><a href="#">Edit</a></div>
+                                            </td>
+                                        </th>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+
+                                </form>
+                            </table>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+{% endblock %}

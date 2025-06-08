@@ -1,0 +1,69 @@
+{% extends './base.html' %}
+
+{% load crispy_forms_tags %}
+{% block content%}
+    <body class="bg03">
+    <div class="container">
+        <div class="row tm-mt-big">
+            <div class="col-12 mx-auto tm-login-col">
+                <div class="bg-white tm-block">
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
+                            <h2 class="tm-block-title mt-3">Purchase Order</h2>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+
+                            
+                            <form action="" method="post" class="tm-login-form">
+                            {% csrf_token %}
+                                   {{form|crispy}}                                 
+                                <input type = 'submit'></input>
+                                
+                            </form>
+                            
+                             <table class="table table-hover table-striped tm-table-striped-even mt-3">
+                                <thead>
+                                    
+                                    <tr class="tm-bg-gray">
+                                        <th scope="col">&nbsp;</th>
+                                        
+                                        <th scope="col" class="text-center">Supplier</th>
+                                        
+                                        
+                                        <th scope="col" class="text-center">Status</th>
+                                        <th scope="col" class="text-center">Recorded by</th>
+                                                                              
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                    {% for order in orders %}
+                                    <tr>
+                                        <td scope="row">&nbsp;</td>
+                                        
+                                        <td>{{order.supplier}}</td>
+                                        <td>{{order.status}}</td>
+                                        <td>{{order.recorded_by}}</td>
+                                    </tr>
+                                    {% endfor %} 
+                                    
+                                    
+                                </tbody>
+
+                                </form>
+                            </table>
+                            
+                            
+
+                                </form>
+                            </table>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+{% endblock %}

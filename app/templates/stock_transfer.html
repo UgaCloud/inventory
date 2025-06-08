@@ -1,0 +1,72 @@
+{% extends './base.html' %}
+
+{% load crispy_forms_tags %}
+{% block content%}
+    <body class="bg03">
+    <div class="container">
+        <div class="row tm-mt-big">
+            <div class="col-12 mx-auto tm-login-col">
+                <div class="bg-white tm-block">
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
+                            <h2 class="tm-block-title mt-3">Stock Transfer</h2>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+
+                            
+                            <form action="" method="post" class="tm-login-form">
+                            {% csrf_token %}
+                                   {{form|crispy}}                                 
+                                <input type = 'submit'></input>
+                                
+                            </form>
+                            
+                             <table class="table table-hover table-striped tm-table-striped-even mt-3">
+                                <thead>
+                                    
+                                    <tr class="tm-bg-gray">
+                                        <th scope="col">&nbsp;</th>
+                                        <th scope="col">&nbsp;</th>
+                                        
+                                        <th scope="col" class="text-center">Product</th>
+                                        
+                                        
+                                        <th scope="col" class="text-center">From - To</th>
+                                        <th scope="col" class="text-center">Quantity</th>
+                                                                              
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <form method = "post" action="{% url 'delete_multiple' %}">
+                                        {% csrf_token %}
+                                        {% for stock_transfer in stock_transfers %}
+                                        <tr>
+                                            <td scope="row">&nbsp;</td>
+                                            <td><input type="checkbox" name = "selected_items" value = {{stock_transfer.id}}></td>
+                                            <td>{{stock_transfer.product}}</td>
+                                            <td>{{stock_transfer.from_store}} - {{stock_transfer.to_store}}</td>
+                                            <td>{{stock_transfer.quantity}}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <button type = "submit">Delete selected</button> 
+                                    </form>
+                                    
+                                </tbody>
+
+                                
+                            </table>
+                            
+                            
+
+                                </form>
+                            </table>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+{% endblock %}
