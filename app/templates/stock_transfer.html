@@ -1,0 +1,69 @@
+{% extends './base.html' %}
+
+{% load crispy_forms_tags %}
+{% block content%}
+    <body class="bg03">
+    <div class="container">
+        <div class="row tm-mt-big">
+            <div class="col-12 mx-auto tm-login-col">
+                <div class="bg-white tm-block">
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
+                            <h2 class="tm-block-title mt-3">Stock Transfer</h2>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+
+                            
+                            <form action="" method="post" class="tm-login-form">
+                            {% csrf_token %}
+                                   {{form|crispy}}                                 
+                                <input type = 'submit'></input>
+                                
+                            </form>
+                            
+                             <table class="table table-hover table-striped tm-table-striped-even mt-3">
+                                <thead>
+                                    
+                                    <tr class="tm-bg-gray">
+                                        <th scope="col">&nbsp;</th>
+                                        
+                                        <th scope="col" class="text-center">Store</th>
+                                        
+                                        
+                                        <th scope="col" class="text-center">In Stock</th>
+                                        <th scope="col" class="text-center">re-order level</th>
+                                                                              
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                    {% for product in product_details %}
+                                    <tr>
+                                        <td scope="row">&nbsp;</td>
+                                        
+                                        <td>{{product.store.name}}</td>
+                                        <td>{{product.quantity_in_stock}}</td>
+                                        <td>{{product.reorder_level}}</td>
+                                    </tr>
+                                    {% endfor %} 
+                                    
+                                    
+                                </tbody>
+
+                                </form>
+                            </table>
+                            
+                            
+
+                                </form>
+                            </table>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+{% endblock %}

@@ -7,6 +7,7 @@ from .views.accounts_views import manage_accounts_view
 from .views.general_views import login_view, sign_up_view
 from .views.supplier_views import supplier_view
 from .views.customer_view import customer_view
+from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
 
 
 
@@ -26,4 +27,8 @@ urlpatterns = [
     path('inventory/', inventory_view, name = 'inventory_page'),
     path('store/', store_view, name = 'store_page'),
     path('customers/', customer_view, name = 'customer_page'),
+    path('purchase/', purchase_order_view, name = 'purchase_order_page'),
+    path('sales/', sales_view, name = 'sales_page'),
+    path('stock_transfer/', stock_transfer_view, name = 'stock_transfer_page'),
+
 ]
