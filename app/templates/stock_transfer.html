@@ -29,31 +29,34 @@
                                     
                                     <tr class="tm-bg-gray">
                                         <th scope="col">&nbsp;</th>
+                                        <th scope="col">&nbsp;</th>
                                         
-                                        <th scope="col" class="text-center">Store</th>
+                                        <th scope="col" class="text-center">Product</th>
                                         
                                         
-                                        <th scope="col" class="text-center">In Stock</th>
-                                        <th scope="col" class="text-center">re-order level</th>
+                                        <th scope="col" class="text-center">From - To</th>
+                                        <th scope="col" class="text-center">Quantity</th>
                                                                               
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    
-                                    {% for product in product_details %}
-                                    <tr>
-                                        <td scope="row">&nbsp;</td>
-                                        
-                                        <td>{{product.store.name}}</td>
-                                        <td>{{product.quantity_in_stock}}</td>
-                                        <td>{{product.reorder_level}}</td>
-                                    </tr>
-                                    {% endfor %} 
-                                    
+                                    <form method = "post" action="{% url 'delete_multiple' %}">
+                                        {% csrf_token %}
+                                        {% for stock_transfer in stock_transfers %}
+                                        <tr>
+                                            <td scope="row">&nbsp;</td>
+                                            <td><input type="checkbox" name = "selected_items" value = {{stock_transfer.id}}></td>
+                                            <td>{{stock_transfer.product}}</td>
+                                            <td>{{stock_transfer.from_store}} - {{stock_transfer.to_store}}</td>
+                                            <td>{{stock_transfer.quantity}}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <button type = "submit">Delete selected</button> 
+                                    </form>
                                     
                                 </tbody>
 
-                                </form>
+                                
                             </table>
                             
                             

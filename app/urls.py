@@ -4,7 +4,7 @@ from django.urls import path
 from .views.general_views import index_view
 from .views.product_views import manage_product_view, delete_category_view, add_product_view,add_category_view, edit_product_view, unit_of_measure_view, product_details_view,inventory_view, store_view
 from .views.accounts_views import manage_accounts_view
-from .views.general_views import login_view, sign_up_view
+from .views.general_views import login_view, sign_up_view, DeleteMultipleSuppliers
 from .views.supplier_views import supplier_view
 from .views.customer_view import customer_view
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
@@ -30,5 +30,6 @@ urlpatterns = [
     path('purchase/', purchase_order_view, name = 'purchase_order_page'),
     path('sales/', sales_view, name = 'sales_page'),
     path('stock_transfer/', stock_transfer_view, name = 'stock_transfer_page'),
+    path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple')
 
 ]

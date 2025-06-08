@@ -2,6 +2,9 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from app.selectors.product_selectors import get_all_products
+from django.views.generic import View
+from app.models.suppliers import Supplier
+from app.models.transactions import StockTransfer
 
 
 
@@ -48,3 +51,16 @@ def sign_up_view(request):
         'message':message
     }
     return render(request, 'registration/sign_up.html', context)
+
+class DeleteMultipleSuppliers(View):
+    def post(self, request):
+        selected_ids = request.POST.getlist('selected_items')
+
+        if selected_ids:
+            Supplier.objects.filter(id__in = selected_ids).delete()
+            StockTransfer.objects.filter(id__in = selected_ids).delete()
+            
+        return redirect(request.META.get('HTTP_REFERER')) # redirect to where the request came from
+
+        
+        

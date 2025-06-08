@@ -30,23 +30,23 @@
                                     <tr class="tm-bg-gray">
                                         <th scope="col">&nbsp;</th>
                                         
-                                        <th scope="col" class="text-center">Store</th>
+                                        <th scope="col" class="text-center">Customer</th>
                                         
                                         
-                                        <th scope="col" class="text-center">In Stock</th>
-                                        <th scope="col" class="text-center">re-order level</th>
+                                        <th scope="col" class="text-center">Status</th>
+                                        <th scope="col" class="text-center">Recorded By</th>
                                                                               
                                     </tr>
                                 </thead>
                                 <tbody>
                                     
-                                    {% for product in product_details %}
+                                    {% for sale in sales %}
                                     <tr>
                                         <td scope="row">&nbsp;</td>
                                         
-                                        <td>{{product.store.name}}</td>
-                                        <td>{{product.quantity_in_stock}}</td>
-                                        <td>{{product.reorder_level}}</td>
+                                        <td>{{sale.customer}}</td>
+                                        <td>{{sale.status}}</td>
+                                        <td>{{sale.recorded_by}}</td>
                                     </tr>
                                     {% endfor %} 
                                     

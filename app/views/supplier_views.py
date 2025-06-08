@@ -1,7 +1,8 @@
 
 from django.shortcuts import render, redirect
-from app.forms.suppliers_form import SupplierForm
+from app.forms.suppliers_form import SupplierForm, Supplier
 from app.selectors.supplier_selectors import get_all_suppliers
+
 
 def supplier_view(request):
     if request.method == "POST":
@@ -18,3 +19,4 @@ def supplier_view(request):
          'suppliers':suppliers
      }
     return render(request, 'supplier.html', context)
+
