@@ -104,7 +104,7 @@ def product_details_view(request, _product_id):
         form = ProductUnitPriceForm()
 
     item = get_product_by_id(_product_id)
-    item_details = ProductUnitPrice.objects.get(product_id = item.id) #I still dont understand how the unit was fetched from the UnitOfMeasure model
+    item_details = ProductUnitPrice.objects.filter(product_id = item.id) #I still dont understand how the unit was fetched from the UnitOfMeasure model
         
     context = {
         'form':form,

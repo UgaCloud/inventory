@@ -38,15 +38,16 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    
+                                    {% for item in item_details %}
                                     <tr>
                                         <td scope="row">&nbsp;</td>
-                                        <td>{{item_details.unit.name}}</td><!--I dont understand how the unit is able to be referenced, i dont even know how django ia able to know what unit is-->
+                                        <td>{{item.unit.name}}</td><!--I dont understand how the unit is able to be referenced, i dont even know how django ia able to know what unit is-->
                                         
-                                        <td>{{item_details.price}}</td>
-                                        <td>{{item_details.conversion_factor}}
+                                        <td>{{item.price}}</td>
+                                        <td>{{item.conversion_factor}}
                                         </td>
                                     </tr>
+                                    {% endfor %}
                                     
                                     
                                 </tbody>
