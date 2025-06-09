@@ -34,7 +34,7 @@ def sales_view(request):
         'form':form,
         'sales':sales
     }
-    return render(request, 'sales.html', context)
+    return render(request, 'sales_list.html', context)
 
 def stock_transfer_view(request):
     if request.method == "POST":
@@ -52,3 +52,19 @@ def stock_transfer_view(request):
         'stock_transfers':stock_transfers
     }
     return render(request, 'stock_transfer.html', context)
+
+#newly created
+def pos_view(request):
+    return render(request, 'pos.html')
+
+def sales_return_view(request):
+    return render(request, 'sales_return_list.html')
+
+def create_sales_return_view(request):
+    return render(request, 'create_sales_return.html')
+
+def purchase_list_view(request):
+    return render(request, 'purchase_list.html')
+
+def add_purchase_view(request):
+    return render(request, 'add_purchase.html')
