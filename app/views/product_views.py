@@ -6,7 +6,7 @@ from app.models.products import ProductUnitPrice, StoreLocation, Inventory
 
 
 
-
+# manage products
 def manage_product_view(request):
     product_form = ProductForm()
 
