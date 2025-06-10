@@ -2,11 +2,11 @@ from django.contrib import admin
 from django.urls import path
 
 from .views.general_views import index_view
-from .views.product_views import manage_product_view, delete_category_view, add_product_view,add_category_view, edit_product_view, unit_of_measure_view, product_details_view,inventory_view, store_view
+from .views.product_views import manage_product_view, delete_category_view, add_product_view,add_category_view, edit_product_view, unit_of_measure_view, add_store_view, product_details_view,inventory_view, store_list_view
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import login_view, sign_up_view, DeleteMultipleSuppliers
-from .views.supplier_views import supplier_view
-from .views.customer_view import customer_view
+from .views.supplier_views import supplier_view, add_supplier_view
+from .views.customer_view import customer_view, add_customer_view
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view, pos_view, sales_return_view, create_sales_return_view, purchase_list_view, add_purchase_view
 
 
@@ -22,10 +22,10 @@ urlpatterns = [
     #path('delete_category/<int:category_id>/',delete_category_view, name = 'delete_category'),
     #path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
     #path('unit_of_measure/', unit_of_measure_view, name = 'unit_of_measure_page'),
-    #path('supplier/', supplier_view, name = 'supplier_page'),
+    path('supplier/', supplier_view, name = 'supplier_list_page'),
     #path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
     #path('inventory/', inventory_view, name = 'inventory_page'),
-    #path('store/', store_view, name = 'store_page'),
+    path('store/', store_list_view, name = 'store_list_page'), 
     path('customers/', customer_view, name = 'customer_list_page'),
     #path('purchase/', purchase_order_view, name = 'purchase_order_page'),
     path('sales/', sales_view, name = 'sales_list_page'),
@@ -36,6 +36,10 @@ urlpatterns = [
     path('sales_return_list/', sales_return_view, name = 'sales_return_page'),
     path('create_sales_return/', create_sales_return_view, name = 'create_sales_return_page'),
     path('purchase_list/', purchase_list_view, name = 'purchase_list_page'),
-    path('add_purchase/', add_purchase_view, name = 'add_purchase_page')
+    path('add_purchase/', add_purchase_view, name = 'add_purchase_page'),
+    path('add_customer/', add_customer_view, name = 'add_customer_page'),
+    path('add_supplier/', add_supplier_view, name = 'add_supplier_page' ),
+    path('add_store/', add_store_view, name = 'add_store_page')
+
 
 ]

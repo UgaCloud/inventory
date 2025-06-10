@@ -18,5 +18,8 @@ def supplier_view(request):
          'form':form,
          'suppliers':suppliers
      }
-    return render(request, 'supplier.html', context)
+    return render(request, 'supplier_list.html', context)
+
+def add_supplier_view(request):
+    return render(request, 'add_supplier.html')
 

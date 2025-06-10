@@ -260,13 +260,11 @@
 <a href="javascript:void(0);"><img src="{% static 'assets/img/icons/users1.svg' %}" alt="img"><span> People</span> <span class="menu-arrow"></span></a>
 <ul>
 <li><a href="{% url 'customer_list_page' %}">Customer List</a></li>
-<li><a href="addcustomer.html">Add Customer </a></li>
-<li><a href="supplierlist.html">Supplier List</a></li>
-<li><a href="addsupplier.html">Add Supplier </a></li>
-<li><a href="userlist.html">User List</a></li>
-<li><a href="adduser.html">Add User</a></li>
-<li><a href="storelist.html">Store List</a></li>
-<li><a href="addstore.html">Add Store</a></li>
+<li><a href="{% url 'add_customer_page' %}">Add Customer </a></li>
+<li><a href="{% url 'supplier_list_page' %}">Supplier List</a></li>
+<li><a href="{% url 'add_supplier_page' %}">Add Supplier </a></li>
+<li><a href="{% url 'store_list_page' %}">Store List</a></li>
+<li><a href="{% url 'add_store_page' %}">Add Store</a></li>
 </ul>
 </li> 
 <li>

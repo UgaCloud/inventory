@@ -134,7 +134,7 @@ def inventory_view(request):
     }
     return render(request, 'inventory.html', context)
 
-def store_view(request):
+def store_list_view(request):
     if request.method == "POST":
         form = StoreLocationForm(request.POST)
 
@@ -147,4 +147,7 @@ def store_view(request):
         'form':form,
         
     }
-    return render(request, 'store.html', context)
+    return render(request, 'store_list.html', context)
+
+def add_store_view(request):
+    return render(request, 'add_store.html')
