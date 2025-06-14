@@ -1,5 +1,5 @@
 {% extends './base.html' %}
-
+{% load static %}
 {% block content %}
 <div class="page-wrapper">
 <div class="content">
@@ -9,7 +9,7 @@
 <h6>Manage your products</h6>
 </div>
 <div class="page-btn">
-<a href="addproduct.html" class="btn btn-added"><img src="/static/assets/img/icons/plus.svg" alt="img" class="me-1">Add New Product</a>
+<a href="{% url 'add_products_page' %}" class="btn btn-added"><img src="{% static 'assets/img/icons/plus.svg' %}" alt="plus">Add New Product</a>
 </div>
 </div>
 
@@ -19,24 +19,24 @@
 <div class="search-set">
 <div class="search-path">
 <a class="btn btn-filter" id="filter_search">
-<img src="/static/assets/img/icons/filter.svg" alt="img">
-<span><img src="/static/assets/img/icons/closes.svg" alt="img"></span>
+<img src="{% static 'assets/img/icons/filter.svg' %}" alt="filter">
+<span><img src="{% static 'assets/img/icons/closes.svg' %}" alt="closes"></span>
 </a>
 </div>
 <div class="search-input">
-<a class="btn btn-searchset"><img src="/static/assets/img/icons/search-white.svg" alt="img"></a>
+<a class="btn btn-searchset"><img src="{% static 'assets/img/icons/search-white.svg' %}" alt="search-white"></a>
 </div>
 </div>
 <div class="wordset">
 <ul>
 <li>
-<a data-bs-toggle="tooltip" data-bs-placement="top" title="pdf"><img src="/static/assets/img/icons/pdf.svg" alt="img"></a>
+<a data-bs-toggle="tooltip" data-bs-placement="top" title="pdf"><img src="{% static 'assets/img/icons/pdf.svg' %}" alt="pdf"></a>
 </li>
 <li>
-<a data-bs-toggle="tooltip" data-bs-placement="top" title="excel"><img src="/static/assets/img/icons/excel.svg" alt="img"></a>
+<a data-bs-toggle="tooltip" data-bs-placement="top" title="excel"><img src="{% static 'assets/img/icons/excel.svg' %}" alt="excel"></a>
 </li>
 <li>
-<a data-bs-toggle="tooltip" data-bs-placement="top" title="print"><img src="/static/assets/img/icons/printer.svg" alt="img"></a>
+<a data-bs-toggle="tooltip" data-bs-placement="top" title="print"><img src="{% static 'assets/img/icons/printer.svg' %}" alt="printer"></a>
 </li>
 </ul>
 </div>
@@ -91,7 +91,7 @@
 </div>
 <div class="col-lg-1 col-sm-6 col-12">
 <div class="form-group">
-<a class="btn btn-filters ms-auto"><img src="/static/assets/img/icons/search-whites.svg" alt="img"></a>
+<a class="btn btn-filters ms-auto"><img src="{% static 'assets/img/icons/search-whites.svg' %}" alt="search-whites"></a>
 </div>
 </div>
 </div>
@@ -131,7 +131,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product1.jpg" alt="product">
+<img src="{% static 'assets/img/product/product1.jpg' %}" alt="product1.jpg">
 </a>
 <a href="javascript:void(0);">Macbook pro</a>
 </td>
@@ -144,13 +144,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -163,7 +163,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product2.jpg" alt="product">
+<img src="{% static 'assets/img/product/product2.jpg' %}" alt="product2.jpg">
 </a>
 <a href="javascript:void(0);">Orange</a>
 </td>
@@ -176,13 +176,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -195,7 +195,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product3.jpg" alt="product">
+<img src="{% static 'assets/img/product/product3.jpg' %}" alt="product3.jpg">
 </a>
 <a href="javascript:void(0);">Pineapple</a>
 </td>
@@ -208,13 +208,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -227,7 +227,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product4.jpg" alt="product">
+<img src="{% static 'assets/img/product/product4.jpg' %}" alt="product4.jpg">
 </a>
 <a href="javascript:void(0);">Strawberry</a>
 </td>
@@ -240,13 +240,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -259,7 +259,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product5.jpg" alt="product">
+<img src="{% static 'assets/img/product/product5.jpg' %}" alt="product5.jpg">
 </a>
 <a href="javascript:void(0);">Avocat</a>
 </td>
@@ -272,13 +272,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -291,7 +291,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product6.jpg" alt="product">
+<img src="{% static 'assets/img/product/product6.jpg' %}" alt="product6.jpg">
 </a>
 <a href="javascript:void(0);">Macbook Pro</a>
 </td>
@@ -304,13 +304,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -323,7 +323,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product7.jpg" alt="product">
+<img src="{% static 'assets/img/product/product7.jpg' %}" alt="product7.jpg">
 </a>
 <a href="javascript:void(0);">Apple Earpods</a>
 </td>
@@ -336,13 +336,13 @@
  <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -355,7 +355,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product8.jpg" alt="product">
+<img src="{% static 'assets/img/product/product8.jpg' %}" alt="product8.jpg">
 </a>
 <a href="javascript:void(0);">iPhone 11	</a>
 </td>
@@ -368,13 +368,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -387,7 +387,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product9.jpg" alt="product">
+<img src="{% static 'assets/img/product/product9.jpg' %}" alt="product9.jpg">
 </a>
 <a href="javascript:void(0);">samsung	</a>
 </td>
@@ -400,13 +400,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -419,7 +419,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product11.jpg" alt="product">
+<img src="{% static 'assets/img/product/product11.jpg' %}" alt="product11.jpg">
 </a>
 <a href="javascript:void(0);">Banana</a>
 </td>
@@ -432,13 +432,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="/static/assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="/static/assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -451,7 +451,7 @@
 </td>
 <td class="productimgname">
 <a href="javascript:void(0);" class="product-img">
-<img src="/static/assets/img/product/product17.jpg" alt="product">
+<img src="{% static 'assets/img/product/product17.jpg' %}" alt="product17.jpg">
 </a>
 <a href="javascript:void(0);">Limon</a>
 </td>
@@ -464,13 +464,13 @@
 <td>Admin</td>
 <td>
 <a class="me-3" href="product-details.html">
-<img src="/static/assets/img/icons/eye.svg" alt="img">
+<img src="{% static 'assets/img/icons/eye.svg' %}" alt="eye">
 </a>
 <a class="me-3" href="editproduct.html">
-<img src="assets/img/icons/edit.svg" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="confirm-text" href="javascript:void(0);">
-<img src="assets/img/icons/delete.svg" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>

@@ -69,7 +69,10 @@ def add_category_view(request):
         'form':form
     }
 
-    return render(request, 'category.html', context)
+    return render(request, 'add_category.html', context)
+
+def category_view(request):
+    return render(request, 'category.html')
 
 def delete_category_view(request, category_id):
     category = get_category_by_id(category_id)
