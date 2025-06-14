@@ -10,7 +10,7 @@
 <h6>Manage your Store</h6>
 </div>
 <div class="page-btn">
-<a href="addstore.html" class="btn btn-added"><img src="assets/img/icons/plus.svg" alt="img" class="me-2">Add Store</a>
+<a href="{% url 'add_store_page' %}" class="btn btn-added"><img src="{% static 'assets/img/icons/plus.svg' %}" alt="plus" class="me-2">Add Store</a>
 </div>
 </div>
 
@@ -20,24 +20,24 @@
 <div class="search-set">
 <div class="search-path">
 <a class="btn btn-filter" id="filter_search">
-<img src="{% static 'assets/img/icons/filter.svg' %}" alt="img">
-<span><img src="{% static 'assets/img/icons/closes.svg' %}" alt="img"></span>
+<img src="{% static 'assets/img/icons/filter.svg' %}" alt="filter">
+<span><img src="{% static 'assets/img/icons/closes.svg' %}" alt="closes"></span>
 </a>
 </div>
 <div class="search-input">
-<a class="btn btn-searchset"><img src="{% static 'assets/img/icons/search-white.svg' %}" alt="img"></a>
+<a class="btn btn-searchset"><img src="{% static 'assets/img/icons/search-white.svg' %}" alt="search-white"></a>
 </div>
 </div>
 <div class="wordset">
 <ul>
 <li>
-<a data-bs-toggle="tooltip" data-bs-placement="top" title="pdf"><img src="{% static 'assets/img/icons/pdf.svg' %}" alt="img"></a>
+<a data-bs-toggle="tooltip" data-bs-placement="top" title="pdf"><img src="{% static 'assets/img/icons/pdf.svg' %}" alt="pdf"></a>
 </li>
 <li>
-<a data-bs-toggle="tooltip" data-bs-placement="top" title="excel"><img src="{% static 'assets/img/icons/excel.svg' %}" alt="img"></a>
+<a data-bs-toggle="tooltip" data-bs-placement="top" title="excel"><img src="{% static 'assets/img/icons/excel.svg' %}" alt="excel"></a>
 </li>
 <li>
-<a data-bs-toggle="tooltip" data-bs-placement="top" title="print"><img src="{% static 'assets/img/icons/printer.svg' %}" alt="img"></a>
+<a data-bs-toggle="tooltip" data-bs-placement="top" title="print"><img src="{% static 'assets/img/icons/printer.svg' %}" alt="printer"></a>
 </li>
 </ul>
 </div>
@@ -71,7 +71,7 @@
 </div>
 <div class="col-lg-1 col-sm-6 col-12 ms-auto">
 <div class="form-group">
-<a class="btn btn-filters ms-auto"><img src="{% static 'assets/img/icons/search-whites.svg' %}" alt="img"></a>
+<a class="btn btn-filters ms-auto"><img src="{% static 'assets/img/icons/search-whites.svg' %}" alt="search-whites"></a>
 </div>
 </div>
 </div>
@@ -116,10 +116,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -142,10 +142,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -168,10 +168,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -194,10 +194,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -220,10 +220,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -246,10 +246,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -272,10 +272,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -298,10 +298,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -324,10 +324,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -350,10 +350,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -376,10 +376,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -402,10 +402,10 @@
 </td>
 <td>
 <a class="me-3" href="editstore.html">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-3 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -447,13 +447,13 @@
 <td>Cash</td>
 <td>
 <a class="me-2" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/printer.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/printer.svg' %}" alt="printer">
 </a>
 <a class="me-2" href="javascript:void(0);" data-bs-target="#editpayment" data-bs-toggle="modal" data-bs-dismiss="modal">
-<img src="{% static 'assets/img/icons/edit.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/edit.svg' %}" alt="edit">
 </a>
 <a class="me-2 confirm-text" href="javascript:void(0);">
-<img src="{% static 'assets/img/icons/delete.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/delete.svg' %}" alt="delete">
 </a>
 </td>
 </tr>
@@ -481,7 +481,7 @@
 <div class="input-group">
 <input type="text" value="2022-03-07" class="datetimepicker">
 <a class="scanner-set input-group-text">
-<img src="{% static 'assets/img/icons/datepicker.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/datepicker.svg' %}" alt="datepicker">
 </a>
 </div>
 </div>
@@ -546,7 +546,7 @@
 <div class="input-group">
 <input type="text" value="2022-03-07" class="datetimepicker">
 <a class="scanner-set input-group-text">
-<img src="{% static 'assets/img/icons/datepicker.svg' %}" alt="img">
+<img src="{% static 'assets/img/icons/datepicker.svg' %}" alt="datepicker">
 </a>
 </div>
 </div>
