@@ -7,13 +7,12 @@ from app.models.suppliers import Supplier
 from app.models.transactions import StockTransfer
 
 
-
 def index_view(request):
     products = get_all_products()
     context = {
         'products':products
     }
-    return render(request, 'index.html', context)
+    return render(request, 'basic/index.html', context)
 
 def login_view(request):
 

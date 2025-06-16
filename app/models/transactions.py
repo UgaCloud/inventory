@@ -81,5 +81,5 @@ class StockMovement(models.Model):
     movement_type = models.CharField(max_length=10, choices=STOCK_MOVEMENT_OPTIONS)
     quantity = models.IntegerField()
     related_order_id = models.IntegerField(null=True, blank=True)
-    note = models.TextField(blank=True)
+    note = models.TextField(blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
