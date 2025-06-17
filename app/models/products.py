@@ -8,6 +8,10 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+    
+    @property
+    def no_of_products(self):
+        return self.products.count()
 
 
 class UnitOfMeasure(models.Model):
@@ -24,7 +28,7 @@ class Product(models.Model):
     description = models.TextField(blank=True)
     barcode = models.CharField(max_length=100, unique=True, blank=True, null=True)
     uuid_code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

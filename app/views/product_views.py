@@ -61,12 +61,14 @@ def add_category_view(request):
 
         if form.is_valid():
             form.save()
-            return redirect(manage_product_view)
+            return redirect(add_category_view)
     else:
         form = CategoryForm()
+        categories = get_all_categories()
 
     context = {
-        'form':form
+        'form':form,
+        'categories': categories
     }
 
     return render(request, 'add_category.html', context)
