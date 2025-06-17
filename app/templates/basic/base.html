@@ -367,13 +367,28 @@
               <li class="submenu">
                 <a href="javascript:void(0);"
                   ><img
+                    src="{% static 'assets/img/icons/places.svg' %}"
+                    alt="img" /><span> Admin</span>
+                  <span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li><a href="newcountry.html">Company Profile</a></li>
+                  <li><a href="countrieslist.html">Branches </a></li>
+                  <li><a href="newstate.html">Stores </a></li>
+                  <li><a href="statelist.html">Measurements</a></li>
+                  <li><a href="statelist.html">Currencies</a></li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><img
                     src="{% static 'assets/img/icons/product.svg' %}"
                     alt="img" /><span> Product</span>
                   <span class="menu-arrow"></span
                 ></a>
                 <ul>
-                  <li><a href="categorylist.html">Product Categories</a></li>
-                  <li><a href="productlist.html">Products</a></li>
+                  <li><a href="{% url 'add_category_page' %}">Product Categories</a></li>
+                  <li><a href="{% url 'products_page' %}">Products</a></li>
                   <li><a href="productlist.html">Inventory</a></li>
                 </ul>
               </li>
@@ -385,11 +400,12 @@
                   <span class="menu-arrow"></span
                 ></a>
                 <ul>
-                  <li><a href="saleslist.html">Manage Sales</a></li>
+                  <li><a href="#">Customers</a></li>
+                  <li><a href="#">Manage Sales</a></li>
                   <li>
                     <a href="createsalesreturns.html">Quotations</a>
                   </li>
-                  <li><a href="salesreturnlists.html">Sales Return</a></li>
+                  <li><a href="#">Sales Return</a></li>
                   
                 </ul>
               </li>
@@ -416,65 +432,18 @@
                   <span class="menu-arrow"></span
                 ></a>
                 <ul>
-                  <li><a href="expenselist.html">Expense List</a></li>
-                  <li><a href="createexpense.html">Add Expense</a></li>
-                  <li><a href="expensecategory.html">Expense Category</a></li>
-                </ul>
-              </li>
-              <li class="submenu">
-                <a href="javascript:void(0);"
-                  ><img
-                    src="{% static 'assets/img/icons/quotation1.svg' %}"
-                    alt="img" /><span> Quotation</span>
-                  <span class="menu-arrow"></span
-                ></a>
-                <ul>
-                  <li><a href="quotationList.html">Quotation List</a></li>
-                  <li><a href="addquotation.html">Add Quotation</a></li>
-                </ul>
-              </li>
-              <li class="submenu">
-                <a href="javascript:void(0);"
-                  ><img
-                    src="{% static 'assets/img/icons/transfer1.svg' %}"
-                    alt="img" /><span> Transfer</span>
-                  <span class="menu-arrow"></span
-                ></a>
-                <ul>
-                  <li><a href="transferlist.html">Transfer List</a></li>
-                  <li><a href="addtransfer.html">Add Transfer </a></li>
-                  <li><a href="importtransfer.html">Import Transfer </a></li>
-                </ul>
-              </li>
-              <li class="submenu">
-                <a href="javascript:void(0);"
-                  ><img
-                    src="{% static 'assets/img/icons/return1.svg' %}"
-                    alt="img" /><span> Return</span>
-                  <span class="menu-arrow"></span
-                ></a>
-                <ul>
-                  <li><a href="salesreturnlist.html">Sales Return List</a></li>
-                  <li>
-                    <a href="createsalesreturn.html">Add Sales Return </a>
-                  </li>
-                  <li>
-                    <a href="purchasereturnlist.html">Purchase Return List</a>
-                  </li>
-                  <li>
-                    <a href="createpurchasereturn.html">Add Purchase Return </a>
-                  </li>
+                  <li><a href="expenselist.html">Expenses</a></li>
+                  <li><a href="createexpense.html">Expenditure</a></li>
                 </ul>
               </li>
               <li class="submenu">
                 <a href="javascript:void(0);"
                   ><img
                     src="{% static 'assets/img/icons/users1.svg' %}"
-                    alt="img" /><span> People</span>
+                    alt="img" /><span> Staff Management</span>
                   <span class="menu-arrow"></span
                 ></a>
                 <ul>
-                  <li><a href="customerlist.html">Customer List</a></li>
                   <li><a href="addcustomer.html">Add Customer </a></li>
                   <li><a href="supplierlist.html">Supplier List</a></li>
                   <li><a href="addsupplier.html">Add Supplier </a></li>
@@ -482,20 +451,6 @@
                   <li><a href="adduser.html">Add User</a></li>
                   <li><a href="storelist.html">Store List</a></li>
                   <li><a href="addstore.html">Add Store</a></li>
-                </ul>
-              </li>
-              <li class="submenu">
-                <a href="javascript:void(0);"
-                  ><img
-                    src="{% static 'assets/img/icons/places.svg' %}"
-                    alt="img" /><span> Places</span>
-                  <span class="menu-arrow"></span
-                ></a>
-                <ul>
-                  <li><a href="newcountry.html">New Country</a></li>
-                  <li><a href="countrieslist.html">Countries list</a></li>
-                  <li><a href="newstate.html">New State </a></li>
-                  <li><a href="statelist.html">State list</a></li>
                 </ul>
               </li>
               <li></li>

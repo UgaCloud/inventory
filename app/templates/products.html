@@ -1,9 +1,9 @@
-{% extends './base.html' %}
+{% extends './basic/base.html' %}
 
 {% block content %}
             <!-- row -->
             <div class="row tm-content-row tm-mt-big">
-                <div class="col-xl-8 col-lg-12 tm-md-12 tm-sm-12 tm-col">
+                <div class="col-xl-12 col-lg-12 tm-md-12 tm-sm-12 tm-col">
                   <div class="bg-white tm-block h-100">
                         <div class="row">
                             <div class="col-md-8 col-sm-12">
@@ -14,7 +14,7 @@
                                 <a href="{% url 'add_products_page' %}" class="btn btn-small btn-primary">Add New Product</a>
                             </div>
                         </div>
-                        <div class="table-responsive">
+                        <div class="table-responsive ">
                             <table class="table table-hover table-striped tm-table-striped-even mt-3">
                                 <thead>
                                     <tr class="tm-bg-gray">
@@ -29,7 +29,7 @@
                                     <tr>
                                         <td class = "text-center">{{product.sku}}</td>
                                         <td class = "text-center">{{product.name}}</td>
-                                        <td class = "text-center"></td>
+                                        <td class = "text-center">{{product.category}}</td>
                                         <td class = "text-center">{{product.total_stock}}</td>
                                         <th scope="row">
                                             <td>
@@ -52,27 +52,6 @@
                                 </nav>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-4 col-lg-12 tm-md-12 tm-sm-12 tm-col">
-                    <div class="bg-white tm-block h-100">
-                        <h2 class="tm-block-title d-inline-block">Product Categories</h2>
-
-                        <table class="table table-hover table-striped mt-3">
-                            <tbody>
-
-                                {% for category in categories %}
-                                <tr>
-                                    <td>{{category.id}}. {{category.name}}</td>
-                                    <td class="tm-trash-icon-cell"><a href = "{% url 'delete_category' category.id %}"  class="fas fa-trash-alt tm-trash-icon"></a></td>
-                                </tr>
-                                {% endfor %}
-                                
-                            </tbody>
-                        </table>
-
-                        <a href="{% url 'add_category_page' %}" class="btn btn-primary tm-table-mt">Add New Category</a>
                     </div>
                 </div>
             </div>
