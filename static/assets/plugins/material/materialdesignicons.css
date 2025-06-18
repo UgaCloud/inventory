@@ -2,7 +2,7 @@
 @font-face {
   font-family: "Material Design Icons";
   src: url("fonts/materialdesignicons-webfont.eot?v=2.0.46");
-  src: url("fonts/materialdesignicons-webfont.eot?#iefix&v=2.0.46") format("embedded-opentype"), url("fonts/materialdesignicons-webfont.woff2") format("woff2"), url("fonts/materialdesignicons/materialdesignicons-webfont.woff?v=2.0.46") format("woff"), url("fonts/materialdesignicons/materialdesignicons-webfont.ttf?v=2.0.46") format("truetype"), url("fonts/materialdesignicons/materialdesignicons-webfont.svg?v=2.0.46#materialdesigniconsregular") format("svg");
+  src: url("fonts/materialdesignicons-webfont.eot?#iefix&v=2.0.46") format("embedded-opentype"), url("fonts/materialdesignicons-webfont.woff2?v=2.0.46") format("woff2"), url("fonts/materialdesignicons/materialdesignicons-webfont.woff?v=2.0.46") format("woff"), url("fonts/materialdesignicons/materialdesignicons-webfont.ttf?v=2.0.46") format("truetype"), url("fonts/materialdesignicons/materialdesignicons-webfont.svg?v=2.0.46#materialdesigniconsregular") format("svg");
   font-weight: normal;
   font-style: normal;
 }
@@ -8211,7 +8211,7 @@
  */
 @font-face {
   font-family: 'Material-Design-Iconic-Font';
-  src: url("fonts/Material-Design-Iconic-Font.woff2") format("woff2"), url("fonts/Material-Design-Iconic-Font.woff?v=2.2.0") format("woff"), url("fonts/Material-Design-Iconic-Font.ttf?v=2.2.0") format("truetype");
+  src: url("fonts/Material-Design-Iconic-Font.woff2?v=2.2.0") format("woff2"), url("fonts/Material-Design-Iconic-Font.woff?v=2.2.0") format("woff"), url("fonts/Material-Design-Iconic-Font.ttf?v=2.2.0") format("truetype");
   font-weight: normal;
   font-style: normal; }
 .zmdi {
@@ -8347,7 +8347,7 @@
   width: 2em;
   height: 2em;
   line-height: 2em;
-  vertical-align: middle; }
+  vertical-align: top; }
 
 .zmdi-hc-stack-1x,
 .zmdi-hc-stack-2x {
