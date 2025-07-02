@@ -27,4 +27,21 @@ class OrganizationSetting(SingletonModel):
     organization_logo = models.ImageField(upload_to="logo", height_field=None, width_field=None, max_length=None)
     app_name = models.CharField(max_length=20, default="Inventory")
     
+class Branch(models.Model):
+
+    name = models.CharField(max_length=100)
+    location = models.TextField(blank=True)
+    contact_person = models.CharField(max_length=150)
+    contact = models.CharField(max_length=20)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = ("Branch")
+        verbose_name_plural = ("Branches")
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse("Branch_detail", kwargs={"pk": self.pk})
    

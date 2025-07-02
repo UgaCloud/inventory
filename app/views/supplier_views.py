@@ -18,5 +18,5 @@ def supplier_view(request):
          'form':form,
          'suppliers':suppliers
      }
-    return render(request, 'supplier.html', context)
+    return render(request, 'stock/supplier.html', context)
 

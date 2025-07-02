@@ -2,10 +2,10 @@ from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPri
 
 #product selectors
 def get_all_products():
-    return Product.objects.all()
+    return Product.objects.select_related('category').all()
 
 def get_product_by_id(product_id):
-    return Product.objects.get(id = product_id)
+    return Product.objects.select_related('category').get(id = product_id)
 
 #category selectors
 def get_category_by_id(category_id):

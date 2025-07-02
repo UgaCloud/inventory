@@ -1,4 +1,4 @@
-{% extends './basic/base.html' %}
+{% extends 'basic/base.html' %}
 {% load crispy_forms_tags %}
 {% block content%}
     <body class="bg03">
@@ -9,7 +9,7 @@
                     <div class="row">
                         <div class="col-12 text-center">
                             <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
-                            <h2 class="tm-block-title mt-3">Product Details</h2>
+                            <h2 class="tm-block-title mt-3">Units Of Measurement</h2>
                         </div>
                     </div>
                     <div class="row mt-2">
@@ -28,34 +28,31 @@
                                     
                                     <tr class="tm-bg-gray">
                                         <th scope="col">&nbsp;</th>
+                                        <th scope="col">&nbsp;</th>
+                                        <th scope="col" class="text-center">Unit Of Measurement</th>
+                                        <th scope="col">&nbsp;</th>
                                         
-                                        <th scope="col" class="text-center">Unit</th>
-                                        
-                                        
-                                        <th scope="col" class="text-center">Price</th>
-                                        <th scope="col" class="text-center">Conversion Factor</th>
+                                        <th scope="col" class="text-center">Abbreviation</th>
                                                                               
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for item in item_details %}
+                                    {% for unit_of_measurement in units_of_measurement %}
                                     <tr>
-                                        <td scope="row">&nbsp;</td>
-                                        <td>{{item.unit.name}}</td><!--I dont understand how the unit is able to be referenced, i dont even know how django ia able to know what unit is-->
                                         
-                                        <td>{{item.price}}</td>
-                                        <td>{{item.conversion_factor}}
-                                        </td>
+                                        <td>{{unit_of_measurement.id}}. </td>
+                                        <th scope="row">
+                                            <td>{{unit_of_measurement.name}}</td>
+                                        </th>
+
+                                        <th scope="row">
+                                            <td>{{unit_of_measurement.abbreviation}}
+                                                <div><a href="#">Edit</a></div>
+                                            </td>
+                                        </th>
                                     </tr>
                                     {% endfor %}
-                                    
-                                    
                                 </tbody>
-
-                                </form>
-                            </table>
-                            Check the product Inventory <a href ="{% url 'inventory_page' %}">here</a>
-                            
 
                                 </form>
                             </table>
