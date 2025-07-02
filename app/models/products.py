@@ -25,6 +25,7 @@ class UnitOfMeasure(models.Model):
 class Product(models.Model):
     name = models.CharField(max_length=255)
     sku = models.CharField(max_length=100, unique=True)
+    brand = models.CharField(max_length=50)
     description = models.TextField(blank=True)
     barcode = models.CharField(max_length=100, unique=True, blank=True, null=True)
     uuid_code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
@@ -37,7 +38,7 @@ class Product(models.Model):
 
     @property
     def total_stock(self): # Total units across all stores
-        return sum(item.quantity_in_stock for item in self.inventory_set.all())
+        return sum(item.quantity_in_stock for item in self.inventories.all())
 
     
     @property
@@ -85,7 +86,7 @@ class StoreLocation(models.Model):
 
 
 class Inventory(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
     store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE)
     quantity_in_stock = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=10)

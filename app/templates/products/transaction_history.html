@@ -1,0 +1,69 @@
+{% load crispy_forms_tags %}
+{% load static %}
+{% block content%}
+    <div class="d-flex table-dropdown my-xl-auto right-content align-items-center flex-wrap row-gap-3">
+        <div class="dropdown me-2">
+            <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
+                Store
+            </a>
+            <ul class="dropdown-menu  dropdown-menu-end p-3">
+                <li>
+                    <a href="javascript:void(0);" class="dropdown-item rounded-1">Main</a>
+                </li>
+                <li>
+                    <a href="javascript:void(0);" class="dropdown-item rounded-1">Main</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table datatable">
+            <thead class="thead-light">
+                <tr>
+                    <th class="no-sort">
+                        <label class="checkboxs">
+                            <input type="checkbox" id="select-all">
+                            <span class="checkmarks"></span>
+                        </label>
+                    </th>
+                    <th># </th>
+                    <th>Date</th>
+                    <th>Transaction Type</th>
+                    <th>Transaction Id</th>
+                    <th>Quantity</th>
+                    <th>Balance</th>
+                    <th>Note</th>
+                    <th class="no-sort"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if transactions %}
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td>
+                            <label class="checkboxs">
+                                <input type="checkbox">
+                                <span class="checkmarks"></span>
+                            </label>
+                        </td>
+                        <td>{{forloop.counter}} </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <a href="javascript:void(0);">{{transaction.timestamp}}</a>
+                            </div>												
+                        </td>							
+                        <td>{{transaction.transaction_type}}</td>
+                        <td>{{transaction.transaction_id}}</td>
+                        <td>{{transaction.quantity}}</td>
+                        <td>{{transaction.balance}}</td>
+                        <td>{{transaction.note}}</td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+{% endblock %}
+
+

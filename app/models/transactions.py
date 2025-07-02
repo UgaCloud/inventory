@@ -5,6 +5,8 @@ from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVE
 
 class PurchaseOrder(models.Model):
     supplier = models.ForeignKey("app.Supplier", on_delete=models.CASCADE)
+    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
+    store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     purchase_date = models.DateField(auto_now_add=True)
     expected_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=PURCHASE_ORDER_OPTIONS)
@@ -31,7 +33,7 @@ class PurchaseOrderItem(models.Model):
     unit_cost = models.DecimalField(max_digits=10, decimal_places=0)
 
     @property
-    def cost(self):
+    def total_cost(self):
         return self.quantity * self.unit_cost
 
 
@@ -39,6 +41,7 @@ class Sales(models.Model):
     customer = models.ForeignKey("app.Customer", on_delete=models.SET_NULL, null=True, blank=True)
     sale_date = models.DateField(auto_now_add=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
+    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=20, choices=SALE_ORDER_OPTIONS)
     recorded_by = models.CharField(max_length=50)
 
@@ -69,6 +72,7 @@ class StockTransfer(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name='outgoing_transfers')
     to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name='incoming_transfers')
+    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
     quantity = models.PositiveIntegerField()
     transfer_date = models.DateField(auto_now_add=True)
 
@@ -78,8 +82,11 @@ class StockTransfer(models.Model):
 class StockMovement(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
-    movement_type = models.CharField(max_length=10, choices=STOCK_MOVEMENT_OPTIONS)
+    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
+    transaction_type = models.CharField(max_length=10, choices=STOCK_MOVEMENT_OPTIONS)
     quantity = models.IntegerField()
-    related_order_id = models.IntegerField(null=True, blank=True)
+    transaction_id = models.IntegerField(null=True, blank=True)
     note = models.TextField(blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
+    units_in_stock = models.IntegerField()
+    user = models.CharField(max_length=50)

@@ -1,24 +1,24 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import (
+    render, redirect, 
+    get_object_or_404, HttpResponseRedirect
+)
+from django.urls import reverse
 
-from app.forms.product_forms import ProductForm, CategoryForm, UnitOfMeasureForm, ProductUnitPriceForm, InventoryForm, StoreLocationForm
-from app.selectors.product_selectors import get_all_products, get_product_by_id, get_category_by_id, get_all_categories, get_all_units_of_measurement
-from app.models.products import ProductUnitPrice, StoreLocation, Inventory
-
-
+from app.forms.product_forms import *
+from app.selectors.product_selectors import *
+from app.models.products import *
 
 
 def manage_product_view(request):
     product_form = ProductForm()
 
     products = get_all_products()
-    categories = get_all_categories() #categories and products are viewed on the same html page
 
     context = {
         'form': product_form,
         'products': products,
-        'categories': categories
     }
-    return render(request, 'products.html', context)
+    return render(request, 'products/products.html', context)
 
 def add_product_view(request):
     if request.method == 'POST':
@@ -26,16 +26,10 @@ def add_product_view(request):
 
        if form.is_valid():
            form.save()
-           return redirect(manage_product_view)
        
-    else:
-        form = ProductForm()
-
-    context = {
-        'form':form
-    }
-
-    return render(request, 'add_product.html', context)
+       return redirect(manage_product_view)
+       
+    
 
 def edit_product_view(request, product_id):
 
@@ -47,13 +41,7 @@ def edit_product_view(request, product_id):
         if edit_form.is_valid():
             edit_form.save()
             return redirect(manage_product_view)
-    else:
-        edit_form = ProductForm(instance = product)
-
-    context = {
-        'edit_form':edit_form
-    }
-    return render(request, 'edit_product.html', context)
+    return HttpResponseRedirect(reverse(product_details_view, args=[product.id]))
 
 def add_category_view(request):
     if request.method == "POST":
@@ -71,7 +59,7 @@ def add_category_view(request):
         'categories': categories
     }
 
-    return render(request, 'add_category.html', context)
+    return render(request, 'products/add_category.html', context)
 
 def delete_category_view(request, category_id):
     category = get_category_by_id(category_id)
@@ -95,46 +83,46 @@ def unit_of_measure_view(request):
         'units_of_measurement':units_of_measurement
     }
     
-    return render(request, 'unit_of_measure.html', context)
+    return render(request, 'products/unit_of_measure.html', context)
 
 def product_details_view(request, _product_id):
-    if request.method == "POST":
+    item = get_product_by_id(product_id=_product_id)
+
+    product_form = ProductForm(instance=item)
+    product_unit_price_form = ProductUnitPriceForm(initial={'product':item})
+    inventory_form = InventoryForm(initial={'product': item})
+
+    product_unit_prices = item.unit_prices.all()
+    inventories = item.inventories.all()
+        
+    context = {
+        'product_form': product_form,
+        'product_unit_price_form': product_unit_price_form,
+        'inventory_form': inventory_form,
+        'product': item,
+        'unit_prices':product_unit_prices,
+        'inventories': inventories    
+    }
+    return render(request, 'products/product_details.html', context)
+
+def add_product_unit_price_view(request):
+    if request.method == 'POST':
         form = ProductUnitPriceForm(request.POST)
         if form.is_valid():
             form.save()
+            
+            return HttpResponseRedirect(reverse(product_details_view, args=[request.POST.get('product')]))
     else:
-        form = ProductUnitPriceForm()
+        pass
 
-    item = get_product_by_id(_product_id)
-    item_details = ProductUnitPrice.objects.filter(product_id = item.id) #I still dont understand how the unit was fetched from the UnitOfMeasure model
-        
-    context = {
-        'form':form,
-        'item_details':item_details    
-    }
-    return render(request, 'product_details.html', context)
-
-def inventory_view(request):
+def add_inventory_view(request):
     if request.method == 'POST':
         form = InventoryForm(request.POST)
 
         if form.is_valid():
             form.save()
-    else:
-        form = InventoryForm()
-    
-    product_details = []
-    for item_id in Inventory.objects.values_list('store_id', flat = True):
-        store_detail  = StoreLocation.objects.get(id = item_id)
-        product = Inventory.objects.get(id = store_detail.id)
-        product_details.append(product)
-    
-
-    context = {
-        'form':form,
-        'product_details':product_details,
-    }
-    return render(request, 'inventory.html', context)
+  
+    return HttpResponseRedirect(reverse(product_details_view, args=[request.POST.get('product')]))
 
 def store_view(request):
     if request.method == "POST":
@@ -144,9 +132,11 @@ def store_view(request):
             form.save()
     else:
         form = StoreLocationForm()
+        stores = StoreLocation.objects.all()
 
     context = {
-        'form':form,
+        'store_form':form,
+        'stores': stores
         
     }
-    return render(request, 'store.html', context)
+    return render(request, 'products/store.html', context)
