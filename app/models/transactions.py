@@ -5,7 +5,6 @@ from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVE
 
 class PurchaseOrder(models.Model):
     supplier = models.ForeignKey("app.Supplier", on_delete=models.CASCADE)
-    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     purchase_date = models.DateField(auto_now_add=True)
     expected_date = models.DateField(null=True, blank=True)
@@ -82,8 +81,7 @@ class StockTransfer(models.Model):
 class StockMovement(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
-    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
-    transaction_type = models.CharField(max_length=10, choices=STOCK_MOVEMENT_OPTIONS)
+    transaction_type = models.CharField(max_length=50, choices=STOCK_MOVEMENT_OPTIONS)
     quantity = models.IntegerField()
     transaction_id = models.IntegerField(null=True, blank=True)
     note = models.TextField(blank=True, null=True)

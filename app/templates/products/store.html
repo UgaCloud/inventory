@@ -53,6 +53,7 @@
                             </th>
                             <th># </th>
                             <th>Store Name</th>
+                            <th>Branch</th>
                             <th>Location</th>
                             <th>Status</th>
                             <th>No. of Items</th>
@@ -74,8 +75,9 @@
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <a href="javascript:void(0);">{{store.name}}</a>
-                                    </div>												
+                                    </div>				
                                 </td>							
+                                <td>{{store.branch}}</td>
                                 <td>{{store.address}}</td>
                                 <td>{{store.is_active}}</td>
                                 <td>{{store.total_products}}</td>
@@ -118,34 +120,35 @@
         </div>
     </div>
 
-    
-{% endblock %}
-
-<div class="modal fade" id="add-store">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="page-wrapper-new p-0">
-                <div class="content">
-                    <div class="modal-header">
-                        <div class="page-title">
-                            <h4>Add Store</h4>
+    <div class="modal fade" id="add-store">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="page-wrapper-new p-0">
+                    <div class="content">
+                        <div class="modal-header">
+                            <div class="page-title">
+                                <h4>Add Store</h4>
+                            </div>
+                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
                         </div>
-                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <div class="modal-body">
+                            <form method="post" action="{% url 'store_page'%}">
+                                {% csrf_token %}
+                                {{store_form|crispy}}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
+                            <button type='submit' class="btn btn-primary fs-13 fw-medium p-2 px-3">Submit</button>
+                        </div>
+                    </form>
                     </div>
-                    <div class="modal-body">
-                        <form method="post" action="{% url 'store_page'%}">
-                            {% csrf_token %}
-                            {{store_form|crispy}}
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
-                        <button type='submit' class="btn btn-primary fs-13 fw-medium p-2 px-3">Submit</button>
-                    </div>
-                </form>
                 </div>
             </div>
         </div>
     </div>
-</div>
+    
+{% endblock %}
+
+

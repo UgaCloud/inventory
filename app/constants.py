@@ -35,9 +35,17 @@ SALE_ORDER_OPTIONS = [
     ]
 
 STOCK_MOVEMENT_OPTIONS = [
-    ('IN', 'In'), 
-    ('OUT', 'Out'), 
-    ('TRANSFER', 'Transfer')
+    ('Initial Stock', 'Initial Stock'), 
+    ('Stocked', 'Stocked'), 
+    ('Sold', 'Sold'), 
+    ('In', 'In'), 
+    ('Out', 'Out'), 
+    ('Transfered', 'Transfered'),
+    ('Returned', 'Returned'),
+    ('Expired', 'Expired'),
+    ('Damaged', 'Damaged'),
+    ('Stolen', 'Stolen'),
+    ('Removed', 'Removed'),
 ]
 
 PAYMENT_METHODS = [

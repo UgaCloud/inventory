@@ -40,8 +40,8 @@ def edit_product_view(request, product_id):
         
         if edit_form.is_valid():
             edit_form.save()
-            return redirect(manage_product_view)
-    return HttpResponseRedirect(reverse(product_details_view, args=[product.id]))
+
+        return redirect(product_details_view, product.id)
 
 def add_category_view(request):
     if request.method == "POST":
@@ -111,7 +111,7 @@ def add_product_unit_price_view(request):
         if form.is_valid():
             form.save()
             
-            return HttpResponseRedirect(reverse(product_details_view, args=[request.POST.get('product')]))
+            return redirect(product_details_view, request.POST.get('product'))
     else:
         pass
 
@@ -122,7 +122,7 @@ def add_inventory_view(request):
         if form.is_valid():
             form.save()
   
-    return HttpResponseRedirect(reverse(product_details_view, args=[request.POST.get('product')]))
+    return redirect(product_details_view, request.POST.get('product'))
 
 def store_view(request):
     if request.method == "POST":
@@ -130,9 +130,9 @@ def store_view(request):
 
         if form.is_valid():
             form.save()
-    else:
-        form = StoreLocationForm()
-        stores = StoreLocation.objects.all()
+    
+    form = StoreLocationForm()
+    stores = StoreLocation.objects.all()
 
     context = {
         'store_form':form,
