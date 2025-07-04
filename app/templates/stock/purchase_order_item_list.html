@@ -1,6 +1,7 @@
 {% extends 'basic/base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load humanize %}
 
 {% block content %}
     <div class="page-header">
@@ -59,8 +60,8 @@
                                 <td>{{item.product}}	
                                 </td>							
                                 <td>{{item.quantity}}</td>
-                                <td>{{item.unit_cost}}</td>
-                                <td>{{item.total_cost}}</td>
+                                <td>{{item.unit_cost|intcomma}}/-</td>
+                                <td>{{item.total_cost|intcomma}}/-</td>
                                 <td class="action-table-data">
                                     <div class="edit-delete-action">
                                         <a class="me-2 edit-icon  p-2" href="#">

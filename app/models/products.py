@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from app.models.organization import Branch
 
 
 class Category(models.Model):
@@ -69,12 +70,13 @@ class ProductUnitPrice(models.Model):
 
 
 class StoreLocation(models.Model):
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='store_locations', null=True, blank=True)
     name = models.CharField(max_length=100)
     address = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.branch.name if self.branch else 'No Branch'})"
     
     @property
     def total_products(self): # Count of products with stock at the store
@@ -95,7 +97,7 @@ class Inventory(models.Model):
         unique_together = ('product', 'store')
 
     def __str__(self):
-        return f"{self.product.name} @ {self.store.name}"
+        return f"{self.product.name} @ {self.store.name} ({self.store.branch.name if self.store.branch else 'No Branch'})"
 
     @property
     def is_below_reorder(self): 
