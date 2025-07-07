@@ -4,7 +4,7 @@ from django.urls import path
 from .views.general_views import index_view
 from .views.product_views import * 
 from .views.accounts_views import manage_accounts_view
-from .views.general_views import login_view, sign_up_view, DeleteMultipleSuppliers
+from .views.general_views import *
 from .views.supplier_views import supplier_view
 from .views.customer_view import customer_view
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
@@ -21,6 +21,7 @@ urlpatterns = [
     path('login/', login_view, name = 'login_page'),
     path('sign_up/', sign_up_view, name = 'sign_up_page'),
     path('accounts/', manage_accounts_view, name='accounts_page'),
+    path('under_maintenance/', under_maintenance_view, name='under_maintenance_page'),
     
     # Organization
     path('branches/', manage_branches, name = 'manage_branch_page'),

@@ -62,5 +62,7 @@ class DeleteMultipleSuppliers(View):
             
         return redirect(request.META.get('HTTP_REFERER')) # redirect to where the request came from
 
+def under_maintenance_view(request):
+    return render(request, 'under_maintenance.html')
         
         
