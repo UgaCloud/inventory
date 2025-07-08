@@ -31,6 +31,9 @@ class PurchaseOrderItem(models.Model):
     quantity = models.PositiveIntegerField()
     unit_cost = models.DecimalField(max_digits=10, decimal_places=0)
 
+    class Meta:
+        unique_together = ("order", "product", "unit")
+
     @property
     def total_cost(self):
         return self.quantity * self.unit_cost
@@ -63,20 +66,70 @@ class SalesItem(models.Model):
     quantity = models.PositiveIntegerField()
     sale_price = models.DecimalField(max_digits=10, decimal_places=0)
 
+    class Meta:
+        unique_together = ("order", "product", "unit")
+
     def get_total_price(self):
         return self.quantity * self.sale_price
 
 
-class StockTransfer(models.Model):
-    product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
-    from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name='outgoing_transfers')
-    to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name='incoming_transfers')
-    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
-    quantity = models.PositiveIntegerField()
-    transfer_date = models.DateField(auto_now_add=True)
+class TransferRequest(models.Model):
+    REQUEST_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("fulfilled", "Fulfilled"),
+    ]
+    requested_by = models.CharField(max_length=100)
+    from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfer_requests_out")
+    to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfer_requests_in")
+    status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default="pending")
+    request_date = models.DateTimeField(auto_now_add=True)
+    approved_by = models.CharField(max_length=100, blank=True, null=True)
+    approved_date = models.DateTimeField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.product.name}: {self.from_store.name} → {self.to_store.name}"
+        return f"Request {self.id}: {self.from_store.name} → {self.to_store.name}"
+
+    @property
+    def total_requested_items(self):
+        return self.stock_transfers.aggregate(total=models.Sum('items__quantity'))['total'] or 0
+
+
+class StockTransfer(models.Model):
+    transfer_request = models.ForeignKey(TransferRequest, on_delete=models.CASCADE, related_name="stock_transfers")
+    transfer_date = models.DateField(auto_now_add=True)
+    completed_by = models.CharField(max_length=100, blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Transfer {self.id} for Request {self.transfer_request.id}"
+
+    @property
+    def total_items(self):
+        return self.items.count()
+
+    @property
+    def total_quantity(self):
+        return sum(item.quantity for item in self.items.all())
+
+
+class StockTransferItem(models.Model):
+    stock_transfer = models.ForeignKey(StockTransfer, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ("stock_transfer", "product")
+
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity} (Transfer {self.stock_transfer.id})"
+
+    @property
+    def total_quantity(self):
+        return self.quantity
+
 
 class StockMovement(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
