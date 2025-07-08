@@ -1,652 +1,1143 @@
 <!DOCTYPE html>
 {% load static %}
 <html lang="en" data-layout="horizontal">
+  <head>
+    <!-- Meta Tags -->
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="This is a powerful  Inventory Management designed for businesses, offering seamless invoicing, project tracking, and estimates."
+    />
+    <meta
+      name="keywords"
+      content="inventory management, admin dashboard, invoicing, estimates, business management, responsive admin, POS system"
+    />
+    <meta name="author" content="UGACloud" />
+    <meta name="robots" content="index, follow" />
+    <title>Inventory Management</title>
 
-<head>
+    <!-- Favicon -->
+    <link
+      rel="shortcut icon"
+      type="image/x-icon"
+      href="{% static 'assets/img/favicon.png' %}"
+    />
 
-	<!-- Meta Tags -->
-	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta name="description" content="This is a powerful  Inventory Management designed for businesses, offering seamless invoicing, project tracking, and estimates.">
-	<meta name="keywords" content="inventory management, admin dashboard, invoicing, estimates, business management, responsive admin, POS system">
-	<meta name="author" content="UGACloud">
-	<meta name="robots" content="index, follow">
-	<title>Inventory Management</title>
+    <!-- Apple Touch Icon -->
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="{% static 'assets/img/apple-touch-icon.png' %}"
+    />
 
-	<!-- Favicon -->
-	<link rel="shortcut icon" type="image/x-icon" href="{% static 'assets/img/favicon.png' %}">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}" />
 
-	<!-- Apple Touch Icon -->
-	<link rel="apple-touch-icon" sizes="180x180" href="{% static 'assets/img/apple-touch-icon.png' %}">
+    <!-- Datetimepicker CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/css/bootstrap-datetimepicker.min.css' %}"
+    />
 
-	<!-- Bootstrap CSS -->
-	<link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}">
+    <!-- animation CSS -->
+    <link rel="stylesheet" href="{% static 'assets/css/animate.css' %}" />
 
-	<!-- Datetimepicker CSS -->
-	<link rel="stylesheet" href="{% static 'assets/css/bootstrap-datetimepicker.min.css' %}">
+    <!-- Select2 CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/select2/css/select2.min.css' %}"
+    />
 
-	<!-- animation CSS -->
-	<link rel="stylesheet" href="{% static 'assets/css/animate.css' %}">
+    <!-- Daterangepikcer CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/daterangepicker/daterangepicker.css' %}"
+    />
 
-	<!-- Select2 CSS -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/select2/css/select2.min.css' %}">
+    <!-- Tabler Icon CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/tabler-icons/tabler-icons.min.css' %}"
+    />
 
-	<!-- Daterangepikcer CSS -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/daterangepicker/daterangepicker.css' %}">
+    <!-- Summernote CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/summernote/summernote-bs4.min.css' %}"
+    />
 
-	<!-- Tabler Icon CSS -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/tabler-icons/tabler-icons.min.css' %}">
-	
-	<!-- Summernote CSS -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/summernote/summernote-bs4.min.css' %}">
-	
-	<!-- Datatable CSS -->
-	<link rel="stylesheet" href="{% static 'assets/css/dataTables.bootstrap5.min.css' %}">
+    <!-- Datatable CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/css/dataTables.bootstrap5.min.css' %}"
+    />
 
-	<!-- Bootstrap Tagsinput CSS -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/bootstrap-tagsinput/bootstrap-tagsinput.css' %}">
-	
-	<!-- Feathericon CSS -->
-	<link rel="stylesheet" href="{% static 'assets/css/feather.css' %}">
+    <!-- Bootstrap Tagsinput CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/bootstrap-tagsinput/bootstrap-tagsinput.css' %}"
+    />
 
-	<!-- Fontawesome CSS -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/fontawesome/css/fontawesome.min.css' %}">
-	<link rel="stylesheet" href="{% static 'assets/plugins/fontawesome/css/all.min.css' %}">
+    <!-- Feathericon CSS -->
+    <link rel="stylesheet" href="{% static 'assets/css/feather.css' %}" />
 
-	<!-- Color Picker Css -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/@simonwep/pickr/themes/nano.min.css' %}">
-	
-	<!-- Owl Carousel CSS -->
-	<link rel="stylesheet" href="{% static 'assets/plugins/owlcarousel/owl.carousel.min.css' %}">
+    <!-- Fontawesome CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/fontawesome/css/fontawesome.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/fontawesome/css/all.min.css' %}"
+    />
 
-	<!-- Main CSS -->
-	<link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <!-- Color Picker Css -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/@simonwep/pickr/themes/nano.min.css' %}"
+    />
 
-</head>
+    <!-- Owl Carousel CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/plugins/owlcarousel/owl.carousel.min.css' %}"
+    />
 
-<body class="menu-horizontal">
-	<div id="global-loader">
-		<div class="whirly-loader"> </div>
-	</div>
-	<!-- Main Wrapper -->
-	<div class="main-wrapper">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+  </head>
 
-		<!-- Header -->
-		<div class="header">
-			<div class="main-header">
+  <body class="menu-horizontal">
+    <div id="global-loader">
+      <div class="whirly-loader"></div>
+    </div>
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+      <!-- Header -->
+      <div class="header">
+        <div class="main-header">
+          <!-- Logo -->
+          <div class="header-left active">
+            <a href="index.html" class="logo logo-normal">
+              <img src="{% static 'assets/img/logo.svg' %}" alt="Img" />
+            </a>
+            <a href="index.html" class="logo logo-white">
+              <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" />
+            </a>
+            <a href="index.html" class="logo-small">
+              <img src="{% static 'assets/img/logo-small.png' %}" alt="Img" />
+            </a>
+          </div>
+          <!-- /Logo -->
 
-				<!-- Logo -->
-				<div class="header-left active">
-					<a href="index.html" class="logo logo-normal">
-						<img src="{% static 'assets/img/logo.svg' %}" alt="Img">
-					</a>
-					<a href="index.html" class="logo logo-white">
-						<img src="{% static 'assets/img/logo-white.svg' %}" alt="Img">
-					</a>
-					<a href="index.html" class="logo-small">
-						<img src="{% static 'assets/img/logo-small.png' %}" alt="Img">
-					</a>
-				</div>
-				<!-- /Logo -->
+          <a id="mobile_btn" class="mobile_btn" href="#sidebar">
+            <span class="bar-icon">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </a>
 
-				<a id="mobile_btn" class="mobile_btn" href="#sidebar">
-					<span class="bar-icon">
-						<span></span>
-						<span></span>
-						<span></span>
-					</span>
-				</a>
+          <!-- Header Menu -->
+          <ul class="nav user-menu">
+            <!-- Search -->
+            <li class="nav-item nav-searchinputs">
+              <div class="top-nav-search">
+                <a href="javascript:void(0);" class="responsive-search">
+                  <i class="fa fa-search"></i>
+                </a>
+                <form action="#" class="dropdown">
+                  <div
+                    class="searchinputs input-group dropdown-toggle"
+                    id="dropdownMenuClickable"
+                    data-bs-toggle="dropdown"
+                    data-bs-auto-close="outside"
+                  >
+                    <input type="text" placeholder="Search" />
+                    <div class="search-addon">
+                      <span><i class="ti ti-search"></i></span>
+                    </div>
+                    <span class="input-group-text">
+                      <kbd class="d-flex align-items-center"
+                        ><img
+                          src="assets/img/icons/command.svg"
+                          alt="img"
+                          class="me-1"
+                        />K</kbd
+                      >
+                    </span>
+                  </div>
+                  <div
+                    class="dropdown-menu search-dropdown"
+                    aria-labelledby="dropdownMenuClickable"
+                  >
+                    <div class="search-info">
+                      <h6>
+                        <span
+                          ><i
+                            data-feather="search"
+                            class="feather-16"
+                          ></i></span
+                        >Recent Searches
+                      </h6>
+                      <ul class="search-tags">
+                        <li><a href="javascript:void(0);">Products</a></li>
+                        <li><a href="javascript:void(0);">Sales</a></li>
+                        <li><a href="javascript:void(0);">Applications</a></li>
+                      </ul>
+                    </div>
+                    <div class="search-info">
+                      <h6>
+                        <span
+                          ><i
+                            data-feather="help-circle"
+                            class="feather-16"
+                          ></i></span
+                        >Help
+                      </h6>
+                      <p>
+                        How to Change Product Volume from 0 to 200 on Inventory
+                        management
+                      </p>
+                      <p>Change Product Name</p>
+                    </div>
+                    <div class="search-info">
+                      <h6>
+                        <span
+                          ><i data-feather="user" class="feather-16"></i></span
+                        >Customers
+                      </h6>
+                      <ul class="customers">
+                        <li>
+                          <a href="javascript:void(0);"
+                            >Aron Varu<img
+                              src="{% static 'assets/img/profiles/avator1.jpg' %}"
+                              alt="Img"
+                              class="img-fluid"
+                          /></a>
+                        </li>
+                        <li>
+                          <a href="javascript:void(0);"
+                            >Jonita<img
+                              src="{% static 'assets/img/profiles/avatar-01.jpg' %}"
+                              alt="Img"
+                              class="img-fluid"
+                          /></a>
+                        </li>
+                        <li>
+                          <a href="javascript:void(0);"
+                            >Aaron<img
+                              src="{% static 'assets/img/profiles/avatar-10.jpg' %}"
+                              alt="Img"
+                              class="img-fluid"
+                          /></a>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </li>
+            <!-- /Search -->
 
-				<!-- Header Menu -->
-				<ul class="nav user-menu">
+            <!-- Select Store -->
+            <li
+              class="nav-item dropdown has-arrow main-drop select-store-dropdown"
+            >
+              <a
+                href="javascript:void(0);"
+                class="dropdown-toggle nav-link select-store"
+                data-bs-toggle="dropdown"
+              >
+                <span class="user-info">
+                  <span class="user-letter">
+                    <img
+                      src="{% static 'assets/img/store/store-01.png' %}"
+                      alt="Store Logo"
+                      class="img-fluid"
+                    />
+                  </span>
+                  <span class="user-detail">
+                    <span class="user-name">Warehouse</span>
+                  </span>
+                </span>
+              </a>
+              <div class="dropdown-menu dropdown-menu-right">
+                <a href="javascript:void(0);" class="dropdown-item">
+                  <img
+                    src="{% static 'assets/img/store/store-01.png' %}"
+                    alt="Store Logo"
+                    class="img-fluid"
+                  />Display
+                </a>
+                <a href="javascript:void(0);" class="dropdown-item">
+                  <img
+                    src="{% static 'assets/img/store/store-02.png' %}"
+                    alt="Store Logo"
+                    class="img-fluid"
+                  />Main Store
+                </a>
+              </div>
+            </li>
+            <!-- /Select Store -->
 
-					<!-- Search -->
-					<li class="nav-item nav-searchinputs">
-						<div class="top-nav-search">
-							<a href="javascript:void(0);" class="responsive-search">
-								<i class="fa fa-search"></i>
-							</a>
-							<form action="#" class="dropdown">
-								<div class="searchinputs input-group dropdown-toggle" id="dropdownMenuClickable" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-									<input type="text" placeholder="Search">
-									<div class="search-addon">
-										<span><i class="ti ti-search"></i></span>
-									</div>
-									<span class="input-group-text">
-										<kbd class="d-flex align-items-center"><img src="assets/img/icons/command.svg" alt="img" class="me-1">K</kbd>
-									</span>
-								</div>
-								<div class="dropdown-menu search-dropdown" aria-labelledby="dropdownMenuClickable">
-									<div class="search-info">
-										<h6><span><i data-feather="search" class="feather-16"></i></span>Recent Searches
-										</h6>
-										<ul class="search-tags">
-											<li><a href="javascript:void(0);">Products</a></li>
-											<li><a href="javascript:void(0);">Sales</a></li>
-											<li><a href="javascript:void(0);">Applications</a></li>
-										</ul>
-									</div>
-									<div class="search-info">
-										<h6><span><i data-feather="help-circle" class="feather-16"></i></span>Help</h6>
-										<p>How to Change Product Volume from 0 to 200 on Inventory management</p>
-										<p>Change Product Name</p>
-									</div>
-									<div class="search-info">
-										<h6><span><i data-feather="user" class="feather-16"></i></span>Customers</h6>
-										<ul class="customers">
-											<li><a href="javascript:void(0);">Aron Varu<img src="assets/img/profiles/avator1.jpg" alt="Img" class="img-fluid"></a></li>
-											<li><a href="javascript:void(0);">Jonita<img src="assets/img/profiles/avatar-01.jpg" alt="Img" class="img-fluid"></a></li>
-											<li><a href="javascript:void(0);">Aaron<img src="assets/img/profiles/avatar-10.jpg" alt="Img" class="img-fluid"></a></li>
-										</ul>
-									</div>
-								</div>
-							</form>
-						</div>
-					</li>
-					<!-- /Search -->
+            <li class="nav-item dropdown link-nav">
+              <a
+                href="javascript:void(0);"
+                class="btn btn-primary btn-md d-inline-flex align-items-center"
+                data-bs-toggle="dropdown"
+              >
+                <i class="ti ti-circle-plus me-1"></i>Add New
+              </a>
+              <div class="dropdown-menu dropdown-xl dropdown-menu-center">
+                <div class="row g-2">
+                  <div class="col-md-2">
+                    <a href="category-list.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-brand-codepen"></i>
+                      </span>
+                      <p>Category</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="add-product.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-square-plus"></i>
+                      </span>
+                      <p>Product</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="category-list.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-shopping-bag"></i>
+                      </span>
+                      <p>Purchase</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="online-orders.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-shopping-cart"></i>
+                      </span>
+                      <p>Sale</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="expense-list.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-file-text"></i>
+                      </span>
+                      <p>Expense</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="quotation-list.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-device-floppy"></i>
+                      </span>
+                      <p>Quotation</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="sales-returns.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-copy"></i>
+                      </span>
+                      <p>Return</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="users.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-user"></i>
+                      </span>
+                      <p>User</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="customers.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-users"></i>
+                      </span>
+                      <p>Customer</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="sales-report.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-shield"></i>
+                      </span>
+                      <p>Biller</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="suppliers.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-user-check"></i>
+                      </span>
+                      <p>Supplier</p>
+                    </a>
+                  </div>
+                  <div class="col-md-2">
+                    <a href="-transfer.html" class="link-item">
+                      <span class="link-icon">
+                        <i class="ti ti-truck"></i>
+                      </span>
+                      <p>Transfer</p>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="nav-item nav-item-box">
+              <a href="javascript:void(0);" id="btnFullscreen">
+                <i class="ti ti-maximize"></i>
+              </a>
+            </li>
+            {% comment %}
+            <li class="nav-item nav-item-box">
+              <a href="email.html">
+                <i class="ti ti-mail"></i>
+                <span class="badge rounded-pill">1</span>
+              </a>
+            </li>
+            {% endcomment %}
+            <!-- Notifications -->
+            <li class="nav-item dropdown nav-item-box">
+              <a
+                href="javascript:void(0);"
+                class="dropdown-toggle nav-link"
+                data-bs-toggle="dropdown"
+              >
+                <i class="ti ti-bell"></i>
+              </a>
+              <div class="dropdown-menu notifications">
+                <div class="topnav-dropdown-header">
+                  <h5 class="notification-title">Notifications</h5>
+                  <a href="javascript:void(0)" class="clear-noti"
+                    >Mark all as read</a
+                  >
+                </div>
+                <div class="noti-content">
+                  <ul class="notification-list">
+                    <li class="notification-message">
+                      <a href="activities.html">
+                        <div class="media d-flex">
+                          <span class="avatar flex-shrink-0">
+                            <img
+                              alt="Img"
+                              src="assets/img/profiles/avatar-13.jpg"
+                            />
+                          </span>
+                          <div class="flex-grow-1">
+                            <p class="noti-details">
+                              <span class="noti-title">James Kirwin</span>
+                              confirmed his order. Order No: #78901.Estimated
+                              delivery: 2 days
+                            </p>
+                            <p class="noti-time">4 mins ago</p>
+                          </div>
+                        </div>
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+                <div
+                  class="topnav-dropdown-footer d-flex align-items-center gap-3"
+                >
+                  <a href="#" class="btn btn-secondary btn-md w-100">Cancel</a>
+                  <a href="activities.html" class="btn btn-primary btn-md w-100"
+                    >View all</a
+                  >
+                </div>
+              </div>
+            </li>
+            <!-- /Notifications -->
 
-					<!-- Select Store -->
-					<li class="nav-item dropdown has-arrow main-drop select-store-dropdown">
-						<a href="javascript:void(0);" class="dropdown-toggle nav-link select-store"
-							data-bs-toggle="dropdown">
-							<span class="user-info">
-								<span class="user-letter">
-									<img src="{% static 'assets/img/store/store-01.png' %}" alt="Store Logo" class="img-fluid">
-								</span>
-								<span class="user-detail">
-									<span class="user-name">Warehouse</span>
-								</span>
-							</span>
-						</a>
-						<div class="dropdown-menu dropdown-menu-right">
-							<a href="javascript:void(0);" class="dropdown-item">
-								<img src="{% static 'assets/img/store/store-01.png' %}" alt="Store Logo" class="img-fluid">Display
-							</a>
-							<a href="javascript:void(0);" class="dropdown-item">
-								<img src="{% static 'assets/img/store/store-02.png' %}" alt="Store Logo" class="img-fluid">Main Store
-							</a>
-						</div>
-					</li>
-					<!-- /Select Store -->
+            <li class="nav-item nav-item-box">
+              <a href="general-settings.html"><i class="ti ti-settings"></i></a>
+            </li>
+            <li class="nav-item dropdown has-arrow main-drop profile-nav">
+              <a
+                href="javascript:void(0);"
+                class="nav-link userset"
+                data-bs-toggle="dropdown"
+              >
+                <span class="user-info p-0">
+                  <span class="user-letter">
+                    <img
+                      src="assets/img/profiles/avator1.jpg"
+                      alt="Img"
+                      class="img-fluid"
+                    />
+                  </span>
+                </span>
+              </a>
+              <div class="dropdown-menu menu-drop-user">
+                <div class="profileset d-flex align-items-center">
+                  <span class="user-img me-2">
+                    <img src="assets/img/profiles/avator1.jpg" alt="Img" />
+                  </span>
+                  <div>
+                    <h6 class="fw-medium">Hajji Ismael</h6>
+                    <p>Admin</p>
+                  </div>
+                </div>
+                <a class="dropdown-item" href="profile.html"
+                  ><i class="ti ti-user-circle me-2"></i>MyProfile</a
+                >
+                <a class="dropdown-item" href="sales-report.html"
+                  ><i class="ti ti-file-text me-2"></i>Reports</a
+                >
+                <a class="dropdown-item" href="general-settings.html"
+                  ><i class="ti ti-settings-2 me-2"></i>Settings</a
+                >
+                <hr class="my-2" />
+                <a class="dropdown-item logout pb-0" href="signin.html"
+                  ><i class="ti ti-logout me-2"></i>Logout</a
+                >
+              </div>
+            </li>
+          </ul>
+          <!-- /Header Menu -->
 
-					<li class="nav-item dropdown link-nav">
-						<a href="javascript:void(0);" class="btn btn-primary btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-							<i class="ti ti-circle-plus me-1"></i>Add New
-						</a>
-						<div class="dropdown-menu dropdown-xl dropdown-menu-center">
-							<div class="row g-2">
-								<div class="col-md-2">
-									<a href="category-list.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-brand-codepen"></i>
-										</span>
-										<p>Category</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="add-product.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-square-plus"></i>
-										</span>
-										<p>Product</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="category-list.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-shopping-bag"></i>
-										</span>
-										<p>Purchase</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="online-orders.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-shopping-cart"></i>
-										</span>
-										<p>Sale</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="expense-list.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-file-text"></i>
-										</span>
-										<p>Expense</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="quotation-list.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-device-floppy"></i>
-										</span>
-										<p>Quotation</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="sales-returns.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-copy"></i>
-										</span>
-										<p>Return</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="users.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-user"></i>
-										</span>
-										<p>User</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="customers.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-users"></i>
-										</span>
-										<p>Customer</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="sales-report.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-shield"></i>
-										</span>
-										<p>Biller</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="suppliers.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-user-check"></i>
-										</span>
-										<p>Supplier</p>
-									</a>
-								</div>
-								<div class="col-md-2">
-									<a href="-transfer.html" class="link-item">
-										<span class="link-icon">
-											<i class="ti ti-truck"></i>
-										</span>
-										<p>Transfer</p>
-									</a>
-								</div>
-							</div>
-						</div>
-					</li>
-					<li class="nav-item nav-item-box">
-						<a href="javascript:void(0);" id="btnFullscreen">
-							<i class="ti ti-maximize"></i>
-						</a>
-					</li>
-					{% comment %} <li class="nav-item nav-item-box">
-						<a href="email.html">
-							<i class="ti ti-mail"></i>
-							<span class="badge rounded-pill">1</span>
-						</a>
-					</li> {% endcomment %}
-					<!-- Notifications -->
-					<li class="nav-item dropdown nav-item-box">
-						<a href="javascript:void(0);" class="dropdown-toggle nav-link" data-bs-toggle="dropdown">
-							<i class="ti ti-bell"></i>
-						</a>
-						<div class="dropdown-menu notifications">
-							<div class="topnav-dropdown-header">
-								<h5 class="notification-title">Notifications</h5>
-								<a href="javascript:void(0)" class="clear-noti">Mark all as read</a>
-							</div>
-							<div class="noti-content">
-								<ul class="notification-list">
-									<li class="notification-message">
-										<a href="activities.html">
-											<div class="media d-flex">
-												<span class="avatar flex-shrink-0">
-													<img alt="Img" src="assets/img/profiles/avatar-13.jpg">
-												</span>
-												<div class="flex-grow-1">
-													<p class="noti-details"><span class="noti-title">James Kirwin</span> confirmed his order.  Order No: #78901.Estimated delivery: 2 days</p>
-													<p class="noti-time">4 mins ago</p>
-												</div>
-											</div>
-										</a>
-									</li>
-								</ul>
-							</div>
-							<div class="topnav-dropdown-footer d-flex align-items-center gap-3">
-								<a href="#" class="btn btn-secondary btn-md w-100">Cancel</a>
-								<a href="activities.html" class="btn btn-primary btn-md w-100">View all</a>
-							</div>
-						</div>
-					</li>
-					<!-- /Notifications -->
-
-					<li class="nav-item nav-item-box">
-						<a href="general-settings.html"><i class="ti ti-settings"></i></a>
-					</li>
-					<li class="nav-item dropdown has-arrow main-drop profile-nav">
-						<a href="javascript:void(0);" class="nav-link userset" data-bs-toggle="dropdown">
-							<span class="user-info p-0">
-								<span class="user-letter">
-									<img src="assets/img/profiles/avator1.jpg" alt="Img" class="img-fluid">
-								</span>
-							</span>
-						</a>
-						<div class="dropdown-menu menu-drop-user">
-							<div class="profileset d-flex align-items-center">
-								<span class="user-img me-2">
-									<img src="assets/img/profiles/avator1.jpg" alt="Img">
-								</span>
-								<div>
-									<h6 class="fw-medium">Hajji Ismael</h6>
-									<p>Admin</p>
-								</div>
-							</div>
-							<a class="dropdown-item" href="profile.html"><i class="ti ti-user-circle me-2"></i>MyProfile</a>
-							<a class="dropdown-item" href="sales-report.html"><i class="ti ti-file-text me-2"></i>Reports</a>
-							<a class="dropdown-item" href="general-settings.html"><i class="ti ti-settings-2 me-2"></i>Settings</a>
-							<hr class="my-2">
-							<a class="dropdown-item logout pb-0" href="signin.html"><i class="ti ti-logout me-2"></i>Logout</a>
-						</div>
-					</li>
-				</ul>
-				<!-- /Header Menu -->
-
-				<!-- Mobile Menu -->
-				<div class="dropdown mobile-user-menu">
-					<a href="javascript:void(0);" class="nav-link dropdown-toggle" data-bs-toggle="dropdown"
-						aria-expanded="false"><i class="fa fa-ellipsis-v"></i></a>
-					<div class="dropdown-menu dropdown-menu-right">
-						<a class="dropdown-item" href="profile.html">My Profile</a>
-						<a class="dropdown-item" href="general-settings.html">Settings</a>
-						<a class="dropdown-item" href="signin.html">Logout</a>
-					</div>
-				</div>
-				<!-- /Mobile Menu -->
-			</div>
-		</div>
-		<!-- /Header -->
-
-		<!-- Sidebar -->
-		<div class="sidebar sidebar-horizontal" id="horizontal-menu">
-			<div id="sidebar-menu-3" class="sidebar-menu">
-				<div class="main-menu">
-					<ul class="nav-menu">
-						<li class="submenu">
-							<a href="index.html"><i class="ti ti-layout-grid fs-16 me-2"></i><span> Main Menu</span> <span class="menu-arrow"></span></a>
-							<ul>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Dashboard</span> <span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="index.html">Dashboard</a></li>
-										<li><a href="index.html">Admin Dashboard 2</a></li>
-										<li><a href="sales-dashboard.html">Sales Dashboard</a></li>
-									</ul>
-								</li>
-							</ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-brand-unity fs-16 me-2"></i><span> Inventory
-								</span> <span class="menu-arrow"></span></a>
-							<ul>
-                                <li><a href="{% url 'add_category_page' %}"><span>Category</span></a></li>
-								<li><a href="{% url 'store_page' %}"><span>Stores</span></a></li>
-								<li><a href="{% url 'unit_of_measure_page' %}"><span>Units</span></a></li>
-								<li><a href="{% url 'products_page' %}"><span>Products</span></a></li>
-								<li><a href="#"><span>Expired Products</span></a></li>
-								<li><a href="#"><span>Low s</span></a></li>
-								<li><a href="barcode.html"><span>Print Barcode</span></a></li>
-							</ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-layout-grid fs-16 me-2"></i><span>Stock</span> <span class="menu-arrow"></span></a>
-							<ul>
-								<li><a href="{% url 'purchase_order_list' %}"><span>Manage Stock</span></a></li>
-								<li><a href="manage-stocks.html"><span>Request Stock</span></a></li>
-								<li><a href="manage-stocks.html"><span>Manage Requisitions</span></a></li>
-								<li><a href="stock-transfer.html"><span>Stock Transfer</span></a></li>
-								<li><a href="stock-adjustment.html"><span>Stock Adjustment</span></a></li>
-								<li><a href="purchase-returns.html"><span>Stock Return</span></a></li>
-								<li><a href="stock-transfer.html"><span>Stock Movement</span></a></li>
-								<li><a href="{% url 'supplier_page' %}"><span>Supllier</span></a></li>
-								
-							</ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-layout-grid fs-16 me-2"></i><span>Sales</span> <span class="menu-arrow"></span></a>
-							<ul>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Sales</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="invoice.html"><span>Record Sale</span></a></li>
-										<li><a href="invoice.html"><span>Invoices</span></a></li>
-										<li><a href="sales-returns.html"><span>Sales Return</span></a></li>
-										<li><a href="quotation-list.html"><span>Quotation</span></a></li>
-									</ul>
-								</li>
-							</ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-page-break fs-16 me-2"></i><span>Staff</span> <span class="menu-arrow"></span></a>
-							<ul>
-								<li><a href="{% url 'under_maintenance_page' %}"><span>Profile</span></a></li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Employees</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="employees-grid.html"><span>Employees</span></a></li>
-										<li><a href="department-grid.html"><span>Departments</span></a></li>
-										<li><a href="designation.html"><span>Designation</span></a></li>
-										<li><a href="shift.html"><span>Shifts</span></a></li>
-									</ul>
-								</li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Attendence</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="attendance-employee.html">Employee Attendence</a></li>
-										<li><a href="attendance-admin.html">Admin Attendence</a></li>
-									</ul>
-								</li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Leaves &amp; Holidays</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="leaves-admin.html">Admin Leaves</a></li>
-										<li><a href="leaves-employee.html">Employee Leaves</a></li>
-										<li><a href="leave-types.html">Leave Types</a></li>
-										<li><a href="holidays.html"><span>Holidays</span></a></li>
-									</ul>
-								</li>
-								<li class="submenu">
-									<a href="employee-salary.html"><span>Payroll</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="employee-salary.html">Employee Salary</a></li>
-										<li><a href="payslip.html">Payslip</a></li>
-									</ul>
-								</li>
-							</ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-users-group fs-16 me-2"></i><span>Finance</span> <span class="menu-arrow"></span></a>
-							<ul>
-                                <li class="submenu">
-									<a href="javascript:void(0);"><span>Expenses</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="expense-list.html">Expenses</a></li>
-										<li><a href="expense-category.html">Expense Category</a></li>
-									</ul>
-								</li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Income</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="income.html">Income</a></li>
-										<li><a href="income-category.html">Income Category</a></li>
-									</ul>
-								</li>
-								<li><a href="account-list"><span>Bank Accounts</span></a></li>
-								<li><a href="money-transfer.html"><span>Money Transfer</span></a></li>
-								<li><a href="balance-sheet.html"><span>Balance Sheet</span></a></li>
-								<li><a href="trial-balance.html"><span>Trial Balance</span></a></li>
-								<li><a href="cash-flow.html"><span>Cash Flow</span></a></li>
-								<li><a href="account-statement.html"><span>Account Statement</span></a></li>
-                            </ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-circle-plus fs-16 me-2"></i><span>User Management</span><span class="menu-arrow"></span></a>
-							<ul>
-								<li><a href="users.html"><span>Users</span></a></li>
-								<li><a href="roles-permissions.html"><span>Roles & Permissions</span></a></li>
-								<li><a href="delete-account.html"><span>Activity Logs</span></a></li>
-								
-								
-							</ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-chart-bar fs-16 me-2"></i><span>Reports</span><span class="menu-arrow"></span></a>
-							<ul>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Sales Report</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="sales-report.html">Sales Report</a></li>
-										<li><a href="best-seller.html">Best Seller</a></li>
-									</ul>
-								</li>
-								<li><a href="purchase-report.html"><span>Purchase report</span></a></li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Inventory Report</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="inventory-report.html">Inventory Report</a></li>
-										<li><a href="-history.html"> History</a></li>
-										<li><a href="sold-.html">Sold </a></li>
-									</ul>
-								</li>
-								<li><a href="invoice-report.html"><span>Invoice Report</span></a></li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Supplier Report</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="supplier-report.html">Supplier Report</a></li>
-										<li><a href="supplier-due-report.html">Supplier Due Report</a></li>
-									</ul>
-								</li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Customer Report</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="customer-report.html">Customer Report</a></li>
-										<li><a href="customer-due-report.html">Customer Due Report</a></li>
-									</ul>
-								</li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Product Report</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="product-report.html">Product Report</a></li>
-										<li><a href="product-expiry-report.html">Product Expiry Report</a></li>
-										<li><a href="product-quantity-alert.html">Product Quantity Alert</a></li>
-									</ul>
-								</li>
-								<li><a href="expense-report.html"><span>Expense Report</span></a></li>
-								<li><a href="income-report.html"><span>Income Report</span></a></li>
-								<li><a href="tax-reports.html"><span>Tax Report</span></a></li>
-								<li><a href="profit-and-loss.html"><span>Profit & Loss</span></a></li>
-								<li><a href="annual-report.html"><span>Annual Report</span></a></li>
-							</ul>
-						</li>
-						<li class="submenu">
-							<a href="javascript:void(0);"><i class="ti ti-settings fs-16 me-2"></i><span>Settings</span><span class="menu-arrow"></span></a>
-							<ul>
-								<li><a href="#">Company Profile </a></li>
-								<li><a href="{% url 'manage_branch_page' %}">Branches </a></li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>App Settings</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li class="submenu submenu-two"><a href="javascript:void(0);">Invoice<span class="menu-arrow inside-submenu"></span></a>
-											<ul>
-												<li><a href="#">Invoice Settings</a></li>
-												<li><a href="#">Invoice Template</a></li>
-											</ul>
-										</li>
-										<li><a href="printer-settings.html">Printer</a></li>
-										<li><a href="pos-settings.html">Signatures</a></li>
-									</ul>
-								</li>
-								<li class="submenu">
-									<a href="javascript:void(0);"><span>Financial Settings</span><span class="menu-arrow"></span></a>
-									<ul>
-										<li><a href="payment-gateway-settings.html">Payment Methods</a></li>
-										<li><a href="bank-settings-grid.html">Bank Accounts</a></li>
-										<li><a href="currency-settings.html">Currencies</a></li>
-									</ul>
-								</li>
-								<li>
-									<a href="signin.html"><span>Logout</span> </a>
-								</li>
-							</ul>
-						</li>
-					</ul>
-				</div>
-			</div>
-		</div>
-		<!-- /Sidebar -->
-
-		<div class="page-wrapper">
-			<div class="content">
-                {% block content %}{% endblock content %}
+          <!-- Mobile Menu -->
+          <div class="dropdown mobile-user-menu">
+            <a
+              href="javascript:void(0);"
+              class="nav-link dropdown-toggle"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+              ><i class="fa fa-ellipsis-v"></i
+            ></a>
+            <div class="dropdown-menu dropdown-menu-right">
+              <a class="dropdown-item" href="profile.html">My Profile</a>
+              <a class="dropdown-item" href="general-settings.html">Settings</a>
+              <a class="dropdown-item" href="signin.html">Logout</a>
             </div>
-			<div class="copyright-footer d-flex align-items-center justify-content-between border-top bg-white gap-3 flex-wrap">
-				<p class="fs-13 text-gray-9 mb-0">2025 &copy; UGACloud. All Right Reserved</p>
-				<p>Designed & Developed By <a href="javascript:void(0);" class="link-primary">UGACloud</a></p>
-			</div>
-		</div>
+          </div>
+          <!-- /Mobile Menu -->
+        </div>
+      </div>
+      <!-- /Header -->
 
-	</div>
-	<!-- /Main Wrapper -->
+      <!-- Sidebar -->
+      <div class="sidebar sidebar-horizontal" id="horizontal-menu">
+        <div id="sidebar-menu-3" class="sidebar-menu">
+          <div class="main-menu">
+            <ul class="nav-menu">
+              <li class="submenu">
+                <a href="index.html"
+                  ><i class="ti ti-layout-grid fs-16 me-2"></i
+                  ><span> Main Menu</span> <span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Dashboard</span> <span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li><a href="index.html">Dashboard</a></li>
+                      <li><a href="index.html">Admin Dashboard 2</a></li>
+                      <li>
+                        <a href="sales-dashboard.html">Sales Dashboard</a>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-brand-unity fs-16 me-2"></i
+                  ><span> Inventory </span> <span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li>
+                    <a href="{% url 'add_category_page' %}"
+                      ><span>Category</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'store_page' %}"><span>Stores</span></a>
+                  </li>
+                  <li>
+                    <a href="{% url 'unit_of_measure_page' %}"
+                      ><span>Units</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'products_page' %}"
+                      ><span>Products</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Expired Products</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Low s</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Print Barcode</span></a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-layout-grid fs-16 me-2"></i
+                  ><span>Stock</span> <span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li>
+                    <a href="{% url 'purchase_order_list' %}"
+                      ><span>Manage Stock</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Request Stock</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Manage Requisitions</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Stock Transfer</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Stock Adjustment</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Stock Return</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Stock Movement</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'supplier_page' %}"
+                      ><span>Supllier</span></a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-layout-grid fs-16 me-2"></i
+                  ><span>Sales</span> <span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Sales</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Record Sale</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Invoices</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Sales Return</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Quotation</span></a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-page-break fs-16 me-2"></i
+                  ><span>Staff</span> <span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Profile</span></a
+                    >
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Employees</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Employees</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Departments</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Designation</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Shifts</span></a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Attendence</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Employee Attendence</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Admin Attendence</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Leaves &amp; Holidays</span
+                      ><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Admin Leaves</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Employee Leaves</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Leave Types</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Holidays</span></a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="submenu">
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Payroll</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Employee Salary</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}">Payslip</a>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-users-group fs-16 me-2"></i
+                  ><span>Finance</span> <span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Expenses</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Expenses</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Expense Category</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Income</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}">Income</a>
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Income Category</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Bank Accounts</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Money Transfer</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Balance Sheet</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Trial Balance</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Cash Flow</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Account Statement</span></a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-circle-plus fs-16 me-2"></i
+                  ><span>User Management</span><span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Users</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Roles & Permissions</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Activity Logs</span></a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-chart-bar fs-16 me-2"></i><span>Reports</span
+                  ><span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Sales Report</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Sales Report</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Best Seller</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Purchase report</span></a
+                    >
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Inventory Report</span
+                      ><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Inventory Report</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}">
+                          History</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}">Sold </a>
+                      </li>
+                    </ul>
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Invoice Report</span></a
+                    >
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Supplier Report</span
+                      ><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Supplier Report</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Supplier Due Report</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Customer Report</span
+                      ><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Customer Report</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Customer Due Report</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Product Report</span
+                      ><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Product Report</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Product Expiry Report</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Product Quantity Alert</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Expense Report</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Income Report</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Tax Report</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Profit & Loss</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Annual Report</span></a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li class="submenu">
+                <a href="javascript:void(0);"
+                  ><i class="ti ti-settings fs-16 me-2"></i><span>Settings</span
+                  ><span class="menu-arrow"></span
+                ></a>
+                <ul>
+                  <li><a href="#">Company Profile </a></li>
+                  <li>
+                    <a href="{% url 'manage_branch_page' %}">Branches </a>
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>App Settings</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li class="submenu submenu-two">
+                        <a href="javascript:void(0);"
+                          >Invoice<span class="menu-arrow inside-submenu"></span
+                        ></a>
+                        <ul>
+                          <li><a href="#">Invoice Settings</a></li>
+                          <li><a href="#">Invoice Template</a></li>
+                        </ul>
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}">Printer</a>
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Signatures</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Financial Settings</span
+                      ><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Payment Methods</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Bank Accounts</a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Currencies</a
+                        >
+                      </li>
+                    </ul>
+                  </li>
+                  <li>
+                    <a href="{% url 'under_maintenance_page' %}"
+                      ><span>Logout</span>
+                    </a>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- /Sidebar -->
 
-	<!-- jQuery -->
-	<script src="{% static 'assets/js/jquery-3.7.1.min.js' %}"></script>
+      <div class="page-wrapper">
+        <div class="content">{% block content %}{% endblock content %}</div>
+        <div
+          class="copyright-footer d-flex align-items-center justify-content-between border-top bg-white gap-3 flex-wrap"
+        >
+          <p class="fs-13 text-gray-9 mb-0">
+            2025 &copy; UGACloud. All Right Reserved
+          </p>
+          <p>
+            Designed & Developed By
+            <a href="javascript:void(0);" class="link-primary">UGACloud</a>
+          </p>
+        </div>
+      </div>
+    </div>
+    <!-- /Main Wrapper -->
 
-	<!-- Feather Icon JS -->
-	<script src="{% static 'assets/js/feather.min.js' %}"></script>
+    <!-- jQuery -->
+    <script src="{% static 'assets/js/jquery-3.7.1.min.js' %}"></script>
 
-	<!-- Slimscroll JS -->
-	<script src="{% static 'assets/js/jquery.slimscroll.min.js' %}"></script>
+    <!-- Feather Icon JS -->
+    <script src="{% static 'assets/js/feather.min.js' %}"></script>
 
-	<!-- Datatable JS -->
-	<script src="{% static 'assets/js/jquery.dataTables.min.js' %}"></script>
-	<script src="{% static 'assets/js/dataTables.bootstrap5.min.js' %}"></script>
+    <!-- Slimscroll JS -->
+    <script src="{% static 'assets/js/jquery.slimscroll.min.js' %}"></script>
 
-	<!-- Summernote JS -->
-	<script src="assets/plugins/summernote/summernote-bs4.min.js"></script>
+    <!-- Datatable JS -->
+    <script src="{% static 'assets/js/jquery.dataTables.min.js' %}"></script>
+    <script src="{% static 'assets/js/dataTables.bootstrap5.min.js' %}"></script>
 
-	<!-- Bootstrap Core JS -->
-	<script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+    <!-- Summernote JS -->
+    <script src="assets/plugins/summernote/summernote-bs4.min.js"></script>
 
-	<!-- Daterangepikcer JS -->
-	<script src="{% static 'assets/js/moment.min.js' %}"></script>
-	<script src="{% static 'assets/plugins/daterangepicker/daterangepicker.js' %}"></script>
+    <!-- Bootstrap Core JS -->
+    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
 
-	<!-- Chart JS -->
-	<script src="{% static 'assets/plugins/chartjs/chart.min.js' %}"></script>
-	<script src="{% static 'assets/plugins/chartjs/chart-data.js' %}"></script>
+    <!-- Daterangepikcer JS -->
+    <script src="{% static 'assets/js/moment.min.js' %}"></script>
+    <script src="{% static 'assets/plugins/daterangepicker/daterangepicker.js' %}"></script>
 
-	<!-- Select2 JS -->
-	<script src="{% static 'assets/plugins/select2/js/select2.min.js' %}"></script>
+    <!-- Chart JS -->
+    <script src="{% static 'assets/plugins/chartjs/chart.min.js' %}"></script>
+    <script src="{% static 'assets/plugins/chartjs/chart-data.js' %}"></script>
 
-	<!-- Chart JS -->
-	<script src="{% static 'assets/plugins/apexchart/apexcharts.min.js' %}"></script>
-	<script src="{% static 'assets/plugins/apexchart/chart-data.js' %}"></script>
+    <!-- Select2 JS -->
+    <script src="{% static 'assets/plugins/select2/js/select2.min.js' %}"></script>
 
-	<!-- Bootstrap Tagsinput JS -->
-	<script src="{% static 'assets/plugins/bootstrap-tagsinput/bootstrap-tagsinput.js' %}"></script>
+    <!-- Chart JS -->
+    <script src="{% static 'assets/plugins/apexchart/apexcharts.min.js' %}"></script>
+    <script src="{% static 'assets/plugins/apexchart/chart-data.js' %}"></script>
 
-	<!-- Color Picker JS -->
-	<script src="{% static 'assets/plugins/@simonwep/pickr/pickr.es5.min.js' %}"></script>
+    <!-- Bootstrap Tagsinput JS -->
+    <script src="{% static 'assets/plugins/bootstrap-tagsinput/bootstrap-tagsinput.js' %}"></script>
 
-	<!-- Custom JS -->
-	<script src="{% static 'assets/js/theme-colorpicker.js' %}"></script>
-	<script src="{% static 'assets/js/script.js' %}"></script>
+    <!-- Color Picker JS -->
+    <script src="{% static 'assets/plugins/@simonwep/pickr/pickr.es5.min.js' %}"></script>
 
-	
-	<!-- Owl JS -->
-	<script src="{% static 'assets/plugins/owlcarousel/owl.carousel.min.js' %}"></script>
+    <!-- Custom JS -->
+    <script src="{% static 'assets/js/theme-colorpicker.js' %}"></script>
+    <script src="{% static 'assets/js/script.js' %}"></script>
 
-	
-</body>
-
+    <!-- Owl JS -->
+    <script src="{% static 'assets/plugins/owlcarousel/owl.carousel.min.js' %}"></script>
+  </body>
 </html>
