@@ -3,7 +3,7 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from app.models.transactions import TransferRequest, StockTransfer, StockTransferItem
 from app.forms.transaction_forms import (
-    TransferRequestForm, StockTransferForm, StockTransferItemForm, StockTransferItemFormSet
+    TransferRequestForm, StockTransferForm, StockTransferItemForm, StockTransferItemFormSet, TransferRequestItemFormSet
 )
 from app.selectors.transfer_selectors import (
     get_all_transfer_requests, get_transfer_request_by_id, get_all_stock_transfers, get_stock_transfer_by_id
@@ -11,63 +11,114 @@ from app.selectors.transfer_selectors import (
 
 def transfer_request_list(request):
     requests = get_all_transfer_requests()
-    form = TransferRequestForm(request.POST)
-
+    
+    form = TransferRequestForm()
+    formset = TransferRequestItemFormSet()
+ 
     context = {
         'requests': requests,
-        'form': form
+        'form': form,
+        'item_formset': formset
     }
+    
     return render(request, 'transfers/transfer_request_list.html', context)
 
-def transfer_request_detail(request, pk):
-    request_obj = get_object_or_404(TransferRequest, pk=pk)
-    return render(request, 'transfer_request_detail.html', {'request_obj': request_obj})
-
 def add_transfer_request(request):
+    
     if request.method == 'POST':
         form = TransferRequestForm(request.POST)
-        if form.is_valid():
-            form.save()
+        formset = TransferRequestItemFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            transfer_request = form.save()
+            formset.instance = transfer_request
+            formset.save()
+            
             messages.success(request, 'Transfer request created successfully.')
+            
+            return redirect(transfer_request_list)
 
-        return redirect(transfer_request_list)
+def transfer_request_detail(request, pk):
+    transfer_request = get_object_or_404(TransferRequest, pk=pk)
+
+    form = TransferRequestForm(instance=transfer_request)
+    formset = TransferRequestItemFormSet(instance=transfer_request)
+
+    context = {
+        'transfer_request': transfer_request,
+        'form': form, 
+        'item_formset': formset
+    }
+
+    return render(request, 'transfer_request_detail.html', context)
 
 def update_transfer_request(request, pk):
+    
     transfer_request = get_object_or_404(TransferRequest, pk=pk)
     
     if request.method == 'POST':
         form = TransferRequestForm(request.POST, instance=transfer_request)
-        
-        if form.is_valid():
+        formset = TransferRequestItemFormSet(request.POST, instance=transfer_request)
+       
+        if form.is_valid() and formset.is_valid():
             form.save()
+            formset.save()
+            
             messages.success(request, 'Transfer request updated successfully.')
             
-        return redirect(transfer_request_list)
+            return redirect(transfer_request_list)
+    
 
 def stock_transfer_list(request):
     transfers = get_all_stock_transfers()
+    
     return render(request, 'stock_transfer_list.html', {'transfers': transfers})
+
+
+
+def stock_transfer_create(request):
+    # Assume transfer_request_id is passed as GET or POST param
+    transfer_request_id = request.GET.get('transfer_request_id') or request.POST.get('transfer_request')
+
+    transfer_request = None
+    initial_items = []
+
+    if transfer_request_id:
+        transfer_request = get_object_or_404(TransferRequest, id=transfer_request_id)
+        
+        # Get items from the transfer request
+        initial_items = [
+            {
+                'product': item.product,
+                'quantity': item.quantity,
+                'transfer_request_item': item.id
+            }
+            for item in transfer_request.items.all()
+        ]
+
+    if request.method == 'POST':
+        form = StockTransferForm(request.POST)
+        formset = StockTransferItemFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            transfer = form.save()
+            formset.instance = transfer
+            formset.save()
+           
+            messages.success(request, 'Stock transfer created successfully.')
+            
+            return redirect(stock_transfer_list)
+    else:
+        form = StockTransferForm(initial={'transfer_request': transfer_request_id} if transfer_request_id else None)
+        
+        formset = StockTransferItemFormSet(initial=initial_items)
+    return render(request, 'stock_transfer_form.html', {'form': form, 'item_formset': formset, 'transfer_request': transfer_request})
 
 def stock_transfer_detail(request, pk):
     transfer_obj = get_stock_transfer_by_id(pk)
     if not transfer_obj:
         return render(request, '404.html', status=404)
     return render(request, 'stock_transfer_detail.html', {'transfer_obj': transfer_obj})
-
-def stock_transfer_create(request):
-    if request.method == 'POST':
-        form = StockTransferForm(request.POST)
-        formset = StockTransferItemFormSet(request.POST)
-        if form.is_valid() and formset.is_valid():
-            transfer = form.save()
-            formset.instance = transfer
-            formset.save()
-            messages.success(request, 'Stock transfer created successfully.')
-            return redirect('stock_transfer_list')
-    else:
-        form = StockTransferForm()
-        formset = StockTransferItemFormSet()
-    return render(request, 'stock_transfer_form.html', {'form': form, 'item_formset': formset})
 
 def stock_transfer_update(request, pk):
     transfer = get_object_or_404(StockTransfer, pk=pk)

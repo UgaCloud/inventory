@@ -2,7 +2,7 @@ from django import forms
 from django.forms import ModelForm, inlineformset_factory
 from app.models.transactions import (
     PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement,
-    TransferRequest, StockTransferItem
+    TransferRequest, StockTransferItem, TransferRequestItem
 )
 
 class PurchaseOrderForm(forms.ModelForm):
@@ -75,9 +75,12 @@ class SalesItemForm(ModelForm):
         return cleaned_data
 
 class TransferRequestForm(forms.ModelForm):
+
     class Meta:
         model = TransferRequest
         fields = "__all__"
+
+        exclude = ['approved_by', 'note', 'status']
 
     def clean(self):
         cleaned_data = super().clean()
@@ -108,6 +111,26 @@ class StockTransferItemForm(forms.ModelForm):
         fields = "__all__"
         widgets = {
             'stock_transfer': forms.HiddenInput(),
+            'transfer_request_item': forms.HiddenInput(),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        quantity = cleaned_data.get('quantity')
+        transfer_request_item = cleaned_data.get('transfer_request_item')
+        if quantity is not None and quantity <= 0:
+            raise forms.ValidationError("Quantity must be greater than zero.")
+        # Prevent transferring more than requested
+        if transfer_request_item and quantity > transfer_request_item.quantity:
+            raise forms.ValidationError(f"Cannot transfer more than requested ({transfer_request_item.quantity}).")
+        return cleaned_data
+
+class TransferRequestItemForm(forms.ModelForm):
+    class Meta:
+        model = TransferRequestItem
+        fields = "__all__"
+        widgets = {
+            'transfer_request': forms.HiddenInput(),
         }
 
     def clean(self):
@@ -123,4 +146,8 @@ PurchaseOrderItemFormSet = inlineformset_factory(
 
 StockTransferItemFormSet = inlineformset_factory(
     StockTransfer, StockTransferItem, fields='__all__', extra=1
+)
+
+TransferRequestItemFormSet = inlineformset_factory(
+    TransferRequest, TransferRequestItem, fields='__all__', extra=0
 )
