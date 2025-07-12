@@ -66,7 +66,7 @@ class ProductUnitPrice(models.Model):
         unique_together = ('product', 'unit')
 
     def __str__(self):
-        return f"{self.product.name} - {self.unit.name} (${self.price})"
+        return f"{self.product.name} - {self.unit.name} ({self.price}/-)"
 
 
 class StoreLocation(models.Model):

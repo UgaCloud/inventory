@@ -1,6 +1,7 @@
-{% extends './base.html' %}
-
+{% extends 'basic/base.html' %}
 {% load crispy_forms_tags %}
+{% load static %}
+
 {% block content%}
     <body class="bg03">
     <div class="container">
@@ -32,8 +33,8 @@
                                         <th scope="col">&nbsp;</th>
                                         
                                         <th scope="col" class="text-center">Product</th>
-                                        
-                                        
+                                        <th scope="col" class="text-center">Requested Qty</th>
+                                        <th scope="col" class="text-center">Transfer Qty</th>
                                         <th scope="col" class="text-center">From - To</th>
                                         <th scope="col" class="text-center">Quantity</th>
                                                                               
@@ -47,6 +48,14 @@
                                             <td scope="row">&nbsp;</td>
                                             <td><input type="checkbox" name = "selected_items" value = {{stock_transfer.id}}></td>
                                             <td>{{stock_transfer.product}}</td>
+                                            <td>
+                                                {% if stock_transfer.transfer_request_item %}
+                                                    {{ stock_transfer.transfer_request_item.quantity }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{stock_transfer.quantity}}</td>
                                             <td>{{stock_transfer.from_store}} - {{stock_transfer.to_store}}</td>
                                             <td>{{stock_transfer.quantity}}</td>
                                         </tr>
