@@ -13,8 +13,11 @@ from .views.stock_views import (
     purchase_order_list, purchase_order_detail, create_purchase_order, edit_purchase_order, delete_purchase_order,
     purchase_order_item_list, create_purchase_order_item, edit_purchase_order_item, delete_purchase_order_item
 )
-
-
+from .views.transfer_views import (
+    transfer_request_list, add_transfer_request, transfer_request_detail, update_transfer_request,
+    stock_transfer_list, stock_transfer_detail, stock_transfer_create, stock_transfer_update, 
+    approve_transfer_request
+)
 
 urlpatterns = [
     path('', index_view, name = 'index_page'),
@@ -61,4 +64,16 @@ urlpatterns = [
     path('purchase_order/<int:order_id>/items/create/', create_purchase_order_item, name='create_purchase_order_item'),
     path('purchase_order/item/<int:item_id>/edit/', edit_purchase_order_item, name='edit_purchase_order_item'),
     path('purchase_order/item/<int:item_id>/delete/', delete_purchase_order_item, name='delete_purchase_order_item'),
+
+    # Transfer Requests
+    path('transfer_requests/', transfer_request_list, name='transfer_request_list'),
+    path('transfer_requests/add/', add_transfer_request, name='add_transfer_request'),
+    path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
+    path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
+    path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
+    # Stock Transfers
+    path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
+    path('stock_transfers/<int:pk>/', stock_transfer_detail, name='stock_transfer_detail'),
+    path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
+    path('stock_transfers/<int:pk>/update/', stock_transfer_update, name='stock_transfer_update'),
 ]

@@ -86,7 +86,7 @@ class TransferRequest(models.Model):
     status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default="pending")
     request_date = models.DateTimeField(auto_now_add=True)
     approved_by = models.CharField(max_length=100, blank=True, null=True)
-    approved_date = models.DateTimeField(blank=True, null=True)
+    approved_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     note = models.TextField(blank=True, null=True)
 
     def __str__(self):
@@ -95,6 +95,19 @@ class TransferRequest(models.Model):
     @property
     def total_requested_items(self):
         return self.stock_transfers.aggregate(total=models.Sum('items__quantity'))['total'] or 0
+
+
+class TransferRequestItem(models.Model):
+    transfer_request = models.ForeignKey('TransferRequest', on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    units = models.ForeignKey("app.ProductUnitPrice", on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ("transfer_request", "product")
+
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity} (Request {self.transfer_request.id})"
 
 
 class StockTransfer(models.Model):
@@ -119,6 +132,9 @@ class StockTransferItem(models.Model):
     stock_transfer = models.ForeignKey(StockTransfer, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
+    transfer_request_item = models.ForeignKey(
+        "app.TransferRequestItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="fulfilled_transfer_items"
+    )
 
     class Meta:
         unique_together = ("stock_transfer", "product")
@@ -141,3 +157,5 @@ class StockMovement(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     units_in_stock = models.IntegerField()
     user = models.CharField(max_length=50)
+
+
