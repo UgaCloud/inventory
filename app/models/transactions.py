@@ -40,15 +40,15 @@ class PurchaseOrderItem(models.Model):
 
 
 class Sales(models.Model):
+    receipt_no = models.CharField(max_length=50, unique=True)
     customer = models.ForeignKey("app.Customer", on_delete=models.SET_NULL, null=True, blank=True)
     sale_date = models.DateField(auto_now_add=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
-    branch = models.ForeignKey("app.Branch", on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=20, choices=SALE_ORDER_OPTIONS)
     recorded_by = models.CharField(max_length=50)
 
     def __str__(self):
-        return f"SO-{self.id} ({self.customer.name if self.customer else 'Walk-in'})"
+        return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"
     
     @property
     def total_items(self):
