@@ -120,13 +120,13 @@
         <div class="main-header">
           <!-- Logo -->
           <div class="header-left active">
-            <a href="index.html" class="logo logo-normal">
+            <a href="{% url 'index_page' %}" class="logo logo-normal">
               <img src="{% static 'assets/img/logo.svg' %}" alt="Img" />
             </a>
-            <a href="index.html" class="logo logo-white">
+            <a href="{% url 'index_page' %}" class="logo logo-white">
               <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" />
             </a>
-            <a href="index.html" class="logo-small">
+            <a href="{% url 'index_page' %}" class="logo-small">
               <img src="{% static 'assets/img/logo-small.png' %}" alt="Img" />
             </a>
           </div>
@@ -162,7 +162,7 @@
                     <span class="input-group-text">
                       <kbd class="d-flex align-items-center"
                         ><img
-                          src="assets/img/icons/command.svg"
+                          src="{% static 'assets/img/icons/command.svg' %}"
                           alt="img"
                           class="me-1"
                         />K</kbd
@@ -294,7 +294,10 @@
               <div class="dropdown-menu dropdown-xl dropdown-menu-center">
                 <div class="row g-2">
                   <div class="col-md-2">
-                    <a href="category-list.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-brand-codepen"></i>
                       </span>
@@ -302,7 +305,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="add-product.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-square-plus"></i>
                       </span>
@@ -310,7 +316,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="category-list.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-shopping-bag"></i>
                       </span>
@@ -318,7 +327,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="online-orders.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-shopping-cart"></i>
                       </span>
@@ -326,7 +338,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="expense-list.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-file-text"></i>
                       </span>
@@ -334,7 +349,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="quotation-list.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-device-floppy"></i>
                       </span>
@@ -342,7 +360,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="sales-returns.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-copy"></i>
                       </span>
@@ -350,7 +371,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="users.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-user"></i>
                       </span>
@@ -358,7 +382,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="customers.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-users"></i>
                       </span>
@@ -366,7 +393,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="sales-report.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-shield"></i>
                       </span>
@@ -374,7 +404,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="suppliers.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-user-check"></i>
                       </span>
@@ -382,7 +415,10 @@
                     </a>
                   </div>
                   <div class="col-md-2">
-                    <a href="-transfer.html" class="link-item">
+                    <a
+                      href="{% url 'under_maintenance_page' %}"
+                      class="link-item"
+                    >
                       <span class="link-icon">
                         <i class="ti ti-truck"></i>
                       </span>
@@ -399,7 +435,7 @@
             </li>
             {% comment %}
             <li class="nav-item nav-item-box">
-              <a href="email.html">
+              <a href="{% url 'under_maintenance_page' %}">
                 <i class="ti ti-mail"></i>
                 <span class="badge rounded-pill">1</span>
               </a>
@@ -424,12 +460,12 @@
                 <div class="noti-content">
                   <ul class="notification-list">
                     <li class="notification-message">
-                      <a href="activities.html">
+                      <a href="{% url 'under_maintenance_page' %}">
                         <div class="media d-flex">
                           <span class="avatar flex-shrink-0">
                             <img
                               alt="Img"
-                              src="assets/img/profiles/avatar-13.jpg"
+                              src="{% static 'assets/img/profiles/avatar-13.jpg' %}"
                             />
                           </span>
                           <div class="flex-grow-1">
@@ -449,7 +485,9 @@
                   class="topnav-dropdown-footer d-flex align-items-center gap-3"
                 >
                   <a href="#" class="btn btn-secondary btn-md w-100">Cancel</a>
-                  <a href="activities.html" class="btn btn-primary btn-md w-100"
+                  <a
+                    href="{% url 'under_maintenance_page' %}"
+                    class="btn btn-primary btn-md w-100"
                     >View all</a
                   >
                 </div>
@@ -458,7 +496,9 @@
             <!-- /Notifications -->
 
             <li class="nav-item nav-item-box">
-              <a href="general-settings.html"><i class="ti ti-settings"></i></a>
+              <a href="{% url 'under_maintenance_page' %}"
+                ><i class="ti ti-settings"></i
+              ></a>
             </li>
             <li class="nav-item dropdown has-arrow main-drop profile-nav">
               <a
@@ -469,7 +509,7 @@
                 <span class="user-info p-0">
                   <span class="user-letter">
                     <img
-                      src="assets/img/profiles/avator1.jpg"
+                      src="{% static 'assets/img/profiles/avator1.jpg' %}"
                       alt="Img"
                       class="img-fluid"
                     />
@@ -479,24 +519,35 @@
               <div class="dropdown-menu menu-drop-user">
                 <div class="profileset d-flex align-items-center">
                   <span class="user-img me-2">
-                    <img src="assets/img/profiles/avator1.jpg" alt="Img" />
+                    <img
+                      src="{% static 'assets/img/profiles/avator1.jpg' %}"
+                      alt="Img"
+                    />
                   </span>
                   <div>
                     <h6 class="fw-medium">Hajji Ismael</h6>
                     <p>Admin</p>
                   </div>
                 </div>
-                <a class="dropdown-item" href="profile.html"
+                <a
+                  class="dropdown-item"
+                  href="{% url 'under_maintenance_page' %}"
                   ><i class="ti ti-user-circle me-2"></i>MyProfile</a
                 >
-                <a class="dropdown-item" href="sales-report.html"
+                <a
+                  class="dropdown-item"
+                  href="{% url 'under_maintenance_page' %}"
                   ><i class="ti ti-file-text me-2"></i>Reports</a
                 >
-                <a class="dropdown-item" href="general-settings.html"
+                <a
+                  class="dropdown-item"
+                  href="{% url 'under_maintenance_page' %}"
                   ><i class="ti ti-settings-2 me-2"></i>Settings</a
                 >
                 <hr class="my-2" />
-                <a class="dropdown-item logout pb-0" href="signin.html"
+                <a
+                  class="dropdown-item logout pb-0"
+                  href="{% url 'under_maintenance_page' %}"
                   ><i class="ti ti-logout me-2"></i>Logout</a
                 >
               </div>
@@ -530,7 +581,7 @@
           <div class="main-menu">
             <ul class="nav-menu">
               <li class="submenu">
-                <a href="index.html"
+                <a href="{% url 'index_page' %}"
                   ><i class="ti ti-layout-grid fs-16 me-2"></i
                   ><span> Main Menu</span> <span class="menu-arrow"></span
                 ></a>
@@ -540,10 +591,14 @@
                       ><span>Dashboard</span> <span class="menu-arrow"></span
                     ></a>
                     <ul>
-                      <li><a href="index.html">Dashboard</a></li>
-                      <li><a href="index.html">Admin Dashboard 2</a></li>
+                      <li><a href="{% url 'index_page' %}">Dashboard</a></li>
                       <li>
-                        <a href="sales-dashboard.html">Sales Dashboard</a>
+                        <a href="{% url 'index_page' %}">Admin Dashboard 2</a>
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          >Sales Dashboard</a
+                        >
                       </li>
                     </ul>
                   </li>
