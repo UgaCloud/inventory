@@ -611,13 +611,17 @@
                 ></a>
                 <ul>
                   <li>
-                    <a href="{% url 'add_category_page' %}"
-                      ><span>Category</span></a
-                    >
+                    <a href="{% url 'manage_branch_page' %}">Branches </a>
                   </li>
                   <li>
                     <a href="{% url 'store_page' %}"><span>Stores</span></a>
                   </li>
+                  <li>
+                    <a href="{% url 'add_category_page' %}"
+                      ><span>Category</span></a
+                    >
+                  </li>
+
                   <li>
                     <a href="{% url 'unit_of_measure_page' %}"
                       ><span>Units</span></a
@@ -1068,9 +1072,7 @@
                 ></a>
                 <ul>
                   <li><a href="#">Company Profile </a></li>
-                  <li>
-                    <a href="{% url 'manage_branch_page' %}">Branches </a>
-                  </li>
+
                   <li class="submenu">
                     <a href="javascript:void(0);"
                       ><span>App Settings</span><span class="menu-arrow"></span
