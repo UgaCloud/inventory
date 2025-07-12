@@ -28,15 +28,7 @@
                     <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
                 </div>
             </div>
-            <div class="d-flex table-dropdown my-xl-auto right-content align-items-center flex-wrap row-gap-3">
-                <div class="dropdown me-2">
-                    <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-                        Transfer Requests
-                    </a>
-                    
-                </div>
-                
-            </div>
+            
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -50,12 +42,11 @@
                                 </label>
                             </th>
                             <th>ID</th>
-                            <th>From Location</th>
-                            <th>To Location</th>
+                            <th>From </th>
+                            <th>To </th>
                             <th>Requested By</th>
                             <th>Date Requested</th>
                             <th>Status</th>
-                            <th>Items</th>
                             <th class="no-sort"></th>
                         </tr>
                     </thead>
@@ -75,21 +66,12 @@
                                 <td>{{ req.requested_by }}</td>
                                 <td>{{ req.request_date|date:'Y-m-d' }}</td>
                                 <td>{{ req.status }}</td>
-                                <td>
-                                    <ul>
-                                    {% for item in req.items.all %}
-                                        <li>{{ item.product }}: {{ item.quantity }}</li>
-                                    {% endfor %}
-                                    </ul>
-                                </td>
                                 <td class="action-table-data">
                                     <div class="edit-delete-action">
                                         <a class="me-2 edit-icon  p-2" href="{% url 'transfer_request_detail' req.id %}">
                                             <i data-feather="eye" class="feather-eye"></i>
                                         </a>
-                                        <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);">
-                                            <i data-feather="trash-2" class="feather-trash-2"></i>
-                                        </a>
+                                        
                                     </div>
                                 </td>
                             </tr>
@@ -97,25 +79,6 @@
                         {% endif %}
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- delete modal -->
-    <div class="modal fade" id="delete-modal">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="page-wrapper-new p-0">
-                    <div class="content p-5 px-3 text-center">
-                        <span class="rounded-circle d-inline-flex p-2 bg-danger-transparent mb-2"><i class="ti ti-trash fs-24 text-danger"></i></span>
-                        <h4 class="fs-20 text-gray-9 fw-bold mb-2 mt-1">Delete Product</h4>
-                        <p class="text-gray-6 mb-0 fs-16">Are you sure you want to delete product?</p>
-                        <div class="modal-footer-btn mt-3 d-flex justify-content-center">
-                            <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary fs-13 fw-medium p-2 px-3">Yes Delete</button>
-                        </div>						
-                    </div>
-                </div>
             </div>
         </div>
     </div>

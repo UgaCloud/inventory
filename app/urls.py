@@ -16,6 +16,7 @@ from .views.stock_views import (
 from .views.transfer_views import (
     transfer_request_list, add_transfer_request, transfer_request_detail, update_transfer_request,
     stock_transfer_list, stock_transfer_detail, stock_transfer_create, stock_transfer_update, 
+    approve_transfer_request
 )
 
 urlpatterns = [
@@ -69,6 +70,8 @@ urlpatterns = [
     path('transfer_requests/add/', add_transfer_request, name='add_transfer_request'),
     path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
     path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
+    path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
+    # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
     path('stock_transfers/<int:pk>/', stock_transfer_detail, name='stock_transfer_detail'),
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),

@@ -3,7 +3,8 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from app.models.transactions import TransferRequest, StockTransfer, StockTransferItem
 from app.forms.transaction_forms import (
-    TransferRequestForm, StockTransferForm, StockTransferItemForm, StockTransferItemFormSet, TransferRequestItemFormSet
+    TransferRequestForm, StockTransferForm, StockTransferItemForm, StockTransferItemFormSet, TransferRequestItemFormSet, 
+    TransferRequestApprovalForm
 )
 from app.selectors.transfer_selectors import (
     get_all_transfer_requests, get_transfer_request_by_id, get_all_stock_transfers, get_stock_transfer_by_id
@@ -38,23 +39,25 @@ def add_transfer_request(request):
             
             return redirect(transfer_request_list)
 
-def transfer_request_detail(request, pk):
-    transfer_request = get_object_or_404(TransferRequest, pk=pk)
+def transfer_request_detail(request, request_id):
+    transfer_request = get_object_or_404(TransferRequest, pk=request_id)
 
     form = TransferRequestForm(instance=transfer_request)
-    formset = TransferRequestItemFormSet(instance=transfer_request)
+    approval_form = TransferRequestApprovalForm(instance=transfer_request)
+    request_items = transfer_request.items.all()
 
     context = {
-        'transfer_request': transfer_request,
+        'request': transfer_request,
         'form': form, 
-        'item_formset': formset
+        'items':request_items,
+        'approval_form': approval_form
     }
 
-    return render(request, 'transfer_request_detail.html', context)
+    return render(request, 'transfers/transfer_request_details.html', context)
 
-def update_transfer_request(request, pk):
+def update_transfer_request(request, request_id):
     
-    transfer_request = get_object_or_404(TransferRequest, pk=pk)
+    transfer_request = get_object_or_404(TransferRequest, pk=request_id)
     
     if request.method == 'POST':
         form = TransferRequestForm(request.POST, instance=transfer_request)
@@ -67,12 +70,24 @@ def update_transfer_request(request, pk):
             messages.success(request, 'Transfer request updated successfully.')
             
             return redirect(transfer_request_list)
+
+def approve_transfer_request(request, request_id):
+    transfer_request = get_object_or_404(TransferRequest, pk=request_id)
     
+    if request.method == 'POST':
+        form = TransferRequestApprovalForm(request.POST, instance=transfer_request)
+        
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Transfer request status updated successfully.')
+            
+            return redirect(transfer_request_detail, pk=request_id)
+     
 
 def stock_transfer_list(request):
     transfers = get_all_stock_transfers()
     
-    return render(request, 'stock_transfer_list.html', {'transfers': transfers})
+    return render(request, 'transfers/stock_transfer_list.html', {'transfers': transfers})
 
 
 

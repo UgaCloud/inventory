@@ -90,6 +90,12 @@ class TransferRequestForm(forms.ModelForm):
             raise forms.ValidationError("Source and destination stores must be different.")
         return cleaned_data
 
+class TransferRequestApprovalForm(forms.ModelForm):
+
+    class Meta:
+        model = TransferRequest
+        fields = ['status', 'approved_by', 'note']
+
 class StockTransferForm(forms.ModelForm):
     class Meta:
         model = StockTransfer
