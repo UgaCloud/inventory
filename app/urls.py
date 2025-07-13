@@ -5,7 +5,7 @@ from .views.general_views import index_view
 from .views.product_views import * 
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import *
-from .views.supplier_views import supplier_view
+from .views.supplier_views import *
 from .views.customer_view import customer_view
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
 from .views.organization_views import *
@@ -48,6 +48,7 @@ urlpatterns = [
     
     path('unit_of_measure/', unit_of_measure_view, name = 'unit_of_measure_page'),
     path('supplier/', supplier_view, name = 'supplier_page'),
+    path('edit_supplier/<int:supplier_id>', edit_supplier_view, name = 'edit_supplier_page'),
     path('inventory/', add_inventory_view, name = 'add_inventory_page'),
     path('store/', store_view, name = 'store_page'),
     path('customers/', customer_view, name = 'customer_page'),

@@ -68,7 +68,14 @@
                                 </td>
                                 <td class="action-table-data">
                                     <div class="edit-delete-action">
-                                        <a class="me-2 edit-icon  p-2" href="#">
+                                        <a class="me-2 edit-icon  p-2" href="#"
+                                        data-bs-toggle="modal" 
+                                           data-bs-target="#add-supllier"
+                                           data-edit-url="{% url 'edit_supplier_page' supplier.id %}"
+                                           data-supplier-name="{{ supplier.name }}"
+                                           data-supplier-contact-person="{{ supplier.contact_person }}"
+                                           data-supplier-email="{{supplier.email}}"
+                                           data-supplier-address="{{supplier.address}}">
                                             <i data-feather="edit" class="feather-edit"></i>
                                         </a>
                                         <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);">
@@ -120,7 +127,7 @@
                             </button>
                         </div>
                         <div class="modal-body">
-                            <form method="post">
+                            <form method="post" action = "{% url 'supplier_page' %}">
                                 {% csrf_token %}
                                 {{form|crispy}}
                         </div>
@@ -135,6 +142,51 @@
         </div>
     </div>
     <!-- End Add Supllier Modal -->
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButtons = document.querySelectorAll('.edit-icon');
+    const modal = document.getElementById('add-supllier');
+    const form = modal.querySelector('form');
+    const nameInput = form.querySelector('[name="name"]');
+    const contact_personInput = form.querySelector('[name="contact_person"]');
+    const emailInput = form.querySelector('[name="email"]');
+    const addressInput = form.querySelector('[name="address"]');
+    
+    editButtons.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Set form action to edit URL
+            form.action = btn.getAttribute('data-edit-url');
+            // Fill form fields
+            if (nameInput) nameInput.value = btn.getAttribute('data-supplier-name');
+            if (contact_personInput) contact_personInput.value = btn.getAttribute('data-supplier-contact-person');
+            if (emailInput) emailInput.value = btn.getAttribute('data-supplier-email');
+            if (addressInput) addressInput.value = btn.getAttribute('data-supplier-address');
+
+            // Change modal title to Edit
+            const modalTitle = modal.querySelector('.modal-header .page-title h4');
+            if (modalTitle) modalTitle.textContent = 'Edit Supplier';
+            // Change submit button text
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.textContent = 'Save Changes';
+        });
+    });
+    // Reset modal on close (optional)
+    modal.addEventListener('hidden.bs.modal', function () {
+        form.reset();
+        form.action = '';
+        const modalTitle = modal.querySelector('.modal-header .page-title h4');
+        if (modalTitle) modalTitle.textContent = 'Add Supplier';
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Submit';
+    });
+
+});
+</script>
+
 {% endblock %}
 
 
