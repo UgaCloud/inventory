@@ -157,3 +157,7 @@ StockTransferItemFormSet = inlineformset_factory(
 TransferRequestItemFormSet = inlineformset_factory(
     TransferRequest, TransferRequestItem, fields='__all__', extra=0
 )
+
+SalesItemFormSet = inlineformset_factory(
+    Sales, SalesItem, form=SalesItemForm, extra=0, can_delete=True
+)

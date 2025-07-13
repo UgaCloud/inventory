@@ -9,15 +9,9 @@ from .views.supplier_views import supplier_view
 from .views.customer_view import customer_view
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
 from .views.organization_views import *
-from .views.stock_views import (
-    purchase_order_list, purchase_order_detail, create_purchase_order, edit_purchase_order, delete_purchase_order,
-    purchase_order_item_list, create_purchase_order_item, edit_purchase_order_item, delete_purchase_order_item
-)
-from .views.transfer_views import (
-    transfer_request_list, add_transfer_request, transfer_request_detail, update_transfer_request,
-    stock_transfer_list, stock_transfer_detail, stock_transfer_create, stock_transfer_update, 
-    approve_transfer_request
-)
+from .views.stock_views import *
+from .views.transfer_views import *
+from .views.sales_views import *
 
 urlpatterns = [
     path('', index_view, name = 'index_page'),
@@ -48,7 +42,6 @@ urlpatterns = [
     path('store/', store_view, name = 'store_page'),
     path('customers/', customer_view, name = 'customer_page'),
     path('purchase/', purchase_order_view, name = 'purchase_order_page'),
-    path('sales/', sales_view, name = 'sales_page'),
     path('stock_transfer/', stock_transfer_view, name = 'stock_transfer_page'),
     path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
 
@@ -71,9 +64,17 @@ urlpatterns = [
     path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
     path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
     path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
+
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
     path('stock_transfers/<int:pk>/', stock_transfer_detail, name='stock_transfer_detail'),
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
     path('stock_transfers/<int:pk>/update/', stock_transfer_update, name='stock_transfer_update'),
+
+    # sales
+    path('sales/', sales_list_view, name='sales_list'),
+    path('sales/<int:pk>/update/', sales_update_view, name='sales_update_view'),
+    path('sales/<int:pk>/detail/', sales_detail_view, name='sales_detail_view'),
+    path('sales/<int:pk>/delete/', sales_delete_view, name='sales_delete_view'),
+    path('sales/record_sale/', record_sales_view, name='record_sale'),    
 ]
