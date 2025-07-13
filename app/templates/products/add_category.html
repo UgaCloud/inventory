@@ -66,7 +66,13 @@
                                 
                                 <td class="action-table-data">
                                     <div class="edit-delete-action">
-                                        <a class="me-2 edit-icon  p-2" href="#">
+                                        <a class="me-2 edit-icon  p-2" href="#"
+                                           data-bs-toggle="modal" 
+                                           data-bs-target="#add-category"
+                                           data-edit-url="{% url 'edit_category_page' category.id %}"
+                                           data-category-name="{{ category.name }}"
+                                           data-category-description="{{ category.description }}">
+
                                             <i data-feather="edit" class="feather-edit"></i>
                                         </a>
                                         <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);">
@@ -131,5 +137,45 @@
             </div>
         </div>
     </div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButtons = document.querySelectorAll('.edit-icon');
+    const modal = document.getElementById('add-category');
+    const form = modal.querySelector('form');
+    const nameInput = form.querySelector('[name="name"]');
+    const descriptionInput = form.querySelector('[name="description"]');
+    
+    editButtons.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Set form action to edit URL
+            form.action = btn.getAttribute('data-edit-url');
+            // Fill form fields
+            if (nameInput) nameInput.value = btn.getAttribute('data-category-name');
+            if (descriptionInput) descriptionInput.value = btn.getAttribute('data-category-description');
+
+            // Change modal title to Edit
+            const modalTitle = modal.querySelector('.modal-header .page-title h4');
+            if (modalTitle) modalTitle.textContent = 'Edit Category';
+            // Change submit button text
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.textContent = 'Save Changes';
+        });
+    });
+    // Reset modal on close (optional)
+    modal.addEventListener('hidden.bs.modal', function () {
+        form.reset();
+        form.action = '';
+        const modalTitle = modal.querySelector('.modal-header .page-title h4');
+        if (modalTitle) modalTitle.textContent = 'Add Category';
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Submit';
+    });
+
+});
+
+</script>
 {% endblock %}
 

@@ -62,6 +62,21 @@ def add_category_view(request):
     }
     return render(request, 'products/add_category.html', context)
 
+def edit_category_view(request, category_id):
+    category = get_object_or_404(Category, id=category_id)
+    if request.method == 'POST':
+        form = CategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Store updated successfully.")
+            return redirect(add_category_view)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = CategoryForm(instance=category)
+    return redirect(add_category_view)
+
+
 def delete_category_view(request, category_id):
     category = get_category_by_id(category_id)
     category.delete()
@@ -84,6 +99,21 @@ def unit_of_measure_view(request):
         'units_of_measurement':units_of_measurement
     }
     return render(request, 'products/unit_of_measure.html', context)
+
+def edit_unit_of_measure_view(request, unit_id):
+    unit = get_object_or_404(UnitOfMeasure, id=unit_id)
+    if request.method == 'POST':
+        form = UnitOfMeasureForm(request.POST, instance=unit)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Unit of Measure updated successfully.")
+            return redirect(unit_of_measure_view)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = CategoryForm(instance=unit)
+    return redirect(unit_of_measure_view)
+
 
 def product_details_view(request, _product_id):
     item = get_product_by_id(product_id=_product_id)

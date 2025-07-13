@@ -37,12 +37,14 @@ urlpatterns = [
     path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
     path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
     path('add_product_unit_price/', add_product_unit_price_view, name = 'add_product_unit_price_page'),
-
+    # new
+    path('edit_unit_of_measure/<int:unit_id>', edit_unit_of_measure_view, name = 'edit_unit_of_measure_page'),
     path('edit_store/<int:store_id>/', edit_store_view, name = 'edit_store_page'),
     
     # Category
     path('add_category/', add_category_view, name = 'add_category_page'),
     path('delete_category/<int:category_id>/',delete_category_view, name = 'delete_category'),
+    path('edit_category/<int:category_id>/',edit_category_view, name = 'edit_category_page'),
     
     path('unit_of_measure/', unit_of_measure_view, name = 'unit_of_measure_page'),
     path('supplier/', supplier_view, name = 'supplier_page'),
