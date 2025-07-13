@@ -37,6 +37,8 @@ urlpatterns = [
     path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
     path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
     path('add_product_unit_price/', add_product_unit_price_view, name = 'add_product_unit_price_page'),
+
+    path('edit_store/<int:store_id>/', edit_store_view, name = 'edit_store_page'),
     
     # Category
     path('add_category/', add_category_view, name = 'add_category_page'),

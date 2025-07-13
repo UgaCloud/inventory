@@ -129,6 +129,7 @@ def add_inventory_view(request):
     return redirect(product_details_view, request.POST.get('product'))
 
 def store_view(request):
+    
     if request.method == "POST":
         form = StoreLocationForm(request.POST)
         if form.is_valid():
@@ -143,3 +144,17 @@ def store_view(request):
         'stores': stores
     }
     return render(request, 'products/store.html', context)
+
+def edit_store_view(request, store_id):
+    store = get_object_or_404(StoreLocation, id=store_id)
+    if request.method == 'POST':
+        form = StoreLocationForm(request.POST, instance=store)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Store updated successfully.")
+            return redirect(store_view)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = StoreLocationForm(instance=store)
+    return redirect(store_view)
