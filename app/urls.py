@@ -5,7 +5,7 @@ from .views.general_views import index_view
 from .views.product_views import * 
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import *
-from .views.supplier_views import supplier_view
+from .views.supplier_views import *
 from .views.customer_view import customer_view
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
 from .views.organization_views import *
@@ -31,13 +31,18 @@ urlpatterns = [
     path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
     path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
     path('add_product_unit_price/', add_product_unit_price_view, name = 'add_product_unit_price_page'),
+    # new
+    path('edit_unit_of_measure/<int:unit_id>', edit_unit_of_measure_view, name = 'edit_unit_of_measure_page'),
+    path('edit_store/<int:store_id>/', edit_store_view, name = 'edit_store_page'),
     
     # Category
     path('add_category/', add_category_view, name = 'add_category_page'),
     path('delete_category/<int:category_id>/',delete_category_view, name = 'delete_category'),
+    path('edit_category/<int:category_id>/',edit_category_view, name = 'edit_category_page'),
     
     path('unit_of_measure/', unit_of_measure_view, name = 'unit_of_measure_page'),
     path('supplier/', supplier_view, name = 'supplier_page'),
+    path('edit_supplier/<int:supplier_id>', edit_supplier_view, name = 'edit_supplier_page'),
     path('inventory/', add_inventory_view, name = 'add_inventory_page'),
     path('store/', store_view, name = 'store_page'),
     path('customers/', customer_view, name = 'customer_page'),
