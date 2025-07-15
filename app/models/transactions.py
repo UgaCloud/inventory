@@ -147,7 +147,7 @@ class StockTransferItem(models.Model):
 
 
 class StockMovement(models.Model):
-    product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
+    product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="stock_movements")
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     transaction_type = models.CharField(max_length=50, choices=STOCK_MOVEMENT_OPTIONS)
     quantity = models.IntegerField()

@@ -33,12 +33,11 @@
                     <th>Quantity</th>
                     <th>Balance</th>
                     <th>Note</th>
-                    <th class="no-sort"></th>
                 </tr>
             </thead>
             <tbody>
-                {% if transactions %}
-                    {% for transaction in transactions %}
+                {% if stock_movements %}
+                    {% for transaction in stock_movements %}
                     <tr>
                         <td>
                             <label class="checkboxs">
