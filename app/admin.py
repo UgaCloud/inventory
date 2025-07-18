@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from app.models.organization import *
 from app.models.products import *
 from app.models.transactions import *
 from app.models.suppliers import *
@@ -23,6 +24,8 @@ admin.site.register(Branch)
 admin.site.register(TransferRequest)
 admin.site.register(TransferRequestItem)
 admin.site.register(StockTransferItem)
+admin.site.register(OrganizationSetting)
+admin.site.register(Currency)
 
 # admin.site.register(StockAdjustment)
 # admin.site.register(StockAdjustmentItem)
