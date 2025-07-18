@@ -42,8 +42,7 @@
                             </th>
                             <th># </th>
                             <th>Profile Photo</th>
-                            <th>First Name</th>
-                            <th>Last Name</th>
+                            <th>Name</th>
                             <th>Gender</th>
                             <th>Branch</th>
                             <th>Department</th>
@@ -69,8 +68,8 @@
                                         <a href="javascript:void(0);">{{employee.photo}}</a>
                                     </div>												
                                 </td>
-                                <td>{{employee.first_name}}</td>
-                                <td>{{employee.last_name}}</t>			
+                                <td>{{employee}}</t>
+                                			
                                 <td>{{employee.gender}}</td>
                                 <td>{{employee.branch}}</td>
                                 <td>{{employee.department}}</td>
@@ -186,7 +185,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (genderInput) genderInput.value = btn.getAttribute('data-employee-gender');
             if (branchInput) branchInput.value = btn.getAttribute('data-employee-branch');
             if (departmentInput) departmentInput.value = btn.getAttribute('data-employee-department');
-            if (is_activeInput) is_activeInput.value = btn.getAttribute('data-employee-is_active');
+            if (is_activeInput) {
+                if (btn.getAttribute('data-employee-is_active') === 'True' || btn.getAttribute('data-employee-is_active') === 'true') {
+                    is_activeInput.checked = true;
+                } else {
+                    is_activeInput.checked = false;
+                }
+            }
             if (contactInput) contactInput.value = btn.getAttribute('data-employee-contact');
             if (emailInput) emailInput.value = btn.getAttribute('data-employee-email');
             

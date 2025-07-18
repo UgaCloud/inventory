@@ -35,7 +35,6 @@ urlpatterns = [
     path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
     path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
     path('add_product_unit_price/', add_product_unit_price_view, name = 'add_product_unit_price_page'),
-    # new
     path('edit_unit_of_measure/<int:unit_id>', edit_unit_of_measure_view, name = 'edit_unit_of_measure_page'),
     path('edit_store/<int:store_id>/', edit_store_view, name = 'edit_store_page'),
     
@@ -90,10 +89,9 @@ urlpatterns = [
 
     #human resource
     path('employee', employee_view, name = 'employee_page'),
+    path('edit_employee/<int:employee_id>', edit_employee_view, name = 'edit_employee_page'),
     path('department', department_view, name = 'department_page'),
     path('edit_department/<int:department_id>', edit_department_view, name = 'edit_department_page'),
     path('designation', designation_view, name = 'designation_page'),
     path('edit_designation/<int:designation_id>', edit_designation_view, name = 'edit_designation_page'),
-    path('edit_employee/<int:employee_id>', edit_employee_view, name = 'edit_employee_page'),
-
-]
+    ]
