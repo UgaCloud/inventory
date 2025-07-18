@@ -1,10 +1,11 @@
-
 from django.shortcuts import render, redirect, get_object_or_404
 from app.forms.suppliers_form import SupplierForm, Supplier
 from django.contrib import messages
 from app.selectors.supplier_selectors import get_all_suppliers
+from django.contrib.auth.decorators import login_required
 
 
+@login_required
 def supplier_view(request):
     if request.method == "POST":
         form = SupplierForm(request.POST)
@@ -21,6 +22,7 @@ def supplier_view(request):
      }
     return render(request, 'stock/supplier.html', context)
 
+@login_required
 def edit_supplier_view(request, supplier_id):
     unit = get_object_or_404(Supplier, id=supplier_id)
     if request.method == 'POST':

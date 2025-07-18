@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from app.models.transactions import StockMovement, StockTransfer, PurchaseOrder, PurchaseOrderItem
 from app.forms.transaction_forms import StockTransferForm, PurchaseOrderForm, PurchaseOrderItemForm
 from app.selectors.transaction_selectors import (
@@ -10,6 +11,7 @@ from app.selectors.transaction_selectors import (
     get_items_by_order
 )
 
+@login_required
 def stock_dashboard(request):
     stock_movements = get_all_stock_movements()
     stock_transfers = get_all_stock_transfers()
@@ -19,14 +21,17 @@ def stock_dashboard(request):
     }
     return render(request, 'stock_dashboard.html', context)
 
+@login_required
 def stock_transfer_list(request):
     transfers = get_all_stock_transfers()
     return render(request, 'stock_transfer_list.html', {'transfers': transfers})
 
+@login_required
 def stock_transfer_detail(request, transfer_id):
     transfer = get_stock_transfer_by_id(transfer_id)
     return render(request, 'stock_transfer_detail.html', {'transfer': transfer})
 
+@login_required
 def create_stock_transfer(request):
     if request.method == 'POST':
         form = StockTransferForm(request.POST)
@@ -38,6 +43,7 @@ def create_stock_transfer(request):
         form = StockTransferForm()
     return render(request, 'stock_transfer_form.html', {'form': form})
 
+@login_required
 def edit_stock_transfer(request, transfer_id):
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
     if request.method == 'POST':
@@ -50,6 +56,7 @@ def edit_stock_transfer(request, transfer_id):
         form = StockTransferForm(instance=transfer)
     return render(request, 'stock_transfer_form.html', {'form': form, 'transfer': transfer})
 
+@login_required
 def delete_stock_transfer(request, transfer_id):
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
     if request.method == 'POST':
@@ -58,6 +65,7 @@ def delete_stock_transfer(request, transfer_id):
         return redirect('stock_transfer_list')
     return render(request, 'stock_transfer_confirm_delete.html', {'transfer': transfer})
 
+@login_required
 def purchase_order_list(request):
     orders = get_all_orders()
 
@@ -69,10 +77,12 @@ def purchase_order_list(request):
     }
     return render(request, 'stock/purchase_order_list.html', context)
 
+@login_required
 def purchase_order_detail(request, order_id):
     order = get_order_by_id(order_id)
     return render(request, 'purchase_order_detail.html', {'order': order})
 
+@login_required
 def create_purchase_order(request):
     if request.method == 'POST':
         form = PurchaseOrderForm(request.POST)
@@ -83,6 +93,7 @@ def create_purchase_order(request):
             return redirect(purchase_order_item_list, order_id = order.id)
     
 
+@login_required
 def edit_purchase_order(request, order_id):
     order = get_object_or_404(PurchaseOrder, id=order_id)
     if request.method == 'POST':
@@ -95,6 +106,7 @@ def edit_purchase_order(request, order_id):
         form = PurchaseOrderForm(instance=order)
     return render(request, 'purchase_order_form.html', {'form': form, 'order': order})
 
+@login_required
 def delete_purchase_order(request, order_id):
     order = get_object_or_404(PurchaseOrder, id=order_id)
     if request.method == 'POST':
@@ -103,6 +115,7 @@ def delete_purchase_order(request, order_id):
         return redirect('purchase_order_list')
     return render(request, 'purchase_order_confirm_delete.html', {'order': order})
 
+@login_required
 def purchase_order_item_list(request, order_id):
     order = get_object_or_404(PurchaseOrder, id=order_id)
     items = get_items_by_order(order)
@@ -117,6 +130,7 @@ def purchase_order_item_list(request, order_id):
 
     return render(request, 'stock/purchase_order_item_list.html', context)
 
+@login_required
 def create_purchase_order_item(request, order_id):
     order = get_object_or_404(PurchaseOrder, id=order_id)
     
@@ -133,6 +147,7 @@ def create_purchase_order_item(request, order_id):
         return redirect(purchase_order_item_list, order_id=order.id)
         
 
+@login_required
 def edit_purchase_order_item(request, item_id):
     item = get_object_or_404(PurchaseOrderItem, id=item_id)
     order = item.order
@@ -146,6 +161,7 @@ def edit_purchase_order_item(request, item_id):
         form = PurchaseOrderItemForm(instance=item)
     return render(request, 'purchase_order_item_form.html', {'form': form, 'order': order, 'item': item})
 
+@login_required
 def delete_purchase_order_item(request, item_id):
     item = get_object_or_404(PurchaseOrderItem, id=item_id)
     order = item.order
