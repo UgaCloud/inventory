@@ -124,6 +124,7 @@ def product_details_view(request, _product_id):
 
     product_unit_prices = item.unit_prices.all()
     inventories = item.inventories.all()
+    stock_movements = item.stock_movements.all()
         
     context = {
         'product_form': product_form,
@@ -131,7 +132,8 @@ def product_details_view(request, _product_id):
         'inventory_form': inventory_form,
         'product': item,
         'unit_prices':product_unit_prices,
-        'inventories': inventories    
+        'inventories': inventories,
+        'stock_movements': stock_movements,    
     }
     return render(request, 'products/product_details.html', context)
 

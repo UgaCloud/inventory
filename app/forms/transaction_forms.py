@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import ModelForm, inlineformset_factory
-from app.models.transactions import PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement
+from app.models.transactions import *
 
 class PurchaseOrderForm(forms.ModelForm):
     class Meta:
@@ -38,6 +38,14 @@ class SalesItemForm(ModelForm):
     class Meta:
         model = SalesItem
         fields = "__all__"
+        # widgets = {
+        #     'product': forms.TextInput(attrs={
+        #         'class': 'form-control product-autocomplete',
+        #         'autocomplete': 'on',
+        #         'placeholder': 'Product Name...'
+        #         # The JS below will hook to this class
+        #     }),
+        # }
 
 class StockTransferForm(ModelForm):
     class Meta:
@@ -53,6 +61,15 @@ PurchaseOrderItemFormSet = inlineformset_factory(
     PurchaseOrder, PurchaseOrderItem, fields='__all__', extra=1
 )
 
-SalesItemFormSet = inlineformset_factory(
-    Sales, SalesItem, fields='__all__', extra=1, can_delete=True
+StockTransferItemFormSet = inlineformset_factory(
+    StockTransfer, StockTransferItem, fields='__all__', extra=1
 )
+
+TransferRequestItemFormSet = inlineformset_factory(
+    TransferRequest, TransferRequestItem, fields='__all__', extra=0
+)
+
+SalesItemFormSet = inlineformset_factory(
+    Sales, SalesItem, form=SalesItemForm, extra=0, can_delete=True
+)
+

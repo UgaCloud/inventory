@@ -44,4 +44,4 @@ class Branch(models.Model):
 
     def get_absolute_url(self):
         return reverse("Branch_detail", kwargs={"pk": self.pk})
-   
+  
