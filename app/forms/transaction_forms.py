@@ -63,6 +63,14 @@ class SalesItemForm(ModelForm):
     class Meta:
         model = SalesItem
         fields = "__all__"
+        # widgets = {
+        #     'product': forms.TextInput(attrs={
+        #         'class': 'form-control product-autocomplete',
+        #         'autocomplete': 'on',
+        #         'placeholder': 'Product Name...'
+        #         # The JS below will hook to this class
+        #     }),
+        # }
 
     def clean(self):
         cleaned_data = super().clean()
@@ -161,3 +169,4 @@ TransferRequestItemFormSet = inlineformset_factory(
 SalesItemFormSet = inlineformset_factory(
     Sales, SalesItem, form=SalesItemForm, extra=0, can_delete=True
 )
+

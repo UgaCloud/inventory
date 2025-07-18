@@ -1,5 +1,6 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
 
 from .views.general_views import index_view
 from .views.product_views import * 
@@ -12,8 +13,10 @@ from .views.organization_views import *
 from .views.stock_views import *
 from .views.transfer_views import *
 from .views.sales_views import *
+from app.views.product_autocomplete import product_autocomplete
 
 urlpatterns = [
+    path('accounts/', include('django.contrib.auth.urls')),
     path('', index_view, name = 'index_page'),
     path('login/', login_view, name = 'login_page'),
     path('sign_up/', sign_up_view, name = 'sign_up_page'),
@@ -79,7 +82,8 @@ urlpatterns = [
     # sales
     path('sales/', sales_list_view, name='sales_list'),
     path('sales/<int:pk>/update/', sales_update_view, name='sales_update_view'),
-    path('sales/<int:pk>/detail/', sales_detail_view, name='sales_detail_view'),
+    path('sales/<int:pk>/detail/', sales_detail_view, name='sales_detail'),
     path('sales/<int:pk>/delete/', sales_delete_view, name='sales_delete_view'),
-    path('sales/record_sale/', record_sales_view, name='record_sale'),    
+    path('sales/record_sale/', record_sales_view, name='record_sale'),  
+    path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
 ]

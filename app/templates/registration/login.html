@@ -1,33 +1,118 @@
-{% extends '../base.html' %}
-{% load crispy_forms_tags %}
-{% block content %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
 
-<body class="bg03">
-    <div class="container">
-        <div class="row tm-mt-big">
-            <div class="col-12 mx-auto tm-login-col">
-                <div class="bg-white tm-block">
-                    <div class="row">
-                        <div class="col-12 text-center">
-                            <i class="fas fa-3x fa-tachometer-alt tm-site-icon text-center"></i>
-                            <h2 class="tm-block-title mt-3">Login</h2>
-                        </div>
-                    </div>
-                    <div class="row mt-2">
-                        <div class="col-12">
+		<!-- Meta Tags -->
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="description" content="Stock Inventory Management designed for businesses, offering seamless invoicing, project tracking, and estimates.">
+		<meta name="keywords" content="inventory management, admin dashboard, bootstrap template, invoicing, estimates, business management, responsive admin, POS system">
+		<meta name="author" content="Dreams Technologies">
+		<meta name="robots" content="index, follow">
+		<title>Stock Inventory Management</title>
 
-                            
-                            <form action="" method="post" class="tm-login-form">
-                            {% csrf_token %}
-                                   {{form|crispy}}                                 
-                                <button type = 'submit'>Login</button>
-                                <div alignment = 'center'><a href="{% url 'sign_up_page' %}">Sign up</a></div>
-                            </form>
+		<!-- Favicon -->
+        <link rel="shortcut icon" type="image/x-icon" href="{% static 'assets/img/favicon.png' %}">
 
+		<!-- Apple Touch Icon -->
+		<link rel="apple-touch-icon" sizes="180x180" href="{% static 'assets/img/apple-touch-icon.png' %}">
+		
+		<!-- Bootstrap CSS -->
+        <link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}">
+		
+        <!-- Fontawesome CSS -->
+		<link rel="stylesheet" href="{% static 'assets/plugins/fontawesome/css/fontawesome.min.css' %}">
+		<link rel="stylesheet" href="{% static 'assets/plugins/fontawesome/css/all.min.css' %}">
 
+         <!-- Tabler Icon CSS -->
+	    <link rel="stylesheet" href="{% static 'assets/plugins/tabler-icons/tabler-icons.min.css' %}">
+
+	    <!-- Main CSS -->
+        <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+		
+    </head>
+    <body class="account-page bg-white">
+
+        <div id="global-loader" >
+			<div class="whirly-loader"> </div>
+		</div>
+	
+		<!-- Main Wrapper -->
+        <div class="main-wrapper">
+			<div class="account-content">
+				<div class="login-wrapper login-new">
+                    <div class="row w-100">
+                        <div class="col-lg-5 mx-auto">
+                            <div class="login-content user-login">
+                                <div class="login-logo">
+                                    <img src="{% static 'assets/img/logo-1.png' %}" alt="img">
+                                    <a href="index.html" class="login-logo logo-white">
+                                        <img src="{% static 'assets/img/logo-white.svg' %}"  alt="Img">
+                                    </a>
+                                </div>
+                                <form action="{% url 'login' %}" method="post">
+                                    {% csrf_token %}
+                                    <div class="card">
+                                        <div class="card-body p-5">
+                                            <div class="login-userheading">
+                                                <h3>Log In</h3>
+                                                <h4>Access the Inventory Systemusing your email and passcode.</h4>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Username <span class="text-danger"> *</span></label>
+                                                <div class="input-group">
+                                                    <input type="text" name="username" value="" class="form-control border-end-0">
+                                                    <span class="input-group-text border-start-0">
+                                                        <i class="ti ti-mail"></i>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Password <span class="text-danger"> *</span></label>
+                                                <div class="pass-group">
+                                                    <input type="password" name="password" class="pass-input form-control">
+                                                    <span class="ti toggle-password ti-eye-off text-gray-9"></span>
+                                                </div>
+                                            </div>
+                                            <div class="form-login authentication-check">
+                                                <div class="row">
+                                                    <div class="col-12 d-flex align-items-center justify-content-between">
+                                                        <div class="text-end">
+                                                            <a class="text-orange fs-16 fw-medium" href="forgot-password.html">Forgot Password?</a>
+                                                        </div>
+                                                    </div>                                    
+                                                </div>
+                                            </div>
+                                            <div class="form-login">
+                                                <button type="submit" class="btn btn-primary w-100">Sign In</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="my-4 d-flex justify-content-center align-items-center copyright-text">
+                                <p>Copyright &copy; 2025 DreamsPOS</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+			</div>
         </div>
- {% endblock%}
+		<!-- /Main Wrapper -->
+
+		<!-- jQuery -->
+        <script src="{% static 'assets/js/jquery-3.7.1.min.js' %}"></script>
+
+         <!-- Feather Icon JS -->
+		<script src="{% static 'assets/js/feather.min.js' %}"></script>
+		
+		<!-- Bootstrap Core JS -->
+        <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+		
+		<!-- Custom JS -->
+        <script src="{% static 'assets/js/script.js' %}"></script>
+
+    </body>
+</html>

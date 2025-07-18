@@ -54,8 +54,8 @@ class Sales(models.Model):
         return sum(item.quantity for item in self.items.all())
 
     @property
-    def total_price(self):
-        return sum(item.get_total_price() for item in self.items.all())
+    def total_amount(self):
+        return sum(item.amount() for item in self.items.all())
 
 
 class SalesItem(models.Model):
@@ -68,7 +68,7 @@ class SalesItem(models.Model):
     class Meta:
         unique_together = ("order", "product", "unit")
 
-    def get_total_price(self):
+    def amount(self):
         return self.quantity * self.sale_price
 
 

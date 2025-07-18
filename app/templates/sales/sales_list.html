@@ -1,3 +1,4 @@
+{# app/templates/transfers/transfer_sale_list.html #}
 {% extends 'basic/base.html' %}
 {% load crispy_forms_tags %}
 {% load i18n %}
@@ -12,162 +13,71 @@
             </div>
         </div>	
         
-    </div>
-
-    <!-- Sale Create/Edit Modal or Page -->
-    {% if form and formset %}
-    <div class="card mt-4">
-        <div class="card-header">
-            <h5>{% if sale %}Edit Sale{% else %}New Sale{% endif %}</h5>
+        <div class="page-btn mt-0">
+            <a href="{% url 'record_sale' %}" class="btn btn-secondary"><i class="ti ti-circle-plus me-1"></i>Record Sale</a>
         </div>
-        <div class="card-body">
-            <form method="post" action="{% url 'record_sale' %}" novalidate>
-                {% csrf_token %}
-                <div class="row">
-                    <div class="col-md-6">
-                        {{ form|crispy }}
-                    </div>
+    </div>
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
+            <div class="search-set">
+                <div class="search-input">
+                    <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
                 </div>
-                <h5 class="mt-4">Sale Items</h5>
-                <div id="saleitem-formset">
-                    {{ formset.management_form }}
-                    <table class="table table-bordered">
-                        <thead>
+            </div>
+            
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table datatable">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="no-sort">
+                                <label class="checkboxs">
+                                    <input type="checkbox" id="select-all">
+                                    <span class="checkmarks"></span>
+                                </label>
+                            </th>
+                            <th>ID</th>
+                            <th>Sale Date </th>
+                            <th>Store </th>
+                            <th>Customer</th>
+                            <th>Recorded By</th>
+                            <th>Status</th>
+                            <th class="no-sort"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if sales %}
+                            {% for sale in sales %}
                             <tr>
-                                <th>Product</th>
-                                <th>Unit</th>
-                                <th>Quantity</th>
-                                <th>Sale Price</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="formset-body">
-                            {% for form in formset.forms %}
-                            <tr class="formset-row">
-                                <td style="min-width: 180px; vertical-align: middle;">{{ form.product|as_crispy_field }}</td>
-                                <td style="min-width: 120px; vertical-align: middle;">{{ form.unit|as_crispy_field }}</td>
-                                <td style="min-width: 100px; vertical-align: middle;">{{ form.quantity|as_crispy_field }}</td>
-                                <td style="min-width: 120px; vertical-align: middle;">{{ form.sale_price|as_crispy_field }}</td>
-                                <td style="vertical-align: middle;">
-                                    {% if formset.can_delete %}
-                                        {{ form.DELETE|as_crispy_field }}
-                                        <button type="button" class="btn btn-danger btn-sm remove-form-row">Delete</button>
-                                    {% endif %}
+                                <td>
+                                    <label class="checkboxs">
+                                        <input type="checkbox">
+                                        <span class="checkmarks"></span>
+                                    </label>
+                                </td>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ sale.sale_date }}</td>
+                                <td>{{ sale.store }}</td>
+                                <td>{{ sale.customer }}</td>
+                                <td>{{ sale.recorded_by|date:'Y-m-d' }}</td>
+                                <td>{{ sale.status }}</td>
+                                <td class="action-table-data">
+                                    <div class="edit-delete-action">
+                                        <a class="me-2 edit-icon  p-2" href="{% url 'sales_detail' sale.id %}">
+                                            <i data-feather="eye" class="feather-eye"></i>
+                                        </a>
+                                        
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                    <button type="button" class="btn btn-success btn-sm" id="add-form-row">Add Item</button>
-                    {% if formset.non_form_errors %}
-                        <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
-                    {% endif %}
-                </div>
-                <div class="row">
-                <div class="col-lg-6 ms-auto">
-                    <div class="total-order w-100 max-widthauto m-auto mb-4">
-                        <ul class="border-1 rounded-2">
-                            <li class="border-bottom">
-                                <h4 class="border-end">Total Amount</h4>
-                                <h5>
-                                    <input type="text" id="total-amount" class="form-control-plaintext fw-bold" value="UGX 0.00" readonly disabled style="background:transparent; border:none; font-size:14px; color:#646B72;" />
-                                </h5>
-                            </li>
-                            <li class="border-bottom">
-                                <h4 class="border-end">Amount Paid</h4>
-                                <h5>
-                                    <input type="number" id="amount-paid" class="form-control fw-bold" value="0" min="0" step="0.01" style="max-width: 280px; font-size:14px; color:#646B72;" />
-                                </h5>
-                            </li>
-                            <li class="border-bottom">
-                                <h4 class="border-end">Balance</h4>
-                                <h5>
-                                    <input type="text" id="balance" class="form-control-plaintext fw-bold" value="$ 0.00" readonly disabled style="background:transparent; border:none; font-size:14px; color:#646B72;" />
-                                </h5>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-primary">Save Sale</button>
-                    <a href="{% url 'sales_list' %}" class="btn btn-secondary">Cancel</a>
-                </div>
-            </form>
         </div>
     </div>
-
-    <script>
-        // Update total amount on input changes
-        function formatCurrency(amount) {
-            return 'UGX ' + Number(amount).toLocaleString('en-UG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        }
-        function updateTotalAmount() {
-            let total = 0;
-            document.querySelectorAll('#formset-body tr').forEach(function(row) {
-                const qtyInput = row.querySelector('[name$="-quantity"]');
-                const priceInput = row.querySelector('[name$="-sale_price"]');
-                const quantity = qtyInput ? parseFloat(qtyInput.value) : 0;
-                const price = priceInput ? parseFloat(priceInput.value) : 0;
-                if (!isNaN(quantity) && !isNaN(price)) {
-                    total += quantity * price;
-                }
-            });
-            document.getElementById('total-amount').value = formatCurrency(total);
-        }
-
-        // Update balance based on total and amount paid
-        function updateBalance() {
-            const totalStr = document.getElementById('total-amount').value.replace(/[^\d.]/g, '');
-            const paidStr = document.getElementById('amount-paid').value;
-            const total = parseFloat(totalStr) || 0;
-            const paid = parseFloat(paidStr) || 0;
-            const balance = total - paid;
-            document.getElementById('balance').value = (balance < 0 ? '-' : '') + 'UGX ' + Math.abs(balance).toLocaleString('en-UG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        }
-        
-        // Event listeners for dynamic formset row addition and deletion
-        document.addEventListener('DOMContentLoaded', function() {
-            var formsetBody = document.getElementById('formset-body');
-            var addBtn = document.getElementById('add-form-row');
-            var totalForms = document.getElementById('id_items-TOTAL_FORMS');
-            var maxForms = document.getElementById('id_items-MAX_NUM_FORMS');
-            var emptyFormHtml = `{% filter escapejs %}<tr class="formset-row">  <td>{{ formset.empty_form.product|as_crispy_field }}</td>  <td>{{ formset.empty_form.unit|as_crispy_field }}</td>  <td>{{ formset.empty_form.quantity|as_crispy_field }}</td>  <td>{{ formset.empty_form.sale_price|as_crispy_field }}</td>  <td>{% if formset.can_delete %} <button type="button" class="btn btn-danger btn-sm remove-form-row">Delete</button>{% endif %}</td></tr>{% endfilter %}`;
-            if (addBtn && totalForms) {
-                addBtn.addEventListener('click', function() {
-                    var formCount = parseInt(totalForms.value);
-                    if (maxForms && formCount >= parseInt(maxForms.value)) return;
-                    var newRow = emptyFormHtml.replace(/__prefix__/g, formCount);
-                    formsetBody.insertAdjacentHTML('beforeend', newRow);
-                    totalForms.value = formCount + 1;
-                });
-            }
-            formsetBody.addEventListener('click', function(e) {
-                if (e.target.classList.contains('remove-form-row')) {
-                    var row = e.target.closest('.formset-row');
-                    if (row) row.remove();
-                }
-            });
-            // Update total on input
-            document.getElementById('formset-body').addEventListener('input', function(e) {
-                if (e.target.name && (e.target.name.endsWith('-quantity') || e.target.name.endsWith('-sale_price'))) {
-                    updateTotalAmount();
-                }
-            });
-            document.getElementById('amount-paid').addEventListener('input', function() {
-                updateBalance();
-            });
-            // Update balance when total changes
-            const origUpdateTotalAmount = updateTotalAmount;
-            updateTotalAmount = function() {
-                origUpdateTotalAmount();
-                updateBalance();
-            };
-            // Initial calculation
-            updateBalance();
-        });
-    </script>
-    {% endif %}
 
 {% endblock %}
 
