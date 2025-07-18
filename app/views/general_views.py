@@ -5,8 +5,10 @@ from app.selectors.product_selectors import get_all_products
 from django.views.generic import View
 from app.models.suppliers import Supplier
 from app.models.transactions import StockTransfer
+from django.contrib.auth.decorators import login_required
 
 
+@login_required
 def index_view(request):
     products = get_all_products()
     context = {
@@ -14,6 +16,7 @@ def index_view(request):
     }
     return render(request, 'basic/index.html', context)
 
+@login_required
 def login_view(request):
 
     if request.method == "POST":
@@ -33,6 +36,7 @@ def login_view(request):
 
     return render(request, 'registration/login.html', context)
 
+@login_required
 def sign_up_view(request):
     message = ''
     if request.method == "POST":
@@ -53,6 +57,7 @@ def sign_up_view(request):
 
 #class based view to handle deletions from the supplier and stock transfer models
 class DeleteMultipleSuppliers(View):
+    @login_required
     def post(self, request):
         selected_ids = request.POST.getlist('selected_items')
 
@@ -62,7 +67,7 @@ class DeleteMultipleSuppliers(View):
             
         return redirect(request.META.get('HTTP_REFERER')) # redirect to where the request came from
 
+@login_required
 def under_maintenance_view(request):
     return render(request, 'under_maintenance.html')
-        
-        
+

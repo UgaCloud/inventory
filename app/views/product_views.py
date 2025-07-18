@@ -4,12 +4,14 @@ from django.shortcuts import (
 )
 from django.urls import reverse
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 
 from app.forms.product_forms import *
 from app.selectors.product_selectors import *
 from app.models.products import *
 
 
+@login_required
 def manage_product_view(request):
     product_form = ProductForm()
 
@@ -21,6 +23,7 @@ def manage_product_view(request):
     }
     return render(request, 'products/products.html', context)
 
+@login_required
 def add_product_view(request):
     if request.method == 'POST':
        form = ProductForm(request.POST)
@@ -33,6 +36,7 @@ def add_product_view(request):
        return redirect(manage_product_view)
        
 
+@login_required
 def edit_product_view(request, product_id):
     product = get_product_by_id(product_id)
     if request.method == "POST":
@@ -44,6 +48,7 @@ def edit_product_view(request, product_id):
             messages.error(request, 'There was an error updating the product.')
         return redirect(product_details_view, product.id)
 
+@login_required
 def add_category_view(request):
     if request.method == "POST":
         form = CategoryForm(request.POST)
@@ -62,6 +67,7 @@ def add_category_view(request):
     }
     return render(request, 'products/add_category.html', context)
 
+@login_required
 def edit_category_view(request, category_id):
     category = get_object_or_404(Category, id=category_id)
     if request.method == 'POST':
@@ -77,12 +83,14 @@ def edit_category_view(request, category_id):
     return redirect(add_category_view)
 
 
+@login_required
 def delete_category_view(request, category_id):
     category = get_category_by_id(category_id)
     category.delete()
     messages.success(request, 'Category deleted successfully.')
     return redirect(manage_product_view)
 
+@login_required
 def unit_of_measure_view(request):
     if request.method == 'POST':
         form = UnitOfMeasureForm(request.POST)
@@ -100,6 +108,7 @@ def unit_of_measure_view(request):
     }
     return render(request, 'products/unit_of_measure.html', context)
 
+@login_required
 def edit_unit_of_measure_view(request, unit_id):
     unit = get_object_or_404(UnitOfMeasure, id=unit_id)
     if request.method == 'POST':
@@ -115,6 +124,7 @@ def edit_unit_of_measure_view(request, unit_id):
     return redirect(unit_of_measure_view)
 
 
+@login_required
 def product_details_view(request, _product_id):
     item = get_product_by_id(product_id=_product_id)
 
@@ -137,6 +147,7 @@ def product_details_view(request, _product_id):
     }
     return render(request, 'products/product_details.html', context)
 
+@login_required
 def add_product_unit_price_view(request):
     if request.method == 'POST':
         form = ProductUnitPriceForm(request.POST)
@@ -150,6 +161,7 @@ def add_product_unit_price_view(request):
     else:
         pass
 
+@login_required
 def add_inventory_view(request):
     if request.method == 'POST':
         form = InventoryForm(request.POST)
@@ -160,6 +172,7 @@ def add_inventory_view(request):
             messages.error(request, 'There was an error adding the inventory.')
     return redirect(product_details_view, request.POST.get('product'))
 
+@login_required
 def store_view(request):
     
     if request.method == "POST":
@@ -177,6 +190,7 @@ def store_view(request):
     }
     return render(request, 'products/store.html', context)
 
+@login_required
 def edit_store_view(request, store_id):
     store = get_object_or_404(StoreLocation, id=store_id)
     if request.method == 'POST':
