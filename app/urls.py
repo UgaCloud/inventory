@@ -13,6 +13,7 @@ from .views.organization_views import *
 from .views.stock_views import *
 from .views.transfer_views import *
 from .views.sales_views import *
+from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
 
 urlpatterns = [
@@ -86,4 +87,13 @@ urlpatterns = [
     path('sales/<int:pk>/delete/', sales_delete_view, name='sales_delete_view'),
     path('sales/record_sale/', record_sales_view, name='record_sale'),  
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
+
+    #human resource
+    path('employee', employee_view, name = 'employee_page'),
+    path('department', department_view, name = 'department_page'),
+    path('edit_department/<int:department_id>', edit_department_view, name = 'edit_department_page'),
+    path('designation', designation_view, name = 'designation_page'),
+    path('edit_designation/<int:designation_id>', edit_designation_view, name = 'edit_designation_page'),
+    path('edit_employee/<int:employee_id>', edit_employee_view, name = 'edit_employee_page'),
+
 ]
