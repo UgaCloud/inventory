@@ -30,3 +30,8 @@ class StoreLocationForm(ModelForm):
     class Meta:
         model = StoreLocation
         fields = ("__all__")
+
+class EditStoreForm(ModelForm):
+    class Meta:
+        model = Inventory
+        fields = ("__all__")
