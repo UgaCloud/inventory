@@ -36,6 +36,8 @@ def edit_employee_view(request, employee_id):
             messages.success(request, 'Employee successfully edited')
         else:
             messages.error(request, 'An error occured, unable to update the employee')
+    form = EmployeeForm(instance = employee)
+
     return redirect(employee_view)
 
 @login_required
@@ -62,7 +64,7 @@ def department_view(request):
 
 @login_required
 def edit_department_view(request, department_id):
-    department = get_department_by_id(department_id) #get_department() is in the human resource selectors
+    department = get_department_by_id(department_id)
 
     if request.method == 'POST':
         form = DepartmentForm(request.POST, instance = department)

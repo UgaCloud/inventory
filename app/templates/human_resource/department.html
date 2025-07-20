@@ -1,6 +1,6 @@
 {% extends 'basic/base.html' %} {% load static %} {% load crispy_forms_tags %}
 {% block content %}
-<div class="page-wrapper">
+<div class="page-wrapper p-0 m-0">
 	<div class="content">
 		<div class="page-header">
 			<div class="add-item d-flex">
@@ -98,9 +98,10 @@
 			</div>
 		</div>
 		{% if departments %}
-		{% for department in departments %}
 		<div class="employee-grid-widget">
 			<div class="row">
+				
+		{% for department in departments %}
 				<div class="col-xxl-3 col-xl-4 col-lg-6 col-md-6">
 					<div class="card">
 						<div class="card-body">
@@ -114,27 +115,17 @@
 											class="feather-user"></i></a>
 									<ul class="dropdown-menu dropdown-menu-end">
 
-
 										<li class="action-table-data">
 											<div class="edit-delete-action">
-                                        <a class="me-2 edit-icon  p-2" href="#"
-                                           data-bs-toggle="modal" 
-                                           data-bs-target="#add-department"
-                                           data-edit-url="{% url 'edit_department_page' department.id %}"
-                                           data-department-name="{{ department.name}}"
-                                           data-department-description="{{ department.description }}"
-                                           
-                                           data-department-is_active="{{ department.is_active }}">
+												<a class="me-2 edit-icon  p-2" href="#" data-bs-toggle="modal"
+													data-bs-target="#add-department"
+													data-edit-url="{% url 'edit_department_page' department.id %}"
+													data-department-name="{{ department.name}}"
+													data-department-description="{{ department.description }}"
+													data-department-is_active="{{ department.is_active }}">
+													<i data-feather="edit" class="feather-edit"></i>Edit</a>
 
-                                            <i data-feather="edit" class="feather-edit"></i>
-                                        Edit</a>
-                                        
-                                    </div>
-										</li>
-										<li>
-											<a href="javascript:void(0);" class="dropdown-item mb-0"
-												data-bs-toggle="modal" data-bs-target="#delete-modal"><i
-													data-feather="trash-2" class="info-img me-2"></i>Delete</a>
+											</div>
 										</li>
 									</ul>
 								</div>
@@ -171,11 +162,11 @@
 						</div>
 					</div>
 				</div>
-
+{% endfor %}
 			</div>
 		</div>
 
-		{% endfor %}
+		
 		{% endif %}
 	</div>
 </div>
