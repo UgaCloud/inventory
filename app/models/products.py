@@ -90,8 +90,8 @@ class StoreLocation(models.Model):
 class Inventory(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
     store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE)
-    quantity_in_stock = models.IntegerField(default=0)
-    reorder_level = models.IntegerField(default=10)
+    quantity_in_stock = models.PositiveIntegerField(default=0)
+    reorder_level = models.PositiveIntegerField(default=10)
 
     class Meta:
         unique_together = ('product', 'store')

@@ -12,9 +12,6 @@ DEBUG = False
 SECRET_KEY = 'django-insecure-gqgpv+7+nke4*fefzsr63+a=r0!!t@bgn!_1a*5(_^ow@^3t)('
 
 
-<<<<<<< HEAD
-ALLOWED_HOSTS = ['kafunda-ug.com', 'www.kafunda-ug.com']
-=======
 ALLOWED_HOSTS = ['*']
 
 DATABASES = {
@@ -27,5 +24,4 @@ DATABASES = {
         'PORT': '3306',
     }
 }
->>>>>>> main
 
