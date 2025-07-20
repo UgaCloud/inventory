@@ -5,7 +5,7 @@ from app.forms.human_resource_forms import *
 from app.selectors.human_resource_selectors import *
 
 @login_required
-def employee_view(request):
+def employee_grid_view(request):
     if request.method == 'POST':
         form = EmployeeForm(request.POST)
 
@@ -19,11 +19,16 @@ def employee_view(request):
     
     employees = Employee.objects.select_related('branch').select_related('department').select_related('designation').all()
 
+    active_employees = employees.filter(is_active=True)
+    inactive_employees = employees.filter(is_active = False)
+
     context = {
         'employees':employees,
-        'form':form
+        'form':form,
+        'active_employees': active_employees,
+        'inactive_employees': inactive_employees
     }
-    return render(request, 'human_resource/employee.html', context)
+    return render(request, 'human_resource/employee_grid.html', context)
 
 @login_required
 def edit_employee_view(request, employee_id):
@@ -38,10 +43,10 @@ def edit_employee_view(request, employee_id):
             messages.error(request, 'An error occured, unable to update the employee')
     form = EmployeeForm(instance = employee)
 
-    return redirect(employee_view)
+    return redirect(employee_grid_view)
 
 @login_required
-def department_view(request):
+def department_grid_view(request):
     if request.method == 'POST':
         form = DepartmentForm(request.POST)
 
@@ -52,15 +57,21 @@ def department_view(request):
             messages.error(request, 'An error occured, unable to add department')
     else:
         form = DepartmentForm()
-    
-    departments = Department.objects.all()
 
+    Department.objects.annotate(employee_count=models.Count('employees'))# this adds a new field 'employee_count' to each department object
+    departments = Department.objects.all()
+    active_departments = departments.filter(is_active=True)
+    inactive_departments = departments.filter(is_active=False)
+
+    
     context = {
         'departments':departments,
-        'form':form
+        'form':form,
+        'active_departments': active_departments,
+        'inactive_departments': inactive_departments  
     }
+    return render(request, 'human_resource/department_grid.html', context)
 
-    return render(request, 'human_resource/department.html', context)
 
 @login_required
 def edit_department_view(request, department_id):
@@ -72,12 +83,12 @@ def edit_department_view(request, department_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'The department has been updated successfully')
-            return redirect(department_view)
+            return redirect(department_grid_view)
         else:
             messages.error(request, 'An error occured, unable to update department')
 
     form = Department(instance = department)
-    return redirect(department_view)
+    return redirect(department_grid_view)
 
 @login_required
 def designation_view(request):

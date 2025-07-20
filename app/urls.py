@@ -88,10 +88,11 @@ urlpatterns = [
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
 
     #human resource
-    path('employee', employee_view, name = 'employee_page'),
+    path('employee_grid', employee_grid_view, name = 'employee_page'),
     path('edit_employee/<int:employee_id>', edit_employee_view, name = 'edit_employee_page'),
-    path('department', department_view, name = 'department_page'),
+    path('department_grid', department_grid_view, name = 'department_page'),
     path('edit_department/<int:department_id>', edit_department_view, name = 'edit_department_page'),
     path('designation', designation_view, name = 'designation_page'),
     path('edit_designation/<int:designation_id>', edit_designation_view, name = 'edit_designation_page'),
+   
     ]
