@@ -74,7 +74,7 @@ def edit_department_view(request, department_id):
         else:
             messages.error(request, 'An error occured, unable to update department')
 
-    form = Department()
+    form = Department(instance = department)
     return redirect(department_view)
 
 @login_required

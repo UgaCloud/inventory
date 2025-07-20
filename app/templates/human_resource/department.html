@@ -97,8 +97,8 @@
 				</div>
 			</div>
 		</div>
-{% if departments %}
-{% for department in departments %}
+		{% if departments %}
+		{% for department in departments %}
 		<div class="employee-grid-widget">
 			<div class="row">
 				<div class="col-xxl-3 col-xl-4 col-lg-6 col-md-6">
@@ -113,10 +113,23 @@
 										aria-expanded="false"><i data-feather="more-vertical"
 											class="feather-user"></i></a>
 									<ul class="dropdown-menu dropdown-menu-end">
-										<li>
-											<a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal"
-												data-bs-target="#edit-department"><i data-feather="edit"
-													class="info-img me-2"></i>Edit</a>
+
+
+										<li class="action-table-data">
+											<div class="edit-delete-action">
+                                        <a class="me-2 edit-icon  p-2" href="#"
+                                           data-bs-toggle="modal" 
+                                           data-bs-target="#add-department"
+                                           data-edit-url="{% url 'edit_department_page' department.id %}"
+                                           data-department-name="{{ department.name}}"
+                                           data-department-description="{{ department.description }}"
+                                           
+                                           data-department-is_active="{{ department.is_active }}">
+
+                                            <i data-feather="edit" class="feather-edit"></i>
+                                        Edit</a>
+                                        
+                                    </div>
 										</li>
 										<li>
 											<a href="javascript:void(0);" class="dropdown-item mb-0"
@@ -128,28 +141,28 @@
 							</div>
 							<div class="bg-light rounded p-3 text-center mb-4">
 								<div class="avatar avatar-lg mb-2">
-									<img src="assets/img/users/user-01.jpg" alt="Img" />
+									<img src="{% static 'assets/img/users/user-01.jpg' %}" alt="Img" />
 								</div>
-								<h4>Mitchum Daniel</h4>
+								<h4>{{department}}</h4>
 							</div>
 							<div class="d-flex align-items-center justify-content-between">
 								<p class="mb-0">Total Members: 08</p>
 								<div class="avatar-list-stacked avatar-group-sm">
 									<span class="avatar avatar-rounded">
-										<img class="border border-white" src="assets/img/profiles/avatar-15.jpg"
-											alt="img" />
+										<img class="border border-white"
+											src="{% static 'assets/img/profiles/avatar-15.jpg' %}" alt="img" />
 									</span>
 									<span class="avatar avatar-rounded">
-										<img class="border border-white" src="assets/img/profiles/avatar-16.jpg"
-											alt="img" />
+										<img class="border border-white"
+											src="{% static 'assets/img/profiles/avatar-16.jpg' %}" alt="img" />
 									</span>
 									<span class="avatar avatar-rounded">
-										<img class="border border-white" src="assets/img/profiles/avatar-18.jpg"
-											alt="img" />
+										<img class="border border-white"
+											src="{% static 'assets/img/profiles/avatar-18.jpg' %}" alt="img" />
 									</span>
 									<a class="avatar avatar-rounded text-fixed-white fs-10 fw-medium position-relative"
 										href="javascript:void(0);">
-										<img src="assets/img/profiles/avatar-17.jpg" alt="img" />
+										<img src="{% static 'assets/img/profiles/avatar-17.jpg' %}" alt="img" />
 										<span
 											class="position-absolute top-50 start-50 translate-middle text-center">+2</span>
 									</a>
@@ -161,7 +174,7 @@
 
 			</div>
 		</div>
-		
+
 		{% endfor %}
 		{% endif %}
 	</div>
@@ -195,4 +208,53 @@
 			</div>
 		</div>
 	</div>
+
+
+	<script>
+		document.addEventListener('DOMContentLoaded', function () {
+			const editButtons = document.querySelectorAll('.edit-icon');
+			const modal = document.getElementById('add-department');
+			const form = modal.querySelector('form');
+			const nameInput = form.querySelector('[name="name"]');
+			const descriptionInput = form.querySelector('[name="description"]');
+			const is_activeInput = form.querySelector('[name="is_active"]');
+
+			editButtons.forEach(function (btn) {
+				btn.addEventListener('click', function (e) {
+					e.preventDefault();
+					// Set form action to edit URL
+					form.action = btn.getAttribute('data-edit-url');
+					// Fill form fields
+					if (nameInput) nameInput.value = btn.getAttribute('data-department-name');
+					if (descriptionInput) descriptionInput.value = btn.getAttribute
+						('data-department-description');
+					if (is_activeInput) {
+						if (btn.getAttribute('data-department-is_active') === 'True' || btn.getAttribute('data-department-is_active') === 'true') {
+							is_activeInput.checked = true;
+						} else {
+							is_activeInput.checked = false;
+						}
+					}
+
+					// Change modal title to Edit
+					const modalTitle = modal.querySelector('.modal-header .page-title h4');
+					if (modalTitle) modalTitle.textContent = 'Edit department';
+					// Change submit button text
+					const submitBtn = form.querySelector('button[type="submit"]');
+					if (submitBtn) submitBtn.textContent = 'Save Changes';
+				});
+			});
+			// Reset modal on close (optional)
+			modal.addEventListener('hidden.bs.modal', function () {
+				form.reset();
+				form.action = '';
+				const modalTitle = modal.querySelector('.modal-header .page-title h4');
+				if (modalTitle) modalTitle.textContent = 'Add department';
+				const submitBtn = form.querySelector('button[type="submit"]');
+				if (submitBtn) submitBtn.textContent = 'Submit';
+			});
+
+		});
+
+	</script>
 	{% endblock %}
