@@ -3,6 +3,7 @@ from django.dispatch import receiver
 from django.db import transaction
 from app.models.products import Inventory, ProductUnitPrice
 from app.models.transactions import PurchaseOrderItem, StockMovement, InventoryBatch
+from datetime import date
 
 @receiver(post_save, sender=PurchaseOrderItem)
 def update_inventory_on_purchase(sender, instance, created, **kwargs):
@@ -29,7 +30,8 @@ def update_inventory_on_purchase(sender, instance, created, **kwargs):
                 quantity=quantity_base,
                 unit_cost=instance.unit_cost,
                 remaining_quantity=quantity_base,
-                purchase_order_item=instance
+                purchase_order_item=instance,
+                expiry_date=instance.expiry_date  # Pass expiry from PurchaseOrderItem
             
             )
 
@@ -65,7 +67,8 @@ def update_inventory_on_purchase(sender, instance, created, **kwargs):
                         quantity=diff_base,
                         unit_cost=instance.unit_cost,
                         remaining_quantity=diff_base,
-                        purchase_order_item=instance
+                        purchase_order_item=instance,
+                        expiry_date=instance.expiry_date  # Pass expiry from PurchaseOrderItem
                     )
 
                     # Log stock movement for increase
@@ -132,19 +135,36 @@ def update_inventory_on_purchase_delete(sender, instance, **kwargs):
             product=instance.product,
             store=instance.order.store
         ).first()
-        
+        unit_price = ProductUnitPrice.objects.filter(product=instance.product, unit=instance.unit).first()
+        conversion_factor = unit_price.conversion_factor if unit_price else 1.0
+        quantity_base = instance.quantity * conversion_factor
         if inventory:
-            inventory.quantity_in_stock -= instance.quantity
+            inventory.quantity_in_stock -= quantity_base
             inventory.save()
-            
-            # Log stock movement for deletion
+            # Remove from batches (FIFO: oldest, non-expired first)
+            batches = InventoryBatch.objects.filter(
+                product=instance.product,
+                store=instance.order.store,
+                remaining_quantity__gt=0,
+                expiry_date__gte=date.today()
+            ).order_by('expiry_date', 'received_date')
+            to_remove = quantity_base
+            for batch in batches:
+                if batch.remaining_quantity >= to_remove:
+                    batch.remaining_quantity -= to_remove
+                    batch.save()
+                    break
+                else:
+                    to_remove -= batch.remaining_quantity
+                    batch.remaining_quantity = 0
+                    batch.save()
             StockMovement.objects.create(
                 product=instance.product,
                 store=instance.order.store,
-                transaction_type='OUT',  
-                quantity=-instance.quantity,  
+                transaction_type='OUT',
+                quantity=-quantity_base,
                 transaction_id=instance.order.id,
-                note='Stock (delete)',
+                note='Purchase Order Item deleted',
                 units_in_stock=inventory.quantity_in_stock,
                 user=getattr(instance.order, 'recorded_by', 'system')
             )

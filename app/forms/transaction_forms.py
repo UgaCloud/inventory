@@ -35,6 +35,7 @@ class PurchaseOrderItemForm(ModelForm):
         fields = "__all__"
         widgets = {
             'order': forms.HiddenInput(),
+            'expiry_date': forms.DateInput(attrs={'type': 'date'}),  # Add date widget for expiry_date
         }
 
     def clean(self):

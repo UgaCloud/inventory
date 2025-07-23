@@ -5,6 +5,7 @@ from app.models.transactions import SalesItem
 from app.models.products import Inventory, ProductUnitPrice
 from app.models.transactions import StockMovement
 from app.models.transactions import InventoryBatch
+from datetime import date
 
 @receiver(post_save, sender=SalesItem)
 def update_inventory_on_sale(sender, instance, created, **kwargs):
@@ -21,9 +22,13 @@ def update_inventory_on_sale(sender, instance, created, **kwargs):
         quantity_base = instance.quantity * conversion_factor
         
         if created:
-            # FIFO: Deduct from oldest batches first
-            batches = InventoryBatch.objects.filter(product=instance.product, store=instance.order.store, remaining_quantity__gt=0).order_by('received_date')
-            
+            # FIFO: Deduct from oldest, non-expired batches first
+            batches = InventoryBatch.objects.filter(
+                product=instance.product,
+                store=instance.order.store,
+                remaining_quantity__gt=0,
+                expiry_date__gte=date.today()
+            ).order_by('expiry_date', 'received_date')
             to_deduct = quantity_base
             
             for batch in batches:
@@ -55,9 +60,12 @@ def update_inventory_on_sale(sender, instance, created, **kwargs):
                 diff_base = diff * conversion_factor
                 
                 if diff_base > 0:
-                    # Deduct additional quantity using FIFO
-                    batches = InventoryBatch.objects.filter(product=instance.product, store=instance.order.store, remaining_quantity__gt=0).order_by('received_date')
-                    
+                    batches = InventoryBatch.objects.filter(
+                        product=instance.product,
+                        store=instance.order.store,
+                        remaining_quantity__gt=0,
+                        expiry_date__gte=date.today()
+                    ).order_by('expiry_date', 'received_date')
                     to_deduct = diff_base
                     
                     for batch in batches:
@@ -79,14 +87,15 @@ def update_inventory_on_sale(sender, instance, created, **kwargs):
                         transaction_type='OUT',
                         quantity=-diff_base,
                         transaction_id=instance.order.id,
-                        note='Sale (update, FIFO)',
+                        note='Sale (update)',
                         units_in_stock=inventory.quantity_in_stock,
                         user=getattr(instance.order, 'recorded_by', 'system')
                     )
                 elif diff_base < 0:
-                    # Return stock to batches (LIFO for return, but FIFO for deduction)
-                    batches = InventoryBatch.objects.filter(product=instance.product, store=instance.order.store).order_by('-received_date')
-                    
+                    batches = InventoryBatch.objects.filter(
+                        product=instance.product,
+                        store=instance.order.store
+                    ).order_by('-expiry_date', '-received_date')
                     to_return = -diff_base
                     
                     for batch in batches:

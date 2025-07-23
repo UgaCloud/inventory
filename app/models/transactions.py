@@ -1,4 +1,5 @@
 from django.db import models
+from datetime import date, timedelta
 
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 
@@ -30,6 +31,7 @@ class PurchaseOrderItem(models.Model):
     unit = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
     unit_cost = models.DecimalField(max_digits=10, decimal_places=0)
+    expiry_date = models.DateField(null=True, blank=True)  # <-- Added expiry date for purchase
 
     class Meta:
         unique_together = ("order", "product", "unit")
@@ -37,6 +39,41 @@ class PurchaseOrderItem(models.Model):
     @property
     def total_cost(self):
         return self.quantity * self.unit_cost
+
+class InventoryBatch(models.Model):
+    product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="batches")
+    store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    received_date = models.DateTimeField(auto_now_add=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    remaining_quantity = models.PositiveIntegerField()
+    purchase_order_item = models.ForeignKey("app.PurchaseOrderItem", on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ["expiry_date", "received_date"]  
+
+    def __str__(self):
+        return f"Batch {self.id}: {self.product.name} @ {self.store.name} ({self.remaining_quantity}/{self.quantity}) Expires: {self.expiry_date}"
+
+    @property
+    def is_expired(self):
+        return self.expiry_date and self.expiry_date < date.today()
+
+    @property
+    def days_to_expiry(self):
+        if self.expiry_date:
+            return (self.expiry_date - date.today()).days
+        return None
+
+    @classmethod
+    def expiring_soon(cls, days=30):
+        return cls.objects.filter(expiry_date__gte=date.today(), expiry_date__lte=date.today() + timedelta(days=days))
+
+    @classmethod
+    def expired(cls):
+        return cls.objects.filter(expiry_date__lt=date.today())
+
 
 
 class Sales(models.Model):
@@ -146,6 +183,35 @@ class StockTransferItem(models.Model):
     def total_quantity(self):
         return self.quantity
 
+    def apply_fifo_transfer(self):
+        # Deduct from source store using FIFO and expiry
+        batches = InventoryBatch.objects.filter(
+            product=self.product,
+            store=self.stock_transfer.transfer_request.from_store,
+            remaining_quantity__gt=0,
+            expiry_date__gte=date.today()
+        ).order_by('expiry_date', 'received_date')
+        to_deduct = self.quantity
+        for batch in batches:
+            if batch.remaining_quantity >= to_deduct:
+                batch.remaining_quantity -= to_deduct
+                batch.save()
+                break
+            else:
+                to_deduct -= batch.remaining_quantity
+                batch.remaining_quantity = 0
+                batch.save()
+        # Add to destination store as new batch (preserve expiry)
+        InventoryBatch.objects.create(
+            product=self.product,
+            store=self.stock_transfer.transfer_request.to_store,
+            quantity=self.quantity,
+            unit_cost=batch.unit_cost if batch else 0,
+            remaining_quantity=self.quantity,
+            expiry_date=batch.expiry_date if batch else None,
+            purchase_order_item=None
+        )
+
 
 class StockMovement(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="stock_movements")
@@ -157,21 +223,5 @@ class StockMovement(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     units_in_stock = models.IntegerField()
     user = models.CharField(max_length=50)
-
-
-class InventoryBatch(models.Model):
-    product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="batches")
-    store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
-    received_date = models.DateTimeField(auto_now_add=True)
-    remaining_quantity = models.PositiveIntegerField()
-    purchase_order_item = models.ForeignKey("app.PurchaseOrderItem", on_delete=models.SET_NULL, null=True, blank=True)
-
-    class Meta:
-        ordering = ["received_date"]
-
-    def __str__(self):
-        return f"Batch {self.id}: {self.product.name} @ {self.store.name} ({self.remaining_quantity}/{self.quantity})"
 
 
