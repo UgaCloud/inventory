@@ -159,3 +159,19 @@ class StockMovement(models.Model):
     user = models.CharField(max_length=50)
 
 
+class InventoryBatch(models.Model):
+    product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="batches")
+    store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    received_date = models.DateTimeField(auto_now_add=True)
+    remaining_quantity = models.PositiveIntegerField()
+    purchase_order_item = models.ForeignKey("app.PurchaseOrderItem", on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ["received_date"]
+
+    def __str__(self):
+        return f"Batch {self.id}: {self.product.name} @ {self.store.name} ({self.remaining_quantity}/{self.quantity})"
+
+

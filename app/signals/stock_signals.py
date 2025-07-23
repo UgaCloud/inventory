@@ -2,27 +2,42 @@ from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 from django.db import transaction
 from app.models.products import Inventory, ProductUnitPrice
-from app.models.transactions import PurchaseOrderItem, StockMovement
+from app.models.transactions import PurchaseOrderItem, StockMovement, InventoryBatch
 
 @receiver(post_save, sender=PurchaseOrderItem)
 def update_inventory_on_purchase(sender, instance, created, **kwargs):
     with transaction.atomic():
         unit_price = ProductUnitPrice.objects.filter(product=instance.product, unit=instance.unit).first()
+        
         conversion_factor = unit_price.conversion_factor if unit_price else 1.0
+        
         quantity_base = instance.quantity * conversion_factor
+        
         if created:
-            # Get or create inventory for the product and store from the purchase order
             inventory, _ = Inventory.objects.get_or_create(
                 product=instance.product,
                 store=instance.order.store
             )
+            
             inventory.quantity_in_stock += quantity_base
             inventory.save()
-            # Log stock movement for creation
+            
+            # Create a new batch for FIFO
+            InventoryBatch.objects.create(
+                product=instance.product,
+                store=instance.order.store,
+                quantity=quantity_base,
+                unit_cost=instance.unit_cost,
+                remaining_quantity=quantity_base,
+                purchase_order_item=instance
+            
+            )
+
+            # Log stock movement
             StockMovement.objects.create(
                 product=instance.product,
                 store=instance.order.store,
-                transaction_type='IN',  # Assuming 'IN' is for restock
+                transaction_type='IN',
                 quantity=quantity_base,
                 transaction_id=instance.order.id,
                 note='Purchase Order',
@@ -30,19 +45,30 @@ def update_inventory_on_purchase(sender, instance, created, **kwargs):
                 user=getattr(instance.order, 'recorded_by', 'system')
             )
         else:
-            # Handle update: adjust inventory by the difference in quantity
             if hasattr(instance, '_old_quantity'):
                 diff = instance.quantity - instance._old_quantity
                 diff_base = diff * conversion_factor
-                if diff != 0:
+                
+                if diff > 0:
                     inventory, _ = Inventory.objects.get_or_create(
                         product=instance.product,
                         store=instance.order.store
                     )
+                    
                     inventory.quantity_in_stock += diff_base
                     inventory.save()
                     
-                    # Log stock movement for update
+                    # Add new batch for increased quantity
+                    InventoryBatch.objects.create(
+                        product=instance.product,
+                        store=instance.order.store,
+                        quantity=diff_base,
+                        unit_cost=instance.unit_cost,
+                        remaining_quantity=diff_base,
+                        purchase_order_item=instance
+                    )
+
+                    # Log stock movement for increase
                     StockMovement.objects.create(
                         product=instance.product,
                         store=instance.order.store,
@@ -50,6 +76,40 @@ def update_inventory_on_purchase(sender, instance, created, **kwargs):
                         quantity=diff_base,
                         transaction_id=instance.order.id,
                         note='Stock (update)',
+                        units_in_stock=inventory.quantity_in_stock,
+                        user=getattr(instance.order, 'recorded_by', 'system')
+                    )
+                elif diff < 0:
+                    # Remove from batches (LIFO for removal, but FIFO for deduction)
+                    batches = InventoryBatch.objects.filter(product=instance.product, store=instance.order.store, remaining_quantity__gt=0).order_by('received_date')
+                    
+                    to_remove = -diff_base
+                    
+                    for batch in batches:
+                        if batch.remaining_quantity >= to_remove:
+                            batch.remaining_quantity -= to_remove
+                            batch.save()
+                            break
+                        else:
+                            to_remove -= batch.remaining_quantity
+                            batch.remaining_quantity = 0
+                            batch.save()
+                    
+                    inventory, _ = Inventory.objects.get_or_create(
+                        product=instance.product,
+                        store=instance.order.store
+                    )
+                    
+                    inventory.quantity_in_stock += diff_base
+                    inventory.save()
+                    
+                    StockMovement.objects.create(
+                        product=instance.product,
+                        store=instance.order.store,
+                        transaction_type='OUT', 
+                        quantity=diff_base,
+                        transaction_id=instance.order.id,
+                        note='Stock (update, reduce)',
                         units_in_stock=inventory.quantity_in_stock,
                         user=getattr(instance.order, 'recorded_by', 'system')
                     )
@@ -72,6 +132,7 @@ def update_inventory_on_purchase_delete(sender, instance, **kwargs):
             product=instance.product,
             store=instance.order.store
         ).first()
+        
         if inventory:
             inventory.quantity_in_stock -= instance.quantity
             inventory.save()
