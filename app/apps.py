@@ -10,3 +10,4 @@ class AppConfig(AppConfig):
         import app.signals.sales_signals
         import app.signals.transfer_signals
         import app.signals.finance_signals
+        import app.signals.bank_signals

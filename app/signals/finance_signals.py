@@ -12,7 +12,7 @@ def create_cash_flow_on_sale(sender, instance, created, **kwargs):
             transaction_type='SALE',
             reference=instance.receipt_no,
             user=instance.recorded_by,
-            note='Auto-generated from sale.'
+            note=f"Sale: {instance.note or ''}"
         )
 
 @receiver(post_save, sender=PurchaseOrder)
@@ -24,5 +24,5 @@ def create_cash_flow_on_purchase(sender, instance, created, **kwargs):
             transaction_type='PURCHASE',
             reference=f'PO-{instance.id}',
             user=instance.recorded_by,
-            note='Auto-generated from purchase.'
+            note=f"Purchase: {instance.note or ''}"
         )

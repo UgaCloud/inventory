@@ -60,12 +60,23 @@ PAYMENT_STATUS = [
     ('Paid', 'Paid')
 ]
 
-TRANSACTION_TYPES = [
+CASHFLOW_TYPES = [
         ('SALE', 'Sale'),
         ('PURCHASE', 'Purchase'),
         ('EXPENSE', 'Expense'),
         ('DEPOSIT', 'Deposit'),
         ('WITHDRAWAL', 'Withdrawal'),
+    ]
+
+TRANSACTION_TYPES = [
+        ('DEPOSIT', 'Deposit'),
+        ('WITHDRAWAL', 'Withdrawal'),
+        ('TRANSFER_IN', 'Transfer In'),
+        ('TRANSFER_OUT', 'Transfer Out'),
+        ('PAYMENT', 'Payment'),
+        ('RECEIPT', 'Receipt'),
+        ('CHARGE', 'Bank Charge'),
+        ('INTEREST', 'Interest'),
     ]
 
 SUCCESS_ADD_MESSAGE = "Record Saved!"
