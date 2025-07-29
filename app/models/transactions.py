@@ -31,7 +31,7 @@ class PurchaseOrderItem(models.Model):
     unit = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
     unit_cost = models.DecimalField(max_digits=10, decimal_places=0)
-    expiry_date = models.DateField(null=True, blank=True)  # <-- Added expiry date for purchase
+    expiry_date = models.DateField(null=True, blank=True) 
 
     class Meta:
         unique_together = ("order", "product", "unit")
@@ -223,5 +223,4 @@ class StockMovement(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     units_in_stock = models.IntegerField()
     user = models.CharField(max_length=50)
-
 

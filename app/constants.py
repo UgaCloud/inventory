@@ -24,14 +24,15 @@ EMPLOYEE_STATUS = [
         ('On Leave', 'On Leave'),
         ('Retired', 'Retired')
     ]
+
 PURCHASE_ORDER_OPTIONS = [
-    ('PENDING', 'Pending'), 
-    ('RECEIVED', 'Received')
+        ('PENDING', 'Pending'), 
+        ('RECEIVED', 'Received')
     ]
 
 SALE_ORDER_OPTIONS = [
-    ('PENDING', 'Pending'), 
-    ('FULFILLED', 'Fulfilled')
+        ('PENDING', 'Pending'), 
+        ('FULFILLED', 'Fulfilled')
     ]
 
 STOCK_MOVEMENT_OPTIONS = [
@@ -58,6 +59,14 @@ PAYMENT_STATUS = [
     ('Pending', 'Pending'), 
     ('Paid', 'Paid')
 ]
+
+TRANSACTION_TYPES = [
+        ('SALE', 'Sale'),
+        ('PURCHASE', 'Purchase'),
+        ('EXPENSE', 'Expense'),
+        ('DEPOSIT', 'Deposit'),
+        ('WITHDRAWAL', 'Withdrawal'),
+    ]
 
 SUCCESS_ADD_MESSAGE = "Record Saved!"
 
