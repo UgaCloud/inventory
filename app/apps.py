@@ -8,3 +8,7 @@ class AppConfig(AppConfig):
     def ready(self):
         import app.signals.stock_signals
         import app.signals.sales_signals
+        import app.signals.transfer_signals
+        import app.signals.finance_signals
+        import app.signals.bank_signals
+        import app.signals.expense_signals
