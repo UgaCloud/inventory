@@ -26,6 +26,7 @@ class OrganizationSetting(SingletonModel):
     office_phone_number2 = models.CharField(max_length=40, blank=True, null=True)
     organization_logo = models.ImageField(upload_to="logo", height_field=None, width_field=None, max_length=None)
     app_name = models.CharField(max_length=20, default="Inventory")
+    currency = models.CharField(max_length=50, choices=CURRENCY_CHOICES, default='UGX')
     
 class Branch(models.Model):
 

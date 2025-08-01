@@ -82,7 +82,19 @@
                             <li class="border-bottom">
                                 <h4 class="border-end">Balance</h4>
                                 <h5>
-                                    <input type="text" id="balance" class="form-control-plaintext fw-bold" value="$ 0.00" readonly disabled style="background:transparent; border:none; font-size:14px; color:#646B72;" />
+                                    <input type="text" id="balance" class="form-control-plaintext fw-bold" value="0" readonly disabled style="background:transparent; border:none; font-size:14px; color:#646B72;" />
+                                </h5>
+                            </li>
+                            <li class="border-bottom">
+                                <h4 class="border-end">Amount Recieved</h4>
+                                <h5>
+                                    <input type="number" id="amount-paid" class="form-control fw-bold" value="0" min="0" step="0.01" style="max-width: 280px; font-size:14px; color:#646B72;" />
+                                </h5>
+                            </li>
+                            <li class="border-bottom">
+                                <h4 class="border-end">Change</h4>
+                                <h5>
+                                    <input type="text" id="change" class="form-control-plaintext fw-bold" value={{organization.currency}}"0.00" readonly disabled style="background:transparent; border:none; font-size:14px; color:#646B72;" />
                                 </h5>
                             </li>
                         </ul>
@@ -115,6 +127,12 @@
                 }
             });
             document.getElementById('total-amount').value = formatCurrency(total);
+            // Set amount paid and amount received to total amount
+            const amountPaidInputs = document.querySelectorAll('#amount-paid');
+            amountPaidInputs.forEach(function(input) {
+                input.value = total;
+            });
+            updateBalance();
         }
 
         // Update balance based on total and amount paid
@@ -127,6 +145,19 @@
             document.getElementById('balance').value = (balance < 0 ? '-' : '') + 'UGX ' + Math.abs(balance).toLocaleString('en-UG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
         
+        // Update change based on amount received and amount paid
+        function updateChange() {
+            const paidInputs = document.querySelectorAll('#amount-paid');
+            if (paidInputs.length < 2) return;
+            const amountPaid = parseFloat(paidInputs[0].value) || 0; // First is Amount Paid
+            const amountReceived = parseFloat(paidInputs[1].value) || 0; // Second is Amount Received
+            const change = amountReceived - amountPaid;
+            const changeInput = document.getElementById('change');
+            if (changeInput) {
+                changeInput.value = (change < 0 ? '-' : '') + 'UGX ' + Math.abs(change).toLocaleString('en-UG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+        }
+
         // Autocomplete for product field
         function setupProductAutocomplete() {
             $('.product-autocomplete').autocomplete({
@@ -157,7 +188,11 @@
             formsetBody.addEventListener('click', function(e) {
                 if (e.target.classList.contains('remove-form-row')) {
                     var row = e.target.closest('.formset-row');
-                    if (row) row.remove();
+                    if (row) {
+                        row.remove();
+                        updateTotalAmount(); // Update totals after removing a row
+                        updateBalance();     // Update balance as well
+                    }
                 }
             });
             
@@ -177,10 +212,19 @@
             updateTotalAmount = function() {
                 origUpdateTotalAmount();
                 updateBalance();
+                updateChange();
             };
             
+            // Update change when amount paid or amount received changes
+            const paidInputs = document.querySelectorAll('#amount-paid');
+            paidInputs.forEach(function(input) {
+                input.addEventListener('input', function() {
+                    updateChange();
+                });
+            });
             // Initial calculation
             updateBalance();
+            updateChange();
             setupProductAutocomplete();
             // If you add formset rows dynamically, call setupProductAutocomplete after each add
             document.getElementById('add-form-row').addEventListener('click', function() {

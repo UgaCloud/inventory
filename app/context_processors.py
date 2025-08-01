@@ -1,8 +1,8 @@
-from app.models.organization import OrganizationSettings, Branch, Currency 
+from app.models.organization import OrganizationSetting, Branch, Currency 
 
-def organization_settings(request):
+def organization_setting(request):
   
-    settings = OrganizationSettings.load()
+    settings = OrganizationSetting.load()
     return {
-        'organization_settings': settings,
+        'organization': settings,
     }

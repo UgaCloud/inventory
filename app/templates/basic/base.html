@@ -121,7 +121,7 @@
           <!-- Logo -->
           <div class="header-left active">
             <a href="{% url 'index_page' %}" class="logo logo-normal">
-              <img src="{{organization_details.logo.url}}" alt="Img" />
+              <img src="{{organization.organization_logo.url}}" alt="Img" />
             </a>
             <a href="{% url 'index_page' %}" class="logo logo-white">
               <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" />
@@ -168,7 +168,6 @@
                         />K</kbd
                       >
                     </span>
-                    {% comment %} URL-{{organization_details.organization_logo.url}} {% endcomment %}
                   </div>
                   <div
                     class="dropdown-menu search-dropdown"
