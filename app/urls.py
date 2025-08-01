@@ -17,6 +17,10 @@ from .views.sales_views import *
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
+from app.views.finance_views import (
+    bankaccount_list_view, add_bankaccount_view, update_bankaccount_view, delete_bankaccount_view,
+    banktransaction_list_view, add_banktransaction_view, update_banktransaction_view, delete_banktransaction_view
+)
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
@@ -110,6 +114,18 @@ urlpatterns = [
     path('expensecategories/add/', add_expensecategory_view, name='add_expense_category_page'),
     path('expensecategories/<int:pk>/edit/', update_expensecategory_view, name='edit_expense_category_page'),
     path('expensecategories/<int:pk>/delete/', expensecategory_delete, name='delete_expensecategory_page'),
+
+    # BankAccount URLs
+    path('bankaccounts/', bankaccount_list_view, name='bankaccount_list'),
+    path('bankaccounts/add/', add_bankaccount_view, name='add_bankaccount_page'),
+    path('bankaccounts/<int:pk>/edit/', update_bankaccount_view, name='edit_bankaccount_page'),
+    path('bankaccounts/<int:pk>/delete/', delete_bankaccount_view, name='delete_bankaccount_page'),
+
+    # BankTransaction URLs
+    path('banktransactions/', banktransaction_list_view, name='banktransaction_list'),
+    path('banktransactions/add/', add_banktransaction_view, name='add_banktransaction_page'),
+    path('banktransactions/<int:pk>/edit/', update_banktransaction_view, name='edit_banktransaction_page'),
+    path('banktransactions/<int:pk>/delete/', delete_banktransaction_view, name='delete_banktransaction_page'),
     ]
 
 if settings.DEBUG:

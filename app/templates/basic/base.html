@@ -168,7 +168,7 @@
                         />K</kbd
                       >
                     </span>
-                    URL-{{organization_details.organization_logo.url}}
+                    {% comment %} URL-{{organization_details.organization_logo.url}} {% endcomment %}
                   </div>
                   <div
                     class="dropdown-menu search-dropdown"
@@ -872,8 +872,13 @@
                     </ul>
                   </li>
                   <li>
-                    <a href="{% url 'under_maintenance_page' %}"
+                    <a href="{% url 'bankaccount_list' %}"
                       ><span>Bank Accounts</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'banktransaction_list' %}"
+                      ><span>Bank Transactions</span></a
                     >
                   </li>
                   <li>
