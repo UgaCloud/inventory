@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.conf.urls.static import static
 
 from .views.general_views import index_view
 from .views.product_views import * 
@@ -15,6 +16,7 @@ from .views.transfer_views import *
 from .views.sales_views import *
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
+from app.views.expense_views import *
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
@@ -28,6 +30,8 @@ urlpatterns = [
     path('branches/', manage_branches, name = 'manage_branch_page'),
     path('edit_branch/<int:branch_id>/', edit_branch, name = 'edit_branch_page'),
     path('delete_branch/<int:branch_id>/', delete_branch, name = 'delete_branch_page'),
+    path('settings/', settings_page,name="settings_page"),
+    path('update_settings/', update_organization_settings, name="update_settings_page"),
 
     # Product
     path('products/', manage_product_view, name ='products_page'),
@@ -94,5 +98,19 @@ urlpatterns = [
     path('edit_department/<int:department_id>', edit_department_view, name = 'edit_department_page'),
     path('designation', designation_view, name = 'designation_page'),
     path('edit_designation/<int:designation_id>', edit_designation_view, name = 'edit_designation_page'),
-   
+
+    # Expense URLs
+    path('expenses/', expense_list_view, name='expense_list'),
+    path('expenses/add/', add_expense_view, name='add_expense_page'),
+    path('expenses/<int:pk>/', expense_detail_view, name='expense_detail_page'),
+    path('expenses/<int:pk>/edit/', expense_update_view, name='edit_expense_page'),
+    path('expenses/<int:pk>/delete/', delete_expense_view, name='delete_expense_page'),
+
+    path('expensecategories/', expensecategory_list_view, name='expensecategory_list'),
+    path('expensecategories/add/', add_expensecategory_view, name='add_expense_category_page'),
+    path('expensecategories/<int:pk>/edit/', update_expensecategory_view, name='edit_expense_category_page'),
+    path('expensecategories/<int:pk>/delete/', expensecategory_delete, name='delete_expensecategory_page'),
     ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

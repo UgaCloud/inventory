@@ -121,7 +121,7 @@
           <!-- Logo -->
           <div class="header-left active">
             <a href="{% url 'index_page' %}" class="logo logo-normal">
-              <img src="{% static 'assets/img/logo-1.png' %}" alt="Img" />
+              <img src="{{organization_details.logo.url}}" alt="Img" />
             </a>
             <a href="{% url 'index_page' %}" class="logo logo-white">
               <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" />
@@ -168,6 +168,7 @@
                         />K</kbd
                       >
                     </span>
+                    URL-{{organization_details.organization_logo.url}}
                   </div>
                   <div
                     class="dropdown-menu search-dropdown"
@@ -844,12 +845,12 @@
                     ></a>
                     <ul>
                       <li>
-                        <a href="{% url 'under_maintenance_page' %}"
+                        <a href="{% url 'expense_list' %}"
                           >Expenses</a
                         >
                       </li>
                       <li>
-                        <a href="{% url 'under_maintenance_page' %}"
+                        <a href="{% url 'expensecategory_list' %}"
                           >Expense Category</a
                         >
                       </li>
@@ -1071,7 +1072,7 @@
                   ><span class="menu-arrow"></span
                 ></a>
                 <ul>
-                  <li><a href="#">Company Profile </a></li>
+                  <li><a href="{% url 'settings_page' %}">Company Profile </a></li>
 
                   <li class="submenu">
                     <a href="javascript:void(0);"
