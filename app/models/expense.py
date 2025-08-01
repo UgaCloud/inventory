@@ -1,6 +1,4 @@
 from django.db import models
-from app.models.transactions import StoreLocation, PurchaseOrder, Sales
-from app.models.finance import CashFlow
 
 class ExpenseCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -10,16 +8,17 @@ class ExpenseCategory(models.Model):
         return self.name
 
 class Expense(models.Model):
-    store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE, related_name='expenses')
+    store = models.ForeignKey('app.StoreLocation', on_delete=models.CASCADE, related_name='expenses')
     category = models.ForeignKey(ExpenseCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField(auto_now_add=True)
     description = models.TextField(blank=True)
     reference = models.CharField(max_length=100, blank=True, null=True)
     user = models.CharField(max_length=50)
-    related_purchase = models.ForeignKey(PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
-    related_sale = models.ForeignKey(Sales, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
-    related_cashflow = models.ForeignKey(CashFlow, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
+    related_purchase = models.ForeignKey('app.PurchaseOrder', on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
+    related_sale = models.ForeignKey('app.Sales', on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
+    related_cashflow = models.ForeignKey('app.CashFlow', on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
+    attachment = models.FileField(upload_to='expense_attachments/', null=True, blank=True)
 
     def __str__(self):
         return f"{self.category} - {self.amount} on {self.date} ({self.store})"

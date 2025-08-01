@@ -12,6 +12,37 @@ from app.models.organization import *
 
 
 @login_required
+def settings_page(request):
+    all_currencies = get_all_currencies()
+    organization_settings = OrganizationSetting.load()   
+    
+    organization_settings_form = OrganizationSettingForm(instance=organization_settings)
+    
+    context = {
+        "currencies": all_currencies,
+        "organization_settings": organization_settings,
+        "organization_settings_form": organization_settings_form,
+    }
+    return render(request, 'organization/settings_page.html', context)
+
+@login_required
+def update_organization_settings(request):
+    organization_settings = OrganizationSetting.load()
+    count = OrganizationSetting.objects.count()
+    
+    if request.method == 'POST':
+        organization_settings_form = OrganizationSettingForm(request.POST, request.FILES, instance=organization_settings)
+        
+        if organization_settings_form.is_valid():
+            organization_settings_form.save()
+            messages.success(request, SUCCESS_EDIT_MESSAGE)
+        else:
+            messages.error(request, FAILURE_MESSAGE)
+    
+    return HttpResponseRedirect(reverse('settings_page'))
+
+
+@login_required
 def manage_branches(request):
     if request.method == 'POST':
         form = BranchForm(request.POST)
@@ -54,4 +85,39 @@ def delete_branch(request, branch_id):
     messages.success(request, "Branch deleted successfully.")
     
     return redirect(manage_branches)
+    
+@login_required
+def add_currency(request):
+    if request.POST:
+        code = request.POST.get('code')
+        desc = request.POST.get('desc')
+        cost = request.POST.get('cost')
 
+        school_settings_services.create_currency(code, desc, cost)
+        messages.success(request, SUCCESS_ADD_MESSAGE)
+
+        return HttpResponseRedirect(reverse('settings_page'))
+    messages.error(request, 'You sent a get request')
+    return HttpResponseRedirect(reverse('settings_page'))
+
+@login_required
+def edit_currency_page(request, currency_id):
+    currency = school_settings_selectors.get_currency(currency_id)
+    if request.POST:
+        code = request.POST.get('code')
+        desc = request.POST.get('desc')
+        cost = request.POST.get('cost')
+        school_settings_services.update_currency(currency, code, desc, cost)
+        messages.success(request, SUCCESS_EDIT_MESSAGE)
+        return HttpResponseRedirect(reverse('settings_page'))
+    context = {
+        "currency": currency
+    }
+    return render(request, 'settings/edit_currency.html', context)
+
+
+def delete_currency(request, currency_id):
+    currency = school_settings_selectors.get_currency(currency_id)
+    currency.delete()
+    messages.success(request, DELETE_MESSAGE)
+    return HttpResponseRedirect(reverse('settings_page'))

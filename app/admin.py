@@ -5,6 +5,8 @@ from app.models.products import *
 from app.models.transactions import *
 from app.models.suppliers import *
 from app.models.customers import *
+from app.models.finance import *
+from app.models.expense import *
 
 admin.site.register(Product)
 admin.site.register(Category)
@@ -26,6 +28,11 @@ admin.site.register(TransferRequestItem)
 admin.site.register(StockTransferItem)
 admin.site.register(OrganizationSetting)
 admin.site.register(Currency)
+admin.site.register(Expense)
+admin.site.register(ExpenseCategory)
+admin.site.register(CashFlow)
+admin.site.register(DailyCashSummary)
+
 
 # admin.site.register(StockAdjustment)
 # admin.site.register(StockAdjustmentItem)
