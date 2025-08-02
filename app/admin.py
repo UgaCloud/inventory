@@ -8,6 +8,7 @@ from app.models.customers import *
 from app.models.finance import *
 from app.models.expense import *
 
+
 admin.site.register(Product)
 admin.site.register(Category)
 admin.site.register(UnitOfMeasure)
@@ -21,6 +22,8 @@ admin.site.register(Inventory)
 admin.site.register(StockTransfer)
 admin.site.register(Supplier)
 admin.site.register(Customer)
+admin.site.register(CustomerLedger)
+admin.site.register(Payment)
 admin.site.register(StoreLocation)
 admin.site.register(Branch)
 admin.site.register(TransferRequest)

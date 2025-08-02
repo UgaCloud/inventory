@@ -8,7 +8,7 @@ from .views.product_views import *
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import *
 from .views.supplier_views import *
-from .views.customer_view import customer_view
+from .views.customer_view import *
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
 from .views.organization_views import *
 from .views.stock_views import *
@@ -17,10 +17,7 @@ from .views.sales_views import *
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
-from app.views.finance_views import (
-    bankaccount_list_view, add_bankaccount_view, update_bankaccount_view, delete_bankaccount_view,
-    banktransaction_list_view, add_banktransaction_view, update_banktransaction_view, delete_banktransaction_view
-)
+from app.views.finance_views import *
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
@@ -56,7 +53,6 @@ urlpatterns = [
     path('edit_supplier/<int:supplier_id>', edit_supplier_view, name = 'edit_supplier_page'),
     path('inventory/', add_inventory_view, name = 'add_inventory_page'),
     path('store/', store_view, name = 'store_page'),
-    path('customers/', customer_view, name = 'customer_page'),
     path('purchase/', purchase_order_view, name = 'purchase_order_page'),
     path('stock_transfer/', stock_transfer_view, name = 'stock_transfer_page'),
     path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
@@ -126,6 +122,13 @@ urlpatterns = [
     path('banktransactions/add/', add_banktransaction_view, name='add_banktransaction_page'),
     path('banktransactions/<int:pk>/edit/', update_banktransaction_view, name='edit_banktransaction_page'),
     path('banktransactions/<int:pk>/delete/', delete_banktransaction_view, name='delete_banktransaction_page'),
+
+    # Customer URLs
+    path('customers/', customer_list_view, name='customer_list'),
+    path('customers/add/', customer_create_view, name='customer_create'),
+    path('customers/<int:pk>/', customer_detail_view, name='customer_detail'),
+    path('customers/<int:pk>/edit/', customer_update_view, name='customer_update'),
+    path('customers/<int:pk>/delete/', customer_delete_view, name='customer_delete'),
     ]
 
 if settings.DEBUG:

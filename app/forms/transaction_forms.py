@@ -51,19 +51,21 @@ class PurchaseOrderItemForm(ModelForm):
 class SalesForm(forms.ModelForm):
     class Meta:
         model = Sales
-        fields = "__all__"
-        exclude = ('amount_paid', 'balance', 'amount_received', 'change')
+        fields = ['receipt_no', 'customer', 'store', 'note', 'amount_paid', 'balance', 'amount_received', 'change']
 
     def clean(self):
         cleaned_data = super().clean()
+        
         # Ensure at least one item is present (handled in formset, but double check)
         if self.instance.pk and self.instance.items.count() == 0:
             raise forms.ValidationError("A sale must have at least one item.")
+        
         # Restrict sales with balance but without a customer
         balance = cleaned_data.get('balance')
         customer = cleaned_data.get('customer')
+       
         if balance and balance > 0 and not customer:
-            raise forms.ValidationError("A customer must be selected for sales with a balance due.")
+            raise forms.ValidationError("A customer must be selected for sales with due balance.")
         return cleaned_data
 
 class SalesItemForm(ModelForm):
