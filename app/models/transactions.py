@@ -11,6 +11,7 @@ class PurchaseOrder(models.Model):
     expected_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=PURCHASE_ORDER_OPTIONS)
     recorded_by = models.CharField(max_length=50)
+    note = models.TextField(blank=True, null=True)  # Add note field
 
     def __str__(self):
         return f"PO-{self.id} ({self.supplier.name})"
@@ -87,6 +88,7 @@ class Sales(models.Model):
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     amount_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     change = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    note = models.TextField(blank=True, null=True)  # Add note field
 
     def __str__(self):
         return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"
