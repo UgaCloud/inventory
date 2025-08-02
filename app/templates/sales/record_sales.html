@@ -25,7 +25,12 @@
                 {% csrf_token %}
                 <div class="row">
                     <div class="col-md-6">
-                        {{ form|crispy }}
+                        {{ form.receipt_no|as_crispy_field }}
+                        {{ form.customer|as_crispy_field }}
+                        {{ form.store|as_crispy_field }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.note|as_crispy_field }}
                     </div>
                 </div>
                 <h5 class="mt-4">Sale Items</h5>
@@ -76,13 +81,25 @@
                             <li class="border-bottom">
                                 <h4 class="border-end">Amount Paid</h4>
                                 <h5>
-                                    <input type="number" id="amount-paid" class="form-control fw-bold" value="0" min="0" step="0.01" style="max-width: 280px; font-size:14px; color:#646B72;" />
+                                    <input type="number" name="amount_paid" id="amount-paid" class="form-control fw-bold" value="0" min="0" step="0.01" style="max-width: 280px; font-size:14px; color:#646B72;" />
                                 </h5>
                             </li>
                             <li class="border-bottom">
                                 <h4 class="border-end">Balance</h4>
                                 <h5>
-                                    <input type="text" id="balance" class="form-control-plaintext fw-bold" value="$ 0.00" readonly disabled style="background:transparent; border:none; font-size:14px; color:#646B72;" />
+                                    <input type="text" name="balance" id="balance" class="form-control-plaintext fw-bold" value="0" readonly style="background:transparent; border:none; font-size:14px; color:#646B72;" />
+                                </h5>
+                            </li>
+                            <li class="border-bottom">
+                                <h4 class="border-end">Amount Recieved</h4>
+                                <h5>
+                                    <input type="number" name="amount_received" id="amount-received" class="form-control fw-bold" value="0" min="0" step="0.01" style="max-width: 280px; font-size:14px; color:#646B72;" />
+                                </h5>
+                            </li>
+                            <li class="border-bottom">
+                                <h4 class="border-end">Change</h4>
+                                <h5>
+                                    <input type="text" name="change" id="change" class="form-control-plaintext fw-bold" readonly style="background:transparent; border:none; font-size:14px; color:#646B72;" />
                                 </h5>
                             </li>
                         </ul>
@@ -115,6 +132,13 @@
                 }
             });
             document.getElementById('total-amount').value = formatCurrency(total);
+            // Set amount paid and amount received to total amount
+            const amountPaidInput = document.getElementById('amount-paid');
+            const amountReceivedInput = document.getElementById('amount-received');
+            if (amountPaidInput) amountPaidInput.value = total;
+            if (amountReceivedInput) amountReceivedInput.value = total;
+            updateBalance();
+            updateChange();
         }
 
         // Update balance based on total and amount paid
@@ -124,9 +148,22 @@
             const total = parseFloat(totalStr) || 0;
             const paid = parseFloat(paidStr) || 0;
             const balance = total - paid;
-            document.getElementById('balance').value = (balance < 0 ? '-' : '') + 'UGX ' + Math.abs(balance).toLocaleString('en-UG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            // Ensure balance is always a number
+            document.getElementById('balance').value = isNaN(balance) ? 0 : balance;
         }
         
+        // Update change based on amount received and amount paid
+        function updateChange() {
+            const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
+            const amountReceived = parseFloat(document.getElementById('amount-received').value) || 0;
+            const change = amountReceived - amountPaid;
+            const changeInput = document.getElementById('change');
+            // Ensure change is always a number
+            if (changeInput) {
+                changeInput.value = isNaN(change) ? 0 : change;
+            }
+        }
+
         // Autocomplete for product field
         function setupProductAutocomplete() {
             $('.product-autocomplete').autocomplete({
@@ -157,7 +194,11 @@
             formsetBody.addEventListener('click', function(e) {
                 if (e.target.classList.contains('remove-form-row')) {
                     var row = e.target.closest('.formset-row');
-                    if (row) row.remove();
+                    if (row) {
+                        row.remove();
+                        updateTotalAmount(); // Update totals after removing a row
+                        updateBalance();     // Update balance as well
+                    }
                 }
             });
             
@@ -169,7 +210,17 @@
             });
             
             document.getElementById('amount-paid').addEventListener('input', function() {
+                // When amount paid changes, set amount received to match and update change
+                const amountPaidVal = this.value;
+                const amountReceivedInput = document.getElementById('amount-received');
+                if (amountReceivedInput) {
+                    amountReceivedInput.value = amountPaidVal;
+                }
                 updateBalance();
+                updateChange();
+            });
+            document.getElementById('amount-received').addEventListener('input', function() {
+                updateChange();
             });
             
             // Update balance when total changes
@@ -177,10 +228,19 @@
             updateTotalAmount = function() {
                 origUpdateTotalAmount();
                 updateBalance();
+                updateChange();
             };
             
+            // Update change when amount paid or amount received changes
+            const paidInputs = document.querySelectorAll('#amount-paid');
+            paidInputs.forEach(function(input) {
+                input.addEventListener('input', function() {
+                    updateChange();
+                });
+            });
             // Initial calculation
             updateBalance();
+            updateChange();
             setupProductAutocomplete();
             // If you add formset rows dynamically, call setupProductAutocomplete after each add
             document.getElementById('add-form-row').addEventListener('click', function() {

@@ -121,7 +121,7 @@
           <!-- Logo -->
           <div class="header-left active">
             <a href="{% url 'index_page' %}" class="logo logo-normal">
-              <img src="{{organization_details.logo.url}}" alt="Img" />
+              <img src="{{organization.organization_logo.url}}" alt="Img" />
             </a>
             <a href="{% url 'index_page' %}" class="logo logo-white">
               <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" />
@@ -168,7 +168,6 @@
                         />K</kbd
                       >
                     </span>
-                    URL-{{organization_details.organization_logo.url}}
                   </div>
                   <div
                     class="dropdown-menu search-dropdown"
@@ -731,6 +730,28 @@
                       </li>
                     </ul>
                   </li>
+                  <li class="submenu">
+                    <a href="javascript:void(0);"
+                      ><span>Customer</span><span class="menu-arrow"></span
+                    ></a>
+                    <ul>
+                      <li>
+                        <a href="{% url 'customer_list' %}"
+                          ><span>Manage Customers</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="#"
+                          ><span>Payments</span></a
+                        >
+                      </li>
+                      <li>
+                        <a href="{% url 'under_maintenance_page' %}"
+                          ><span>Customer Ledgers</span></a
+                        >
+                      </li>
+                    </ul>
+                  </li>
                 </ul>
               </li>
               <li class="submenu">
@@ -872,8 +893,13 @@
                     </ul>
                   </li>
                   <li>
-                    <a href="{% url 'under_maintenance_page' %}"
+                    <a href="{% url 'bankaccount_list' %}"
                       ><span>Bank Accounts</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="{% url 'banktransaction_list' %}"
+                      ><span>Bank Transactions</span></a
                     >
                   </li>
                   <li>
@@ -1135,7 +1161,24 @@
       <!-- /Sidebar -->
 
       <div class="page-wrapper">
-        <div class="content">{% block content %}{% endblock content %}</div>
+        <div class="content">
+          <!-- Messages -->
+            {% if messages %} 
+              {% for message in messages %}
+                <div class="alert alert-solid-{{message.tags}} alert-dismissible fade show">
+                    <strong>
+                      {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %} Error
+                      {%else %} {{ message.tags|title }} {% endif %}!
+                    </strong>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"><i class="fas fa-xmark"></i></button>
+                </div>
+                
+              {% endfor %} 
+          {% endif %}
+          <!-- /Messages -->
+           
+          {% block content %}{% endblock content %}</div>
         <div
           class="copyright-footer d-flex align-items-center justify-content-between border-top bg-white gap-3 flex-wrap"
         >

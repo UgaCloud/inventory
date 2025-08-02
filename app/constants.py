@@ -79,6 +79,11 @@ TRANSACTION_TYPES = [
         ('INTEREST', 'Interest'),
     ]
 
+CURRENCY_CHOICES = [
+    ('UGX', 'Ugandan Shilling'),
+    ('KSH', 'Kenyan Shilling'),
+]
+
 SUCCESS_ADD_MESSAGE = "Record Saved!"
 
 SUCCESS_EDIT_MESSAGE = "Changes Saved"
