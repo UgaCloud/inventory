@@ -2,7 +2,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from app.models.finance import BankAccount, BankTransaction
 from app.forms.finance_forms import BankAccountForm, BankTransactionForm
-from app.selectors.finance_selectors import get_bank_accounts, get_bank_transactions
+from app.selectors.finance_selectors import get_bank_accounts, get_bank_transactions, get_cashflows, get_cashflow_total
+from app.models.products import StoreLocation
+from app.constants import CASHFLOW_TYPES
 
 # BankAccount Views
 
@@ -93,3 +95,40 @@ def delete_banktransaction_view(request, pk):
         messages.success(request, 'Bank transaction deleted successfully.')
         return redirect('banktransaction_list')
     return render(request, 'finance/banktransaction_confirm_delete.html', {'transaction': transaction})
+
+# Cashflow Views
+
+def cashflow_list_view(request):
+    store = request.GET.get('store')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    transaction_type = request.GET.get('transaction_type')
+
+    cashflows = get_cashflows(
+        store=store or None,
+        start_date=start_date or None,
+        end_date=end_date or None,
+        transaction_type=transaction_type or None
+    )
+    stores = StoreLocation.objects.filter(is_active=True)
+
+    total_cashflow = None
+    if cashflows.exists():
+        total_cashflow = get_cashflow_total(
+            store=store or None,
+            start_date=start_date or None,
+            end_date=end_date or None,
+            transaction_type=transaction_type or None
+        )
+    context = {
+        'cashflows': cashflows,
+        'stores': stores,
+        'cashflow_types': CASHFLOW_TYPES,
+        'selected_store': store,
+        'selected_start_date': start_date,
+        'selected_end_date': end_date,
+        'selected_transaction_type': transaction_type,
+        'total_cashflow': total_cashflow,
+    }
+    return render(request, 'finance/cashflows.html', context)
+
