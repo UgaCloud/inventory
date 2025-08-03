@@ -29,38 +29,66 @@
     <div class="card">
         <div class="card-body">
             <div class="row">
-                <div class="productdetails">
-                    <ul class="product-bar">
-                        <li>
-                            <h4>Receipt No.</h4>
-                            <h6>{{sale.receipt_no}}	</h6>
-                        </li>
-                        <li>
-                            <h4>sale Date</h4>
-                            <h6>{{sale.sale_date}}</h6>
-                        </li>
-                        <li>
-                            <h4>Store</h4>
-                            <h6>{{sale.store}}</h6>
-                        </li>
-                        <li>
-                            <h4>Customer</h4>
-                            <h6>{{sale.recorded_by}}</h6>
-                        </li>
-                        <li>
-                            <h4>No. of Items</h4>
-                            <h6>{{sale.total_items}}</h6>
-                        </li>
-                        <li>
-                            <h4>Total Amount</h4>
-                            <h6>{{sale.total_amount|intcomma}}/-</h6>
-                        </li>
-                        <li>
-                            <h4>Status</h4>
-                            <h6>{{sale.status}}</h6>
-                        </li>
-                    </ul>
+                <div class="col-md-6">
+                    
+                    <div class="productdetails">
+                        <ul class="product-bar">
+                            <li>
+                                <h4>Receipt No.</h4>
+                                <h6>{{sale.receipt_no}}	</h6>
+                            </li>
+                            <li>
+                                <h4>sale Date</h4>
+                                <h6>{{sale.sale_date}}</h6>
+                            </li>
+                            <li>
+                                <h4>Store</h4>
+                                <h6>{{sale.store}}</h6>
+                            </li>
+                            <li>
+                                <h4>Customer</h4>
+                                <h6>{{sale.customer}}</h6>
+                            </li>
+                            <li>
+                                <h4>No. of Items</h4>
+                                <h6>{{sale.number_of_items}}</h6>
+                            </li>
+                            <li>
+                                <h4>Total Amount</h4>
+                                <h6>{{sale.total_amount|intcomma}}/-</h6>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
+                <div class="col-md-6">
+                    <div class="productdetails">
+                        <ul class="product-bar">
+                            <li>
+                                <h4>Amount Paid</h4>
+                                <h6>{{sale.amount_paid|intcomma}}/-</h6>
+                            </li>
+                            <li>
+                                <h4>Balance</h4>
+                                <h6>{{sale.balance|intcomma}}/-</h6>
+                            </li>
+                            <li>
+                                <h4>Amount Received</h4>
+                                <h6>{{sale.amount_received|intcomma}}/-</h6>
+                            </li>
+                            <li>
+                                <h4>Change</h4>
+                                <h6>{{sale.change|intcomma}}/-</h6>
+                            </li>
+                            <li>
+                                <h4>Recorded By</h4>
+                                <h6>{{sale.recorded_by}}</h6>
+                            </li>
+                            <li>
+                                <h4>Status</h4>
+                                <h6>{{sale.get_status_display}}</h6>
+                            </li>
+                        </ul>
+                    </div>
             </div>
 
             <hr />

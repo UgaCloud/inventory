@@ -46,7 +46,7 @@ class Payment(models.Model):
     customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateTimeField(auto_now_add=True)
-    payment_method = models.CharField(max_length=50, blank=True, null=True)
+    payment_method = models.ForeignKey('app.PaymentMethod', on_delete=models.RESTRICT)
     reference = models.CharField(max_length=100, blank=True, null=True)
     note = models.TextField(blank=True, null=True)
 
@@ -58,7 +58,6 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.customer.name} | {self.amount} | {self.payment_date.date()}"
 
-# Utility: Update or create ledger entries for sales and payments
-# (Moved to app/services/customer_transactions.py)
+
 
 

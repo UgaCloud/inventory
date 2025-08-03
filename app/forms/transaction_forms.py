@@ -51,7 +51,7 @@ class PurchaseOrderItemForm(ModelForm):
 class SalesForm(forms.ModelForm):
     class Meta:
         model = Sales
-        fields = ['receipt_no', 'customer', 'store', 'note', 'amount_paid', 'balance', 'amount_received', 'change']
+        fields = ['receipt_no', 'customer', 'store', 'note', 'amount_paid', 'balance', 'amount_received', 'change', 'payment_method']
 
     def clean(self):
         cleaned_data = super().clean()

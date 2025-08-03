@@ -11,6 +11,10 @@
                 <h6>Manage Sales</h6>
             </div>
         </div>	
+
+        <div class="page-btn mt-0">
+            <a href="{% url 'sales_list' %}" class="btn btn-secondary"><i data-feather="arrow-left" class="me-2"></i>Back to Sales</a>
+        </div>
         
     </div>
 
@@ -75,7 +79,7 @@
                             <li class="border-bottom">
                                 <h4 class="border-end">Total Amount</h4>
                                 <h5>
-                                    <input type="text" id="total-amount" class="form-control-plaintext fw-bold" value="UGX 0.00" readonly disabled style="background:transparent; border:none; font-size:14px; color:#646B72;" />
+                                    <input type="text" id="total-amount" name="total_amount" class="form-control-plaintext fw-bold" value="0.00" readonly style="background:transparent; border:none; font-size:14px; color:#646B72;" />
                                 </h5>
                             </li>
                             <li class="border-bottom">
@@ -90,6 +94,7 @@
                                     <input type="text" name="balance" id="balance" class="form-control-plaintext fw-bold" value="0" readonly style="background:transparent; border:none; font-size:14px; color:#646B72;" />
                                 </h5>
                             </li>
+                            
                             <li class="border-bottom">
                                 <h4 class="border-end">Amount Recieved</h4>
                                 <h5>
@@ -118,7 +123,7 @@
     <script>
         // Update total amount on input changes
         function formatCurrency(amount) {
-            return 'UGX ' + Number(amount).toLocaleString('en-UG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            return Number(amount).toLocaleString('en-UG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
         function updateTotalAmount() {
             let total = 0;
@@ -131,7 +136,8 @@
                     total += quantity * price;
                 }
             });
-            document.getElementById('total-amount').value = formatCurrency(total);
+            // Set the value as a number (no formatting)
+            document.getElementById('total-amount').value = isNaN(total) ? 0 : total;
             // Set amount paid and amount received to total amount
             const amountPaidInput = document.getElementById('amount-paid');
             const amountReceivedInput = document.getElementById('amount-received');

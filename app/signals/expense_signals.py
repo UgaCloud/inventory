@@ -14,7 +14,8 @@ def create_or_update_cashflow_for_expense(sender, instance, created, **kwargs):
                 transaction_type='EXPENSE',
                 reference=instance.reference,
                 user=instance.user,
-                note=f"Expense: {instance.description or ''}"
+                note=f"Expense: {instance.description or ''}",
+                payment_method=getattr(instance, 'payment_method', None)
             )
             instance.related_cashflow = cashflow
             instance.save(update_fields=["related_cashflow"])
@@ -27,6 +28,7 @@ def create_or_update_cashflow_for_expense(sender, instance, created, **kwargs):
             cashflow.reference = instance.reference
             cashflow.user = instance.user
             cashflow.note = f"Expense: {instance.description or ''}"
+            cashflow.payment_method = getattr(instance, 'payment_method', None)
             cashflow.save()
 
 @receiver(post_delete, sender=Expense)

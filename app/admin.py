@@ -37,6 +37,7 @@ admin.site.register(CashFlow)
 admin.site.register(DailyCashSummary)
 admin.site.register(BankAccount)
 admin.site.register(BankTransaction)
+admin.site.register(PaymentMethod)
 
 
 # admin.site.register(StockAdjustment)

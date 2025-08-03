@@ -51,7 +51,7 @@ STOCK_MOVEMENT_OPTIONS = [
 
 PAYMENT_METHODS = [
     ('Cash', 'Cash'),
-    ('School Pay', 'School Pay'),
+    ('Mobile Money', 'Mobile Money'),
     ('Bank', 'Bank')
 ]
 

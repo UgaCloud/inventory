@@ -24,7 +24,7 @@ def create_ledger_on_payment(sender, instance, created, **kwargs):
             description=f'Payment received (Ref: {instance.reference})',
             debit=0,
             credit=instance.amount,
-            note=instance.note or ''
+            note=instance.note or '',
         )
     update_customer_balance(instance.customer)
 
@@ -39,7 +39,7 @@ def delete_ledger_on_payment_delete(sender, instance, **kwargs):
     ).delete()
     update_customer_balance(instance.customer)
 
-# Create ledger entry when a Sale is created (if you want to track sales in the ledger)
+# Create ledger entry when a Sale is created 
 @receiver(post_save, sender=Sales)
 def create_ledger_on_sale(sender, instance, created, **kwargs):
     if created and instance.customer:
@@ -49,7 +49,8 @@ def create_ledger_on_sale(sender, instance, created, **kwargs):
             description=f'Sale (Receipt: {instance.receipt_no})',
             debit=instance.balance,  # Or instance.total_amount if you want full sale
             credit=0,
-            note=instance.note or ''
+            note=instance.note or '',
+            # Optionally, you can add payment_method info to description or extend CustomerLedger if needed
         )
     update_customer_balance(instance.customer)
 
@@ -59,7 +60,7 @@ def delete_ledger_on_sale_delete(sender, instance, **kwargs):
     CustomerLedger.objects.filter(
         customer=instance.customer,
         transaction_type='SALE',
-        debit=instance.balance,  # Or instance.total_amount
+        debit=instance.balance,  
         note=instance.note or ''
     ).delete()
     update_customer_balance(instance.customer)

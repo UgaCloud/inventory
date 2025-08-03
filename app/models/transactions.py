@@ -41,11 +41,15 @@ class PurchaseOrderItem(models.Model):
     def total_cost(self):
         return self.quantity * self.unit_cost
 
+    def __str__(self):
+        return f"POI-{self.id}: {self.product.name} x {self.quantity} @ {self.unit} (Order {self.order.id})"
+
+
 class InventoryBatch(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="batches")
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=0)
     received_date = models.DateTimeField(auto_now_add=True)
     expiry_date = models.DateField(null=True, blank=True)
     remaining_quantity = models.PositiveIntegerField()
@@ -84,11 +88,12 @@ class Sales(models.Model):
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=SALE_ORDER_OPTIONS)
     recorded_by = models.CharField(max_length=50)
-    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    amount_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    change = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    note = models.TextField(blank=True, null=True)  # Add note field
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    balance = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    amount_received = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    change = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    note = models.TextField(blank=True, null=True)  
+    payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT)
 
     def __str__(self):
         return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"
@@ -100,6 +105,10 @@ class Sales(models.Model):
     @property
     def total_amount(self):
         return sum(item.amount() for item in self.items.all())
+
+    @property
+    def number_of_items(self):
+        return self.items.count()
 
 
 class SalesItem(models.Model):
@@ -114,6 +123,9 @@ class SalesItem(models.Model):
 
     def amount(self):
         return self.quantity * self.sale_price
+
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity} @ {self.sale_price} (Order {self.order.receipt_no})"
 
 
 class TransferRequest(models.Model):
@@ -229,4 +241,7 @@ class StockMovement(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     units_in_stock = models.IntegerField()
     user = models.CharField(max_length=50)
+
+    def __str__(self):
+        return f"{self.product.name} | {self.store.name} | {self.transaction_type} | {self.quantity} | {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 

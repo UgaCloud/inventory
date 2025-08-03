@@ -22,14 +22,19 @@ def record_sales_view(request):
     if request.method == 'POST':
         form = SalesForm(request.POST)
         formset = SalesItemFormSet(request.POST, queryset=SalesItem.objects.none())
+
+        total_amount = int(request.POST['total_amount'])
         
         if form.is_valid() and formset.is_valid():
             sale_data = form.save(commit=False)
             
+            print(f"Sale: {sale_data.customer}")
             # A call service to handle sale, payment, and ledger
             sale = record_sale_and_payment(
+                receipt_no=sale_data.receipt_no,
+                store=sale_data.store,
                 customer=sale_data.customer,
-                total_amount=sale_data.total_amount,
+                total_amount=total_amount,
                 amount_paid=sale_data.amount_paid,
                 note=sale_data.note
             )

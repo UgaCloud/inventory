@@ -19,6 +19,7 @@ class Expense(models.Model):
     related_sale = models.ForeignKey('app.Sales', on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
     related_cashflow = models.ForeignKey('app.CashFlow', on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
     attachment = models.FileField(upload_to='expense_attachments/', null=True, blank=True)
+    payment_method = models.ForeignKey('app.PaymentMethod', on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
 
     def __str__(self):
         return f"{self.category} - {self.amount} on {self.date} ({self.store})"
