@@ -5,7 +5,7 @@
 cd /Users/abdulhakiim/Me/UGACloud/Projects/inventory
 
 # Activate the virtual environment if needed
-# source /path/to/venv/bin/activate
+source ../venv/bin/activate
 
 # Run the management command
-/opt/homebrew/bin/python3 manage.py daily_cash_summary
+/opt/homebrew/bin/python3 manage.py generate_daily_cash_summaries
