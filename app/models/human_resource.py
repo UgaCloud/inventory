@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 from app.constants import GENDERS
 
 class Department(models.Model):
@@ -48,6 +49,7 @@ class Employee(models.Model):
     is_active = models.BooleanField(default=True)
     address = models.TextField(blank=True, null=True)
     photo = models.ImageField(upload_to='employee_photos/', blank=True, null=True)
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='employee_profile')
 
     class Meta:
         verbose_name = "Employee"
