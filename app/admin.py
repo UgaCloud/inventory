@@ -7,6 +7,15 @@ from app.models.suppliers import *
 from app.models.customers import *
 from app.models.finance import *
 from app.models.expense import *
+from app.models.human_resource import Employee
+from app.forms.human_resource_forms import EmployeeForm
+
+
+class EmployeeAdmin(admin.ModelAdmin):
+    form = EmployeeForm
+    list_display = ('first_name', 'last_name', 'email', 'department', 'designation', 'user', 'is_active')
+    search_fields = ('first_name', 'last_name', 'email', 'user__username')
+    list_filter = ('department', 'designation', 'is_active')
 
 
 admin.site.register(Product)
@@ -38,6 +47,7 @@ admin.site.register(DailyCashSummary)
 admin.site.register(BankAccount)
 admin.site.register(BankTransaction)
 admin.site.register(PaymentMethod)
+admin.site.register(Employee, EmployeeAdmin)
 
 
 # admin.site.register(StockAdjustment)
