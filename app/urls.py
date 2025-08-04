@@ -3,7 +3,6 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
-from .views.general_views import index_view
 from .views.product_views import * 
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import *
@@ -129,6 +128,12 @@ urlpatterns = [
     path('customers/<int:pk>/', customer_detail_view, name='customer_detail'),
     path('customers/<int:pk>/edit/', customer_update_view, name='customer_update'),
     path('customers/<int:pk>/delete/', customer_delete_view, name='customer_delete'),
+
+    # CashFlow URLs
+    path('cashflows/', cashflow_list_view, name='cashflow_list'),
+
+    # Manual close day (DailyCashSummary) URL
+    path('finance/close_day/', close_day_view, name='close_day'),
     ]
 
 if settings.DEBUG:

@@ -7,16 +7,19 @@ from app.models.suppliers import Supplier
 from app.models.transactions import StockTransfer
 from django.contrib.auth.decorators import login_required
 from app.selectors.organization_selectors import get_organization_settings
+from app.selectors.product_selectors import get_stores
 
 
 @login_required
 def index_view(request):
     products = get_all_products()
     organization_details = get_organization_settings()
+    stores = get_stores()
     
     context = {
         'products':products,
         'organization_details': organization_details,
+        'stores': stores,
     }
     return render(request, 'basic/index.html', context)
 

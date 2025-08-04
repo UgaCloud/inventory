@@ -1,8 +1,14 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from app.models.finance import BankAccount, BankTransaction
+from app.models.finance import BankAccount, BankTransaction, DailyCashSummary, CashFlow
 from app.forms.finance_forms import BankAccountForm, BankTransactionForm
-from app.selectors.finance_selectors import get_bank_accounts, get_bank_transactions
+from app.selectors.finance_selectors import get_bank_accounts, get_bank_transactions, get_cashflows, get_cashflow_total
+from app.models.products import StoreLocation
+from app.constants import CASHFLOW_TYPES
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse
+from django.utils import timezone
+from django.db.models import Sum
 
 # BankAccount Views
 
@@ -93,3 +99,68 @@ def delete_banktransaction_view(request, pk):
         messages.success(request, 'Bank transaction deleted successfully.')
         return redirect('banktransaction_list')
     return render(request, 'finance/banktransaction_confirm_delete.html', {'transaction': transaction})
+
+# Cashflow Views
+
+def cashflow_list_view(request):
+    store = request.GET.get('store')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    transaction_type = request.GET.get('transaction_type')
+
+    cashflows = get_cashflows(
+        store=store or None,
+        start_date=start_date or None,
+        end_date=end_date or None,
+        transaction_type=transaction_type or None
+    )
+
+    total_cashflow = None
+    if cashflows.exists():
+        total_cashflow = get_cashflow_total(
+            store=store or None,
+            start_date=start_date or None,
+            end_date=end_date or None,
+            transaction_type=transaction_type or None
+        )
+    context = {
+        'cashflows': cashflows,
+        'cashflow_types': CASHFLOW_TYPES,
+        'selected_store': store,
+        'selected_start_date': start_date,
+        'selected_end_date': end_date,
+        'selected_transaction_type': transaction_type,
+        'total_cashflow': total_cashflow,
+    }
+    return render(request, 'finance/cashflows.html', context)
+
+@require_POST
+def close_day_view(request):
+    store_id = request.POST.get('store_id')
+    date_str = request.POST.get('date')
+    if not store_id or not date_str:
+        return JsonResponse({'success': False, 'error': 'Store and date are required.'}, status=400)
+    try:
+        store = StoreLocation.objects.get(id=store_id)
+        date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    # Opening balance: closing balance of previous day, or 0 if none
+    prev_summary = DailyCashSummary.objects.filter(store=store, date=date - timezone.timedelta(days=1)).first()
+    opening_balance = prev_summary.closing_balance if prev_summary else 0
+    # Sum all cash flows for the day
+    cashflows = CashFlow.objects.filter(store=store, date=date)
+    total_flow = cashflows.aggregate(total=Sum('amount'))['total'] or 0
+    calculated_balance = opening_balance + total_flow
+    closing_balance = calculated_balance
+    summary, created = DailyCashSummary.objects.update_or_create(
+        store=store, date=date,
+        defaults={
+            'opening_balance': opening_balance,
+            'closing_balance': closing_balance,
+            'calculated_balance': calculated_balance,
+            'note': 'Closed manually by user',
+        }
+    )
+    return JsonResponse({'success': True, 'created': created, 'summary_id': summary.id})
+
