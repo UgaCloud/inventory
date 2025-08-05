@@ -40,7 +40,7 @@ class EmployeeForm(forms.ModelForm):
         if not user:
             # Create a new user if not selected
             username = self.generate_unique_username(first_name, last_name)
-            password = get_random_string(8)
+            password = 'user_123' # Default password, can be changed later
             user = get_user_model().objects.create_user(
                 username=username,
                 first_name=first_name,
