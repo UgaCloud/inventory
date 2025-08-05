@@ -6,22 +6,16 @@ from app.models.human_resource import Employee
 @receiver(post_save, sender=Employee)
 def create_user_for_employee(sender, instance, created, **kwargs):
     if created and not instance.user:
-       
-        username = f"{instance.first_name.lower()}.{instance.last_name.lower()}"
-        
-        # Ensure username is unique
-        base_username = username
+        # Use department name as part of username for uniqueness if needed
+        base_username = f"{instance.department.name.lower()}_employee{instance.pk}"
+        username = base_username
         counter = 1
         while User.objects.filter(username=username).exists():
             username = f"{base_username}{counter}"
             counter += 1
-        
         # Create user
         user = User.objects.create_user(
             username=username,
-            email=instance.email,
-            first_name=instance.first_name,
-            last_name=instance.last_name,
             password="user_123"
         )
         instance.user = user
