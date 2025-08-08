@@ -1,4 +1,6 @@
 from app.models.finance import CashFlow, DailyCashSummary, BankAccount, BankTransaction
+from app.models.transactions import PurchaseOrder, Sales
+from app.models.expense import Expense
 from django.db.models import Sum, Q
 from datetime import date
 

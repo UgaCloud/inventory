@@ -1,6 +1,8 @@
-{% extends './base.html' %}
+{% extends 'basic/base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load humanize %}
+
 {% block content %}
 
 
@@ -61,7 +63,7 @@
 					<div class="ms-2">
 						<p class="text-white mb-1">Total Sales</p>
 						<div class="d-inline-flex align-items-center flex-wrap gap-2">
-							<h4 class="text-white">$48,988,078</h4>
+							<h4 class="text-white">UGX {{ total_sales|intcomma }}</h4>
 							<span class="badge badge-soft-primary"><i class="ti ti-arrow-up me-1"></i>+22%</span>
 						</div>
 					</div>
@@ -75,9 +77,9 @@
 						<i class="ti ti-repeat fs-24"></i>
 					</span>
 					<div class="ms-2">
-						<p class="text-white mb-1">Total Sales Return</p>
+						<p class="text-white mb-1">Total Purchases</p>
 						<div class="d-inline-flex align-items-center flex-wrap gap-2">
-							<h4 class="text-white">$16,478,145</h4>
+							<h4 class="text-white">UGX {{ total_purchases|intcomma }}</h4>
 							<span class="badge badge-soft-danger"><i class="ti ti-arrow-down me-1"></i>-22%</span>
 						</div>
 					</div>
@@ -91,9 +93,9 @@
 						<i class="ti ti-gift fs-24"></i>
 					</span>
 					<div class="ms-2">
-						<p class="text-white mb-1">Total Purchase</p>
+						<p class="text-white mb-1">Total Expenses</p>
 						<div class="d-inline-flex align-items-center flex-wrap gap-2">
-							<h4 class="text-white">$24,145,789</h4>
+							<h4 class="text-white">UGX {{ total_expenses|intcomma }}</h4>
 							<span class="badge badge-soft-success"><i class="ti ti-arrow-up me-1"></i>+22%</span>
 						</div>
 					</div>
@@ -107,9 +109,9 @@
 						<i class="ti ti-brand-pocket fs-24"></i>
 					</span>
 					<div class="ms-2">
-						<p class="text-white mb-1">Total Purchase Return</p>
+						<p class="text-white mb-1">Net Profit</p>
 						<div class="d-inline-flex align-items-center flex-wrap gap-2">
-							<h4 class="text-white">$18,458,747</h4>
+							<h4 class="text-white">UGX {{ net_profit|intcomma}}</h4>
 							<span class="badge badge-soft-success"><i class="ti ti-arrow-up me-1"></i>+22%</span>
 						</div>
 					</div>
@@ -127,7 +129,7 @@
 				<div class="card-body">
 					<div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
 						<div>
-							<h4 class="mb-1">$8,458,798</h4>
+							<h4 class="mb-1">UGX {{ net_profit|floatformat:0 }}</h4>
 							<p>Profit</p>
 						</div>
 						<span class="revenue-icon bg-cyan-transparent text-cyan">
@@ -171,7 +173,7 @@
 				<div class="card-body">
 					<div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
 						<div>
-							<h4 class="mb-1">$8,980,097</h4>
+							<h4 class="mb-1">UGX {{ total_expenses|floatformat:0 }}</h4>
 							<p>Total Expenses</p>
 						</div>
 						<span class="revenue-icon bg-orange-transparent text-orange">
@@ -266,7 +268,7 @@
 									<i class="ti ti-user-check"></i>
 								</div>
 								<p class="mb-1">Suppliers</p>
-								<h5>6987</h5>
+								<h5>{{total_suppliers}}</h5>
 							</div>
 						</div>
 						<div class="col-md-4">
@@ -275,7 +277,7 @@
 									<i class="ti ti-users"></i>
 								</div>
 								<p class="mb-1">Customer</p>
-								<h5>4896</h5>
+								<h5>{{total_customers}}</h5>
 							</div>
 						</div>
 						<div class="col-md-4">
@@ -284,7 +286,7 @@
 									<i class="ti ti-shopping-cart"></i>
 								</div>
 								<p class="mb-1">Orders</p>
-								<h5>487</h5>
+								<h5>{{total_sale_orders}}</h5>
 							</div>
 						</div>
 					</div>
@@ -365,81 +367,23 @@
 					</div>
 				</div>
 				<div class="card-body sell-product">
-					<div class="d-flex align-items-center justify-content-between border-bottom">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-01.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Charger Cable - Lighting</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>$187</p>
-									<p>247+ Sales</p>
+					{% for product in top_selling_products %}
+						<div class="d-flex align-items-center justify-content-between mb-4">
+							<div class="d-flex align-items-center">
+								<a href="javascript:void(0);" class="avatar avatar-lg">
+									<img src="#" alt="img">
+								</a>
+								<div class="ms-2">
+									<h6 class="fw-bold mb-1"><a href="javascript:void(0);">{{product.product__name}}</a></h6>
+									<p class="fs-13">ID : #{{product.product__id}}</p>
 								</div>
 							</div>
-						</div>
-						<span class="badge bg-outline-success badge-xs d-inline-flex align-items-center"><i class="ti ti-arrow-up-left me-1"></i>25%</span>
-					</div>
-					<div class="d-flex align-items-center justify-content-between border-bottom">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-16.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Yves Saint Eau De Parfum</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>$145</p>
-									<p>289+ Sales</p>
-								</div>
+							<div class="text-end">
+								<p class="fs-13 mb-1">Sold</p>
+								<h6 class="text-primary fw-medium">{{product.total_sold}}</h6>
 							</div>
 						</div>
-						<span class="badge bg-outline-success badge-xs d-inline-flex align-items-center"><i class="ti ti-arrow-up-left me-1"></i>25%</span>
-					</div>
-					<div class="d-flex align-items-center justify-content-between border-bottom">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-03.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Apple Airpods 2</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>$458</p>
-									<p>300+ Sales</p>
-								</div>
-							</div>
-						</div>
-						<span class="badge bg-outline-success badge-xs d-inline-flex align-items-center"><i class="ti ti-arrow-up-left me-1"></i>25%</span>
-					</div>
-					<div class="d-flex align-items-center justify-content-between border-bottom">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-04.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Vacuum Cleaner</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>$139</p>
-									<p>225+ Sales</p>
-								</div>
-							</div>
-						</div>
-						<span class="badge bg-outline-danger badge-xs d-inline-flex align-items-center"><i class="ti ti-arrow-down-left me-1"></i>21%</span>
-					</div>
-					<div class="d-flex align-items-center justify-content-between">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-05.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Samsung Galaxy S21 Fe 5g</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>$898</p>
-									<p>365+ Sales</p>
-								</div>
-							</div>
-						</div>
-						<span class="badge bg-outline-success badge-xs d-inline-flex align-items-center"><i class="ti ti-arrow-up-left me-1"></i>25%</span>
-					</div>
+					{% endfor %}
 				</div>
 			</div>
 		</div>
@@ -453,84 +397,26 @@
 						<span class="title-icon bg-soft-danger fs-16 me-2"><i class="ti ti-alert-triangle"></i></span>
 						<h5 class="card-title mb-0">Low Stock Products</h5>
 					</div>								
-					<a href="low-stocks.html" class="fs-13 fw-medium text-decoration-underline">View All</a>
+					<a href="#" class="fs-13 fw-medium text-decoration-underline">View All</a>
 				</div>
 				<div class="card-body">
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-06.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Dell XPS 13</a></h6>
-								<p class="fs-13">ID : #665814</p>
+					{% for product in low_stock_products %}
+						<div class="d-flex align-items-center justify-content-between mb-4">
+							<div class="d-flex align-items-center">
+								<a href="javascript:void(0);" class="avatar avatar-lg">
+									<img src="#" alt="img">
+								</a>
+								<div class="ms-2">
+									<h6 class="fw-bold mb-1"><a href="javascript:void(0);">{{product}}</a></h6>
+									<p class="fs-13">ID : #{{product.sku}}</p>
+								</div>
+							</div>
+							<div class="text-end">
+								<p class="fs-13 mb-1">Instock</p>
+								<h6 class="text-orange fw-medium">{{product.quantity_in_stock}}</h6>
 							</div>
 						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">Instock</p>
-							<h6 class="text-orange fw-medium">08</h6>
-						</div>
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-07.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Vacuum Cleaner Robot</a></h6>
-								<p class="fs-13">ID : #940004</p>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">Instock</p>
-							<h6 class="text-orange fw-medium">14</h6>
-						</div>
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-08.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">KitchenAid Stand Mixer</a></h6>
-								<p class="fs-13">ID : #325569</p>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">Instock</p>
-							<h6 class="text-orange fw-medium">21</h6>
-						</div>
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-09.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Levi's Trucker Jacket</a></h6>
-								<p class="fs-13">ID : #124588</p>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">Instock</p>
-							<h6 class="text-orange fw-medium">12</h6>
-						</div>
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-0">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-10.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Lay's Classic</a></h6>
-								<p class="fs-13">ID : #365586</p>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">Instock</p>
-							<h6 class="text-orange fw-medium">10</h6>
-						</div>
-					</div>
+					{% endfor %}
 				</div>
 			</div>
 		</div>
@@ -562,96 +448,26 @@
 					</div>
 				</div>
 				<div class="card-body">
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-11.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Apple Watch Series 9</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>Electronics</p>
-									<p class="text-gray-9">$640</p>
+					{%for product in recent_sales%}
+						<div class="d-flex align-items-center justify-content-between mb-4">
+							<div class="d-flex align-items-center">
+								<a href="javascript:void(0);" class="avatar avatar-lg">
+									<img src="assets/img/products/product-11.jpg" alt="img">
+								</a>
+								<div class="ms-2">
+									<h6 class="fw-bold mb-1"><a href="javascript:void(0);">{{product.items__product}}</a></h6>
+									<div class="d-flex align-items-center item-list">			
+										<p>Electronics</p>
+										<p class="text-gray-9">$640</p>
+									</div>
 								</div>
 							</div>
+							<div class="text-end">
+								<p class="fs-13 mb-1">Today</p>
+								<span class="badge bg-purple badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Processing</span>
+							</div>			
 						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">Today</p>
-							<span class="badge bg-purple badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Processing</span>
-						</div>									
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-12.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Gold Bracelet</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>Fashion</p>
-									<p class="text-gray-9">$126</p>
-								</div>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">Today</p>
-							<span class="badge badge-danger badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Cancelled</span>
-						</div>									
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-13.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Parachute Down Duvet</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>Health</p>
-									<p class="text-gray-9">$69</p>
-								</div>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">15 Jan 2025</p>
-							<span class="badge badge-cyan badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Onhold</span>
-						</div>									
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-4">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-14.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">YETI Rambler Tumbler</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>Sports</p>
-									<p class="text-gray-9">$65</p>
-								</div>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">12 Jan 2025</p>
-							<span class="badge bg-purple badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Processing</span>
-						</div>									
-					</div>
-					<div class="d-flex align-items-center justify-content-between mb-0">
-						<div class="d-flex align-items-center">
-							<a href="javascript:void(0);" class="avatar avatar-lg">
-								<img src="assets/img/products/product-15.jpg" alt="img">
-							</a>
-							<div class="ms-2">
-								<h6 class="fw-bold mb-1"><a href="javascript:void(0);">Osmo Genius Starter Kit</a></h6>
-								<div class="d-flex align-items-center item-list">			
-									<p>Lifestyles</p>
-									<p class="text-gray-9">$87.56</p>
-								</div>
-							</div>
-						</div>
-						<div class="text-end">
-							<p class="fs-13 mb-1">11 Jan 2025</p>
-							<span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span>
-						</div>									
-					</div>
+					{% endfor %}
 				</div>
 			</div>
 		</div>
@@ -689,11 +505,11 @@
 				<div class="card-body pb-0">
 					<div class="d-flex align-items-center flex-wrap gap-2">
 						<div class="border p-2 br-8">
-							<h5 class="d-inline-flex align-items-center text-teal">$12,189<span class="badge badge-success badge-xs d-inline-flex align-items-center ms-2"><i class="ti ti-arrow-up-left me-1"></i>25%</span></h5>
+							<h5 class="d-inline-flex align-items-center text-teal">UGX {{ total_revenue|floatformat:0 }}<span class="badge badge-success badge-xs d-inline-flex align-items-center ms-2"><i class="ti ti-arrow-up-left me-1"></i>25%</span></h5>
 							<p>Revenue</p>
 						</div>
 						<div class="border p-2 br-8">
-							<h5 class="d-inline-flex align-items-center text-orange">$48,988,078<span class="badge badge-danger badge-xs d-inline-flex align-items-center ms-2"><i class="ti ti-arrow-down-right me-1"></i>25%</span></h5>
+							<h5 class="d-inline-flex align-items-center text-orange">UGX {{ total_expenses|floatformat:0 }}<span class="badge badge-danger badge-xs d-inline-flex align-items-center ms-2"><i class="ti ti-arrow-down-right me-1"></i>25%</span></h5>
 							<p>Expense</p>
 						</div>
 					</div>
@@ -748,7 +564,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="fs-16 fw-bold text-gray-9">$4,560</td>
+											<td class="fs-16 fw-bold text-gray-9">UGX 4,560</td>
 										</tr>
 										<tr>
 											<td>23 May 2025</td>
@@ -764,7 +580,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="fs-16 fw-bold text-gray-9">$3,569</td>
+											<td class="fs-16 fw-bold text-gray-9">UGX 3,569</td>
 										</tr>
 										<tr>
 											<td>22 May 2025</td>
@@ -780,7 +596,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-pink badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Draft</span></td>
-											<td class="fs-16 fw-bold text-gray-9">$4,560</td>
+											<td class="fs-16 fw-bold text-gray-9">UGX 4,560</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -796,7 +612,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="fs-16 fw-bold text-gray-9">$2,155</td>
+											<td class="fs-16 fw-bold text-gray-9">UGX 2,155</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -812,7 +628,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="fs-16 fw-bold text-gray-9">$5,123</td>
+											<td class="fs-16 fw-bold text-gray-9">UGX 5,123</td>
 										</tr>
 									</tbody>
 								</table>
@@ -836,7 +652,7 @@
 												<a href="javascript:void(0);" class="fw-semibold">Electro Mart</a>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="text-gray-9">$1000</td>
+											<td class="text-gray-9">UGX 1,000</td>
 										</tr>
 										<tr>
 											<td>23 May 2025</td>
@@ -844,7 +660,7 @@
 												<a href="javascript:void(0);" class="fw-semibold">Quantum Gadgets</a>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="text-gray-9">$1500</td>
+											<td class="text-gray-9">UGX 1,500</td>
 										</tr>
 										<tr>
 											<td>22 May 2025</td>
@@ -852,7 +668,7 @@
 												<a href="javascript:void(0);" class="fw-semibold">Prime Bazaar</a>
 											</td>
 											<td><span class="badge badge-cyan badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Pending</span></td>
-											<td class="text-gray-9">$2000</td>
+											<td class="text-gray-9">UGX 2,000</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -860,7 +676,7 @@
 												<a href="javascript:void(0);" class="fw-semibold">Alpha Mobiles</a>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="text-gray-9">$1200</td>
+											<td class="text-gray-9">UGX 1,200</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -868,7 +684,7 @@
 												<a href="javascript:void(0);" class="fw-semibold">Aesthetic Bags</a>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="text-gray-9">$1300</td>
+											<td class="text-gray-9">UGX 1,300</td>
 										</tr>
 										<tr>
 											<td>28 May 2025</td>
@@ -876,7 +692,7 @@
 												<a href="javascript:void(0);" class="fw-semibold">Sigma Chairs</a>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="text-gray-9">$1600</td>
+											<td class="text-gray-9">UGX 1,600</td>
 										</tr>
 										<tr>
 											<td>26 May 2025</td>
@@ -884,7 +700,7 @@
 												<a href="javascript:void(0);" class="fw-semibold">A-Z Store	s</a>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Completed</span></td>
-											<td class="text-gray-9">$1100</td>
+											<td class="text-gray-9">UGX 1,100</td>
 										</tr>
 									</tbody>
 								</table>
@@ -916,7 +732,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Sent</span></td>
-											<td class="text-gray-9">$4,560</td>
+											<td class="text-gray-9">UGX 4,560</td>
 										</tr>
 										<tr>
 											<td>23 May 2025</td>
@@ -932,7 +748,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-warning badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Ordered</span></td>
-											<td class="text-gray-9">$3,569</td>
+											<td class="text-gray-9">UGX 3,569</td>
 										</tr>
 										<tr>
 											<td>22 May 2025</td>
@@ -948,7 +764,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-cyan badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Pending</span></td>
-											<td class="text-gray-9">$4,560</td>
+											<td class="text-gray-9">UGX 4,560</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -964,7 +780,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-warning badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Ordered</span></td>
-											<td class="text-gray-9">$2,155</td>
+											<td class="text-gray-9">UGX 2,155</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -980,7 +796,7 @@
 												</div>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Sent</span></td>
-											<td class="text-gray-9">$5,123</td>
+											<td class="text-gray-9">UGX 5,123</td>
 										</tr>
 									</tbody>
 								</table>
@@ -1005,7 +821,7 @@
 												<span class="fs-13 text-orange">#EX849</span>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Approved</span></td>
-											<td class="text-gray-9">$200</td>
+											<td class="text-gray-9">UGX 200</td>
 										</tr>
 										<tr>
 											<td>23 May 2025</td>
@@ -1014,7 +830,7 @@
 												<span class="fs-13 text-orange">#EX849</span>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Approved</span></td>
-											<td class="text-gray-9">$200</td>
+											<td class="text-gray-9">UGX 200</td>
 										</tr>
 										<tr>
 											<td>22 May 2025</td>
@@ -1023,7 +839,7 @@
 												<span class="fs-13 text-orange">#EX848</span>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Approved</span></td>
-											<td class="text-gray-9">$50</td>
+											<td class="text-gray-9">UGX 50</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -1032,7 +848,7 @@
 												<span class="fs-13 text-orange">#EX847</span>
 											</td>
 											<td><span class="badge badge-cyan badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Pending</span></td>
-											<td class="text-gray-9">$800</td>
+											<td class="text-gray-9">UGX 800</td>
 										</tr>
 										<tr>
 											<td>21 May 2025</td>
@@ -1041,7 +857,7 @@
 												<span class="fs-13 text-orange">#EX846</span>
 											</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Approved</span></td>
-											<td class="text-gray-9">$100</td>
+											<td class="text-gray-9">UGX 100</td>
 										</tr>
 									</tbody>
 								</table>
@@ -1073,7 +889,7 @@
 											</td>
 											<td>24 May 2025</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Paid</span></td>
-											<td class="text-gray-9">$1300</td>
+											<td class="text-gray-9">UGX 1,300</td>
 										</tr>
 										<tr>
 											<td>
@@ -1089,7 +905,7 @@
 											</td>
 											<td>23 May 2025</td>
 											<td><span class="badge badge-warning badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Overdue</span></td>
-											<td class="text-gray-9">$1250</td>
+											<td class="text-gray-9">UGX 1,250</td>
 										</tr>
 										<tr>
 											<td>
@@ -1105,7 +921,7 @@
 											</td>
 											<td>22 May 2025</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Paid</span></td>
-											<td class="text-gray-9">$1700</td>
+											<td class="text-gray-9">UGX 1,700</td>
 										</tr>
 										<tr>
 											<td>
@@ -1121,7 +937,7 @@
 											</td>
 											<td>21 May 2025</td>
 											<td><span class="badge badge-danger badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Unpaid</span></td>
-											<td class="text-gray-9">$1500</td>
+											<td class="text-gray-9">UGX 1,500</td>
 										</tr>
 										<tr>
 											<td>
@@ -1137,7 +953,7 @@
 											</td>
 											<td>21 May 2025</td>
 											<td><span class="badge badge-success badge-xs d-inline-flex align-items-center"><i class="ti ti-circle-filled fs-5 me-1"></i>Paid</span></td>
-											<td class="text-gray-9">$1000</td>
+											<td class="text-gray-9">UGX 1,000</td>
 										</tr>
 									</tbody>
 								</table>
@@ -1178,7 +994,7 @@
 							</div>
 						</div>
 						<div class="text-end">
-							<h5>$8,9645</h5>
+							<h5>UGX 8,9645</h5>
 						</div>									
 					</div>
 					<div class="d-flex align-items-center justify-content-between border-bottom mb-3 pb-3 flex-wrap gap-2">
@@ -1195,7 +1011,7 @@
 							</div>
 						</div>
 						<div class="text-end">
-							<h5>$16,985</h5>
+							<h5>UGX 16,985</h5>
 						</div>									
 					</div>
 					<div class="d-flex align-items-center justify-content-between border-bottom mb-3 pb-3 flex-wrap gap-2">
@@ -1212,7 +1028,7 @@
 							</div>
 						</div>
 						<div class="text-end">
-							<h5>$5,366</h5>
+							<h5>UGX 5,366</h5>
 						</div>									
 					</div>
 					<div class="d-flex align-items-center justify-content-between border-bottom mb-3 pb-3 flex-wrap gap-2">
@@ -1229,7 +1045,7 @@
 							</div>
 						</div>
 						<div class="text-end">
-							<h5>$4,569</h5>
+							<h5>UGX 4,569</h5>
 						</div>									
 					</div>
 					<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -1246,7 +1062,7 @@
 							</div>
 						</div>
 						<div class="text-end">
-							<h5>$3,5698</h5>
+							<h5>UGX 3,5698</h5>
 						</div>									
 					</div>
 				</div>

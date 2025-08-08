@@ -1,13 +1,13 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from app.selectors.product_selectors import get_all_products
-from django.views.generic import View
-from app.models.suppliers import Supplier
-from app.models.transactions import StockTransfer
 from django.contrib.auth.decorators import login_required
-from app.selectors.organization_selectors import get_organization_settings
-from app.selectors.product_selectors import get_stores
+
+from app.selectors.organization_selectors import *
+from app.selectors.product_selectors import *
+from app.selectors.transaction_selectors import *
+from app.selectors.customer_selectors import *
+from app.selectors.supplier_selectors import *
 
 
 @login_required
@@ -16,10 +16,34 @@ def index_view(request):
     organization_details = get_organization_settings()
     stores = get_stores()
     
+    total_purchases = get_total_purchases()
+    total_sales = get_total_sales()
+    total_expenses = get_total_expenses()
+    net_profit = get_net_profit()
+    total_suppliers = get_number_of_suppliers()
+    total_customers = get_number_of_customers()
+    total_sale_orders = get_number_of_sales()
+
+    low_stock_products = get_low_stock_products()
+    top_selling_products = get_top_selling_products()
+    recent_sales = get_recent_sales(limit=5)
+
+    print("Recent Sales:", recent_sales)
+
     context = {
-        'products':products,
+        'products': products,
         'organization_details': organization_details,
         'stores': stores,
+        'total_purchases': total_purchases,
+        'total_sales': total_sales,
+        'total_expenses': total_expenses,
+        'net_profit': net_profit,
+        'total_suppliers': total_suppliers,
+        'total_customers': total_customers,
+        'total_sale_orders': total_sale_orders,
+        'low_stock_products': low_stock_products,
+        'top_selling_products': top_selling_products,
+        'recent_sales': recent_sales,
     }
     return render(request, 'basic/index.html', context)
 
@@ -61,18 +85,6 @@ def sign_up_view(request):
         'message':message
     }
     return render(request, 'registration/sign_up.html', context)
-
-#class based view to handle deletions from the supplier and stock transfer models
-class DeleteMultipleSuppliers(View):
-    @login_required
-    def post(self, request):
-        selected_ids = request.POST.getlist('selected_items')
-
-        if selected_ids:
-            Supplier.objects.filter(id__in = selected_ids).delete()
-            StockTransfer.objects.filter(id__in = selected_ids).delete()
-            
-        return redirect(request.META.get('HTTP_REFERER')) # redirect to where the request came from
 
 @login_required
 def under_maintenance_view(request):

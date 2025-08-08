@@ -54,7 +54,7 @@ urlpatterns = [
     path('store/', store_view, name = 'store_page'),
     path('purchase/', purchase_order_view, name = 'purchase_order_page'),
     path('stock_transfer/', stock_transfer_view, name = 'stock_transfer_page'),
-    path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
+    # path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
 
     # Purchase Order
     path('purchase_orders/', purchase_order_list, name='purchase_order_list'),
