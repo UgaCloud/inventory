@@ -5,6 +5,9 @@ from django.shortcuts import (
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+import csv
+from django.http import HttpResponse
 
 from app.forms.product_forms import *
 from app.selectors.product_selectors import *
@@ -204,3 +207,95 @@ def edit_store_view(request, store_id):
     else:
         form = StoreLocationForm(instance=store)
     return redirect(store_view)
+
+
+@login_required
+def bulk_add_categories_view(request):
+    """
+    Allows bulk creation of categories via CSV upload (columns: name, description).
+    """
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        decoded_file = csv_file.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded_file)
+        created, errors = 0, []
+        for row in reader:
+            name = row.get('name')
+            description = row.get('description', '')
+            if name:
+                Category.objects.get_or_create(name=name, defaults={'description': description})
+                created += 1
+            else:
+                errors.append(row)
+        if errors:
+            messages.warning(request, f"Some rows were skipped due to missing name: {errors}")
+        messages.success(request, f"{created} categories added successfully.")
+        return redirect(add_category_view)
+    return render(request, 'products/bulk_add_categories.html')
+
+@login_required
+def download_category_template_view(request):
+    """
+    Provides a CSV template for bulk category upload.
+    """
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="category_template.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['name', 'description'])
+    writer.writerow(['Example Category', 'Optional description'])
+    return response
+
+@login_required
+def bulk_add_products_view(request):
+    """
+    Allows bulk creation of products via CSV upload (columns: name, sku, brand, description, barcode, category, is_active).
+    Category should match an existing category name.
+    """
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        decoded_file = csv_file.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded_file)
+        created, errors = 0, []
+        for row in reader:
+            name = row.get('name')
+            sku = row.get('sku')
+            brand = row.get('brand', '')
+            description = row.get('description', '')
+            barcode = row.get('barcode', '')
+            category_name = row.get('category')
+            is_active = row.get('is_active', 'True').lower() in ['true', '1', 'yes']
+            category = None
+            if category_name:
+                category = Category.objects.filter(name=category_name).first()
+            if name and sku and category:
+                Product.objects.get_or_create(
+                    name=name,
+                    sku=sku,
+                    defaults={
+                        'brand': brand,
+                        'description': description,
+                        'barcode': barcode,
+                        'category': category,
+                        'is_active': is_active,
+                    }
+                )
+                created += 1
+            else:
+                errors.append(row)
+        if errors:
+            messages.warning(request, f"Some rows were skipped due to missing required fields or invalid category: {errors}")
+        messages.success(request, f"{created} products added successfully.")
+        return redirect(manage_product_view)
+    return render(request, 'products/bulk_add_products.html')
+
+@login_required
+def download_product_template_view(request):
+    """
+    Provides a CSV template for bulk product upload.
+    """
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="product_template.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['name', 'sku', 'brand', 'description', 'barcode', 'category', 'is_active'])
+    writer.writerow(['Example Product', 'SKU123', 'BrandX', 'Description here', '123456789', 'CategoryName', 'True'])
+    return response
