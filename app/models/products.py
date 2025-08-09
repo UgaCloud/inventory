@@ -1,6 +1,7 @@
 from django.db import models
 import uuid
 from app.models.organization import Branch
+import re
 
 
 class Category(models.Model):
@@ -25,9 +26,9 @@ class UnitOfMeasure(models.Model):
 
 class Product(models.Model):
     name = models.CharField(max_length=255)
-    sku = models.CharField(max_length=100, unique=True)
-    brand = models.CharField(max_length=50)
-    description = models.TextField(blank=True)
+    sku = models.CharField(max_length=100, unique=True, blank=True)  # SKU can be auto-generated
+    brand = models.CharField(max_length=50, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
     barcode = models.CharField(max_length=100, unique=True, blank=True, null=True)
     uuid_code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
@@ -54,6 +55,23 @@ class Product(models.Model):
     @property
     def total_purchase_quantity(self): # All purchases across orders
         return sum(item.quantity for item in self.purchaseorderitem_set.all())
+
+    def save(self, *args, **kwargs):
+        # Auto-generates SKU if not provided, based on category and a sequence
+        if not self.sku:
+            prefix = (self.category.name[:3].upper() if self.category and self.category.name else 'PRD')
+            # Find the highest existing SKU for this category prefix
+            existing_skus = Product.objects.filter(sku__startswith=prefix).values_list('sku', flat=True)
+            max_num = 0
+            for sku in existing_skus:
+                match = re.match(rf"{prefix}[-]?(\d+)", sku)
+                if match:
+                    num = int(match.group(1))
+                    if num > max_num:
+                        max_num = num
+            next_num = max_num + 1
+            self.sku = f"{prefix}-{next_num:04d}"
+        super().save(*args, **kwargs)
 
 
 class ProductUnitPrice(models.Model):
