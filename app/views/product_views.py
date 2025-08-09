@@ -248,8 +248,9 @@ def download_category_template_view(request):
 @login_required
 def bulk_add_products_view(request):
     """
-    Allows bulk creation of products via CSV upload (columns: name, sku, brand, description, barcode, category, is_active).
+    Allows bulk creation of products via CSV upload (columns: name, brand, description, barcode, category, is_active).
     Category should match an existing category name.
+    SKU will be auto-generated if not provided, using the Product model's save() logic.
     """
     if request.method == 'POST' and request.FILES.get('csv_file'):
         csv_file = request.FILES['csv_file']
@@ -258,23 +259,20 @@ def bulk_add_products_view(request):
         created, errors = 0, []
         for row in reader:
             name = row.get('name')
-            sku = row.get('sku')
             brand = row.get('brand', '')
             description = row.get('description', '')
-            barcode = row.get('barcode', '')
             category_name = row.get('category')
             is_active = row.get('is_active', 'True').lower() in ['true', '1', 'yes']
             category = None
             if category_name:
                 category = Category.objects.filter(name=category_name).first()
-            if name and sku and category:
+            if name and category:
+                # Do not set SKU, let Product.save() auto-generate it
                 Product.objects.get_or_create(
                     name=name,
-                    sku=sku,
                     defaults={
                         'brand': brand,
                         'description': description,
-                        'barcode': barcode,
                         'category': category,
                         'is_active': is_active,
                     }
@@ -284,6 +282,7 @@ def bulk_add_products_view(request):
                 errors.append(row)
         if errors:
             messages.warning(request, f"Some rows were skipped due to missing required fields or invalid category: {errors}")
+            return redirect(manage_product_view)
         messages.success(request, f"{created} products added successfully.")
         return redirect(manage_product_view)
     return render(request, 'products/bulk_add_products.html')
@@ -296,6 +295,6 @@ def download_product_template_view(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="product_template.csv"'
     writer = csv.writer(response)
-    writer.writerow(['name', 'sku', 'brand', 'description', 'barcode', 'category', 'is_active'])
-    writer.writerow(['Example Product', 'SKU123', 'BrandX', 'Description here', '123456789', 'CategoryName', 'True'])
+    writer.writerow(['name', 'brand', 'description', 'category', 'is_active'])
+    writer.writerow(['Example Product', 'BrandX', 'Description here', 'CategoryName', 'True'])
     return response
