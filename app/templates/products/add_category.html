@@ -1,4 +1,3 @@
-
 {% extends 'basic/base.html' %}
 {% load crispy_forms_tags %}
 
@@ -16,6 +15,12 @@
                 <i class="ti ti-circle-plus me-1"></i>
                 Add category
             </a>
+            <a href="{% url 'download_category_template' %}" class="btn btn-outline-secondary ms-2">
+                <i class="ti ti-download me-1"></i>Download Template
+            </a>
+            <button class="btn btn-success ms-2" data-bs-toggle="modal" data-bs-target="#bulk-upload-modal">
+                <i class="ti ti-upload me-1"></i>Bulk Upload
+            </button>
         </div>	
         
     </div>
@@ -132,6 +137,40 @@
                             <button type='submit' class="btn btn-primary fs-13 fw-medium p-2 px-3">Submit</button>
                         </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Upload Modal -->
+    <div class="modal fade" id="bulk-upload-modal">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="page-wrapper-new p-0">
+                    <div class="content">
+                        <div class="modal-header">
+                            <div class="page-title">
+                                <h4>Bulk Upload Categories</h4>
+                            </div>
+                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <form method="post" action="{% url 'bulk_add_categories' %}" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="csv_file" class="form-label">Upload CSV File</label>
+                                    <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                                    <div class="form-text">Download the template and fill in your categories.</div>
+                                </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-success">Upload</button>
+                        </div>
+                            </form>
                     </div>
                 </div>
             </div>

@@ -35,7 +35,7 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.brand})"
 
     @property
     def total_stock(self): # Total units across all stores

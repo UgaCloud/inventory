@@ -1,4 +1,7 @@
 from app.models.transactions import PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement
+from app.models.expense import Expense
+from django.db.models import Sum
+from datetime import date
 
 # PurchaseOrder selectors
 def get_all_orders():
@@ -89,8 +92,41 @@ def get_stock_movements_in_date_range(start_date, end_date):
 def get_recent_orders(limit=10):
     return PurchaseOrder.objects.order_by('-purchase_date')[:limit]
 
-def get_recent_sales(limit=10):
-    return Sales.objects.order_by('-sale_date')[:limit]
+def get_recent_sales(limit=5):
+    
+    return Sales.objects.order_by('-sale_date').prefetch_related('items', 'items__product', 'items__unit')[:limit]
 
 def get_recent_stock_movements(limit=10):
     return StockMovement.objects.order_by('-timestamp')[:limit]
+
+def get_total_purchases():
+    today = date.today()
+    result = PurchaseOrder.objects.filter(purchase_date=today).aggregate(total=Sum('total_cost'))
+    return result['total'] or 0
+
+def get_total_sales():
+    today = date.today()
+    result = Sales.objects.filter(sale_date=today).aggregate(total=Sum('total_amount'))
+    return result['total'] or 0
+
+def get_total_expenses():
+    today = date.today()
+    result = Expense.objects.filter(date=today).aggregate(total=Sum('amount'))
+    return result['total'] or 0
+
+def get_net_profit():
+    total_sales = get_total_sales()
+    total_expenses = get_total_expenses()
+    total_purchases = get_total_purchases()
+    return total_sales - total_purchases - total_expenses
+
+def get_number_of_sales():
+    return Sales.objects.count()
+
+def get_top_selling_products():
+    
+    return (
+        SalesItem.objects.values('product__id', 'product__name')
+        .annotate(total_sold=Sum('quantity'))
+        .order_by('-total_sold')[:5]
+    )

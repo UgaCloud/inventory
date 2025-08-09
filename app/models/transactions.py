@@ -12,6 +12,7 @@ class PurchaseOrder(models.Model):
     status = models.CharField(max_length=20, choices=PURCHASE_ORDER_OPTIONS)
     recorded_by = models.CharField(max_length=50)
     note = models.TextField(blank=True, null=True)  # Add note field
+    total_cost = models.DecimalField(max_digits=16, decimal_places=2, default=0)  # New field
 
     def __str__(self):
         return f"PO-{self.id} ({self.supplier.name})"
@@ -20,9 +21,9 @@ class PurchaseOrder(models.Model):
     def total_items(self):
         return sum(item.quantity for item in self.items.all())
 
-    @property
-    def total_cost(self):
-        return sum(item.cost() for item in self.items.all())
+    def update_total_cost(self):
+        self.total_cost = sum(item.cost for item in self.items.all())
+        self.save(update_fields=["total_cost"])
 
 
 
@@ -38,7 +39,7 @@ class PurchaseOrderItem(models.Model):
         unique_together = ("order", "product", "unit")
 
     @property
-    def total_cost(self):
+    def cost(self):
         return self.quantity * self.unit_cost
 
     def __str__(self):
@@ -94,6 +95,7 @@ class Sales(models.Model):
     change = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     note = models.TextField(blank=True, null=True)  
     payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT)
+    total_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0)
 
     def __str__(self):
         return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"
@@ -102,9 +104,9 @@ class Sales(models.Model):
     def total_items(self):
         return sum(item.quantity for item in self.items.all())
 
-    @property
-    def total_amount(self):
-        return sum(item.amount() for item in self.items.all())
+    def update_total_amount(self):
+        self.total_amount = sum(item.amount() for item in self.items.all())
+        self.save(update_fields=["total_amount"])
 
     @property
     def number_of_items(self):
@@ -244,4 +246,6 @@ class StockMovement(models.Model):
 
     def __str__(self):
         return f"{self.product.name} | {self.store.name} | {self.transaction_type} | {self.quantity} | {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+from app.signals import transaction_signals
 

@@ -17,6 +17,7 @@ from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
 from app.views.finance_views import *
+from app.views.product_views import bulk_add_categories_view, download_category_template_view
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
@@ -54,7 +55,7 @@ urlpatterns = [
     path('store/', store_view, name = 'store_page'),
     path('purchase/', purchase_order_view, name = 'purchase_order_page'),
     path('stock_transfer/', stock_transfer_view, name = 'stock_transfer_page'),
-    path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
+    # path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
 
     # Purchase Order
     path('purchase_orders/', purchase_order_list, name='purchase_order_list'),
@@ -134,7 +135,11 @@ urlpatterns = [
 
     # Manual close day (DailyCashSummary) URL
     path('finance/close_day/', close_day_view, name='close_day'),
-    ]
+    path('products/categories/bulk-add/', bulk_add_categories_view, name='bulk_add_categories'),
+    path('products/categories/bulk-template/', download_category_template_view, name='download_category_template'),
+    path('products/bulk-add/', bulk_add_products_view, name='bulk_add_products'),
+    path('products/bulk-template/', download_product_template_view, name='download_product_template'),
+]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
