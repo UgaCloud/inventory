@@ -94,8 +94,8 @@ class Sales(models.Model):
     amount_received = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     change = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     note = models.TextField(blank=True, null=True)  
-    payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT)
-    total_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT, null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=16, decimal_places=0, default=0)
 
     def __str__(self):
         return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"

@@ -27,15 +27,17 @@ def record_sales_view(request):
         
         if form.is_valid() and formset.is_valid():
             sale_data = form.save(commit=False)
-            
-            print(f"Sale: {sale_data.customer}")
-            # A call service to handle sale, payment, and ledger
+          
+            # A call to a service to handle sale, payment, and ledger
             sale = record_sale_and_payment(
                 receipt_no=sale_data.receipt_no,
                 store=sale_data.store,
                 customer=sale_data.customer,
                 total_amount=total_amount,
                 amount_paid=sale_data.amount_paid,
+                amount_received=sale_data.amount_received,
+                change=sale_data.change,
+                payment_method=sale_data.payment_method,
                 note=sale_data.note
             )
             

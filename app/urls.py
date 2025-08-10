@@ -129,6 +129,9 @@ urlpatterns = [
     path('customers/<int:pk>/', customer_detail_view, name='customer_detail'),
     path('customers/<int:pk>/edit/', customer_update_view, name='customer_update'),
     path('customers/<int:pk>/delete/', customer_delete_view, name='customer_delete'),
+    path('customers/<int:pk>/add-payment/', record_customer_payment_view, name='customer_add_payment'),
+    path('customers/ledgers/', customer_ledger_list_view, name='customer_ledger_list'),
+    path('customers/ledgers/<int:ledger_id>/', customer_ledger_detail_view, name='customer_ledger_detail'),
 
     # CashFlow URLs
     path('cashflows/', cashflow_list_view, name='cashflow_list'),

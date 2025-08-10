@@ -1,6 +1,7 @@
 {% extends 'basic/base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load humanize %}
 
 {% block content %}
     <div class="page-header">
@@ -38,10 +39,8 @@
                             </th>
                             <th>#</th>
                             <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Address</th>
-                            <th>Company</th>
+                            <th style="max-width: 180px; min-width: 120px; white-space: normal; word-break: break-word;">Contacts</th>
+                            <th style="max-width: 220px; min-width: 120px; white-space: normal; word-break: break-word;">Company Address</th>
                             <th>Balance</th>
                             <th class="no-sort">Actions</th>
                         </tr>
@@ -58,18 +57,16 @@
                                 </td>
                                 <td>{{forloop.counter}}</td>
                                 <td><a href="{% url 'customer_detail' customer.pk %}">{{ customer.name }}</a></td>
-                                <td>{{ customer.email }}</td>
-                                <td>{{ customer.phone }}</td>
-                                <td>{{ customer.address }}</td>
-                                <td>{{ customer.company }}</td>
-                                <td>{{ customer.balance|floatformat:2 }}</td>
+                                <td style="max-width: 180px; min-width: 120px; white-space: normal; word-break: break-word;">{{ customer.email }} - ({{ customer.phone }})</td>
+                                <td style="max-width: 220px; min-width: 120px; white-space: normal; word-break: break-word;">{{ customer.company }} - ({{ customer.address }})</td>
+                                <td>{{ customer.balance|floatformat:0|intcomma }}/-</td>
                                 <td class="action-table-data">
                                     <div class="edit-delete-action">
+                                        <a class="me-2 eye-icon p-2" href="{% url 'customer_detail' customer.pk %}">
+                                            <i data-feather="eye" class="feather-eye"></i>
+                                        </a>
                                         <a class="me-2 edit-icon p-2" href="{% url 'customer_update' customer.pk %}">
                                             <i data-feather="edit" class="feather-edit"></i>
-                                        </a>
-                                        <a data-bs-toggle="modal" data-bs-target="#delete-modal-{{ customer.pk }}" class="p-2 delete-icon" href="#">
-                                            <i data-feather="trash-2" class="feather-trash-2"></i>
                                         </a>
                                     </div>
                                 </td>
