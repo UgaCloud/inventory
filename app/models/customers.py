@@ -58,6 +58,18 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.customer.name} | {self.amount} | {self.payment_date.date()}"
 
+class PaymentAllocation(models.Model):
+    payment = models.ForeignKey('Payment', on_delete=models.CASCADE, related_name='allocations')
+    sale = models.ForeignKey('app.Sales', on_delete=models.CASCADE, related_name='payment_allocations')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        verbose_name = 'Payment Allocation'
+        verbose_name_plural = 'Payment Allocations'
+
+    def __str__(self):
+        return f"{self.payment} -> {self.sale} | {self.amount}"
+
 
 
 
