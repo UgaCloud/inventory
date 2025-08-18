@@ -116,7 +116,7 @@
 								{% if employees %}
 								{% for employee in employees %}
 								<li>
-									<a href="javascript:void(0);" class="dropdown-item rounded-1">{{employee}}</a>
+									<a href="javascript:void(0);" class="dropdown-item rounded-1">{{employee.user.first_name}} {{employee.user.last_name}} ({{employee.user.email}})</a>
 								</li>
 								{% endfor %}
 								{% endif %}
@@ -173,19 +173,18 @@
 										aria-expanded="false"><i data-feather="more-vertical"
 											class="feather-user"></i></a>
 									<ul class="dropdown-menu dropdown-menu-end">
-
 										<li class="action-table-data">
 											<div class="edit-delete-action">
 												<a class="me-2 edit-icon  p-2" href="#" data-bs-toggle="modal"
 													data-bs-target="#add-employee"
 													data-edit-url="{% url 'edit_employee_page' employee.id %}"
-													data-employee-first_name="{{ employee.first_name}}"
-													data-employee-last_name="{{ employee.last_name}}"
-													data-employee-gender="{{ employee.gender}}"
-													data-employee-email="{{ employee.email}}"
-													data-employee-contact="{{ employee.contact}}"
-													data-employee-branch="{{ employee.branch}}"
-													data-employee-department="{{ employee.department}}"
+													data-employee-first_name="{{ employee.user.first_name }}"
+													data-employee-last_name="{{ employee.user.last_name }}"
+													data-employee-gender="{{ employee.gender }}"
+													data-employee-email="{{ employee.user.email }}"
+													data-employee-contact="{{ employee.contact }}"
+													data-employee-branch="{{ employee.branch }}"
+													data-employee-department="{{ employee.department }}"
 													data-employee-designation="{{ employee.designation }}"
 													data-employee-address="{{ employee.address }}"
 													data-employee-is_active="{{ employee.is_active }}"
@@ -206,7 +205,7 @@
 							</div>
 							<div class="text-center mb-3">
 								<h6 class="mb-1">
-									<a href="employee-details.html">{{employee}}</a>
+									<a href="employee-details.html">{{employee.user.first_name}} {{employee.user.last_name}}</a>
 								</h6>
 								<span class="badge bg-secondary-transparent text-gray-9 fs-10 fw-medium">{{employee.branch}} branch</span>
 							</div>
@@ -246,7 +245,15 @@
 								<div class="modal-body">
 									<form method="post">
 										{% csrf_token %}
-										{{form|crispy}}
+										{{ form.first_name|as_crispy_field }}
+										{{ form.last_name|as_crispy_field }}
+										{{ form.email|as_crispy_field }}
+										{% for field in form.visible_fields %}
+											{% if field.name not in 'first_name last_name email user' %}
+												{{ field|as_crispy_field }}
+											{% endif %}
+										{% endfor %}
+										{{ form.user|as_crispy_field }}
 								</div>
 								<div class="modal-footer">
 									<button type="button"
@@ -271,7 +278,6 @@
 					const form = modal.querySelector('form');
 					const first_nameInput = form.querySelector('[name="first_name"]');
 					const last_nameInput = form.querySelector('[name="last_name"]');
-					const genderInput = form.querySelector('[name="gender"]');
 					const emailInput = form.querySelector('[name="email"]');
 					const contactInput = form.querySelector('[name="contact"]');
 					const branchInput = form.querySelector('[name="branch"]');
@@ -290,7 +296,6 @@
 							// Fill form fields
 							if (first_nameInput) first_nameInput.value = btn.getAttribute('data-employee-first_name');
 							if (last_nameInput) last_nameInput.value = btn.getAttribute('data-employee-last_name');
-							if (genderInput) genderInput.value = btn.getAttribute('data-employee-gender');
 							if (emailInput) emailInput.value = btn.getAttribute('data-employee-email');
 							if (contactInput) contactInput.value = btn.getAttribute('data-employee-contact');
 							if (branchInput) branchInput.value = btn.getAttribute('data-employee-branch');

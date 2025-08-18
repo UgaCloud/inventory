@@ -1,13 +1,13 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.conf.urls.static import static
 
-from .views.general_views import index_view
 from .views.product_views import * 
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import *
 from .views.supplier_views import *
-from .views.customer_view import customer_view
+from .views.customer_view import *
 from .views.transactions_views import purchase_order_view, sales_view, stock_transfer_view
 from .views.organization_views import *
 from .views.stock_views import *
@@ -15,6 +15,9 @@ from .views.transfer_views import *
 from .views.sales_views import *
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
+from app.views.expense_views import *
+from app.views.finance_views import *
+from app.views.product_views import bulk_add_categories_view, download_category_template_view
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
@@ -28,6 +31,8 @@ urlpatterns = [
     path('branches/', manage_branches, name = 'manage_branch_page'),
     path('edit_branch/<int:branch_id>/', edit_branch, name = 'edit_branch_page'),
     path('delete_branch/<int:branch_id>/', delete_branch, name = 'delete_branch_page'),
+    path('settings/', settings_page,name="settings_page"),
+    path('update_settings/', update_organization_settings, name="update_settings_page"),
 
     # Product
     path('products/', manage_product_view, name ='products_page'),
@@ -48,10 +53,9 @@ urlpatterns = [
     path('edit_supplier/<int:supplier_id>', edit_supplier_view, name = 'edit_supplier_page'),
     path('inventory/', add_inventory_view, name = 'add_inventory_page'),
     path('store/', store_view, name = 'store_page'),
-    path('customers/', customer_view, name = 'customer_page'),
     path('purchase/', purchase_order_view, name = 'purchase_order_page'),
     path('stock_transfer/', stock_transfer_view, name = 'stock_transfer_page'),
-    path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
+    # path('delete_multiple/', DeleteMultipleSuppliers.as_view(), name = 'delete_multiple'),
 
     # Purchase Order
     path('purchase_orders/', purchase_order_list, name='purchase_order_list'),
@@ -94,5 +98,51 @@ urlpatterns = [
     path('edit_department/<int:department_id>', edit_department_view, name = 'edit_department_page'),
     path('designation', designation_view, name = 'designation_page'),
     path('edit_designation/<int:designation_id>', edit_designation_view, name = 'edit_designation_page'),
-   
-    ]
+
+    # Expense URLs
+    path('expenses/', expense_list_view, name='expense_list'),
+    path('expenses/add/', add_expense_view, name='add_expense_page'),
+    path('expenses/<int:pk>/', expense_detail_view, name='expense_detail_page'),
+    path('expenses/<int:pk>/edit/', expense_update_view, name='edit_expense_page'),
+    path('expenses/<int:pk>/delete/', delete_expense_view, name='delete_expense_page'),
+
+    path('expensecategories/', expensecategory_list_view, name='expensecategory_list'),
+    path('expensecategories/add/', add_expensecategory_view, name='add_expense_category_page'),
+    path('expensecategories/<int:pk>/edit/', update_expensecategory_view, name='edit_expense_category_page'),
+    path('expensecategories/<int:pk>/delete/', expensecategory_delete, name='delete_expensecategory_page'),
+
+    # BankAccount URLs
+    path('bankaccounts/', bankaccount_list_view, name='bankaccount_list'),
+    path('bankaccounts/add/', add_bankaccount_view, name='add_bankaccount_page'),
+    path('bankaccounts/<int:pk>/edit/', update_bankaccount_view, name='edit_bankaccount_page'),
+    path('bankaccounts/<int:pk>/delete/', delete_bankaccount_view, name='delete_bankaccount_page'),
+
+    # BankTransaction URLs
+    path('banktransactions/', banktransaction_list_view, name='banktransaction_list'),
+    path('banktransactions/add/', add_banktransaction_view, name='add_banktransaction_page'),
+    path('banktransactions/<int:pk>/edit/', update_banktransaction_view, name='edit_banktransaction_page'),
+    path('banktransactions/<int:pk>/delete/', delete_banktransaction_view, name='delete_banktransaction_page'),
+
+    # Customer URLs
+    path('customers/', customer_list_view, name='customer_list'),
+    path('customers/add/', customer_create_view, name='customer_create'),
+    path('customers/<int:pk>/', customer_detail_view, name='customer_detail'),
+    path('customers/<int:pk>/edit/', customer_update_view, name='customer_update'),
+    path('customers/<int:pk>/delete/', customer_delete_view, name='customer_delete'),
+    path('customers/<int:pk>/add-payment/', record_customer_payment_view, name='customer_add_payment'),
+    path('customers/ledgers/', customer_ledger_list_view, name='customer_ledger_list'),
+    path('customers/ledgers/<int:ledger_id>/', customer_ledger_detail_view, name='customer_ledger_detail'),
+
+    # CashFlow URLs
+    path('cashflows/', cashflow_list_view, name='cashflow_list'),
+
+    # Manual close day (DailyCashSummary) URL
+    path('finance/close_day/', close_day_view, name='close_day'),
+    path('products/categories/bulk-add/', bulk_add_categories_view, name='bulk_add_categories'),
+    path('products/categories/bulk-template/', download_category_template_view, name='download_category_template'),
+    path('products/bulk-add/', bulk_add_products_view, name='bulk_add_products'),
+    path('products/bulk-template/', download_product_template_view, name='download_product_template'),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

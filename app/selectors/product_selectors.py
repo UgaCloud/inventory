@@ -1,4 +1,5 @@
-from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice, Inventory
+from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice, Inventory, StoreLocation
+from django.db import models
 
 #product selectors
 def get_all_products():
@@ -23,3 +24,13 @@ def get_unit_of_measurement_by_id(unit_id):
 
 def get_all_product_unit_prices():
     return ProductUnitPrice.objects.all()
+
+def get_stores():
+    return StoreLocation.objects.filter(is_active=True)
+
+
+def get_low_stock_products():
+    
+    return Inventory.objects.filter(quantity_in_stock__lte=models.F('reorder_level')).select_related('product', 'store')
+
+

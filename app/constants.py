@@ -24,14 +24,15 @@ EMPLOYEE_STATUS = [
         ('On Leave', 'On Leave'),
         ('Retired', 'Retired')
     ]
+
 PURCHASE_ORDER_OPTIONS = [
-    ('PENDING', 'Pending'), 
-    ('RECEIVED', 'Received')
+        ('PENDING', 'Pending'), 
+        ('RECEIVED', 'Received')
     ]
 
 SALE_ORDER_OPTIONS = [
-    ('PENDING', 'Pending'), 
-    ('FULFILLED', 'Fulfilled')
+        ('PENDING', 'Pending'), 
+        ('FULFILLED', 'Fulfilled')
     ]
 
 STOCK_MOVEMENT_OPTIONS = [
@@ -50,13 +51,37 @@ STOCK_MOVEMENT_OPTIONS = [
 
 PAYMENT_METHODS = [
     ('Cash', 'Cash'),
-    ('School Pay', 'School Pay'),
+    ('Mobile Money', 'Mobile Money'),
     ('Bank', 'Bank')
 ]
 
 PAYMENT_STATUS = [
     ('Pending', 'Pending'), 
     ('Paid', 'Paid')
+]
+
+CASHFLOW_TYPES = [
+        ('SALE', 'Sale'),
+        ('PURCHASE', 'Purchase'),
+        ('EXPENSE', 'Expense'),
+        ('DEPOSIT', 'Deposit'),
+        ('WITHDRAWAL', 'Withdrawal'),
+    ]
+
+TRANSACTION_TYPES = [
+        ('DEPOSIT', 'Deposit'),
+        ('WITHDRAWAL', 'Withdrawal'),
+        ('TRANSFER_IN', 'Transfer In'),
+        ('TRANSFER_OUT', 'Transfer Out'),
+        ('PAYMENT', 'Payment'),
+        ('RECEIPT', 'Receipt'),
+        ('CHARGE', 'Bank Charge'),
+        ('INTEREST', 'Interest'),
+    ]
+
+CURRENCY_CHOICES = [
+    ('UGX', 'Ugandan Shilling'),
+    ('KSH', 'Kenyan Shilling'),
 ]
 
 SUCCESS_ADD_MESSAGE = "Record Saved!"

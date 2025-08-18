@@ -8,20 +8,17 @@ from app.selectors.human_resource_selectors import *
 def employee_grid_view(request):
     if request.method == 'POST':
         form = EmployeeForm(request.POST)
-
         if form.is_valid():
             form.save()
             messages.success(request, 'Employee has been added successfully')
+            return redirect('employee_page')
         else:
             messages.error(request, 'There was an error adding the employee')
     else:
         form = EmployeeForm()
-    
     employees = Employee.objects.select_related('branch').select_related('department').select_related('designation').all()
-
     active_employees = employees.filter(is_active=True)
     inactive_employees = employees.filter(is_active = False)
-
     context = {
         'employees':employees,
         'form':form,
@@ -33,17 +30,26 @@ def employee_grid_view(request):
 @login_required
 def edit_employee_view(request, employee_id):
     employee = get_employee_by_id(employee_id)
-
     if request.method == 'POST':
-        form = EmployeeForm(request.POST, instance = employee)
+        form = EmployeeForm(request.POST, instance=employee)
         if form.is_valid():
             form.save()
             messages.success(request, 'Employee successfully edited')
+            return redirect('employee_page')
         else:
             messages.error(request, 'An error occured, unable to update the employee')
-    form = EmployeeForm(instance = employee)
-
-    return redirect(employee_grid_view)
+    else:
+        form = EmployeeForm(instance=employee)
+    employees = Employee.objects.select_related('branch').select_related('department').select_related('designation').all()
+    active_employees = employees.filter(is_active=True)
+    inactive_employees = employees.filter(is_active = False)
+    context = {
+        'employees':employees,
+        'form':form,
+        'active_employees': active_employees,
+        'inactive_employees': inactive_employees
+    }
+    return render(request, 'human_resource/employee_grid.html', context)
 
 @login_required
 def department_grid_view(request):

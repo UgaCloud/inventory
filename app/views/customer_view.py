@@ -1,20 +1,108 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from app.models.customers import Customer, CustomerLedger, Payment
 from app.forms.customer_forms import CustomerForm
-from app.selectors.customer_selectors import get_all_customers
+from app.forms.customer_forms import PaymentForm
+from app.selectors.customer_selectors import *
 
-def customer_view(request):
-    if request.method == "POST":
+@login_required
+def customer_list_view(request):
+    customers = Customer.objects.all()
+    return render(request, 'customers/customer_list.html', {'customers': customers})
+
+@login_required
+def customer_detail_view(request, pk):
+    customer = get_object_or_404(Customer, pk=pk)
+    ledger_entries = customer.ledger_entries.order_by('-date')
+    payments = customer.payments.order_by('-payment_date')
+
+    form = CustomerForm(instance=customer)
+    payment_form = PaymentForm(initial={'customer': customer})
+    
+    context = {
+        'customer': customer,
+        'ledger_entries': ledger_entries,
+        'payments': payments,
+        'form': form,
+        'payment_form': payment_form,
+    }
+    return render(request, 'customers/customer_detail.html', context)
+
+@login_required
+def customer_create_view(request):
+    if request.method == 'POST':
         form = CustomerForm(request.POST)
-
         if form.is_valid():
             form.save()
+            messages.success(request, 'Customer created successfully.')
+            return redirect('customer_list')
+        else:
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = CustomerForm()
+    return render(request, 'customers/customer_form.html', {'form': form})
+
+@login_required
+def customer_update_view(request, pk):
+    customer = get_object_or_404(Customer, pk=pk)
     
-    customers = get_all_customers()
+    if request.method == 'POST':
+        form = CustomerForm(request.POST, instance=customer)
+        
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Customer updated successfully.')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+        
+        return redirect('customer_detail', pk=customer.pk)
+
+@login_required
+def customer_delete_view(request, pk):
+    customer = get_object_or_404(Customer, pk=pk)
+    if request.method == 'POST':
+        customer.delete()
+        messages.success(request, 'Customer deleted successfully.')
+        return redirect('customer_list')
+    return render(request, 'customers/customer_confirm_delete.html', {'customer': customer})
+
+@login_required
+def customer_ledger_list_view(request):
+    """
+    Lists all customer ledger entries for all customers.
+    """
+    ledger_entries = get_all_customer_ledgers()
 
     context = {
-        'form':form,
-        'customers':customers
+        'ledger_entries': ledger_entries,
     }
-    return render(request, 'customers.html', context)
+    
+    return render(request, 'customers/customer_ledgers.html', context)
+
+@login_required
+def customer_ledger_detail_view(request, ledger_id):
+    ledger_entry = get_object_or_404(CustomerLedger, pk=ledger_id)
+
+    context = {
+        'ledger_entry': ledger_entry,
+        'customer': ledger_entry.customer,
+    }
+    
+    return render(request, 'customers/customer_ledger_detail.html', context)
+
+@login_required
+def record_customer_payment_view(request, pk):
+    customer = get_object_or_404(Customer, pk=pk)
+    if request.method == 'POST':
+        form = PaymentForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.customer = customer
+            payment.save()
+            messages.success(request, 'Payment recorded successfully.')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+        
+        return redirect('customer_detail', pk=customer.pk)
+    
