@@ -25,6 +25,8 @@
       href="{% static 'assets/img/favicon.png' %}"
     />
 
+    <script src="https://cdn.rawgit.com/xcash/bootstrap-autocomplete/3de7ad37/dist/latest/bootstrap-autocomplete.js"></script>
+
     <!-- Apple Touch Icon -->
     <link
       rel="apple-touch-icon"
@@ -666,7 +668,7 @@
                     >
                   </li>
                   <li>
-                    <a href="{% url 'under_maintenance_page' %}"
+                    <a href="{% url 'transfer_request_for_approval' %}"
                       ><span>Manage Requisitions</span></a
                     >
                   </li>
@@ -1223,6 +1225,8 @@
 
     <!-- Select2 JS -->
     <script src="{% static 'assets/plugins/select2/js/select2.min.js' %}"></script>
+   
+    <script src="{% static 'assets/plugins/select2/js/custom-select.js' %}"></script>
 
     <!-- Chart JS -->
     <script src="{% static 'assets/plugins/apexchart/apexcharts.min.js' %}"></script>
@@ -1240,5 +1244,14 @@
 
     <!-- Owl JS -->
     <script src="{% static 'assets/plugins/owlcarousel/owl.carousel.min.js' %}"></script>
+
+    {% block custom_JS %}{% endblock custom_JS %}
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+          // Initialize select2 with AJAX for product fields
+          $('.select2').select2();
+      });
+    </script>
   </body>
 </html>

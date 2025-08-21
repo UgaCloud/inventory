@@ -1,6 +1,6 @@
 from django.db import transaction
 from app.models.transactions import Sales
-from app.models.customers import Payment, CustomerLedger
+from app.models.customers import Payment, CustomerLedger, PaymentAllocation
 
 def record_sale_and_payment(receipt_no, store, customer, total_amount, amount_paid, amount_received, change, payment_method, sale_instance=None, note=None):
     """
@@ -59,3 +59,61 @@ def record_sale_and_payment(receipt_no, store, customer, total_amount, amount_pa
                 note=note or ''
             )
         return sale
+
+def allocate_bulk_payment_to_sales(customer, payment_amount, payment_method, reference='', note=''):
+    """
+    Allocates a payment to the customer's oldest outstanding sales (receipts),
+    updates balances/statuses, creates Payment, ledger entry, and PaymentAllocation records.
+    Returns the Payment instance.
+    """
+    with transaction.atomic():
+        sales = Sales.objects.filter(
+            customer=customer,
+        ).exclude(balance=0).order_by('sale_date', 'id')
+
+        remaining = payment_amount
+        allocations = []
+        payment = None
+        for sale in sales:
+            if remaining <= 0:
+                break
+            to_pay = min(sale.balance, remaining)
+            sale.amount_paid += to_pay
+            sale.balance -= to_pay
+            if sale.balance <= 0:
+                sale.status = 'FULFILLED'
+                sale.balance = 0
+            else:
+                sale.status = 'PARTIALLY_PAID'
+            sale.save(update_fields=['amount_paid', 'balance', 'status'])
+            remaining -= to_pay
+            # Create payment if not already created
+            if payment is None:
+                payment = Payment.objects.create(
+                    customer=customer,
+                    amount=payment_amount,
+                    payment_method=payment_method,
+                    reference=reference,
+                    note=note,
+                )
+            # Save allocation
+            PaymentAllocation.objects.create(payment=payment, sale=sale, amount=to_pay)
+            allocations.append((sale, to_pay))
+        # If payment was not created (no sales to allocate), still create payment record
+        if payment is None:
+            payment = Payment.objects.create(
+                customer=customer,
+                amount=payment_amount,
+                payment_method=payment_method,
+                reference=reference,
+                note=note,
+            )
+        CustomerLedger.objects.create(
+            customer=customer,
+            transaction_type='PAYMENT',
+            description=f'Bulk payment allocation',
+            debit=0,
+            credit=payment_amount,
+            note=note,
+        )
+    return payment

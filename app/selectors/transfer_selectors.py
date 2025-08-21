@@ -24,7 +24,7 @@ def get_total_quantity_transferred(product_id=None, from_date=None, to_date=None
     return qs.aggregate(total=Sum('quantity'))['total'] or 0
 
 def get_pending_transfer_requests():
-    return TransferRequest.objects.filter(status='pending')
+    return TransferRequest.objects.filter(status='pending').order_by('-request_date')
 
 def get_fulfilled_transfer_requests():
     return TransferRequest.objects.filter(status='fulfilled')

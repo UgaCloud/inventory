@@ -96,7 +96,8 @@
             <!-- End Items Table -->
 
             <hr />
-
+            
+            {% if user.is_superuser %}
             <!-- Approve/Reject Request -->
              <div class="row">
                 <h4>Manage Request Status</h4>
@@ -110,6 +111,7 @@
                 </form>
             </div>
             <!-- End Approve/Reject Request -->
+            {% endif %}
         </div>
     </div>
 	

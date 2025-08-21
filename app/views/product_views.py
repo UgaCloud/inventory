@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 import csv
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 from app.forms.product_forms import *
 from app.selectors.product_selectors import *
@@ -33,28 +33,28 @@ def add_product_view(request):
 
        if form.is_valid():
            form.save()
-           messages.success(request, 'Product added successfully.')
-       else:
-           messages.error(request, 'There was an error adding the product.')
+       
        return redirect(manage_product_view)
        
+    
 
-@login_required
 def edit_product_view(request, product_id):
+
     product = get_product_by_id(product_id)
+
     if request.method == "POST":
         edit_form = ProductForm(request.POST, instance = product)
+        
         if edit_form.is_valid():
             edit_form.save()
-            messages.success(request, 'Product updated successfully.')
-        else:
-            messages.error(request, 'There was an error updating the product.')
+
         return redirect(product_details_view, product.id)
 
 @login_required
 def add_category_view(request):
     if request.method == "POST":
         form = CategoryForm(request.POST)
+
         if form.is_valid():
             form.save()
             messages.success(request, 'Category added successfully.')
@@ -64,10 +64,12 @@ def add_category_view(request):
     else:
         form = CategoryForm()
         categories = get_all_categories()
+
     context = {
         'form':form,
         'categories': categories
     }
+
     return render(request, 'products/add_category.html', context)
 
 @login_required
@@ -95,8 +97,10 @@ def delete_category_view(request, category_id):
 
 @login_required
 def unit_of_measure_view(request):
+
     if request.method == 'POST':
         form = UnitOfMeasureForm(request.POST)
+
         if form.is_valid():
             form.save()
             messages.success(request, 'Unit of measure added successfully.')
@@ -104,11 +108,14 @@ def unit_of_measure_view(request):
             messages.error(request, 'There was an error adding the unit of measure.')
     else:
         form = UnitOfMeasureForm()
+
     units_of_measurement = get_all_units_of_measurement()
+    
     context = {
         'form':form,
         'units_of_measurement':units_of_measurement
     }
+    
     return render(request, 'products/unit_of_measure.html', context)
 
 @login_required
@@ -160,6 +167,7 @@ def add_product_unit_price_view(request):
             return redirect(product_details_view, request.POST.get('product'))
         else:
             messages.error(request, form.errors)
+            
             return redirect(product_details_view, request.POST.get('product'))
     else:
         pass
@@ -168,11 +176,10 @@ def add_product_unit_price_view(request):
 def add_inventory_view(request):
     if request.method == 'POST':
         form = InventoryForm(request.POST)
+
         if form.is_valid():
             form.save()
-            messages.success(request, 'Inventory added successfully.')
-        else:
-            messages.error(request, 'There was an error adding the inventory.')
+  
     return redirect(product_details_view, request.POST.get('product'))
 
 @login_required
@@ -180,6 +187,7 @@ def store_view(request):
     
     if request.method == "POST":
         form = StoreLocationForm(request.POST)
+
         if form.is_valid():
             form.save()
             messages.success(request, 'Store location added successfully.')
@@ -187,9 +195,11 @@ def store_view(request):
             messages.error(request, 'There was an error adding the store location.')
     form = StoreLocationForm()
     stores = StoreLocation.objects.all()
+
     context = {
         'store_form':form,
         'stores': stores
+        
     }
     return render(request, 'products/store.html', context)
 
@@ -298,3 +308,11 @@ def download_product_template_view(request):
     writer.writerow(['name', 'brand', 'description', 'category', 'is_active'])
     writer.writerow(['Example Product', 'BrandX', 'Description here', 'CategoryName', 'True'])
     return response
+
+def product_autocomplete(request):
+    q = request.GET.get('q', '')
+    products = Product.objects.filter(name__icontains=q)[:20]
+    results = [
+        {'id': p.pk, 'text': p.name} for p in products
+    ]
+    return JsonResponse({'results': results})
