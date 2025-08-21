@@ -202,6 +202,20 @@
                     var newRow = emptyFormHtml.replace(/__prefix__/g, formCount);
                     formsetBody.insertAdjacentHTML('beforeend', newRow);
                     totalForms.value = formCount + 1;
+
+                    // Ensure any select elements in the new row get the select2 class and are initialized
+                    var lastRow = formsetBody.querySelector('.formset-row:last-child');
+                    if (lastRow) {
+                        var selects = lastRow.querySelectorAll('select');
+                        selects.forEach(function(s) { s.classList.add('select2'); });
+                        // initialize select2 if available
+                        if (window.jQuery && jQuery().select2) {
+                            $(lastRow).find('select.select2').select2({ width: '100%' });
+                        }
+                    }
+
+                    // Initialize autocomplete on any new inputs
+                    if (typeof setupProductAutocomplete === 'function') setupProductAutocomplete();
                 });
             }
             formsetBody.addEventListener('click', function(e) {

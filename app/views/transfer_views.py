@@ -9,7 +9,7 @@ from app.forms.transaction_forms import (
     TransferRequestApprovalForm
 )
 from app.selectors.transfer_selectors import (
-    get_all_transfer_requests, get_transfer_request_by_id, get_all_stock_transfers, get_stock_transfer_by_id
+    get_all_transfer_requests, get_transfer_request_by_id, get_all_stock_transfers, get_stock_transfer_by_id, get_pending_transfer_requests
 )
 
 @login_required
@@ -35,7 +35,9 @@ def add_transfer_request(request):
         formset = TransferRequestItemFormSet(request.POST)
         
         if form.is_valid() and formset.is_valid():
-            transfer_request = form.save()
+            transfer_request = form.save(commit=False)
+            transfer_request.requested_by = request.user  
+            transfer_request.save()
             formset.instance = transfer_request
             formset.save()
             
@@ -48,14 +50,13 @@ def transfer_request_detail(request, request_id):
     transfer_request = get_object_or_404(TransferRequest, pk=request_id)
 
     form = TransferRequestForm(instance=transfer_request)
-    approval_form = TransferRequestApprovalForm(instance=transfer_request)
+    
     request_items = transfer_request.items.all()
 
     context = {
         'request': transfer_request,
         'form': form, 
         'items':request_items,
-        'approval_form': approval_form
     }
 
     return render(request, 'transfers/transfer_request_details.html', context)
@@ -99,7 +100,7 @@ def stock_transfer_list(request):
 
 @login_required
 def stock_transfer_create(request):
-    # Assume transfer_request_id is passed as GET or POST param
+    
     transfer_request_id = request.GET.get('transfer_request_id') or request.POST.get('transfer_request')
 
     transfer_request = None
@@ -158,3 +159,18 @@ def stock_transfer_update(request, pk):
         form = StockTransferForm(instance=transfer)
         formset = StockTransferItemFormSet(instance=transfer)
     return render(request, 'stock_transfer_form.html', {'form': form, 'item_formset': formset})
+
+@login_required
+def pending_transfer_requests_for_approval(request):
+    if not request.user.is_superuser:
+        messages.error(request, 'You do not have permission to view this page.')
+        return redirect('index_page')
+    
+    requests = get_pending_transfer_requests()
+    approval_form = TransferRequestApprovalForm()
+
+    context = {
+        'requests': requests,
+        'approval_form': approval_form
+    }
+    return render(request, 'transfers/pending_transfer_requests.html', context)

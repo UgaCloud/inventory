@@ -76,6 +76,7 @@ urlpatterns = [
     path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
     path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
     path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
+    path('transfer_request_for_approval/', pending_transfer_requests_for_approval, name='transfer_request_for_approval'),
 
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
@@ -90,6 +91,7 @@ urlpatterns = [
     path('sales/<int:pk>/delete/', sales_delete_view, name='sales_delete_view'),
     path('sales/record_sale/', record_sales_view, name='record_sale'),  
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
+    path('product_autocomplete/', product_autocomplete, name='product_autocomplete'),
 
     #human resource
     path('employee_grid', employee_grid_view, name = 'employee_page'),

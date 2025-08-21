@@ -4,6 +4,7 @@ from app.models.transactions import (
     PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement,
     TransferRequest, StockTransferItem, TransferRequestItem
 )
+from app.models.products import Product
 
 class PurchaseOrderForm(forms.ModelForm):
     class Meta:
@@ -33,10 +34,17 @@ class PurchaseOrderItemForm(ModelForm):
     class Meta:
         model = PurchaseOrderItem
         fields = "__all__"
+        
         widgets = {
             'order': forms.HiddenInput(),
-            'expiry_date': forms.DateInput(attrs={'type': 'date'}),  # Add date widget for expiry_date
+            'expiry_date': forms.DateInput(attrs={'type': 'date'}),  
+            'product': forms.Select(attrs={
+                'class': 'select2',})
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
 
     def clean(self):
         cleaned_data = super().clean()
@@ -75,14 +83,12 @@ class SalesItemForm(ModelForm):
     class Meta:
         model = SalesItem
         fields = "__all__"
-        # widgets = {
-        #     'product': forms.TextInput(attrs={
-        #         'class': 'form-control product-autocomplete',
-        #         'autocomplete': 'on',
-        #         'placeholder': 'Product Name...'
-        #         # The JS below will hook to this class
-        #     }),
-        # }
+        widgets = {
+            'product': forms.Select(attrs={
+                'class': 'select2',
+                'style': 'width:100%'
+            }),
+        }
 
     def clean(self):
         cleaned_data = super().clean()
@@ -100,7 +106,7 @@ class TransferRequestForm(forms.ModelForm):
         model = TransferRequest
         fields = "__all__"
 
-        exclude = ['approved_by', 'note', 'status']
+        exclude = ['approved_by', 'note', 'status', 'requested_by']
 
     def clean(self):
         cleaned_data = super().clean()

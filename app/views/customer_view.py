@@ -37,12 +37,9 @@ def customer_create_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Customer created successfully.')
-            return redirect('customer_list')
         else:
-            messages.error(request, 'Please correct the errors below.')
-    else:
-        form = CustomerForm()
-    return render(request, 'customers/customer_form.html', {'form': form})
+            messages.error(request, f'Please correct the errors below.\n{form.errors}')
+    return redirect(customer_list_view)
 
 @login_required
 def customer_update_view(request, pk):
