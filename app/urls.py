@@ -92,6 +92,7 @@ urlpatterns = [
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
 
     #human resource
+    path('employee_profile', employee_profile_view, name = 'employee_profile_page'),
     path('employee_grid', employee_grid_view, name = 'employee_page'),
     path('edit_employee/<int:employee_id>', edit_employee_view, name = 'edit_employee_page'),
     path('department_grid', department_grid_view, name = 'department_page'),

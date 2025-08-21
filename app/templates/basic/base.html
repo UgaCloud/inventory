@@ -565,7 +565,7 @@
               ><i class="fa fa-ellipsis-v"></i
             ></a>
             <div class="dropdown-menu dropdown-menu-right">
-              <a class="dropdown-item" href="profile.html">My Profile</a>
+              <a class="dropdown-item" href="#">My Profile</a>
               <a class="dropdown-item" href="general-settings.html">Settings</a>
               <a class="dropdown-item" href="signin.html">Logout</a>
             </div>
@@ -741,9 +741,7 @@
                         >
                       </li>
                       <li>
-                        <a href="#"
-                          ><span>Payments</span></a
-                        >
+                        <a href="#"><span>Payments</span></a>
                       </li>
                       <li>
                         <a href="{% url 'customer_ledger_list' %}"
@@ -761,7 +759,7 @@
                 ></a>
                 <ul>
                   <li>
-                    <a href="{% url 'under_maintenance_page' %}"
+                    <a href="{% url 'employee_profile_page' %}"
                       ><span>Profile</span></a
                     >
                   </li>
@@ -866,9 +864,7 @@
                     ></a>
                     <ul>
                       <li>
-                        <a href="{% url 'expense_list' %}"
-                          >Expenses</a
-                        >
+                        <a href="{% url 'expense_list' %}">Expenses</a>
                       </li>
                       <li>
                         <a href="{% url 'expensecategory_list' %}"
@@ -1098,7 +1094,9 @@
                   ><span class="menu-arrow"></span
                 ></a>
                 <ul>
-                  <li><a href="{% url 'settings_page' %}">Company Profile </a></li>
+                  <li>
+                    <a href="{% url 'settings_page' %}">Company Profile </a>
+                  </li>
 
                   <li class="submenu">
                     <a href="javascript:void(0);"
@@ -1163,22 +1161,30 @@
       <div class="page-wrapper">
         <div class="content">
           <!-- Messages -->
-            {% if messages %} 
-              {% for message in messages %}
-                <div class="alert alert-solid-{{message.tags}} alert-dismissible fade show">
-                    <strong>
-                      {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %} Error
-                      {%else %} {{ message.tags|title }} {% endif %}!
-                    </strong>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"><i class="fas fa-xmark"></i></button>
-                </div>
-                
-              {% endfor %} 
-          {% endif %}
+          {% if messages %} {% for message in messages %}
+          <div
+            class="alert alert-solid-{{message.tags}} alert-dismissible fade show"
+          >
+            <strong>
+              {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %} Error
+              {%else %} {{ message.tags|title }} {% endif %}!
+            </strong>
+            {{ message }}
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="alert"
+              aria-label="Close"
+            >
+              <i class="fas fa-xmark"></i>
+            </button>
+          </div>
+
+          {% endfor %} {% endif %}
           <!-- /Messages -->
-           
-          {% block content %}{% endblock content %}</div>
+
+          {% block content %}{% endblock content %}
+        </div>
         <div
           class="copyright-footer d-flex align-items-center justify-content-between border-top bg-white gap-3 flex-wrap"
         >

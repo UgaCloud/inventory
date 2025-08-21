@@ -4,6 +4,9 @@ from django.contrib.auth.decorators import login_required
 from app.forms.human_resource_forms import *
 from app.selectors.human_resource_selectors import *
 
+def employee_profile_view(request):
+    return render(request, 'human_resource/employee-profile.html')
+
 @login_required
 def employee_grid_view(request):
     if request.method == 'POST':
