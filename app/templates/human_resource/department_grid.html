@@ -102,7 +102,7 @@
 		<div class="employee-grid-widget">
 			<div class="row">
 
-				{% for department in departments %}
+				{% for department in page_obj %}
 				<div class="col-xxl-3 col-xl-4 col-lg-6 col-md-6">
 					<div class="card">
 						<div class="card-body">
@@ -124,7 +124,12 @@
 													data-department-name="{{ department.name}}"
 													data-department-description="{{ department.description }}"
 													data-department-is_active="{{ department.is_active }}">
-													<i data-feather="edit" class="feather-edit"></i>Edit</a>
+													<i data-feather="edit" class="feather-edit"></i>Edit</a> <br>&nbsp;
+
+												<a href="">
+													<i data-feather="edit" class="feather-edit"></i>&nbsp;Delete</a>
+
+												</a>
 
 											</div>
 										</li>
@@ -143,31 +148,36 @@
 							</div>
 							<div class="d-flex align-items-center justify-content-between">
 								<p class="mb-0">Number of Employees: {{department.employee_count}}</p>
+
 								<div class="avatar-list-stacked avatar-group-sm">
+									{% for employee in department.employees.all|slice:":4" %}
 									<span class="avatar avatar-rounded">
-										<img class="border border-white"
-											src="{% static 'assets/img/profiles/avatar-15.jpg' %}" alt="img" />
+										{% if employee.photo %}
+										<img class="border border-white" src="{{ employee.photo.url }}"	alt="img" />
+										
+										
+										{% endif %}
 									</span>
-									<span class="avatar avatar-rounded">
-										<img class="border border-white"
-											src="{% static 'assets/img/profiles/avatar-16.jpg' %}" alt="img" />
-									</span>
-									<span class="avatar avatar-rounded">
-										<img class="border border-white"
-											src="{% static 'assets/img/profiles/avatar-18.jpg' %}" alt="img" />
-									</span>
-									<a class="avatar avatar-rounded text-fixed-white fs-10 fw-medium position-relative"
-										href="javascript:void(0);">
-										<img src="{% static 'assets/img/profiles/avatar-17.jpg' %}" alt="img" />
-										<span
-											class="position-absolute top-50 start-50 translate-middle text-center">+2</span>
-									</a>
+									{% endfor %}
+									
 								</div>
+
 							</div>
 						</div>
 					</div>
 				</div>
 				{% endfor %}
+				<div class="pagination">
+    {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}">Previous&nbsp;&nbsp;&nbsp;</a>
+    {% endif %}
+
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+    {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}">&nbsp;&nbsp;&nbsp;Next</a>
+    {% endif %}
+</div>
 			</div>
 		</div>
 

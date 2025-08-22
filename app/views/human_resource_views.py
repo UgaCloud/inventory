@@ -1,12 +1,22 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from app.forms.human_resource_forms import *
 from app.selectors.human_resource_selectors import *
 
-def employee_profile_view(request):
-    
-    return render(request, 'human_resource/employee-profile.html')
+@login_required
+def employee_profile_view(request, employee_id=None): # Two URLs point to this view, one of the URLs uses an employee id and the other doesnt
+    if employee_id:
+        employee = get_employee_by_id(employee_id)
+         
+        context = {
+            'employee':employee
+         }
+    else:
+        context = None
+
+    return render(request, 'human_resource/employee-profile.html', context)
 
 @login_required
 def employee_grid_view(request):
@@ -15,19 +25,24 @@ def employee_grid_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Employee has been added successfully')
-            return redirect('employee_page')
         else:
             messages.error(request, 'There was an error adding the employee')
     else:
         form = EmployeeForm()
-    employees = Employee.objects.select_related('branch').select_related('department').select_related('designation').all()
+    employees = get_all_employees().select_related('branch').select_related('department').prefetch_related('designation').all()
+
+    paginator = Paginator(employees, 8)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     active_employees = employees.filter(is_active=True)
     inactive_employees = employees.filter(is_active = False)
     context = {
         'employees':employees,
         'form':form,
         'active_employees': active_employees,
-        'inactive_employees': inactive_employees
+        'inactive_employees': inactive_employees,
+        'page_obj': page_obj,
     }
     return render(request, 'human_resource/employee_grid.html', context)
 
@@ -35,25 +50,16 @@ def employee_grid_view(request):
 def edit_employee_view(request, employee_id):
     employee = get_employee_by_id(employee_id)
     if request.method == 'POST':
-        form = EmployeeForm(request.POST, instance=employee)
+        form = EmployeeForm(request.POST, request.FILES, instance=employee)
         if form.is_valid():
             form.save()
             messages.success(request, 'Employee successfully edited')
-            return redirect('employee_page')
         else:
             messages.error(request, 'An error occured, unable to update the employee')
     else:
         form = EmployeeForm(instance=employee)
-    employees = Employee.objects.select_related('branch').select_related('department').select_related('designation').all()
-    active_employees = employees.filter(is_active=True)
-    inactive_employees = employees.filter(is_active = False)
-    context = {
-        'employees':employees,
-        'form':form,
-        'active_employees': active_employees,
-        'inactive_employees': inactive_employees
-    }
-    return render(request, 'human_resource/employee_grid.html', context)
+
+    return render(request, 'human_resource/employee_grid.html')
 
 @login_required
 def department_grid_view(request):
@@ -69,16 +75,22 @@ def department_grid_view(request):
         form = DepartmentForm()
 
     Department.objects.annotate(employee_count=models.Count('employees'))# this adds a new field 'employee_count' to each department object
-    departments = Department.objects.all()
+    departments = get_all_departments()
     active_departments = departments.filter(is_active=True)
     inactive_departments = departments.filter(is_active=False)
 
-    
+    paginator = Paginator(departments, 8)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+   
     context = {
         'departments':departments,
         'form':form,
         'active_departments': active_departments,
-        'inactive_departments': inactive_departments  
+        'inactive_departments': inactive_departments,
+        'page_obj':page_obj,
+    
     }
     return render(request, 'human_resource/department_grid.html', context)
 
@@ -96,8 +108,6 @@ def edit_department_view(request, department_id):
             return redirect(department_grid_view)
         else:
             messages.error(request, 'An error occured, unable to update department')
-
-    form = Department(instance = department)
     return redirect(department_grid_view)
 
 @login_required
