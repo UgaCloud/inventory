@@ -85,7 +85,7 @@
 					<div class="card-body d-flex align-items-center justify-content-between">
 						<div>
 							<p class="mb-1 text-white">New Joiners</p>
-							<h4 class="text-white">67</h4>
+							<h4 class="text-white">0</h4>
 						</div>
 						<div>
 							<span class="avatar avatar-lg bg-info-900"><i class="ti ti-user-check"></i></span>
@@ -113,7 +113,7 @@
 							</a>
 							<ul class="dropdown-menu dropdown-menu-end p-3">
 								{% if employees %}
-								{% for employee in employees %}
+								{% for employee in page_obj %}
 								<li>
 									<a href="javascript:void(0);"
 										class="dropdown-item rounded-1">{{employee.user.first_name}}
@@ -163,9 +163,9 @@
 									<input class="form-check-input" type="checkbox" />
 								</div>
 								<div>
-									<a href="#" class="avatar avatar-xl avatar-rounded border p-1 rounded-circle">
+									<a href="#" class="avatar avatar-xl avatar-rounded border p-1 rounded-circle{% if employee.is_active %}border border-success border-3{% else %}border border-danger border-3{% endif %}">
 										{% if employee.photo %}
-										<img src="{{ employee.photo.url }}" class="img-fluid h-auto w-auto" alt="img" />
+										<img src="{{ employee.photo.url }}" class="img-fluid h-auto w-auto" alt="img"/>
 										{% else %}
 										<img src="" class="img-fluid h-auto w-auto" alt="img" />
 										{% endif %}
