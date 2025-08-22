@@ -162,10 +162,16 @@
 									<input class="form-check-input" type="checkbox" />
 								</div>
 								<div>
-									<a href="employee-details.html"
+									<a href="#"
 										class="avatar avatar-xl avatar-rounded border p-1 rounded-circle">
-										<img src="{% static 'assets/img/users/user-32.jpg' %}"
+										{% if employee.photo %}
+										<img src="{{ employee.photo.url }}"
 											class="img-fluid h-auto w-auto" alt="img" />
+											{% else %}
+											<img src=""
+											class="img-fluid h-auto w-auto" alt="img" />
+											{% endif %}
+
 									</a>
 								</div>
 								<div class="dropdown">
@@ -205,7 +211,7 @@
 							</div>
 							<div class="text-center mb-3">
 								<h6 class="mb-1">
-									<a href="employee-details.html">{{employee.user.first_name}} {{employee.user.last_name}}</a>
+									<a href="#">{{employee.first_name}} {{employee.last_name}}</a>
 								</h6>
 								<span class="badge bg-secondary-transparent text-gray-9 fs-10 fw-medium">{{employee.branch}} branch</span>
 							</div>
@@ -243,7 +249,7 @@
 									</button>
 								</div>
 								<div class="modal-body">
-									<form method="post">
+									<form method="post" enctype="multipart/form-data">
 										{% csrf_token %}
 										{{ form.first_name|as_crispy_field }}
 										{{ form.last_name|as_crispy_field }}
