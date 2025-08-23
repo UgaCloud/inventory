@@ -1,9 +1,15 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% block content%}
-    <div class="page-btn">
+    <div class="page-btn d-flex gap-2">
         <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-unit" >
             <i class="ti ti-circle-plus me-1"></i>Add Unit
+        </a>
+        <a href="#" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulk-unit-upload">
+            <i class="ti ti-upload me-1"></i>Bulk Upload
+        </a>
+        <a href="{% url 'download_product_unit_price_template' %}" class="btn btn-outline-secondary">
+            <i class="ti ti-download me-1"></i>Download Template
         </a>
     </div>	
     <div class="table-responsive">
@@ -87,3 +93,41 @@
         </div>
     </div>
 </div>
+
+<!-- Bulk Upload Modal -->
+<div class="modal fade" id="bulk-unit-upload">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="page-wrapper-new p-0">
+                <div class="content">
+                    <div class="modal-header">
+                        <div class="page-title">
+                            <h4>Bulk Upload Product Unit Prices (CSV)</h4>
+                            <small class="text-muted d-block">Columns: product_sku|sku|product, unit, conversion_factor, price</small>
+                        </div>
+                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form method="post" action="{% url 'bulk_add_product_unit_prices' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="csv-file" class="form-label">CSV file</label>
+                                <input class="form-control" type="file" id="csv-file" name="csv_file" accept=".csv" required>
+                            </div>
+                            <div class="mb-2">
+                                <a href="{% url 'download_product_unit_price_template' %}" class="btn btn-sm btn-link">Download example template</a>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn me-2 btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Upload</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- End Bulk Upload Modal -->
