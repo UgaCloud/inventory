@@ -3,21 +3,22 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from app.models.transactions import StockMovement, StockTransfer, PurchaseOrder, PurchaseOrderItem
-from app.forms.transaction_forms import StockTransferForm, PurchaseOrderForm, PurchaseOrderItemForm
+from app.models.transactions import StockMovement, StockTransfer, PurchaseOrder, PurchaseOrderItem, StockAdjustment
+from app.forms.transaction_forms import StockTransferForm, PurchaseOrderForm, PurchaseOrderItemForm, StockAdjustmentForm
 from app.selectors.transaction_selectors import (
     get_all_stock_movements, get_stock_movements_by_branch,
     get_all_stock_transfers, get_stock_transfer_by_id, get_stock_transfers_by_branch,
     get_all_orders, get_order_by_id, get_orders_by_branch,
     get_items_by_order
 )
+from app.models.products import Product, UnitOfMeasure
+from app.forms.transaction_forms import StockAdjustmentItemFormSet
 
 # Added imports for bulk upload
 import csv
 import io
 from decimal import Decimal
 from datetime import datetime
-from app.models.products import Product, UnitOfMeasure
 
 @login_required
 def stock_dashboard(request):
@@ -310,3 +311,78 @@ def download_purchase_order_item_template(request):
     response = HttpResponse(output.getvalue(), content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="purchase_order_items_template.csv"'
     return response
+
+@login_required
+def stock_adjustment_list(request):
+    adjustments = StockAdjustment.objects.all().order_by('-created_at')
+
+    form = StockAdjustmentForm()
+    formset = StockAdjustmentItemFormSet()
+
+    context = {
+        'adjustments': adjustments,
+        'form': form,
+        'formset': formset,
+    }
+
+    return render(request, 'stock/stock_adjustment_list.html', context)
+
+@login_required
+def stock_adjustment_detail(request, adjustment_id):
+    adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
+    return render(request, 'stock/stock_adjustment_detail.html', {'adjustment': adjustment})
+
+@login_required
+def create_stock_adjustment(request):
+    if request.method == 'POST':
+        form = StockAdjustmentForm(request.POST)
+        formset = StockAdjustmentItemFormSet(request.POST)
+        if form.is_valid() and formset.is_valid():
+            adj = form.save(commit=False)
+            # prefer to record username; fallback to form value
+            try:
+                adj.created_by = request.user.username
+            except Exception:
+                pass
+            adj.save()
+            formset.instance = adj
+            formset.save()
+            messages.success(request, 'Stock adjustment created successfully.')
+            return redirect('stock_adjustment_list')
+
+@login_required
+def edit_stock_adjustment(request, adjustment_id):
+    adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
+    if request.method == 'POST':
+        form = StockAdjustmentForm(request.POST, instance=adjustment)
+        formset = StockAdjustmentItemFormSet(request.POST, instance=adjustment)
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
+            messages.success(request, 'Stock adjustment updated successfully.')
+            return redirect('stock_adjustment_detail', adjustment_id=adjustment.id)
+    else:
+        form = StockAdjustmentForm(instance=adjustment)
+        formset = StockAdjustmentItemFormSet(instance=adjustment)
+    return render(request, 'stock/stock_adjustment_form.html', {'form': form, 'formset': formset, 'adjustment': adjustment})
+
+@login_required
+def apply_stock_adjustment(request, adjustment_id):
+    adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
+    if request.method == 'POST':
+        applied = adjustment.apply(applied_by=getattr(request.user, 'username', None))
+        if applied:
+            messages.success(request, 'Stock adjustment applied successfully.')
+        else:
+            messages.info(request, 'Stock adjustment was already applied.')
+        return redirect('stock_adjustment_detail', adjustment_id=adjustment.id)
+    return render(request, 'stock/stock_adjustment_confirm_apply.html', {'adjustment': adjustment})
+
+@login_required
+def delete_stock_adjustment(request, adjustment_id):
+    adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
+    if request.method == 'POST':
+        adjustment.delete()
+        messages.success(request, 'Stock adjustment deleted successfully.')
+        return redirect('stock_adjustment_list')
+    return render(request, 'stock/stock_adjustment_confirm_delete.html', {'adjustment': adjustment})

@@ -634,21 +634,21 @@
                       ><span>Products</span></a
                     >
                   </li>
-                  <li>
+                  {% comment %} <li>
                     <a href="{% url 'under_maintenance_page' %}"
                       ><span>Expired Products</span></a
                     >
-                  </li>
-                  <li>
+                  </li> {% endcomment %}
+                  {% comment %} <li>
                     <a href="{% url 'under_maintenance_page' %}"
                       ><span>Low s</span></a
                     >
-                  </li>
-                  <li>
+                  </li> {% endcomment %}
+                  {% comment %} <li>
                     <a href="{% url 'under_maintenance_page' %}"
                       ><span>Print Barcode</span></a
                     >
-                  </li>
+                  </li> {% endcomment %}
                 </ul>
               </li>
               <li class="submenu">
@@ -678,23 +678,13 @@
                     >
                   </li>
                   <li>
-                    <a href="{% url 'under_maintenance_page' %}"
+                    <a href="{% url 'stock_adjustment_list' %}"
                       ><span>Stock Adjustment</span></a
                     >
                   </li>
                   <li>
-                    <a href="{% url 'under_maintenance_page' %}"
-                      ><span>Stock Return</span></a
-                    >
-                  </li>
-                  <li>
-                    <a href="{% url 'under_maintenance_page' %}"
-                      ><span>Stock Movement</span></a
-                    >
-                  </li>
-                  <li>
                     <a href="{% url 'supplier_page' %}"
-                      ><span>Supllier</span></a
+                      ><span>Supplier</span></a
                     >
                   </li>
                 </ul>
