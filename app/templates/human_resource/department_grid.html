@@ -108,7 +108,7 @@
 						<div class="card-body">
 							<div class="d-flex align-items-center justify-content-between mb-4">
 								<h5 class="d-inline-flex align-items-center">
-									<i class="ti ti-point-filled text-success fs-20"></i>{{department.name}}
+									<i class="ti ti-point-filled {% if department.is_active %}text-success {% else %} text-danger {% endif %}fs-20"></i>{{department.name}}
 								</h5>
 								<div class="dropdown">
 									<a href="#" class="action-icon border-0" data-bs-toggle="dropdown"
