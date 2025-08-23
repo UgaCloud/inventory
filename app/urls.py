@@ -87,6 +87,14 @@ urlpatterns = [
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
     path('stock_transfers/<int:pk>/update/', stock_transfer_update, name='stock_transfer_update'),
 
+    # Stock Adjustments
+    path('stock_adjustments/', stock_adjustment_list, name='stock_adjustment_list'),
+    path('stock_adjustments/<int:adjustment_id>/', stock_adjustment_detail, name='stock_adjustment_detail'),
+    path('stock_adjustments/create/', create_stock_adjustment, name='create_stock_adjustment'),
+    path('stock_adjustments/<int:adjustment_id>/edit/', edit_stock_adjustment, name='edit_stock_adjustment'),
+    path('stock_adjustments/<int:adjustment_id>/apply/', apply_stock_adjustment, name='apply_stock_adjustment'),
+    path('stock_adjustments/<int:adjustment_id>/delete/', delete_stock_adjustment, name='delete_stock_adjustment'),
+
     # sales
     path('sales/', sales_list_view, name='sales_list'),
     path('sales/<int:pk>/update/', sales_update_view, name='sales_update_view'),
