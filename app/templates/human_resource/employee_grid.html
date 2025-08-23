@@ -11,15 +11,14 @@
 			<ul class="table-top-head">
 				<li>
 					<div class="d-flex me-2 pe-2 border-end">
-						<a href="#" class="btn-list me-2"><i data-feather="list"
-								class="feather-user"></i></a>
+						<a href="#" class="btn-list me-2"><i data-feather="list" class="feather-user"></i></a>
 						<a href="#" class="btn-grid active bg-primary me-2"><i data-feather="grid"
 								class="feather-user text-white"></i></a>
 					</div>
 				</li>
 				<li class="me-2">
-					<a data-bs-toggle="tooltip" data-bs-placement="top" title="Pdf"><img src="{% static 'assets/img/icons/pdf.svg' %}"
-							alt="img" /></a>
+					<a data-bs-toggle="tooltip" data-bs-placement="top" title="Pdf"><img
+							src="{% static 'assets/img/icons/pdf.svg' %}" alt="img" /></a>
 				</li>
 				<li class="me-2">
 					<a data-bs-toggle="tooltip" data-bs-placement="top" title="Excel"><img
@@ -86,7 +85,7 @@
 					<div class="card-body d-flex align-items-center justify-content-between">
 						<div>
 							<p class="mb-1 text-white">New Joiners</p>
-							<h4 class="text-white">67</h4>
+							<h4 class="text-white">0</h4>
 						</div>
 						<div>
 							<span class="avatar avatar-lg bg-info-900"><i class="ti ti-user-check"></i></span>
@@ -114,9 +113,11 @@
 							</a>
 							<ul class="dropdown-menu dropdown-menu-end p-3">
 								{% if employees %}
-								{% for employee in employees %}
+								{% for employee in page_obj %}
 								<li>
-									<a href="javascript:void(0);" class="dropdown-item rounded-1">{{employee.user.first_name}} {{employee.user.last_name}} ({{employee.user.email}})</a>
+									<a href="javascript:void(0);"
+										class="dropdown-item rounded-1">{{employee.user.first_name}}
+										{{employee.user.last_name}} ({{employee.user.email}})</a>
 								</li>
 								{% endfor %}
 								{% endif %}
@@ -153,7 +154,7 @@
 		{% if employees %}
 		<div class="employee-grid-widget">
 			<div class="row">
-				{% for employee in employees %}
+				{% for employee in page_obj %}
 				<div class="col-xxl-3 col-xl-4 col-lg-6 col-md-6">
 					<div class="card">
 						<div class="card-body">
@@ -162,10 +163,13 @@
 									<input class="form-check-input" type="checkbox" />
 								</div>
 								<div>
-									<a href="employee-details.html"
-										class="avatar avatar-xl avatar-rounded border p-1 rounded-circle">
-										<img src="{% static 'assets/img/users/user-32.jpg' %}"
-											class="img-fluid h-auto w-auto" alt="img" />
+									<a href="#" class="avatar avatar-xl avatar-rounded border p-1 rounded-circle{% if employee.is_active %}border border-success border-3{% else %}border border-danger border-3{% endif %}">
+										{% if employee.photo %}
+										<img src="{{ employee.photo.url }}" class="img-fluid h-auto w-auto" alt="img"/>
+										{% else %}
+										<img src="" class="img-fluid h-auto w-auto" alt="img" />
+										{% endif %}
+
 									</a>
 								</div>
 								<div class="dropdown">
@@ -189,7 +193,13 @@
 													data-employee-address="{{ employee.address }}"
 													data-employee-is_active="{{ employee.is_active }}"
 													data-employee-photo="{{ employee.photo }}">
-													<i data-feather="edit" class="feather-edit"></i>Edit</a>
+
+													<i data-feather="edit"
+														class="feather-edit"></i>&nbsp;Edit</a><br>&nbsp;
+												</a>
+												<a href="{% url 'employee_profile_page' employee.id %}">
+													<i data-feather="info"></i>&nbsp;Details
+												</a>
 
 											</div>
 										</li>
@@ -198,16 +208,18 @@
 								</div>
 							</div>
 							<div class="text-center">
-								<p class="text-primary mb-2"> Status <span
+								<p> Status <span
 										class="badge {% if employee.is_active %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %}">
 										{{ employee.is_active|yesno:'Active,Inactive' }}
 									</span></p>
 							</div>
 							<div class="text-center mb-3">
 								<h6 class="mb-1">
-									<a href="employee-details.html">{{employee.user.first_name}} {{employee.user.last_name}}</a>
+									<a href="#">{{employee.first_name}} {{employee.last_name}}</a>
 								</h6>
-								<span class="badge bg-secondary-transparent text-gray-9 fs-10 fw-medium">{{employee.branch}} branch</span>
+								<span
+									class="badge bg-secondary-transparent text-gray-9 fs-10 fw-medium">{{employee.branch}}
+									branch</span>
 							</div>
 							<div class="d-flex align-items-center justify-content-between bg-light rounded p-3">
 								<div class="text-start">
@@ -225,6 +237,17 @@
 
 				</div>
 				{% endfor %}
+				<div class="pagination">
+					{% if page_obj.has_previous %}
+					<a href="?page={{ page_obj.previous_page_number }}">&nbsp;&nbsp;Previous&nbsp;&nbsp;</a>
+					{% endif %}
+
+					<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+					{% if page_obj.has_next %}
+					<a href="?page={{ page_obj.next_page_number }}">&nbsp;&nbsp;Next</a>
+					{% endif %}
+				</div>
 				{% endif %}
 			</div>
 
@@ -243,15 +266,15 @@
 									</button>
 								</div>
 								<div class="modal-body">
-									<form method="post">
+									<form method="post" enctype="multipart/form-data">
 										{% csrf_token %}
 										{{ form.first_name|as_crispy_field }}
 										{{ form.last_name|as_crispy_field }}
 										{{ form.email|as_crispy_field }}
 										{% for field in form.visible_fields %}
-											{% if field.name not in 'first_name last_name email user' %}
-												{{ field|as_crispy_field }}
-											{% endif %}
+										{% if field.name not in 'first_name last_name email user' %}
+										{{ field|as_crispy_field }}
+										{% endif %}
 										{% endfor %}
 										{{ form.user|as_crispy_field }}
 								</div>

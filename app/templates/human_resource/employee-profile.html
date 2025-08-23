@@ -1,0 +1,75 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+{% block content %}
+<div class="page-wrapper p-0 m-0">
+	<div class="content">
+		<div class="page-header">
+			<div class="page-title">
+				<h4>Profile</h4>
+				<h6>User Profile</h6>
+			</div>
+		</div>
+		<!-- /product list -->
+		<div class="card">
+			<div class="card-header">
+				<h4>Profile</h4>
+			</div>
+			<div class="card-body profile-body">
+				<h5 class="mb-2"><i class="ti ti-user text-primary me-1"></i>Basic Information</h5>
+				<div class="profile-pic-upload image-field">
+					<div class="profile-pic p-2">
+						{% if employee.photo %}
+						<img src="{{employee.photo.url}}" class="object-fit-cover h-100 rounded-1" alt="user">
+						{% else %}
+						<img src="#" class="object-fit-cover h-100 rounded-1" alt="user">
+						{% endif %}
+					</div>
+
+				</div>
+				<div class="row">
+					<div class="col-lg-6 col-sm-12">
+						First Name: {{ employee.first_name }}
+					</div>
+					<div class="col-lg-6 col-sm-12">
+						<div class="mb-3">
+							Last Name: {{ employee.last_name }}
+						</div>
+					</div>
+					<div class="col-lg-6 col-sm-12">
+						<div class="mb-3">
+							Email: {{ employee.email }}
+						</div>
+					</div>
+					<div class="col-lg-6 col-sm-12">
+						<div class="mb-3">
+							Phone Number: {{ employee.contact }}
+						</div>
+					</div>
+					<div class="col-lg-6 col-sm-12">
+						<div class="mb-3">
+							Branch: {{ employee.branch }}
+						</div>
+					</div>
+					<div class="col-lg-6 col-sm-12">
+						<div class="mb-3">
+							Department: {{ employee.department }}
+						</div>
+					</div>
+					<div class="col-lg-6 col-sm-12">
+						<div class="mb-3">
+							Address: {{ employee.address }}
+						</div>
+					</div>
+
+				</div>
+			</div>
+		</div>
+		<!-- /product list -->
+	</div>
+	{% endblock %}
+	<div class="footer d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+		<p class="mb-0 text-gray-9">2014 - 2025 &copy; DreamsPOS. All Right Reserved</p>
+		<p>Designed &amp; Developed by <a href="javascript:void(0);" class="text-primary">Dreams</a></p>
+	</div>
+</div>
+</div>
