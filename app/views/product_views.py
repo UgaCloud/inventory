@@ -316,3 +316,90 @@ def product_autocomplete(request):
         {'id': p.pk, 'text': p.name} for p in products
     ]
     return JsonResponse({'results': results})
+
+@login_required
+def bulk_add_product_unit_prices_view(request):
+    """
+    Bulk upload product unit prices via CSV.
+    Expected CSV columns (case-insensitive):
+      - product_sku OR product (sku or exact product name)
+      - unit (unit of measure name)
+      - conversion_factor (optional, defaults to 1.0)
+      - price (required)
+
+    Creates ProductUnitPrice records when product and unit are found. Skips rows with missing/invalid data.
+    """
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        decoded_file = csv_file.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded_file)
+        created, errors = 0, []
+        for row in reader:
+            # helper to fetch case-insensitive keys
+            def get_row_val(keys):
+                for k in keys:
+                    val = row.get(k)
+                    if val is not None:
+                        return val.strip()
+                return None
+
+            product_key = get_row_val(['product_sku', 'sku', 'product'])
+            unit_name = get_row_val(['unit', 'unit_name'])
+            conv_raw = get_row_val(['conversion_factor', 'conversion'])
+            price_raw = get_row_val(['price', 'unit_price'])
+
+            # Resolve product
+            product = None
+            if product_key:
+                product = Product.objects.filter(sku__iexact=product_key).first()
+                if not product:
+                    product = Product.objects.filter(name__iexact=product_key).first()
+
+            # Resolve unit
+            unit = None
+            if unit_name:
+                unit = UnitOfMeasure.objects.filter(name__iexact=unit_name).first()
+
+            # Parse numeric values
+            try:
+                conversion_factor = float(conv_raw) if conv_raw not in (None, '') else 1.0
+            except Exception:
+                conversion_factor = 1.0
+
+            try:
+                price = int(float(price_raw)) if price_raw not in (None, '') else None
+            except Exception:
+                price = None
+
+            if not product or not unit or price is None:
+                errors.append({'row': row, 'reason': 'missing product/unit/price'})
+                continue
+
+            # Create or update ProductUnitPrice
+            try:
+                pup, created_flag = ProductUnitPrice.objects.update_or_create(
+                    product=product,
+                    unit=unit,
+                    defaults={'conversion_factor': conversion_factor, 'price': price}
+                )
+                if created_flag:
+                    created += 1
+            except Exception as e:
+                errors.append({'row': row, 'reason': str(e)})
+                continue
+
+        if errors:
+            messages.warning(request, f"Some rows were skipped: {len(errors)}. See server logs for details.")
+        messages.success(request, f"Bulk upload finished — created/updated: {created}.")
+        return redirect(manage_product_view)
+
+
+@login_required
+def download_product_unit_price_template_view(request):
+    """Provide a CSV template for product unit prices bulk upload."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="product_unit_price_template.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['product_sku', 'unit', 'conversion_factor', 'price'])
+    writer.writerow(['PRD-0001', 'Kilogram', '1.0', '3500'])
+    return response

@@ -11,8 +11,8 @@ class PurchaseOrder(models.Model):
     expected_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=PURCHASE_ORDER_OPTIONS)
     recorded_by = models.CharField(max_length=50)
-    note = models.TextField(blank=True, null=True)  # Add note field
-    total_cost = models.DecimalField(max_digits=16, decimal_places=2, default=0)  # New field
+    note = models.TextField(blank=True, null=True)  
+    total_cost = models.DecimalField(max_digits=16, decimal_places=2, default=0)  
 
     def __str__(self):
         return f"PO-{self.id} ({self.supplier.name})"
@@ -189,6 +189,7 @@ class StockTransferItem(models.Model):
     stock_transfer = models.ForeignKey(StockTransfer, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
+    units = models.ForeignKey("app.ProductUnitPrice", on_delete=models.SET_NULL, null=True, blank=True)
     transfer_request_item = models.ForeignKey(
         "app.TransferRequestItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="fulfilled_transfer_items"
     )

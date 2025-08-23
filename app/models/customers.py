@@ -35,7 +35,7 @@ class CustomerLedger(models.Model):
     note = models.TextField(blank=True, null=True)
 
     class Meta:
-        ordering = ['date']
+        ordering = ['-date']
         verbose_name = 'Customer Ledger Entry'
         verbose_name_plural = 'Customer Ledger Entries'
 

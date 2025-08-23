@@ -69,6 +69,9 @@ urlpatterns = [
     path('purchase_order/<int:order_id>/items/create/', create_purchase_order_item, name='create_purchase_order_item'),
     path('purchase_order/item/<int:item_id>/edit/', edit_purchase_order_item, name='edit_purchase_order_item'),
     path('purchase_order/item/<int:item_id>/delete/', delete_purchase_order_item, name='delete_purchase_order_item'),
+    # Bulk upload / template for PurchaseOrderItem
+    path('purchase_order/<int:order_id>/items/bulk-upload/', purchase_order_items_bulk_upload, name='purchase_order_items_bulk_upload'),
+    path('purchase_order/items/bulk-template/', download_purchase_order_item_template, name='download_purchase_order_item_template'),
 
     # Transfer Requests
     path('transfer_requests/', transfer_request_list, name='transfer_request_list'),
@@ -144,6 +147,9 @@ urlpatterns = [
     path('products/categories/bulk-template/', download_category_template_view, name='download_category_template'),
     path('products/bulk-add/', bulk_add_products_view, name='bulk_add_products'),
     path('products/bulk-template/', download_product_template_view, name='download_product_template'),
+    # Product Unit Prices bulk upload and template
+    path('products/unit-prices/bulk-add/', bulk_add_product_unit_prices_view, name='bulk_add_product_unit_prices'),
+    path('products/unit-prices/bulk-template/', download_product_unit_price_template_view, name='download_product_unit_price_template'),
 ]
 
 if settings.DEBUG:

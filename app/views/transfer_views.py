@@ -79,28 +79,9 @@ def update_transfer_request(request, request_id):
             return redirect(transfer_request_list)
 
 @login_required
-def approve_transfer_request(request, request_id):
-    transfer_request = get_object_or_404(TransferRequest, pk=request_id)
-    
-    if request.method == 'POST':
-        form = TransferRequestApprovalForm(request.POST, instance=transfer_request)
-        
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Transfer request status updated successfully.')
-            
-            return redirect(transfer_request_detail, pk=request_id)
-     
-
-@login_required
 def stock_transfer_list(request):
     transfers = get_all_stock_transfers()
-    
-    return render(request, 'transfers/stock_transfer_list.html', {'transfers': transfers})
 
-@login_required
-def stock_transfer_create(request):
-    
     transfer_request_id = request.GET.get('transfer_request_id') or request.POST.get('transfer_request')
 
     transfer_request = None
@@ -119,6 +100,22 @@ def stock_transfer_create(request):
             for item in transfer_request.items.all()
         ]
 
+    form = StockTransferForm(initial={'transfer_request': transfer_request_id} if transfer_request_id else None)
+        
+    formset = StockTransferItemFormSet(initial=initial_items)
+    
+    context = {
+        'transfers': transfers,
+        'form': form,
+        'item_formset': formset,
+        'transfer_request': transfer_request
+    }
+
+    return render(request, 'transfers/stock_transfer_list.html', context)
+
+@login_required
+def stock_transfer_create(request):
+    
     if request.method == 'POST':
         form = StockTransferForm(request.POST)
         formset = StockTransferItemFormSet(request.POST)
@@ -130,12 +127,8 @@ def stock_transfer_create(request):
            
             messages.success(request, 'Stock transfer created successfully.')
             
-            return redirect(stock_transfer_list)
-    else:
-        form = StockTransferForm(initial={'transfer_request': transfer_request_id} if transfer_request_id else None)
-        
-        formset = StockTransferItemFormSet(initial=initial_items)
-    return render(request, 'stock_transfer_form.html', {'form': form, 'item_formset': formset, 'transfer_request': transfer_request})
+        return redirect(stock_transfer_list)
+     
 
 @login_required
 def stock_transfer_detail(request, pk):
@@ -174,3 +167,29 @@ def pending_transfer_requests_for_approval(request):
         'approval_form': approval_form
     }
     return render(request, 'transfers/pending_transfer_requests.html', context)
+
+@login_required
+def approve_transfer_request(request, request_id):
+    transfer_request = get_object_or_404(TransferRequest, pk=request_id)
+    
+    
+    if request.method == 'POST':
+        form = TransferRequestApprovalForm(request.POST, instance=transfer_request)
+        
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Transfer request status updated successfully.')
+
+        return redirect(pending_transfer_requests_for_approval)
+    else:
+        form = TransferRequestApprovalForm(instance=transfer_request)
+
+        request_items = transfer_request.items.all()
+    
+        context = {
+            'request': transfer_request,
+            'approval_form': form,
+            'items': request_items,
+        }
+
+        return render(request, 'transfers/approve_reject.html', context)

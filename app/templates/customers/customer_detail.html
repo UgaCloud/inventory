@@ -60,7 +60,7 @@
                                 <td>{{ payment.reference }}</td>
                             </tr>
                             {% if payment.allocations.exists %}
-                            <tr>
+                            {% comment %} <tr>
                                 <td colspan="4" class="p-0 border-0">
                                     <div class="ps-3 pb-2">
                                         <small class="text-muted">Allocated to:</small>
@@ -73,7 +73,7 @@
                                         </ul>
                                     </div>
                                 </td>
-                            </tr>
+                            </tr> {% endcomment %}
                             {% endif %}
                             {% endfor %}
                         {% endif %}

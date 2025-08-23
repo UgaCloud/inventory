@@ -1,4 +1,5 @@
-from django.shortcuts import render, get_object_or_404, redirect, HttpResponseRedirect
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -10,6 +11,13 @@ from app.selectors.transaction_selectors import (
     get_all_orders, get_order_by_id, get_orders_by_branch,
     get_items_by_order
 )
+
+# Added imports for bulk upload
+import csv
+import io
+from decimal import Decimal
+from datetime import datetime
+from app.models.products import Product, UnitOfMeasure
 
 @login_required
 def stock_dashboard(request):
@@ -170,3 +178,135 @@ def delete_purchase_order_item(request, item_id):
         messages.success(request, 'Purchase order item deleted successfully.')
         return redirect('purchase_order_item_list', order_id=order.id)
     return render(request, 'purchase_order_item_confirm_delete.html', {'item': item, 'order': order})
+
+@login_required
+def purchase_order_items_bulk_upload(request, order_id):
+    """Handle CSV bulk upload to create PurchaseOrderItem records for a given PurchaseOrder.
+
+    Expected CSV headers (case-insensitive, any of these are accepted):
+      - sku, product_sku, barcode, product  (used to find Product by sku, barcode or name)
+      - unit or unit_name                      (UnitOfMeasure name)
+      - quantity
+      - unit_cost
+      - expiry_date (YYYY-MM-DD or DD/MM/YYYY)
+
+    Rows missing product/unit/quantity or with invalid quantity are skipped. A summary message
+    is shown and the user is redirected back to the purchase order item list.
+    """
+    order = get_object_or_404(PurchaseOrder, id=order_id)
+
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            messages.error(request, 'No file uploaded.')
+            return redirect(purchase_order_item_list, order_id=order.id)
+
+        try:
+            decoded = uploaded_file.read().decode('utf-8').splitlines()
+            reader = csv.DictReader(decoded)
+        except Exception as e:
+            messages.error(request, f'Failed to read uploaded file: {e}')
+            return redirect(purchase_order_item_list, order_id=order.id)
+
+        created = 0
+        skipped = []
+
+        for row_number, row in enumerate(reader, start=1):
+            # Normalize keys
+            def get_row_value(keys):
+                for k in keys:
+                    val = row.get(k)
+                    if val:
+                        return val.strip()
+                return None
+
+            product_key = get_row_value(['sku', 'product_sku', 'barcode', 'product'])
+            unit_key = get_row_value(['unit', 'unit_name'])
+            qty_raw = get_row_value(['quantity', 'qty'])
+            cost_raw = get_row_value(['unit_cost', 'unitcost', 'cost'])
+            expiry_raw = get_row_value(['expiry_date', 'expiry'])
+
+            # Resolve product
+            product = None
+            if product_key:
+                product = Product.objects.filter(sku__iexact=product_key).first()
+                if not product:
+                    product = Product.objects.filter(barcode__iexact=product_key).first()
+                if not product:
+                    product = Product.objects.filter(name__iexact=product_key).first()
+
+            # Resolve unit
+            unit = None
+            if unit_key:
+                unit = UnitOfMeasure.objects.filter(name__iexact=unit_key).first()
+
+            # Parse numeric values
+            try:
+                quantity = int(float(qty_raw)) if qty_raw is not None else None
+            except Exception:
+                quantity = None
+
+            try:
+                unit_cost = Decimal(cost_raw) if cost_raw is not None and cost_raw != '' else Decimal(0)
+            except Exception:
+                unit_cost = Decimal(0)
+
+            expiry_date = None
+            if expiry_raw:
+                for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+                    try:
+                        expiry_date = datetime.strptime(expiry_raw, fmt).date()
+                        break
+                    except Exception:
+                        continue
+
+            # Basic validation
+            if not product or not unit or not quantity or quantity <= 0:
+                skipped.append((row_number, row))
+                continue
+
+            # Create PurchaseOrderItem
+            try:
+                poi = PurchaseOrderItem(
+                    order=order,
+                    product=product,
+                    unit=unit,
+                    quantity=quantity,
+                    unit_cost=unit_cost,
+                    expiry_date=expiry_date
+                )
+                poi.save()
+                created += 1
+            except Exception as e:
+                skipped.append((row_number, str(e)))
+                continue
+
+        # Update order totals if any items were created
+        if created:
+            try:
+                order.update_total_cost()
+            except Exception:
+                pass
+
+        messages.success(request, f'Bulk upload finished — created: {created}, skipped: {len(skipped)}.')
+        if skipped:
+            messages.warning(request, f'First skipped row: {skipped[0]} (see server logs for details).')
+
+        return redirect(purchase_order_item_list, order_id=order.id)
+
+@login_required
+def download_purchase_order_item_template(request):
+    """Return a small CSV template file for PurchaseOrderItem bulk upload."""
+    # Use the same headers the bulk upload expects
+    headers = ['sku', 'unit', 'quantity', 'unit_cost', 'expiry_date']
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(headers)
+    # Example row — optional, helps users understand format
+    writer.writerow(['PRD-0001', 'Kilogram', '10', '3500', '2026-12-31'])
+
+    response = HttpResponse(output.getvalue(), content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="purchase_order_items_template.csv"'
+    return response
