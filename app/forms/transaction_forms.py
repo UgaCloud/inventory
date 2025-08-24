@@ -63,6 +63,12 @@ class SalesForm(forms.ModelForm):
         labels = {
             'payment_method': '',  # Hide label for payment_method
         }
+        widgets = {
+            'customer': forms.Select(attrs={
+                'class': 'select2',
+                'style': 'width:100%'
+            }),
+        }
 
     def clean(self):
         cleaned_data = super().clean()

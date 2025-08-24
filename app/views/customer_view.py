@@ -6,6 +6,9 @@ from app.forms.customer_forms import CustomerForm
 from app.forms.customer_forms import PaymentForm
 from app.selectors.customer_selectors import *
 from app.services.customer_transactions import allocate_bulk_payment_to_sales
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.http import require_POST
+from app.forms.customer_forms import QuickCustomerForm
 
 @login_required
 def customer_list_view(request):
@@ -111,4 +114,23 @@ def record_customer_payment_view(request, pk):
         else:
             messages.error(request, 'Please correct the errors below.')
         return redirect('customer_detail', pk=customer.pk)
+
+@login_required
+@require_POST
+def create_customer_ajax(request):
+    # Expect JSON body
+    try:
+        data = request.body.decode('utf-8')
+        import json
+        payload = json.loads(data) if data else {}
+    except Exception:
+        return HttpResponseBadRequest('Invalid JSON')
+
+    form = QuickCustomerForm(payload)
+    if form.is_valid():
+        customer = form.save()
+        return JsonResponse({'id': customer.pk, 'name': str(customer)})
+    else:
+        # return form errors
+        return JsonResponse(form.errors, status=400)
 

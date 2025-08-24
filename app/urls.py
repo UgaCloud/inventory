@@ -141,6 +141,7 @@ urlpatterns = [
     # Customer URLs
     path('customers/', customer_list_view, name='customer_list'),
     path('customers/add/', customer_create_view, name='customer_create'),
+    path('customers/create-ajax/', create_customer_ajax, name='create_customer_ajax'),
     path('customers/<int:pk>/', customer_detail_view, name='customer_detail'),
     path('customers/<int:pk>/edit/', customer_update_view, name='customer_update'),
     path('customers/<int:pk>/delete/', customer_delete_view, name='customer_delete'),
