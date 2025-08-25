@@ -582,7 +582,52 @@
         <div id="sidebar-menu-3" class="sidebar-menu">
           <div class="main-menu">
             <ul class="nav-menu">
-              <li class="submenu">
+              {% if app_menu %}
+                {% for item in app_menu %}
+                  <li class="submenu">
+                    <a href="{% if item.url_name %}{% url item.url_name %}{% else %}javascript:void(0);{% endif %}"
+                      >{% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
+                      <span> {{ item.label }} </span>
+                      {% if item.children %}<span class="menu-arrow"></span>{% endif %}
+                    </a>
+
+                    {% if item.children %}
+                      <ul>
+                        {% for child in item.children %}
+                          {% if child.children %}
+                            <li class="submenu">
+                              <a href="javascript:void(0);">
+                                <span>{{ child.label }}</span>
+                                <span class="menu-arrow"></span>
+                              </a>
+                              <ul>
+                                {% for grand in child.children %}
+                                  <li>
+                                    {% if grand.url_name %}
+                                      <a href="{% url grand.url_name %}"><span>{{ grand.label }}</span></a>
+                                    {% else %}
+                                      <a href="javascript:void(0);"><span>{{ grand.label }}</span></a>
+                                    {% endif %}
+                                  </li>
+                                {% endfor %}
+                              </ul>
+                            </li>
+                          {% else %}
+                            <li>
+                              {% if child.url_name %}
+                                <a href="{% url child.url_name %}"><span>{{ child.label }}</span></a>
+                              {% else %}
+                                <a href="javascript:void(0);"><span>{{ child.label }}</span></a>
+                              {% endif %}
+                            </li>
+                          {% endif %}
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
+                  </li>
+                {% endfor %}
+              {% else %}
+                <li class="submenu">
                 <a href="{% url 'index_page' %}"
                   ><i class="ti ti-layout-grid fs-16 me-2"></i
                   ><span> Main Menu</span> <span class="menu-arrow"></span
@@ -1144,6 +1189,7 @@
                   </li>
                 </ul>
               </li>
+              {% endif %}
             </ul>
           </div>
         </div>
