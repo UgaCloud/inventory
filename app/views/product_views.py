@@ -403,3 +403,21 @@ def download_product_unit_price_template_view(request):
     writer.writerow(['product_sku', 'unit', 'conversion_factor', 'price'])
     writer.writerow(['PRD-0001', 'Kilogram', '1.0', '3500'])
     return response
+
+@login_required
+def product_unit_prices_api(request, product_id):
+    """Return JSON list of unit prices for a product.
+    Response format: { results: [{unit_id, unit_name, price, conversion_factor}, ...] }
+    """
+    from django.shortcuts import get_object_or_404
+    prod = get_object_or_404(Product, pk=product_id)
+    unit_prices = prod.unit_prices.select_related('unit').all()
+    results = []
+    for up in unit_prices:
+        results.append({
+            'unit_id': up.unit.id,
+            'unit_name': str(up.unit),
+            'price': float(up.price),
+            'conversion_factor': float(up.conversion_factor),
+        })
+    return JsonResponse({'results': results})
