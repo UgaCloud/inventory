@@ -406,6 +406,80 @@
             }
         })();
 
+        // Update unit options and price when product select changes in formset rows
+        (function(){
+            async function fetchUnitPrices(productId) {
+                try {
+                    const resp = await fetch(`/products/${productId}/unit-prices/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+                    if (!resp.ok) return [];
+                    const json = await resp.json();
+                    return json.results || [];
+                } catch (e) {
+                    console.error('Failed to fetch unit prices', e);
+                    return [];
+                }
+            }
+
+            function findRow(element) {
+                return element.closest('.formset-row');
+            }
+
+            document.getElementById('formset-body').addEventListener('change', async function(e) {
+                var target = e.target;
+                // product selects likely have names like items-0-product or product
+                if (!target) return;
+                if (target.tagName.toLowerCase() === 'select' && /product/.test(target.name)) {
+                    var row = findRow(target);
+                    var unitSelect = row.querySelector('select[name$="-unit"]');
+                    var priceInput = row.querySelector('input[name$="-sale_price"]');
+                    var productId = target.value;
+                    if (!productId) return;
+                    var unitPrices = await fetchUnitPrices(productId);
+                    // clear existing options
+                    if (unitSelect) {
+                        unitSelect.innerHTML = '';
+                        var emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.text = 'Select unit';
+                        unitSelect.appendChild(emptyOpt);
+                        unitPrices.forEach(function(u){
+                            var opt = document.createElement('option');
+                            opt.value = u.unit_id;
+                            opt.text = u.unit_name;
+                            opt.dataset.price = u.price;
+                            opt.dataset.conversion_factor = u.conversion_factor;
+                            unitSelect.appendChild(opt);
+                        });
+                        // if select2 is used, re-init
+                        if (window.jQuery && jQuery().select2) {
+                            $(unitSelect).trigger('change.select2');
+                        }
+                    }
+                    // if exactly one unit, auto-select and set price
+                    if (unitPrices.length === 1 && unitSelect) {
+                        unitSelect.value = unitPrices[0].unit_id;
+                        if (priceInput) priceInput.value = unitPrices[0].price;
+                    } else if (priceInput) {
+                        // If multiple units, try to set price from first option's data-price if present
+                        priceInput.value = unitPrices.length ? unitPrices[0].price : '';
+                    }
+                    // recalc totals
+                    updateTotalAmount();
+                }
+
+                // If unit select changed, set price from selected option data-price
+                if (target.tagName.toLowerCase() === 'select' && /-unit$/.test(target.name)) {
+                    var row = findRow(target);
+                    var priceInput = row.querySelector('input[name$="-sale_price"]');
+                    var selOpt = target.options[target.selectedIndex];
+                    if (selOpt && selOpt.dataset && selOpt.dataset.price) {
+                        if (priceInput) priceInput.value = selOpt.dataset.price;
+                    }
+                    updateTotalAmount();
+                }
+            });
+        })();
+
     </script>
     {% endif %}
 

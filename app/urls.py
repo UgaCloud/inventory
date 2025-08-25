@@ -161,6 +161,7 @@ urlpatterns = [
     # Product Unit Prices bulk upload and template
     path('products/unit-prices/bulk-add/', bulk_add_product_unit_prices_view, name='bulk_add_product_unit_prices'),
     path('products/unit-prices/bulk-template/', download_product_unit_price_template_view, name='download_product_unit_price_template'),
+    path('products/<int:product_id>/unit-prices/', product_unit_prices_api, name='product_unit_prices_api'),
 ]
 
 if settings.DEBUG:

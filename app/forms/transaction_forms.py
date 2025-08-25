@@ -4,7 +4,8 @@ from app.models.transactions import (
     PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement,
     TransferRequest, StockTransferItem, TransferRequestItem, StockAdjustment, StockAdjustmentItem
 )
-from app.models.products import Product
+from app.models.products import Product, ProductUnitPrice
+from decimal import Decimal
 
 class PurchaseOrderForm(forms.ModelForm):
     class Meta:
@@ -100,10 +101,34 @@ class SalesItemForm(ModelForm):
         cleaned_data = super().clean()
         quantity = cleaned_data.get('quantity')
         sale_price = cleaned_data.get('sale_price')
+        product = cleaned_data.get('product')
+        unit = cleaned_data.get('unit')
         if quantity is not None and quantity <= 0:
             raise forms.ValidationError("Quantity must be greater than zero.")
         if sale_price is not None and sale_price < 0:
             raise forms.ValidationError("Sale price cannot be negative.")
+
+        # Enforce floor price based on ProductUnitPrice (if configured)
+        try:
+            if product:
+                up = None
+                if unit:
+                    up = ProductUnitPrice.objects.filter(product=product, unit=unit).first()
+                if not up:
+                    # fallback to product's first configured unit price
+                    up = product.unit_prices.order_by('id').first()
+                if up and sale_price is not None:
+                    min_price = Decimal(up.price)
+                    # sale_price may already be Decimal, but ensure Decimal for safe compare
+                    sp = Decimal(str(sale_price))
+                    if sp < min_price:
+                        raise forms.ValidationError(
+                            f"Sale price ({sp}) cannot be below configured unit price ({min_price}) for {product.name}."
+                        )
+        except Exception:
+            # Don't fail validation on unexpected lookup errors; let other validations surface
+            pass
+
         return cleaned_data
 
 class TransferRequestForm(forms.ModelForm):
