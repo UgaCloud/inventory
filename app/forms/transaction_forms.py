@@ -69,7 +69,19 @@ class SalesForm(forms.ModelForm):
                 'class': 'select2',
                 'style': 'width:100%'
             }),
+            'receipt_no': forms.HiddenInput(attrs={
+                'placeholder': 'Leave blank for auto-generation',
+                'class': 'form-control'
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make receipt_no field optional since it can be auto-generated
+        self.fields['receipt_no'].required = False
+        self.fields['receipt_no'].help_text = 'Leave blank to auto-generate based on store and year'
+        # Make payment method field required
+        self.fields['payment_method'].required = True
 
     def clean(self):
         cleaned_data = super().clean()
@@ -109,25 +121,32 @@ class SalesItemForm(ModelForm):
             raise forms.ValidationError("Sale price cannot be negative.")
 
         # Enforce floor price based on ProductUnitPrice (if configured)
-        try:
-            if product:
+        if product and sale_price is not None:
+            try:
                 up = None
                 if unit:
                     up = ProductUnitPrice.objects.filter(product=product, unit=unit).first()
                 if not up:
                     # fallback to product's first configured unit price
                     up = product.unit_prices.order_by('id').first()
-                if up and sale_price is not None:
-                    min_price = Decimal(up.price)
+                
+                if up and hasattr(up, 'price'):
+                    min_price = Decimal(str(up.price))
                     # sale_price may already be Decimal, but ensure Decimal for safe compare
                     sp = Decimal(str(sale_price))
                     if sp < min_price:
                         raise forms.ValidationError(
                             f"Sale price ({sp}) cannot be below configured unit price ({min_price}) for {product.name}."
                         )
-        except Exception:
-            # Don't fail validation on unexpected lookup errors; let other validations surface
-            pass
+            except forms.ValidationError:
+                # Re-raise validation errors
+                raise
+            except Exception as e:
+                # Log unexpected errors but don't fail validation entirely
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error during price validation: {e}")
+                pass
 
         return cleaned_data
 
