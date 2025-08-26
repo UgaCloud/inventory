@@ -5,8 +5,29 @@ def organization_setting(request):
     settings = OrganizationSetting.load()
     return {
         'organization': settings,
+        'is_admin': is_admin(request.user),
+        'is_manager': is_manager(request.user),
+        'is_accountant': is_accountant(request.user),
+        'is_sales': is_sales(request.user),
     }
 
+def is_superuser(user):
+    return user.is_authenticated and user.is_superuser
+
+def is_admin(user):
+    return user.is_authenticated and user.groups.filter(name='Admin').exists()
+
+def is_manager(user):
+    return user.is_authenticated and user.groups.filter(name='Manager').exists()
+
+def is_accountant(user):
+    return user.is_authenticated and user.groups.filter(name='Accountant').exists()
+
+def is_sales(user):
+    return user.is_authenticated and user.groups.filter(name='Sales').exists()
+
+def is_stores(user):
+    return user.is_authenticated and user.groups.filter(name='Stores').exists()
 
 # New context processor: builds a menu structure and filters it per user roles/permissions
 def app_menu(request):
@@ -31,8 +52,8 @@ def app_menu(request):
             'label': 'Inventory',
             'icon': 'ti ti-brand-unity fs-16 me-2',
             'children': [
-                {'label': 'Branches', 'url_name': 'manage_branch_page', 'perm': 'app.view_branch'},
-                {'label': 'Stores', 'url_name': 'store_page', 'perm': 'app.view_store'},
+                {'label': 'Branches', 'url_name': 'manage_branch_page', 'perm': 'app.view_branch', 'groups': ['Admin']},
+                {'label': 'Stores', 'url_name': 'store_page', 'perm': 'app.view_store', 'groups': ['Admin', 'Manager']},
                 {'label': 'Category', 'url_name': 'add_category_page', 'perm': 'app.view_category'},
                 {'label': 'Units', 'url_name': 'unit_of_measure_page', 'perm': 'app.view_unit'},
                 {'label': 'Products', 'url_name': 'products_page', 'perm': 'app.view_product'},
@@ -54,16 +75,16 @@ def app_menu(request):
             'label': 'Sales',
             'icon': 'ti ti-layout-grid fs-16 me-2',
             'children': [
-                {'label': 'Record Sale', 'url_name': 'record_sale', 'perm': 'sales.add_sale'},
-                {'label': 'Sales List', 'url_name': 'sales_list', 'perm': 'sales.view_sale'},
+                {'label': 'Record Sale', 'url_name': 'record_sale', 'perm': 'sales.add_sale', 'groups': ['Admin', 'Sales', 'Manager']},
+                {'label': 'Sales List', 'url_name': 'sales_list', 'perm': 'app.view_sale', 'groups': ['Admin', 'Sales', 'Manager']},
                 {'label': 'Sales Return', 'url_name': 'under_maintenance_page'},
                 {'label': 'Quotation', 'url_name': 'under_maintenance_page'},
                 {
                     'label': 'Customer',
                     'children': [
-                        {'label': 'Manage Customers', 'url_name': 'customer_list', 'perm': 'app.view_customer'},
+                        {'label': 'Manage Customers', 'url_name': 'customer_list', 'perm': 'app.view_customer', 'groups': ['Admin', 'Manager']},
                         {'label': 'Payments', 'url_name': None},
-                        {'label': 'Customer Ledgers', 'url_name': 'customer_ledger_list', 'perm': 'app.view_customerledger'},
+                        {'label': 'Customer Ledgers', 'url_name': 'customer_ledger_list', 'perm': 'app.view_customerledger', 'groups': ['Admin', 'Manager']},
                     ],
                 },
             ],
@@ -75,8 +96,8 @@ def app_menu(request):
                 {
                     'label': 'Expenses',
                     'children': [
-                        {'label': 'Expenses', 'url_name': 'expense_list', 'perm': 'app.view_expense'},
-                        {'label': 'Expense Category', 'url_name': 'expensecategory_list', 'perm': 'app.view_expensecategory'},
+                        {'label': 'Expenses', 'url_name': 'expense_list', 'perm': 'app.view_expense', 'groups': ['Admin', 'Manager', 'Accountant']},
+                        {'label': 'Expense Category', 'url_name': 'expensecategory_list', 'perm': 'app.view_expensecategory', 'groups': ['Admin', 'Manager', 'Accountant']},
                     ],
                 },
                 {'label': 'Bank Accounts', 'url_name': 'bankaccount_list', 'perm': 'app.view_bankaccount'},

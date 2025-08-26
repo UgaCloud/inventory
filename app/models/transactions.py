@@ -1,5 +1,6 @@
 from django.db import models
 from datetime import date, timedelta
+import re
 
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 
@@ -83,7 +84,7 @@ class InventoryBatch(models.Model):
 
 
 class Sales(models.Model):
-    receipt_no = models.CharField(max_length=50, unique=True)
+    receipt_no = models.CharField(max_length=50, unique=True, blank=True)  # Allow blank for auto-generation
     customer = models.ForeignKey("app.Customer", on_delete=models.SET_NULL, null=True, blank=True)
     sale_date = models.DateField(auto_now_add=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
@@ -96,6 +97,34 @@ class Sales(models.Model):
     note = models.TextField(blank=True, null=True)  
     payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT, null=True, blank=True)
     total_amount = models.DecimalField(max_digits=16, decimal_places=0, default=0)
+
+    def save(self, *args, **kwargs):
+        # Auto-generate receipt number if not provided
+        if not self.receipt_no:
+            # Create prefix based on store and current year
+            current_year = date.today().year
+            if hasattr(self.store, 'code') and self.store.code:
+                store_prefix = self.store.code[:3].upper()
+            else:
+                store_prefix = self.store.name[:3].upper() if self.store.name else 'STR'
+            
+            prefix = f"{store_prefix}{current_year}"
+            
+            # Find the highest existing receipt number for this prefix
+            existing_receipts = Sales.objects.filter(receipt_no__startswith=prefix).values_list('receipt_no', flat=True)
+            max_num = 0
+            for receipt in existing_receipts:
+                # Extract number from receipt format: STR2024-0001
+                match = re.match(rf"{prefix}[-]?(\d+)", receipt)
+                if match:
+                    num = int(match.group(1))
+                    if num > max_num:
+                        max_num = num
+            
+            next_num = max_num + 1
+            self.receipt_no = f"{prefix}-{next_num:04d}"
+        
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"
