@@ -47,7 +47,7 @@
                         <div class="col-lg-5 mx-auto">
                             <div class="login-content user-login">
                                 <div class="login-logo">
-                                    <img src="{% static 'assets/img/logo-1.png' %}" alt="img">
+                                    <img src="{% static '{assets/img/logo-1.png' %}" alt="img">
                                     <a href="index.html" class="login-logo logo-white">
                                         <img src="{% static 'assets/img/logo-white.svg' %}"  alt="Img">
                                     </a>
@@ -56,9 +56,27 @@
                                     {% csrf_token %}
                                     <div class="card">
                                         <div class="card-body p-5">
+                                            <!-- Timeout Message -->
+                                            {% if timeout_message %}
+                                            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                                                <i class="ti ti-clock me-2"></i>
+                                                {{ timeout_message }}
+                                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                            </div>
+                                            {% endif %}
+                                            
+                                            <!-- Form Errors -->
+                                            {% if form.errors %}
+                                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                                <i class="ti ti-alert-circle me-2"></i>
+                                                Please correct the errors below.
+                                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                            </div>
+                                            {% endif %}
+                                            
                                             <div class="login-userheading">
                                                 <h3>Log In</h3>
-                                                <h4>Access the Inventory Systemusing your email and passcode.</h4>
+                                                <h4>Access the Inventory System using your email and passcode.</h4>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Username <span class="text-danger"> *</span></label>
