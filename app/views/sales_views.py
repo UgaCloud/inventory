@@ -28,7 +28,7 @@ def record_sales_view(request):
         if form.is_valid() and formset.is_valid():
             sale_data = form.save(commit=False)
           
-            # A call to a service to handle sale, payment, and ledger
+            # A call to the service to handle sale, payment, and ledger
             sale = record_sale_and_payment(
                 receipt_no=sale_data.receipt_no,
                 store=sale_data.store,

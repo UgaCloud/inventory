@@ -30,7 +30,15 @@
                 <div class="row">
                     <div class="col-md-6">
                         {{ form.receipt_no|as_crispy_field }}
-                        {{ form.customer|as_crispy_field }}
+                        <!-- customer field with Add button -->
+                        <div class="d-flex align-items-start">
+                            <div style="flex:1;">
+                                {{ form.customer|as_crispy_field }}
+                            </div>
+                            <div class="ms-2" style="margin-top:30px;">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="open-add-customer-modal">+ Add Customer</button>
+                            </div>
+                        </div>
                         {{ form.store|as_crispy_field }}
                     </div>
                     <div class="col-md-6">
@@ -126,6 +134,32 @@
         </div>
     </div>
 
+    <!-- Add Customer Modal -->
+    <div class="modal fade" id="addCustomerModal" tabindex="-1" aria-labelledby="addCustomerModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="addCustomerModalLabel">Add Customer</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form id="add-customer-form">
+              <div class="modal-body">
+                  {% csrf_token %}
+                  <div id="add-customer-errors" class="alert alert-danger d-none"></div>
+                  <div class="mb-3">
+                      <label for="new-customer-name" class="form-label">Name</label>
+                      <input type="text" class="form-control" id="new-customer-name" name="name" required />
+                  </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+              </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     <script>
         // Update total amount on input changes
@@ -202,6 +236,20 @@
                     var newRow = emptyFormHtml.replace(/__prefix__/g, formCount);
                     formsetBody.insertAdjacentHTML('beforeend', newRow);
                     totalForms.value = formCount + 1;
+
+                    // Ensure any select elements in the new row get the select2 class and are initialized
+                    var lastRow = formsetBody.querySelector('.formset-row:last-child');
+                    if (lastRow) {
+                        var selects = lastRow.querySelectorAll('select');
+                        selects.forEach(function(s) { s.classList.add('select2'); });
+                        // initialize select2 if available
+                        if (window.jQuery && jQuery().select2) {
+                            $(lastRow).find('select.select2').select2({ width: '100%' });
+                        }
+                    }
+
+                    // Initialize autocomplete on any new inputs
+                    if (typeof setupProductAutocomplete === 'function') setupProductAutocomplete();
                 });
             }
             formsetBody.addEventListener('click', function(e) {
@@ -260,6 +308,177 @@
                 setTimeout(setupProductAutocomplete, 100);
             });
         });
+
+        // --- Add customer modal logic ---
+        (function(){
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            var openBtn = document.getElementById('open-add-customer-modal');
+            var addCustomerModalEl = document.getElementById('addCustomerModal');
+            var addCustomerForm = document.getElementById('add-customer-form');
+            var errorBox = document.getElementById('add-customer-errors');
+
+            if (openBtn && addCustomerModalEl) {
+                openBtn.addEventListener('click', function() {
+                    // show bootstrap modal
+                    if (window.bootstrap && bootstrap.Modal) {
+                        var modal = new bootstrap.Modal(addCustomerModalEl);
+                        modal.show();
+                    } else {
+                        // fallback: show by adding class
+                        addCustomerModalEl.classList.add('show');
+                        addCustomerModalEl.style.display = 'block';
+                    }
+                });
+            }
+
+            if (addCustomerForm) {
+                addCustomerForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    errorBox.classList.add('d-none');
+                    var data = {
+                        name: document.getElementById('new-customer-name').value,
+                    };
+                    var csrftoken = getCookie('csrftoken');
+                    fetch('/customers/create-ajax/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(data)
+                    }).then(function(response){
+                        if (!response.ok) return response.json().then(function(err){ throw err; });
+                        return response.json();
+                    }).then(function(json){
+                        // expecting {id: <pk>, name: <display_name>} on success
+                        if (json && json.id) {
+                            var select = document.getElementById('id_customer');
+                            if (select) {
+                                // create new option and select it
+                                var opt = new Option(json.name, json.id, true, true);
+                                select.add(opt);
+                                // trigger change for select2 if present
+                                if (window.jQuery && jQuery().select2) {
+                                    $(select).trigger('change');
+                                }
+                            }
+                            // hide modal
+                            if (window.bootstrap && bootstrap.Modal) {
+                                var modalInstance = bootstrap.Modal.getInstance(addCustomerModalEl);
+                                if (modalInstance) modalInstance.hide();
+                            } else {
+                                addCustomerModalEl.classList.remove('show');
+                                addCustomerModalEl.style.display = 'none';
+                            }
+                        } else {
+                            errorBox.textContent = json.error || 'Unable to add customer';
+                            errorBox.classList.remove('d-none');
+                        }
+                    }).catch(function(err){
+                        console.error('Add customer error', err);
+                        var message = 'Unable to add customer';
+                        if (err && err.error) message = err.error;
+                        if (err && typeof err === 'object') {
+                            // try to show validation errors
+                            var msgs = [];
+                            for (var k in err) if (err[k]) msgs.push(k + ': ' + err[k]);
+                            if (msgs.length) message = msgs.join('\n');
+                        }
+                        errorBox.textContent = message;
+                        errorBox.classList.remove('d-none');
+                    });
+                });
+            }
+        })();
+
+        // Update unit options and price when product select changes in formset rows
+        (function(){
+            async function fetchUnitPrices(productId) {
+                try {
+                    const resp = await fetch(`/products/${productId}/unit-prices/`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+                    if (!resp.ok) return [];
+                    const json = await resp.json();
+                    return json.results || [];
+                } catch (e) {
+                    console.error('Failed to fetch unit prices', e);
+                    return [];
+                }
+            }
+
+            function findRow(element) {
+                return element.closest('.formset-row');
+            }
+
+            document.getElementById('formset-body').addEventListener('change', async function(e) {
+                var target = e.target;
+                // product selects likely have names like items-0-product or product
+                if (!target) return;
+                if (target.tagName.toLowerCase() === 'select' && /product/.test(target.name)) {
+                    var row = findRow(target);
+                    var unitSelect = row.querySelector('select[name$="-unit"]');
+                    var priceInput = row.querySelector('input[name$="-sale_price"]');
+                    var productId = target.value;
+                    if (!productId) return;
+                    var unitPrices = await fetchUnitPrices(productId);
+                    // clear existing options
+                    if (unitSelect) {
+                        unitSelect.innerHTML = '';
+                        var emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.text = 'Select unit';
+                        unitSelect.appendChild(emptyOpt);
+                        unitPrices.forEach(function(u){
+                            var opt = document.createElement('option');
+                            opt.value = u.unit_id;
+                            opt.text = u.unit_name;
+                            opt.dataset.price = u.price;
+                            opt.dataset.conversion_factor = u.conversion_factor;
+                            unitSelect.appendChild(opt);
+                        });
+                        // if select2 is used, re-init
+                        if (window.jQuery && jQuery().select2) {
+                            $(unitSelect).trigger('change.select2');
+                        }
+                    }
+                    // if exactly one unit, auto-select and set price
+                    if (unitPrices.length === 1 && unitSelect) {
+                        unitSelect.value = unitPrices[0].unit_id;
+                        if (priceInput) priceInput.value = unitPrices[0].price;
+                    } else if (priceInput) {
+                        // If multiple units, try to set price from first option's data-price if present
+                        priceInput.value = unitPrices.length ? unitPrices[0].price : '';
+                    }
+                    // recalc totals
+                    updateTotalAmount();
+                }
+
+                // If unit select changed, set price from selected option data-price
+                if (target.tagName.toLowerCase() === 'select' && /-unit$/.test(target.name)) {
+                    var row = findRow(target);
+                    var priceInput = row.querySelector('input[name$="-sale_price"]');
+                    var selOpt = target.options[target.selectedIndex];
+                    if (selOpt && selOpt.dataset && selOpt.dataset.price) {
+                        if (priceInput) priceInput.value = selOpt.dataset.price;
+                    }
+                    updateTotalAmount();
+                }
+            });
+        })();
 
     </script>
     {% endif %}

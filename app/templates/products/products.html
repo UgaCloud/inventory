@@ -1,6 +1,7 @@
 {% extends 'basic/base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load humanize %}
 
 {% block content %}
     <div class="page-header">
@@ -104,8 +105,8 @@
                             <th>Category</th>
                             <th>Brand</th>
                             <th>Qty</th>
+                            <th>Base Price</th>
                             <th>Status</th>
-                            <th>Created By</th>
                             <th class="no-sort"></th>
                         </tr>
                     </thead>
@@ -132,6 +133,11 @@
                                 <td>{{product.brand}}</td>
                                 <td>{{product.total_stock}}</td>
                                 <td>
+                                    <div class="d-flex align-items-center">
+                                        <a href="javascript:void(0);">{{product.default_price|intcomma}}/-</a>
+                                    </div>
+                                </td>
+                                <td>
                                     {% if product.is_active %}
                                         <span class="badge table-badge bg-success fw-medium fs-10">
                                             Active
@@ -143,15 +149,10 @@
                                     {% endif %}
                                     
                                 </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        {% comment %} <a href="javascript:void(0);" class="avatar avatar-sm me-2">
-                                            <img src="assets/img/users/user-30.jpg" alt="product">
-                                        </a> {% endcomment %}
-                                        <a href="javascript:void(0);">User</a>
-                                    </div>
-                                </td>
-                                <td class="action-table-data">
+                                
+                                <td 
+                                {% if is_admin %}
+                                class="action-table-data">
                                     <div class="edit-delete-action">
                                         <a class="me-2 edit-icon  p-2" href="{% url 'product_details_page' product.id %}">
                                             <i data-feather="eye" class="feather-eye"></i>
@@ -160,6 +161,7 @@
                                             <i data-feather="trash-2" class="feather-trash-2"></i>
                                         </a>
                                     </div>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}

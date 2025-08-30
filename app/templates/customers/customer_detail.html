@@ -21,7 +21,7 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-header"><strong>Contact Information</strong></div>
             <div class="card-body">
@@ -34,15 +34,64 @@
             </div>
         </div>
     </div>
+
+    <!-- Payments -->
+     <div class="col">
+        <div class="card mb-4">
+            <div class="card-header"><strong>Payments</strong></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm  table-bordered mb-0 datatable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                                <th>Reference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% if payments %}
+                            {% for payment in payments %}
+                            <tr>
+                                <td>{{ payment.payment_date|date:'Y-m-d H:i' }}</td>
+                                <td>{{ payment.amount|floatformat:0|intcomma }}</td>
+                                <td>{{ payment.payment_method }}</td>
+                                <td>{{ payment.reference }}</td>
+                            </tr>
+                            {% if payment.allocations.exists %}
+                            {% comment %} <tr>
+                                <td colspan="4" class="p-0 border-0">
+                                    <div class="ps-3 pb-2">
+                                        <small class="text-muted">Allocated to:</small>
+                                        <ul class="mb-0 ps-3">
+                                            {% for alloc in payment.allocations.all %}
+                                            <li>
+                                                Receipt: <a href="{% url 'sales_detail' alloc.sale.id %}">#{{ alloc.sale.receipt_no }}</a> &mdash; {{ alloc.amount|floatformat:0|intcomma }}/-
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr> {% endcomment %}
+                            {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row">
-    <div class="col-md-7">
+    <div class="col">
         <div class="card mb-4">
             <div class="card-header"><strong>Ledger Entries</strong></div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-sm table-bordered mb-0">
+                    <table class="table datatable table-sm table-bordered mb-0">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -65,8 +114,6 @@
                                 <td>{{ entry.note }}</td>
                             </tr>
                             {% endfor %}
-                        {% else %}
-                            <tr><td colspan="6" class="text-center">No ledger entries found.</td></tr>
                         {% endif %}
                         </tbody>
                     </table>
@@ -74,39 +121,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-5">
-        <div class="card mb-4">
-            <div class="card-header"><strong>Payments</strong></div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Amount</th>
-                                <th>Method</th>
-                                <th>Reference</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% if payments %}
-                            {% for payment in payments %}
-                            <tr>
-                                <td>{{ payment.payment_date|date:'Y-m-d H:i' }}</td>
-                                <td>{{ payment.amount|floatformat:0|intcomma }}</td>
-                                <td>{{ payment.payment_method }}</td>
-                                <td>{{ payment.reference }}</td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="4" class="text-center">No payments found.</td></tr>
-                        {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
+    
 </div>
 
 <!-- Edit Customer Modal -->
@@ -143,6 +158,9 @@
         </div>
         <div class="modal-body">
           {{ payment_form|crispy }}
+          <div class="alert alert-info mt-3">
+            <strong>Note:</strong> If this payment covers multiple receipts, it will be automatically allocated to the oldest outstanding balances first.
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

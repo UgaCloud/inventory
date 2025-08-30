@@ -24,6 +24,8 @@ urlpatterns = [
     path('', index_view, name = 'index_page'),
     path('login/', login_view, name = 'login_page'),
     path('sign_up/', sign_up_view, name = 'sign_up_page'),
+    path('extend-session/', extend_session_view, name = 'extend_session'),
+    path('logout/', logout_view, name = 'logout'),
     path('accounts/', manage_accounts_view, name='accounts_page'),
     path('under_maintenance/', under_maintenance_view, name='under_maintenance_page'),
     
@@ -69,6 +71,9 @@ urlpatterns = [
     path('purchase_order/<int:order_id>/items/create/', create_purchase_order_item, name='create_purchase_order_item'),
     path('purchase_order/item/<int:item_id>/edit/', edit_purchase_order_item, name='edit_purchase_order_item'),
     path('purchase_order/item/<int:item_id>/delete/', delete_purchase_order_item, name='delete_purchase_order_item'),
+    # Bulk upload / template for PurchaseOrderItem
+    path('purchase_order/<int:order_id>/items/bulk-upload/', purchase_order_items_bulk_upload, name='purchase_order_items_bulk_upload'),
+    path('purchase_order/items/bulk-template/', download_purchase_order_item_template, name='download_purchase_order_item_template'),
 
     # Transfer Requests
     path('transfer_requests/', transfer_request_list, name='transfer_request_list'),
@@ -76,12 +81,21 @@ urlpatterns = [
     path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
     path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
     path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
+    path('transfer_request_for_approval/', pending_transfer_requests_for_approval, name='transfer_request_for_approval'),
 
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
     path('stock_transfers/<int:pk>/', stock_transfer_detail, name='stock_transfer_detail'),
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
     path('stock_transfers/<int:pk>/update/', stock_transfer_update, name='stock_transfer_update'),
+
+    # Stock Adjustments
+    path('stock_adjustments/', stock_adjustment_list, name='stock_adjustment_list'),
+    path('stock_adjustments/<int:adjustment_id>/', stock_adjustment_detail, name='stock_adjustment_detail'),
+    path('stock_adjustments/create/', create_stock_adjustment, name='create_stock_adjustment'),
+    path('stock_adjustments/<int:adjustment_id>/edit/', edit_stock_adjustment, name='edit_stock_adjustment'),
+    path('stock_adjustments/<int:adjustment_id>/apply/', apply_stock_adjustment, name='apply_stock_adjustment'),
+    path('stock_adjustments/<int:adjustment_id>/delete/', delete_stock_adjustment, name='delete_stock_adjustment'),
 
     # sales
     path('sales/', sales_list_view, name='sales_list'),
@@ -90,6 +104,7 @@ urlpatterns = [
     path('sales/<int:pk>/delete/', sales_delete_view, name='sales_delete_view'),
     path('sales/record_sale/', record_sales_view, name='record_sale'),  
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
+    path('product_autocomplete/', product_autocomplete, name='product_autocomplete'),
 
     #human resource
     path('employee_profile/<int:employee_id>', employee_profile_view, name = 'employee_profile_page'),
@@ -128,6 +143,7 @@ urlpatterns = [
     # Customer URLs
     path('customers/', customer_list_view, name='customer_list'),
     path('customers/add/', customer_create_view, name='customer_create'),
+    path('customers/create-ajax/', create_customer_ajax, name='create_customer_ajax'),
     path('customers/<int:pk>/', customer_detail_view, name='customer_detail'),
     path('customers/<int:pk>/edit/', customer_update_view, name='customer_update'),
     path('customers/<int:pk>/delete/', customer_delete_view, name='customer_delete'),
@@ -144,6 +160,10 @@ urlpatterns = [
     path('products/categories/bulk-template/', download_category_template_view, name='download_category_template'),
     path('products/bulk-add/', bulk_add_products_view, name='bulk_add_products'),
     path('products/bulk-template/', download_product_template_view, name='download_product_template'),
+    # Product Unit Prices bulk upload and template
+    path('products/unit-prices/bulk-add/', bulk_add_product_unit_prices_view, name='bulk_add_product_unit_prices'),
+    path('products/unit-prices/bulk-template/', download_product_unit_price_template_view, name='download_product_unit_price_template'),
+    path('products/<int:product_id>/unit-prices/', product_unit_prices_api, name='product_unit_prices_api'),
 ]
 
 if settings.DEBUG:

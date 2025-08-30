@@ -5,6 +5,10 @@ from app.models.customers import Customer, CustomerLedger, Payment
 from app.forms.customer_forms import CustomerForm
 from app.forms.customer_forms import PaymentForm
 from app.selectors.customer_selectors import *
+from app.services.customer_transactions import allocate_bulk_payment_to_sales
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.http import require_POST
+from app.forms.customer_forms import QuickCustomerForm
 
 @login_required
 def customer_list_view(request):
@@ -36,12 +40,9 @@ def customer_create_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Customer created successfully.')
-            return redirect('customer_list')
         else:
-            messages.error(request, 'Please correct the errors below.')
-    else:
-        form = CustomerForm()
-    return render(request, 'customers/customer_form.html', {'form': form})
+            messages.error(request, f'Please correct the errors below.\n{form.errors}')
+    return redirect(customer_list_view)
 
 @login_required
 def customer_update_view(request, pk):
@@ -97,12 +98,39 @@ def record_customer_payment_view(request, pk):
     if request.method == 'POST':
         form = PaymentForm(request.POST)
         if form.is_valid():
-            payment = form.save(commit=False)
-            payment.customer = customer
-            payment.save()
-            messages.success(request, 'Payment recorded successfully.')
+            payment_amount = form.cleaned_data['amount']
+            payment_method = form.cleaned_data['payment_method']
+            reference = form.cleaned_data.get('reference', '')
+            note = form.cleaned_data.get('note', '')
+
+            allocate_bulk_payment_to_sales(
+                customer=customer,
+                payment_amount=payment_amount,
+                payment_method=payment_method,
+                reference=reference,
+                note=note,
+            )
+            messages.success(request, 'Payment recorded and allocated to outstanding receipts.')
         else:
             messages.error(request, 'Please correct the errors below.')
-        
         return redirect('customer_detail', pk=customer.pk)
-    
+
+@login_required
+@require_POST
+def create_customer_ajax(request):
+    # Expect JSON body
+    try:
+        data = request.body.decode('utf-8')
+        import json
+        payload = json.loads(data) if data else {}
+    except Exception:
+        return HttpResponseBadRequest('Invalid JSON')
+
+    form = QuickCustomerForm(payload)
+    if form.is_valid():
+        customer = form.save()
+        return JsonResponse({'id': customer.pk, 'name': str(customer)})
+    else:
+        # return form errors
+        return JsonResponse(form.errors, status=400)
+

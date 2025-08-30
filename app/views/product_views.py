@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 import csv
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 from app.forms.product_forms import *
 from app.selectors.product_selectors import *
@@ -33,28 +33,28 @@ def add_product_view(request):
 
        if form.is_valid():
            form.save()
-           messages.success(request, 'Product added successfully.')
-       else:
-           messages.error(request, 'There was an error adding the product.')
+       
        return redirect(manage_product_view)
        
+    
 
-@login_required
 def edit_product_view(request, product_id):
+
     product = get_product_by_id(product_id)
+
     if request.method == "POST":
         edit_form = ProductForm(request.POST, instance = product)
+        
         if edit_form.is_valid():
             edit_form.save()
-            messages.success(request, 'Product updated successfully.')
-        else:
-            messages.error(request, 'There was an error updating the product.')
+
         return redirect(product_details_view, product.id)
 
 @login_required
 def add_category_view(request):
     if request.method == "POST":
         form = CategoryForm(request.POST)
+
         if form.is_valid():
             form.save()
             messages.success(request, 'Category added successfully.')
@@ -64,10 +64,12 @@ def add_category_view(request):
     else:
         form = CategoryForm()
         categories = get_all_categories()
+
     context = {
         'form':form,
         'categories': categories
     }
+
     return render(request, 'products/add_category.html', context)
 
 @login_required
@@ -95,8 +97,10 @@ def delete_category_view(request, category_id):
 
 @login_required
 def unit_of_measure_view(request):
+
     if request.method == 'POST':
         form = UnitOfMeasureForm(request.POST)
+
         if form.is_valid():
             form.save()
             messages.success(request, 'Unit of measure added successfully.')
@@ -104,11 +108,14 @@ def unit_of_measure_view(request):
             messages.error(request, 'There was an error adding the unit of measure.')
     else:
         form = UnitOfMeasureForm()
+
     units_of_measurement = get_all_units_of_measurement()
+    
     context = {
         'form':form,
         'units_of_measurement':units_of_measurement
     }
+    
     return render(request, 'products/unit_of_measure.html', context)
 
 @login_required
@@ -160,6 +167,7 @@ def add_product_unit_price_view(request):
             return redirect(product_details_view, request.POST.get('product'))
         else:
             messages.error(request, form.errors)
+            
             return redirect(product_details_view, request.POST.get('product'))
     else:
         pass
@@ -168,11 +176,10 @@ def add_product_unit_price_view(request):
 def add_inventory_view(request):
     if request.method == 'POST':
         form = InventoryForm(request.POST)
+
         if form.is_valid():
             form.save()
-            messages.success(request, 'Inventory added successfully.')
-        else:
-            messages.error(request, 'There was an error adding the inventory.')
+  
     return redirect(product_details_view, request.POST.get('product'))
 
 @login_required
@@ -180,6 +187,7 @@ def store_view(request):
     
     if request.method == "POST":
         form = StoreLocationForm(request.POST)
+
         if form.is_valid():
             form.save()
             messages.success(request, 'Store location added successfully.')
@@ -187,9 +195,11 @@ def store_view(request):
             messages.error(request, 'There was an error adding the store location.')
     form = StoreLocationForm()
     stores = StoreLocation.objects.all()
+
     context = {
         'store_form':form,
         'stores': stores
+        
     }
     return render(request, 'products/store.html', context)
 
@@ -298,3 +308,116 @@ def download_product_template_view(request):
     writer.writerow(['name', 'brand', 'description', 'category', 'is_active'])
     writer.writerow(['Example Product', 'BrandX', 'Description here', 'CategoryName', 'True'])
     return response
+
+def product_autocomplete(request):
+    q = request.GET.get('q', '')
+    products = Product.objects.filter(name__icontains=q)[:20]
+    results = [
+        {'id': p.pk, 'text': p.name} for p in products
+    ]
+    return JsonResponse({'results': results})
+
+@login_required
+def bulk_add_product_unit_prices_view(request):
+    """
+    Bulk upload product unit prices via CSV.
+    Expected CSV columns (case-insensitive):
+      - product_sku OR product (sku or exact product name)
+      - unit (unit of measure name)
+      - conversion_factor (optional, defaults to 1.0)
+      - price (required)
+
+    Creates ProductUnitPrice records when product and unit are found. Skips rows with missing/invalid data.
+    """
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        decoded_file = csv_file.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded_file)
+        created, errors = 0, []
+        for row in reader:
+            # helper to fetch case-insensitive keys
+            def get_row_val(keys):
+                for k in keys:
+                    val = row.get(k)
+                    if val is not None:
+                        return val.strip()
+                return None
+
+            product_key = get_row_val(['product_sku', 'sku', 'product'])
+            unit_name = get_row_val(['unit', 'unit_name'])
+            conv_raw = get_row_val(['conversion_factor', 'conversion'])
+            price_raw = get_row_val(['price', 'unit_price'])
+
+            # Resolve product
+            product = None
+            if product_key:
+                product = Product.objects.filter(sku__iexact=product_key).first()
+                if not product:
+                    product = Product.objects.filter(name__iexact=product_key).first()
+
+            # Resolve unit
+            unit = None
+            if unit_name:
+                unit = UnitOfMeasure.objects.filter(name__iexact=unit_name).first()
+
+            # Parse numeric values
+            try:
+                conversion_factor = float(conv_raw) if conv_raw not in (None, '') else 1.0
+            except Exception:
+                conversion_factor = 1.0
+
+            try:
+                price = int(float(price_raw)) if price_raw not in (None, '') else None
+            except Exception:
+                price = None
+
+            if not product or not unit or price is None:
+                errors.append({'row': row, 'reason': 'missing product/unit/price'})
+                continue
+
+            # Create or update ProductUnitPrice
+            try:
+                pup, created_flag = ProductUnitPrice.objects.update_or_create(
+                    product=product,
+                    unit=unit,
+                    defaults={'conversion_factor': conversion_factor, 'price': price}
+                )
+                if created_flag:
+                    created += 1
+            except Exception as e:
+                errors.append({'row': row, 'reason': str(e)})
+                continue
+
+        if errors:
+            messages.warning(request, f"Some rows were skipped: {len(errors)}. See server logs for details.")
+        messages.success(request, f"Bulk upload finished — created/updated: {created}.")
+        return redirect(manage_product_view)
+
+
+@login_required
+def download_product_unit_price_template_view(request):
+    """Provide a CSV template for product unit prices bulk upload."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="product_unit_price_template.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['product_sku', 'unit', 'conversion_factor', 'price'])
+    writer.writerow(['PRD-0001', 'Kilogram', '1.0', '3500'])
+    return response
+
+@login_required
+def product_unit_prices_api(request, product_id):
+    """Return JSON list of unit prices for a product.
+    Response format: { results: [{unit_id, unit_name, price, conversion_factor}, ...] }
+    """
+    from django.shortcuts import get_object_or_404
+    prod = get_object_or_404(Product, pk=product_id)
+    unit_prices = prod.unit_prices.select_related('unit').all()
+    results = []
+    for up in unit_prices:
+        results.append({
+            'unit_id': up.unit.id,
+            'unit_name': str(up.unit),
+            'price': float(up.price),
+            'conversion_factor': float(up.conversion_factor),
+        })
+    return JsonResponse({'results': results})

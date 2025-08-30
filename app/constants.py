@@ -32,6 +32,7 @@ PURCHASE_ORDER_OPTIONS = [
 
 SALE_ORDER_OPTIONS = [
         ('PENDING', 'Pending'), 
+        ('PARTIALLY_PAID', 'Partially Paid'),
         ('FULFILLED', 'Fulfilled')
     ]
 

@@ -1,5 +1,6 @@
 from django.db import models
 from datetime import date, timedelta
+import re
 
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 
@@ -11,8 +12,8 @@ class PurchaseOrder(models.Model):
     expected_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=PURCHASE_ORDER_OPTIONS)
     recorded_by = models.CharField(max_length=50)
-    note = models.TextField(blank=True, null=True)  # Add note field
-    total_cost = models.DecimalField(max_digits=16, decimal_places=2, default=0)  # New field
+    note = models.TextField(blank=True, null=True)  
+    total_cost = models.DecimalField(max_digits=16, decimal_places=2, default=0)  
 
     def __str__(self):
         return f"PO-{self.id} ({self.supplier.name})"
@@ -83,7 +84,7 @@ class InventoryBatch(models.Model):
 
 
 class Sales(models.Model):
-    receipt_no = models.CharField(max_length=50, unique=True)
+    receipt_no = models.CharField(max_length=50, unique=True, blank=True)  # Allow blank for auto-generation
     customer = models.ForeignKey("app.Customer", on_delete=models.SET_NULL, null=True, blank=True)
     sale_date = models.DateField(auto_now_add=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
@@ -96,6 +97,34 @@ class Sales(models.Model):
     note = models.TextField(blank=True, null=True)  
     payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT, null=True, blank=True)
     total_amount = models.DecimalField(max_digits=16, decimal_places=0, default=0)
+
+    def save(self, *args, **kwargs):
+        # Auto-generate receipt number if not provided
+        if not self.receipt_no:
+            # Create prefix based on store and current year
+            current_year = date.today().year
+            if hasattr(self.store, 'code') and self.store.code:
+                store_prefix = self.store.code[:3].upper()
+            else:
+                store_prefix = self.store.name[:3].upper() if self.store.name else 'STR'
+            
+            prefix = f"{store_prefix}{current_year}"
+            
+            # Find the highest existing receipt number for this prefix
+            existing_receipts = Sales.objects.filter(receipt_no__startswith=prefix).values_list('receipt_no', flat=True)
+            max_num = 0
+            for receipt in existing_receipts:
+                # Extract number from receipt format: STR2024-0001
+                match = re.match(rf"{prefix}[-]?(\d+)", receipt)
+                if match:
+                    num = int(match.group(1))
+                    if num > max_num:
+                        max_num = num
+            
+            next_num = max_num + 1
+            self.receipt_no = f"{prefix}-{next_num:04d}"
+        
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"
@@ -189,6 +218,7 @@ class StockTransferItem(models.Model):
     stock_transfer = models.ForeignKey(StockTransfer, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
+    units = models.ForeignKey("app.ProductUnitPrice", on_delete=models.SET_NULL, null=True, blank=True)
     transfer_request_item = models.ForeignKey(
         "app.TransferRequestItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="fulfilled_transfer_items"
     )
@@ -233,6 +263,135 @@ class StockTransferItem(models.Model):
         )
 
 
+class StockAdjustment(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('applied', 'Applied'),
+        ('cancelled', 'Cancelled'),
+    ]
+    store = models.ForeignKey('app.StoreLocation', on_delete=models.CASCADE, related_name='stock_adjustments')
+    reference = models.CharField(max_length=100, blank=True, null=True)
+    created_by = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    approved_by = models.CharField(max_length=100, blank=True, null=True)
+    approved_at = models.DateTimeField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Stock Adjustment'
+        verbose_name_plural = 'Stock Adjustments'
+
+    def __str__(self):
+        return f"Adjustment {self.id} @ {self.store.name} ({self.status})"
+
+    @property
+    def total_items(self):
+        return self.items.count()
+
+    @property
+    def total_quantity_changed(self):
+        return sum(item.quantity_change for item in self.items.all())
+
+    def apply(self, applied_by=None):
+        """
+        Apply the stock adjustment: update Inventory.quantity_in_stock and create StockMovement records.
+        Marks adjustment as 'applied' when complete. Uses a database transaction and locks inventory rows.
+        """
+        from django.db import transaction
+        from app.models.products import Inventory
+        from app.models.products import Product, UnitOfMeasure
+        # import StockMovement here to avoid circular import at module load
+        from app.models.transactions import StockMovement
+
+        if self.status == 'applied':
+            return False
+
+        with transaction.atomic():
+            for item in self.items.select_for_update():
+                item.apply_to_inventory()
+
+            self.status = 'applied'
+            if applied_by:
+                self.approved_by = applied_by
+            from django.utils import timezone
+            self.approved_at = timezone.now()
+            self.save(update_fields=['status', 'approved_by', 'approved_at'])
+        return True
+
+
+class StockAdjustmentItem(models.Model):
+    adjustment = models.ForeignKey(StockAdjustment, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
+    unit = models.ForeignKey('app.UnitOfMeasure', on_delete=models.SET_NULL, null=True, blank=True)
+    # positive -> add stock, negative -> reduce stock
+    quantity_change = models.IntegerField()
+    reason = models.CharField(max_length=255, blank=True, null=True)
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Stock Adjustment Item'
+        verbose_name_plural = 'Stock Adjustment Items'
+        unique_together = ('adjustment', 'product', 'unit')
+
+    def __str__(self):
+        return f"{self.product.name} {self.quantity_change} ({self.unit})"
+
+    def apply_to_inventory(self):
+        """
+        Apply this item to the inventory for the adjustment's store.
+        Creates a StockMovement record for auditing.
+        """
+        from django.db import transaction
+        from app.models.products import Inventory
+        from django.utils import timezone
+
+        store = self.adjustment.store
+
+        with transaction.atomic():
+            # Get or create inventory row for product+store
+            inv, created = Inventory.objects.select_for_update().get_or_create(
+                product=self.product,
+                store=store,
+                defaults={'quantity_in_stock': 0}
+            )
+
+            # Apply change
+            inv.quantity_in_stock = inv.quantity_in_stock + int(self.quantity_change)
+            # Prevent negative stock unless business allows it
+            if inv.quantity_in_stock < 0:
+                inv.quantity_in_stock = 0
+            inv.save(update_fields=['quantity_in_stock'])
+
+            # Record stock movement for audit
+            StockMovement.objects.create(
+                product=self.product,
+                store=store,
+                transaction_type='ADJUSTMENT',
+                quantity=self.quantity_change,
+                transaction_id=self.adjustment.id,
+                note=self.reason or f'Adjustment {self.adjustment.id}',
+                units_in_stock=inv.quantity_in_stock,
+                user=self.adjustment.created_by
+            )
+            # Optionally, if positive change and unit_cost provided, create a batch (preserve simple behaviour)
+            if self.quantity_change > 0 and self.unit_cost:
+                from app.models.transactions import InventoryBatch
+                InventoryBatch.objects.create(
+                    product=self.product,
+                    store=store,
+                    quantity=self.quantity_change,
+                    unit_cost=self.unit_cost,
+                    remaining_quantity=self.quantity_change,
+                    expiry_date=None,
+                    purchase_order_item=None
+                )
+
+
 class StockMovement(models.Model):
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="stock_movements")
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
@@ -247,5 +406,5 @@ class StockMovement(models.Model):
     def __str__(self):
         return f"{self.product.name} | {self.store.name} | {self.transaction_type} | {self.quantity} | {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
-from app.signals import transaction_signals
+
 

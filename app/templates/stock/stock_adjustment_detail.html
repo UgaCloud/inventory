@@ -1,0 +1,60 @@
+{% extends 'basic/base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="page-header d-flex justify-content-between">
+    <div>
+        <h4>Stock Adjustment {{ adjustment.id }}</h4>
+        <p class="text-muted">{{ adjustment.reference }} — {{ adjustment.get_status_display }}</p>
+    </div>
+    <div>
+        <a href="{% url 'edit_stock_adjustment' adjustment.id %}" class="btn btn-outline-secondary">Edit</a>
+        {% if adjustment.status != 'applied' %}
+            <form method="post" action="{% url 'apply_stock_adjustment' adjustment.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">Apply</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">Store</dt><dd class="col-sm-9">{{ adjustment.store }}</dd>
+            <dt class="col-sm-3">Reference</dt><dd class="col-sm-9">{{ adjustment.reference }}</dd>
+            <dt class="col-sm-3">Created by</dt><dd class="col-sm-9">{{ adjustment.created_by }}</dd>
+            <dt class="col-sm-3">Status</dt><dd class="col-sm-9">{{ adjustment.get_status_display }}</dd>
+            <dt class="col-sm-3">Note</dt><dd class="col-sm-9">{{ adjustment.note }}</dd>
+        </dl>
+
+        <h5>Items</h5>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Product</th>
+                        <th>Unit</th>
+                        <th>Qty Change</th>
+                        <th>Reason</th>
+                        <th>Unit Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in adjustment.items.all %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ item.product }}</td>
+                        <td>{{ item.unit }}</td>
+                        <td>{{ item.quantity_change }}</td>
+                        <td>{{ item.reason }}</td>
+                        <td>{{ item.unit_cost }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

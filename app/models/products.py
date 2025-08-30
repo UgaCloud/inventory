@@ -46,7 +46,7 @@ class Product(models.Model):
     @property
     def default_price(self):
         unit = self.unit_prices.order_by('id').first()
-        return unit.price if unit else None
+        return unit.price if unit else 0
 
     @property
     def total_sales_quantity(self): # All sales across orders
