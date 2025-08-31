@@ -92,6 +92,7 @@ class StoreLocation(models.Model):
     name = models.CharField(max_length=100)
     address = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name} ({self.branch.name if self.branch else 'No Branch'})"
