@@ -28,12 +28,12 @@ def index_view(request):
     total_suppliers = get_number_of_suppliers()
     total_customers = get_number_of_customers()
     total_sale_orders = get_number_of_sales()
+    total_payments_received = get_total_payments_received()
+    total_outstanding_balances = get_total_outstanding_balances()
 
     low_stock_products = get_low_stock_products()
     top_selling_products = get_top_selling_products()
     recent_sales = get_recent_sales(limit=5)
-
-    print("Recent Sales:", recent_sales)
 
     context = {
         'products': products,
@@ -49,6 +49,8 @@ def index_view(request):
         'low_stock_products': low_stock_products,
         'top_selling_products': top_selling_products,
         'recent_sales': recent_sales,
+        'total_payments_received': total_payments_received,
+        'total_outstanding_balances': total_outstanding_balances,
     }
     return render(request, 'basic/index.html', context)
 

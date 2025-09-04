@@ -581,6 +581,9 @@
       <div class="sidebar sidebar-horizontal" id="horizontal-menu">
         <div id="sidebar-menu-3" class="sidebar-menu">
           <div class="main-menu">
+            {% if is_superuser %}
+              {% include "basic/admin_menu.html" %}
+            {% endif %}
             {% if is_admin %}
               {% include "basic/admin_menu.html" %}
             {% endif %}

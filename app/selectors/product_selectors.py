@@ -29,8 +29,24 @@ def get_stores():
     return StoreLocation.objects.filter(is_active=True)
 
 
-def get_low_stock_products():
+def get_low_stock_products(limit=10):
+    """
+    Get products with low stock (quantity <= reorder level).
     
-    return Inventory.objects.filter(quantity_in_stock__lte=models.F('reorder_level')).select_related('product', 'store')
+    Args:
+        limit (int): Maximum number of products to return. Default is 10.
+                    Set to None for no limit.
+    
+    Returns:
+        QuerySet: Inventory objects with low stock
+    """
+    queryset = Inventory.objects.filter(
+        quantity_in_stock__lte=models.F('reorder_level')
+    ).select_related('product', 'store').order_by('quantity_in_stock')
+    
+    if limit is not None:
+        queryset = queryset[:limit]
+    
+    return queryset
 
 
