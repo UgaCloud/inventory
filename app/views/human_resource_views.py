@@ -12,10 +12,12 @@ def employee_profile_view(request, employee_id=None): # Two URLs point to this v
          
         context = {
             'employee':employee
-         }
+        }
     else:
-        context = None
-
+        context = {
+            'employee':request.user 
+        }
+        #this works incase the user is the one trying to access the page as a user that want to view thier profile
     return render(request, 'human_resource/employee-profile.html', context)
 
 @login_required
@@ -54,12 +56,15 @@ def edit_employee_view(request, employee_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Employee successfully edited')
+            return redirect(employee_grid_view)
         else:
             messages.error(request, 'An error occured, unable to update the employee')
     else:
         form = EmployeeForm(instance=employee)
 
-    return render(request, 'human_resource/employee_grid.html')
+    context = {'form':form}
+
+    return render(request, 'human_resource/employee_grid.html', context)
 
 @login_required
 def department_grid_view(request):
