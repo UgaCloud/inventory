@@ -130,3 +130,12 @@ def get_top_selling_products():
         .annotate(total_sold=Sum('quantity'))
         .order_by('-total_sold')[:5]
     )
+
+def get_total_payments_received():
+    today = date.today()
+    result = Sales.objects.filter(sale_date=today).aggregate(total=Sum('amount_received'))
+    return result['total'] or 0
+
+def get_total_outstanding_balances():
+    result = Sales.objects.aggregate(total=Sum('balance'))
+    return result['total'] or 0

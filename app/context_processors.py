@@ -9,6 +9,9 @@ def organization_setting(request):
         'is_manager': is_manager(request.user),
         'is_accountant': is_accountant(request.user),
         'is_sales': is_sales(request.user),
+        'is_stores': is_stores(request.user),
+        'branches': Branch.objects.all(),
+        'currencies': Currency.objects.all(),
     }
 
 def is_superuser(user):
