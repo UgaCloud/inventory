@@ -1,10 +1,12 @@
 from django import forms
 from django.forms import ModelForm, inlineformset_factory
+import app
 from app.models.transactions import (
     PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement,
     TransferRequest, StockTransferItem, TransferRequestItem, StockAdjustment, StockAdjustmentItem
 )
-from app.models.products import Product, ProductUnitPrice
+from app.models.finance import PaymentMethod
+from app.models.products import Product, ProductUnitPrice, StoreLocation
 from decimal import Decimal
 
 class PurchaseOrderForm(forms.ModelForm):
@@ -82,6 +84,34 @@ class SalesForm(forms.ModelForm):
         self.fields['receipt_no'].help_text = 'Leave blank to auto-generate based on store and year'
         # Make payment method field required
         self.fields['payment_method'].required = True
+        
+        # Filter stores to show only the default store
+        try:
+            default_store = StoreLocation.objects.filter(is_default=True).first()
+            if default_store:
+                self.fields['store'].queryset = StoreLocation.objects.filter(id=default_store.id)
+                # Optionally set the default store as the initial value
+                self.fields['store'].initial = default_store
+            else:
+                # If no default store exists, show all stores as fallback
+                self.fields['store'].queryset = StoreLocation.objects.all()
+        except Exception:
+            # Fallback to all stores if there's an error
+            self.fields['store'].queryset = StoreLocation.objects.all()
+        
+        # Pre-select the default payment method
+        try:
+            default_payment_method = PaymentMethod.objects.filter(is_default=True).first()
+            if default_payment_method:
+                self.fields['payment_method'].initial = default_payment_method
+            else:
+                # If no default payment method exists, try to set 'Cash' as default
+                cash_method = PaymentMethod.objects.filter(name__icontains='cash').first()
+                if cash_method:
+                    self.fields['payment_method'].initial = cash_method
+        except Exception:
+            # If PaymentMethod model doesn't exist or there's an error, skip
+            pass
 
     def clean(self):
         cleaned_data = super().clean()
