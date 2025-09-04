@@ -164,6 +164,15 @@ urlpatterns = [
     path('products/unit-prices/bulk-add/', bulk_add_product_unit_prices_view, name='bulk_add_product_unit_prices'),
     path('products/unit-prices/bulk-template/', download_product_unit_price_template_view, name='download_product_unit_price_template'),
     path('products/<int:product_id>/unit-prices/', product_unit_prices_api, name='product_unit_prices_api'),
+
+    # Store Inventory URLs - Complete Section
+    path('stores/<int:store_id>/inventory/', store_inventory_view, name='store_inventory'),
+    path('stores/<int:store_id>/inventory/export/', store_inventory_export_view, name='store_inventory_export'),
+    path('stores/<int:store_id>/low-stock-api/', store_low_stock_api, name='store_low_stock_api'),
+    path('stores/inventory/overview/', all_stores_inventory_view, name='all_stores_inventory'),
+    path('stores/<int:store_id>/products/<int:product_id>/detail/', product_inventory_detail_view, name='product_inventory_detail'),
+    path('stores/<int:store_id>/aging-report/', store_inventory_aging_report_view, name='store_inventory_aging'),
+    path('stores/<int:store_id>/products/<int:product_id>/batches-api/', store_inventory_batch_api, name='store_inventory_batch_api'),
 ]
 
 if settings.DEBUG:

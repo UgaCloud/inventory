@@ -151,7 +151,6 @@
                                 </td>
                                 
                                 <td 
-                                {% if is_admin %}
                                 class="action-table-data">
                                     <div class="edit-delete-action">
                                         <a class="me-2 edit-icon  p-2" href="{% url 'product_details_page' product.id %}">
@@ -161,7 +160,6 @@
                                             <i data-feather="trash-2" class="feather-trash-2"></i>
                                         </a>
                                     </div>
-                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}

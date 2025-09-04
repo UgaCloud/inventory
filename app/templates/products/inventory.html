@@ -1,11 +1,11 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% block content%}
-    <div class="page-btn">
+    {% comment %} <div class="page-btn">
         <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-inventory" >
             <i class="ti ti-circle-plus me-1"></i>Add Inventory
         </a>
-    </div>	
+    </div>	 {% endcomment %}
     <div class="table-responsive">
         <table class="table datatable">
             <thead class="thead-light">
@@ -43,7 +43,7 @@
                         <td>{{inventory.reorder_level}}</td>
                         <td class="action-table-data">
                             <div class="edit-delete-action">
-                                <a class="me-2 edit-icon  p-2" href="{% url 'product_details_page' inventory.id %}">
+                                <a class="me-2 edit-icon  p-2" href="{% url 'store_inventory' inventory.store.id %}">
                                     <i data-feather="eye" class="feather-eye"></i>
                                 </a>
                                 <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);">
