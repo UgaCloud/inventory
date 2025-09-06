@@ -16,9 +16,8 @@
         </div>
       </div>
       <ul class="table-top-head">
-        {% comment %} {% url 'store_inventory_aging' store.id %} {% endcomment %}
         <li>
-          <a href="#" class="btn btn-outline-warning">
+          <a href="{% url 'store_inventory_aging' store.id %}" class="btn btn-outline-warning">
             <i data-feather="clock" class="feather-16"></i>
             Aging Report
           </a>
@@ -30,7 +29,7 @@
           </a>
         </li>
         <li>
-          <a href="{% url 'add_transfer_request' %}" class="btn btn-primary">
+          <a href="{% url 'transfer_request_list' %}" class="btn btn-primary">
             <i data-feather="plus" class="feather-16"></i>
             Request Stock
           </a>
@@ -283,15 +282,14 @@
                         <i data-feather="layers" class="feather-14"></i>
                       </button>
                       {% if item.quantity_in_stock <= item.reorder_level %}
-                      <a href="{% url 'add_transfer_request' %}?product={{ item.product.id }}" class="btn btn-sm btn-primary me-1" title="Request Stock">
+                      <a href="{% url 'transfer_request_list' %}?product={{ item.product.id }}" class="btn btn-sm btn-primary me-1" title="Request Stock">
                         <i data-feather="plus" class="feather-14"></i>
                       </a>
                       {% endif %}
                       <a href="{% url 'create_stock_adjustment' %}?product={{ item.product.id }}" class="btn btn-sm btn-warning me-1" title="Adjust Stock">
                         <i data-feather="edit" class="feather-14"></i>
                       </a>
-                      {% comment %} {% url 'product_inventory_detail' store.id item.product.id %} {% endcomment %}
-                      <a href="#" class="btn btn-sm btn-info" title="View Details">
+                      <a href="{% url 'product_inventory_detail' store.id item.product.id %}" class="btn btn-sm btn-info" title="View Details">
                         <i data-feather="eye" class="feather-14"></i>
                       </a>
                     </div>
@@ -305,7 +303,7 @@
                     <i data-feather="package" class="feather-48 text-muted mb-3"></i>
                     <h5 class="text-muted">No inventory items found</h5>
                     <p class="text-muted">Try adjusting your search criteria or add products to this store.</p>
-                    <a href="{% url 'add_transfer_request' %}" class="btn btn-primary">Request Stock</a>
+                    <a href="{% url 'transfer_request_list' %}" class="btn btn-primary">Request Stock</a>
                   </div>
                 </td>
               </tr>
@@ -369,7 +367,7 @@
           <div class="card-body">
             <p class="mb-3">{{ inventory_summary.low_stock_count }} items need restocking</p>
             <div class="d-grid gap-2">
-              <a href="{% url 'add_transfer_request' %}" class="btn btn-warning">
+              <a href="{% url 'transfer_request_list' %}" class="btn btn-warning">
                 <i data-feather="truck" class="feather-16 me-2"></i>
                 Request Stock Transfer
               </a>
@@ -377,8 +375,7 @@
                 <i data-feather="edit" class="feather-16 me-2"></i>
                 Create Stock Adjustment
               </a>
-              {% comment %} {% url 'store_inventory_aging' store.id %} {% endcomment %}
-              <a href="#" class="btn btn-outline-primary">
+              <a href="{% url 'store_inventory_aging' store.id %}" class="btn btn-outline-primary">
                 <i data-feather="clock" class="feather-16 me-2"></i>
                 View Aging Report
               </a>
@@ -485,7 +482,13 @@ function loadProductBatchData(productId, storeId, row) {
       
       // Store batch data for modal
       row.dataset.batchData = JSON.stringify(data);
+    }).catch(error => {
+      console.error('Error fetching batch data:', error);
+      avgCostCell.innerHTML = '<span class="text-danger">Error</span>';
+      totalValueCell.innerHTML = '<span class="text-danger">Error</span>';
+      batchCountCell.innerHTML = '<span class="text-danger">Error</span>';
     });
+    
 }
 
 // Show batch details modal

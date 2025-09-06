@@ -243,7 +243,7 @@ def get_product_inventory_value_by_store(store_id, product_id):
     total_quantity = 0
     
     for batch in batches:
-        batch_value = batch.qremaining_quantity * batch.unit_cost
+        batch_value = batch.remaining_quantity * batch.unit_cost
         total_value += batch_value
         total_quantity += batch.remaining_quantity
         
