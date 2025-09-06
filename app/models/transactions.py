@@ -188,7 +188,7 @@ class TransferRequestItem(models.Model):
     transfer_request = models.ForeignKey('TransferRequest', on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
-    units = models.ForeignKey("app.ProductUnitPrice", on_delete=models.CASCADE)
+    units = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
 
     class Meta:
         unique_together = ("transfer_request", "product")

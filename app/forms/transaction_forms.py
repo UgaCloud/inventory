@@ -243,6 +243,10 @@ class TransferRequestItemForm(forms.ModelForm):
         fields = "__all__"
         widgets = {
             'transfer_request': forms.HiddenInput(),
+            'product': forms.Select(attrs={
+                'class': 'select2',
+                'style': 'width:100%'
+            }),
         }
 
     def clean(self):

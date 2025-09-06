@@ -8,9 +8,7 @@ from app.forms.transaction_forms import (
     TransferRequestForm, StockTransferForm, StockTransferItemForm, StockTransferItemFormSet, TransferRequestItemFormSet, 
     TransferRequestApprovalForm
 )
-from app.selectors.transfer_selectors import (
-    get_all_transfer_requests, get_transfer_request_by_id, get_all_stock_transfers, get_stock_transfer_by_id, get_pending_transfer_requests
-)
+from app.selectors.transfer_selectors import *
 
 @login_required
 def transfer_request_list(request):
@@ -80,7 +78,7 @@ def update_transfer_request(request, request_id):
 
 @login_required
 def stock_transfer_list(request):
-    transfers = get_all_stock_transfers()
+    transfers = get_approved_transfer_requests()
 
     transfer_request_id = request.GET.get('transfer_request_id') or request.POST.get('transfer_request')
 

@@ -29,6 +29,9 @@ def get_pending_transfer_requests():
 def get_fulfilled_transfer_requests():
     return TransferRequest.objects.filter(status='fulfilled')
 
+def get_approved_transfer_requests():
+    return TransferRequest.objects.filter(status='approved')
+
 def get_all_transfer_requests():
     return TransferRequest.objects.all()
 
