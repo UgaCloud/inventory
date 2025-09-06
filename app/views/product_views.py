@@ -13,6 +13,11 @@ from app.forms.product_forms import *
 from app.selectors.product_selectors import *
 from app.models.products import *
 
+from django.core.paginator import Paginator
+from django.db.models import Q
+import csv
+from django.utils import timezone
+
 
 @login_required
 def manage_product_view(request):
@@ -421,3 +426,308 @@ def product_unit_prices_api(request, product_id):
             'conversion_factor': float(up.conversion_factor),
         })
     return JsonResponse({'results': results})
+
+@login_required
+def store_inventory_view(request, store_id):
+    """
+    Display inventory/product quantities for a specific store.
+    Includes filtering options and inventory summary with InventoryBatch-based calculations.
+    """
+    
+    store = get_object_or_404(StoreLocation, id=store_id)
+    
+    # Get query parameters
+    search_query = request.GET.get('search', '').strip()
+    show_zero_stock = request.GET.get('show_zero_stock', 'false').lower() == 'true'
+    category_filter = request.GET.get('category', '')
+    sort_by = request.GET.get('sort', 'product__name')  # Default sort by product name
+    
+    # Get base inventory queryset
+    inventory_queryset = get_product_quantities_by_store(
+        store_id=store_id, 
+        include_zero_stock=show_zero_stock
+    )
+    
+    # Apply search filter
+    if search_query:
+        inventory_queryset = inventory_queryset.filter(
+            Q(product__name__icontains=search_query) |
+            Q(product__sku__icontains=search_query) |
+            Q(product__brand__icontains=search_query)
+        )
+    
+    # Apply category filter
+    if category_filter:
+        inventory_queryset = inventory_queryset.filter(
+            product__category_id=category_filter
+        )
+    
+    # Apply sorting
+    valid_sort_fields = [
+        'product__name', '-product__name',
+        'quantity_in_stock', '-quantity_in_stock',
+        'reorder_level', '-reorder_level',
+        'product__category__name', '-product__category__name'
+    ]
+    if sort_by in valid_sort_fields:
+        inventory_queryset = inventory_queryset.order_by(sort_by)
+    
+    # Pagination
+    paginator = Paginator(inventory_queryset, 25)  # Show 25 items per page
+    page_number = request.GET.get('page')
+    inventory_page = paginator.get_page(page_number)
+    
+    # Get store inventory summary using optimized InventoryBatch calculation
+    inventory_summary = get_store_inventory_summary_optimized(store_id)
+    
+    # Get categories for filter dropdown
+    categories = Category.objects.filter(
+        products__inventories__store_id=store_id
+    ).distinct().order_by('name')
+    
+    context = {
+        'store': store,
+        'inventory_page': inventory_page,
+        'inventory_summary': inventory_summary,
+        'categories': categories,
+        'search_query': search_query,
+        'show_zero_stock': show_zero_stock,
+        'category_filter': category_filter,
+        'sort_by': sort_by,
+        'total_items': paginator.count,
+    }
+    
+    return render(request, 'products/store_inventory.html', context)
+
+
+@login_required
+def store_inventory_export_view(request, store_id):
+    """
+    Export store inventory to CSV format with InventoryBatch-based valuation.
+    """
+    
+    store = get_object_or_404(StoreLocation, id=store_id)
+    
+    # Get all inventory (including zero stock for export)
+    inventory_queryset = get_product_quantities_by_store(
+        store_id=store_id, 
+        include_zero_stock=True
+    )
+    
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    filename = f"store_{store.name}_inventory_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    writer = csv.writer(response)
+    
+    # Write header
+    writer.writerow([
+        'Product Name',
+        'SKU',
+        'Brand',
+        'Category',
+        'Current Stock',
+        'Reorder Level',
+        'Average Unit Cost',
+        'Total Value',
+        'Batch Count',
+        'Status'
+    ])
+    
+    # Write data with InventoryBatch-based calculations
+    for item in inventory_queryset:
+        # Get detailed inventory value from batches
+        product_value_data = get_product_inventory_value_by_store(
+            store_id=store_id, 
+            product_id=item.product.id
+        )
+        
+        average_cost = product_value_data['average_cost']
+        total_value = product_value_data['total_value']
+        batch_count = product_value_data['batch_count']
+        
+        if item.quantity_in_stock == 0:
+            status = 'Out of Stock'
+        elif item.quantity_in_stock <= (item.reorder_level or 0):
+            status = 'Low Stock'
+        else:
+            status = 'In Stock'
+        
+        writer.writerow([
+            item.product.name,
+            item.product.sku,
+            item.product.brand or '',
+            item.product.category.name if item.product.category else '',
+            item.quantity_in_stock,
+            item.reorder_level or '',
+            f"{average_cost:.2f}",
+            f"{total_value:.2f}",
+            batch_count,
+            status
+        ])
+    
+    return response
+
+
+@login_required
+def all_stores_inventory_view(request):
+    """
+    Overview of inventory across all stores with InventoryBatch-based calculations.
+    Useful for managers to see stock levels across locations.
+    """
+   
+    stores = StoreLocation.objects.all().order_by('name')
+    stores_data = []
+    
+    for store in stores:
+        summary = get_store_inventory_summary_optimized(store.id)
+        summary['store'] = store
+        stores_data.append(summary)
+    
+    # Calculate totals across all stores
+    total_products = sum(data['total_products'] for data in stores_data)
+    total_low_stock = sum(data['low_stock_count'] for data in stores_data)
+    total_out_of_stock = sum(data['out_of_stock_count'] for data in stores_data)
+    total_value = sum(data['total_inventory_value'] for data in stores_data)
+    
+    context = {
+        'stores_data': stores_data,
+        'totals': {
+            'total_products': total_products,
+            'total_low_stock': total_low_stock,
+            'total_out_of_stock': total_out_of_stock,
+            'total_value': total_value,
+        }
+    }
+    
+    return render(request, 'products/all_stores_inventory.html', context)
+
+
+@login_required
+def product_inventory_detail_view(request, store_id, product_id):
+    """
+    Detailed view of a specific product's inventory in a store.
+    Shows batch-level details and valuation breakdown.
+    """
+    
+    store = get_object_or_404(StoreLocation, id=store_id)
+    product = get_object_or_404(Product, id=product_id)
+    
+    # Get detailed inventory information
+    inventory_data = get_product_inventory_value_by_store(store_id, product_id)
+    
+    context = {
+        'store': store,
+        'product': product,
+        'inventory_data': inventory_data,
+    }
+    
+    return render(request, 'products/product_inventory_detail.html', context)
+
+
+@login_required
+def store_inventory_aging_report_view(request, store_id):
+    """
+    Show aging inventory report for a specific store.
+    Helps identify slow-moving stock that may need attention.
+    """
+    
+    store = get_object_or_404(StoreLocation, id=store_id)
+    
+    # Get aging threshold from query parameter (default 90 days)
+    aging_days = int(request.GET.get('days', 90))
+    
+    # Get aging inventory
+    aging_batches = get_inventory_aging_report(store_id, aging_days)
+    
+    # Pagination
+    paginator = Paginator(aging_batches, 25)
+    page_number = request.GET.get('page')
+    aging_page = paginator.get_page(page_number)
+    
+    # Calculate totals
+    total_aging_value = sum([
+        batch.quantity_remaining * batch.unit_cost 
+        for batch in aging_batches
+    ])
+    
+    context = {
+        'store': store,
+        'aging_page': aging_page,
+        'aging_days': aging_days,
+        'total_aging_value': total_aging_value,
+        'total_aging_items': paginator.count,
+    }
+    
+    return render(request, 'products/store_inventory_aging.html', context)
+
+
+@login_required 
+def store_inventory_batch_api(request, store_id, product_id):
+    """
+    API endpoint to get batch details for a specific product in a store.
+    Returns JSON data with batch information for inventory management.
+    """
+    
+    store = get_object_or_404(StoreLocation, id=store_id)
+    product = get_object_or_404(Product, id=product_id)
+    
+    inventory_data = get_product_inventory_value_by_store(store_id, product_id)
+    
+    return JsonResponse({
+        'store_id': store_id,
+        'store_name': store.name,
+        'product_id': product_id,
+        'product_name': product.name,
+        'total_quantity': inventory_data['quantity_in_stock'],
+        'total_value': inventory_data['total_value'],
+        'average_cost': inventory_data['average_cost'],
+        'batch_count': inventory_data['batch_count'],
+        'batches': inventory_data['batches']
+    })
+
+
+@login_required
+def store_low_stock_api(request, store_id):
+    """
+    Enhanced API endpoint to get low stock products for a specific store.
+    Now includes batch-based valuation data.
+    """
+    
+    store = get_object_or_404(StoreLocation, id=store_id)
+    limit = int(request.GET.get('limit', 10))
+    include_values = request.GET.get('include_values', 'false').lower() == 'true'
+    
+    # Get low stock products for this store
+    low_stock_items = get_low_stock_products(limit=limit).filter(store_id=store_id)
+    
+    results = []
+    for item in low_stock_items:
+        result_data = {
+            'product_id': item.product.id,
+            'product_name': item.product.name,
+            'sku': item.product.sku,
+            'current_stock': item.quantity_in_stock,
+            'reorder_level': item.reorder_level or 0,
+            'category': item.product.category.name if item.product.category else '',
+            'status': 'out_of_stock' if item.quantity_in_stock == 0 else 'low_stock'
+        }
+        
+        # Include valuation data if requested
+        if include_values:
+            value_data = get_product_inventory_value_by_store(store_id, item.product.id)
+            result_data.update({
+                'total_value': value_data['total_value'],
+                'average_cost': value_data['average_cost'],
+                'batch_count': value_data['batch_count']
+            })
+        
+        results.append(result_data)
+    
+    return JsonResponse({
+        'store_id': store_id,
+        'store_name': store.name,
+        'low_stock_count': len(results),
+        'results': results
+    })

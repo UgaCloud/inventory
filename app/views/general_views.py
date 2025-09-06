@@ -52,6 +52,21 @@ def index_view(request):
         'total_payments_received': total_payments_received,
         'total_outstanding_balances': total_outstanding_balances,
     }
+    # context = {
+    # 'current_store': current_store,
+    # 'total_products': total_products,
+    # 'low_stock_count': low_stock_count,
+    # 'pending_transfers': pending_transfers,
+    # 'today_sales': today_sales,
+    # 'low_stock_products': low_stock_products,
+    # 'recent_activities': recent_activities,
+    # # 'my_transfer_requests': my_transfer_requests,
+    # # 'stock_received_today': stock_received_today,
+    # 'stock_sold_today': stock_sold_today,
+    # # 'top_moving_products': top_moving_products,
+    # # 'total_inventory_value': total_inventory_value,
+    # 'critical_alerts': critical_alerts,
+# }
     return render(request, 'basic/index.html', context)
 
 def login_view(request):

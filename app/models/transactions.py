@@ -56,6 +56,7 @@ class InventoryBatch(models.Model):
     expiry_date = models.DateField(null=True, blank=True)
     remaining_quantity = models.PositiveIntegerField()
     purchase_order_item = models.ForeignKey("app.PurchaseOrderItem", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     class Meta:
         ordering = ["expiry_date", "received_date"]  
