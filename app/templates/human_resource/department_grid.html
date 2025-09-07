@@ -102,7 +102,7 @@
 		<div class="employee-grid-widget">
 			<div class="row">
 
-				{% for department in page_obj %}
+				{% for department in departments %}
 				<div class="col-xxl-3 col-xl-4 col-lg-6 col-md-6">
 					<div class="card">
 						<div class="card-body">
@@ -165,7 +165,7 @@
 					</div>
 				</div>
 				{% endfor %}
-				<div class="pagination">
+				{% comment %} <div class="pagination">
     {% if page_obj.has_previous %}
         <a href="?page={{ page_obj.previous_page_number }}">Previous&nbsp;&nbsp;&nbsp;</a>
     {% endif %}
@@ -175,7 +175,7 @@
     {% if page_obj.has_next %}
         <a href="?page={{ page_obj.next_page_number }}">&nbsp;&nbsp;&nbsp;Next</a>
     {% endif %}
-</div>
+</div> {% endcomment %}
 			</div>
 		</div>
 
