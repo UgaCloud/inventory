@@ -31,10 +31,6 @@ def employee_grid_view(request):
         form = EmployeeForm()
     employees = get_all_employees().select_related('branch').select_related('department').prefetch_related('designation').all()
 
-    paginator = Paginator(employees, 8)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
     active_employees = employees.filter(is_active=True)
     inactive_employees = employees.filter(is_active = False)
     context = {
@@ -42,7 +38,6 @@ def employee_grid_view(request):
         'form':form,
         'active_employees': active_employees,
         'inactive_employees': inactive_employees,
-        'page_obj': page_obj,
     }
     return render(request, 'human_resource/employee_grid.html', context)
 
@@ -79,17 +74,11 @@ def department_grid_view(request):
     active_departments = departments.filter(is_active=True)
     inactive_departments = departments.filter(is_active=False)
 
-    paginator = Paginator(departments, 8)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-   
     context = {
         'departments':departments,
         'form':form,
         'active_departments': active_departments,
         'inactive_departments': inactive_departments,
-        'page_obj':page_obj,
     
     }
     return render(request, 'human_resource/department_grid.html', context)
