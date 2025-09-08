@@ -375,7 +375,8 @@ def bulk_add_product_unit_prices_view(request):
                 price = int(float(price_raw)) if price_raw not in (None, '') else None
             except Exception:
                 price = None
-
+            
+            messages.warning(request, f"Product: {product} - Unit: {unit} - Price: {price}")
             if not product or not unit or price is None:
                 errors.append({'row': row, 'reason': 'missing product/unit/price'})
                 continue
