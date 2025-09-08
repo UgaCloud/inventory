@@ -395,6 +395,7 @@ def bulk_add_product_unit_prices_view(request):
 
         if errors:
             messages.warning(request, f"Some rows were skipped: {len(errors)}. See server logs for details.")
+            messages.warning(request, errors)
         messages.success(request, f"Bulk upload finished — created/updated: {created}.")
         return redirect(manage_product_view)
 
