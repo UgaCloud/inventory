@@ -321,7 +321,9 @@
                           <i data-feather="more-horizontal" class="feather-14"></i>
                         </button>
                         <ul class="dropdown-menu">
-                          <li><a class="dropdown-item" href="{% url 'stock_transfer_print' transfer.id %}">
+                          <li>
+                            {% comment %} {% url 'stock_transfer_print' transfer.id %} {% endcomment %}
+                            <a class="dropdown-item" href="#">
                             <i data-feather="printer" class="feather-14 me-2"></i>Print Slip
                           </a></li>
                           {% if transfer.transfer_request %}
