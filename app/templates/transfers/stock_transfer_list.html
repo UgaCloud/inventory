@@ -44,7 +44,7 @@
             </button>
             <ul class="dropdown-menu">
               <li><a class="dropdown-item" href="#" onclick="showApprovedRequestsModal()">From Approved Request</a></li>
-              <li><a class="dropdown-item" href="{% url 'stock_transfer_create' %}">Direct Transfer</a></li>
+              <li><a class="dropdown-item" href="#" onclick="showDirectTransferModal()">Direct Transfer</a></li>
             </ul>
           </div>
         </li>
@@ -321,7 +321,8 @@
                           <i data-feather="more-horizontal" class="feather-14"></i>
                         </button>
                         <ul class="dropdown-menu">
-                          <li><a class="dropdown-item" href="{% url 'stock_transfer_print' transfer.id %}">
+                          <li>
+                            <a class="dropdown-item" href="#">
                             <i data-feather="printer" class="feather-14 me-2"></i>Print Slip
                           </a></li>
                           {% if transfer.transfer_request %}
@@ -353,10 +354,10 @@
                         <i data-feather="list" class="feather-16 me-1"></i>
                         View Approved Requests
                       </a>
-                      <a href="{% url 'stock_transfer_create' %}" class="btn btn-outline-primary">
+                      <button class="btn btn-outline-primary" onclick="showDirectTransferModal()">
                         <i data-feather="plus" class="feather-16 me-1"></i>
                         Create Direct Transfer
-                      </a>
+                      </button>
                     </div>
                   </div>
                 </td>
@@ -439,7 +440,121 @@
   </div>
 </div>
 
+<!-- Direct Transfer Modal -->
+<div class="modal fade" id="directTransferModal" tabindex="-1" aria-labelledby="directTransferModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="directTransferModalLabel">
+          <i data-feather="truck" class="feather-16 me-2"></i>
+          Create Direct Stock Transfer
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="directTransferForm" method="post">
+          {% csrf_token %}
+          
+          <!-- Transfer Basic Info -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="from_store" class="form-label">From Store <span class="text-danger">*</span></label>
+                <select id="from_store" name="from_store" class="form-select" required>
+                  <option value="">Select source store</option>
+                  {% for store in stores %}
+                  <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="to_store" class="form-label">To Store <span class="text-danger">*</span></label>
+                <select id="to_store" name="to_store" class="form-select" required>
+                  <option value="">Select destination store</option>
+                  {% for store in stores %}
+                  <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="expected_delivery_date" class="form-label">Expected Delivery Date</label>
+                <input type="date" id="expected_delivery_date" name="expected_delivery_date" class="form-control">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="notes" class="form-label">Notes</label>
+                <textarea id="notes" name="notes" class="form-control" rows="2" placeholder="Optional transfer notes..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transfer Items Section -->
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Transfer Items</h6>
+              <button type="button" class="btn btn-sm btn-primary" onclick="addTransferItem()">
+                <i data-feather="plus" class="feather-12 me-1"></i>
+                Add Item
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm" id="transferItemsTable">
+                  <thead class="table-light">
+                    <tr>
+                      <th width="40%">Product</th>
+                      <th width="15%">Available</th>
+                      <th width="15%">Quantity</th>
+                      <th width="15%">Unit Cost</th>
+                      <th width="10%">Total</th>
+                      <th width="5%">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transferItemsBody">
+                    <!-- Dynamic rows will be added here -->
+                  </tbody>
+                  <tfoot>
+                    <tr class="table-info">
+                      <td colspan="4" class="text-end fw-bold">Total Transfer Value:</td>
+                      <td class="fw-bold" id="totalTransferValue">UGX 0</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              
+              <div class="alert alert-info mt-3" style="display: none;" id="stockWarning">
+                <i data-feather="alert-triangle" class="feather-16 me-2"></i>
+                <span id="stockWarningMessage"></span>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitDirectTransfer()">
+          <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+          <i data-feather="save" class="feather-16 me-1"></i>
+          Create Transfer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+let transferItemCounter = 0;
+let availableProducts = [];
+
 // Show approved requests modal
 function showApprovedRequestsModal() {
   const modal = new bootstrap.Modal(document.getElementById('approvedRequestsModal'));
@@ -449,7 +564,7 @@ function showApprovedRequestsModal() {
   modal.show();
   
   // Fetch approved requests
-  fetch('/api/approved-transfer-requests/')
+  fetch('/approved_transfer_requests/')
     .then(response => response.json())
     .then(data => {
       let content = '';
@@ -553,6 +668,264 @@ function showApprovedRequestsModal() {
     });
 }
 
+// Show direct transfer modal
+function showDirectTransferModal() {
+  // Reset form and counter
+  transferItemCounter = 0;
+  document.getElementById('directTransferForm').reset();
+  document.getElementById('transferItemsBody').innerHTML = '';
+  document.getElementById('totalTransferValue').textContent = 'UGX 0';
+  document.getElementById('stockWarning').style.display = 'none';
+  
+  // Load available products
+  loadAvailableProducts();
+  
+  // Add initial item row
+  addTransferItem();
+  
+  const modal = new bootstrap.Modal(document.getElementById('directTransferModal'));
+  modal.show();
+}
+
+// Load available products
+function loadAvailableProducts() {
+  fetch('/api/products/')
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        availableProducts = data.products;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading products:', error);
+    });
+}
+
+// Add transfer item row
+function addTransferItem() {
+  transferItemCounter++;
+  const tbody = document.getElementById('transferItemsBody');
+  
+  const row = document.createElement('tr');
+  row.id = `item-row-${transferItemCounter}`;
+  row.innerHTML = `
+    <td>
+      <select name="items-${transferItemCounter}-product" class="form-select form-select-sm product-select" 
+              onchange="updateProductInfo(${transferItemCounter})" required>
+        <option value="">Select product...</option>
+        ${availableProducts.map(product => 
+          `<option value="${product.id}" data-cost="${product.cost_price}">${product.name} (${product.sku})</option>`
+        ).join('')}
+      </select>
+    </td>
+    <td>
+      <span class="available-stock text-muted" id="available-${transferItemCounter}">-</span>
+    </td>
+    <td>
+      <input type="number" name="items-${transferItemCounter}-quantity" 
+             class="form-control form-control-sm quantity-input" 
+             min="1" step="1" onchange="updateItemTotal(${transferItemCounter})" required>
+    </td>
+    <td>
+      <input type="number" name="items-${transferItemCounter}-unit_cost" 
+             class="form-control form-control-sm cost-input" 
+             min="0" step="0.01" onchange="updateItemTotal(${transferItemCounter})" required>
+    </td>
+    <td>
+      <span class="item-total fw-bold" id="total-${transferItemCounter}">UGX 0</span>
+    </td>
+    <td>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTransferItem(${transferItemCounter})">
+        <i data-feather="trash-2" class="feather-12"></i>
+      </button>
+    </td>
+  `;
+  
+  tbody.appendChild(row);
+  
+  // Re-initialize feather icons
+  if (typeof feather !== 'undefined') {
+    feather.replace();
+  }
+}
+
+// Remove transfer item row
+function removeTransferItem(itemId) {
+  const row = document.getElementById(`item-row-${itemId}`);
+  if (row) {
+    row.remove();
+    updateTransferTotal();
+  }
+  
+  // Ensure at least one row exists
+  const tbody = document.getElementById('transferItemsBody');
+  if (tbody.children.length === 0) {
+    addTransferItem();
+  }
+}
+
+// Update product info when product is selected
+function updateProductInfo(itemId) {
+  const productSelect = document.querySelector(`select[name="items-${itemId}-product"]`);
+  const costInput = document.querySelector(`input[name="items-${itemId}-unit_cost"]`);
+  const availableSpan = document.getElementById(`available-${itemId}`);
+  const fromStoreSelect = document.getElementById('from_store');
+  
+  if (productSelect.value && fromStoreSelect.value) {
+    const selectedOption = productSelect.selectedOptions[0];
+    const productCost = selectedOption.dataset.cost || 0;
+    
+    // Set cost
+    costInput.value = parseFloat(productCost).toFixed(2);
+    
+    // Get available stock
+    fetch(`/api/products/${productSelect.value}/info/?from_store=${fromStoreSelect.value}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const available = data.product.available_stock;
+          availableSpan.textContent = available;
+          availableSpan.className = available > 0 ? 'available-stock text-success' : 'available-stock text-danger';
+          
+          // Validate quantity against available stock
+          const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+          quantityInput.max = available;
+          
+          if (quantityInput.value && parseInt(quantityInput.value) > available) {
+            quantityInput.classList.add('is-invalid');
+            showStockWarning(`Insufficient stock for ${data.product.name}. Available: ${available}`);
+          } else {
+            quantityInput.classList.remove('is-invalid');
+            hideStockWarning();
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching product info:', error);
+        availableSpan.textContent = '-';
+        availableSpan.className = 'available-stock text-muted';
+      });
+    
+    updateItemTotal(itemId);
+  } else {
+    costInput.value = '';
+    availableSpan.textContent = '-';
+    availableSpan.className = 'available-stock text-muted';
+  }
+}
+
+// Update individual item total
+function updateItemTotal(itemId) {
+  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+  const costInput = document.querySelector(`input[name="items-${itemId}-unit_cost"]`);
+  const totalSpan = document.getElementById(`total-${itemId}`);
+  
+  const quantity = parseFloat(quantityInput.value) || 0;
+  const cost = parseFloat(costInput.value) || 0;
+  const total = quantity * cost;
+  
+  totalSpan.textContent = `UGX ${total.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+  
+  updateTransferTotal();
+}
+
+// Update total transfer value
+function updateTransferTotal() {
+  const itemTotals = document.querySelectorAll('.item-total');
+  let grandTotal = 0;
+  
+  itemTotals.forEach(span => {
+    const value = span.textContent.replace('UGX ', '').replace(/,/g, '');
+    grandTotal += parseFloat(value) || 0;
+  });
+  
+  document.getElementById('totalTransferValue').textContent = 
+    `UGX ${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+}
+
+// Show stock warning
+function showStockWarning(message) {
+  const warning = document.getElementById('stockWarning');
+  const messageSpan = document.getElementById('stockWarningMessage');
+  messageSpan.textContent = message;
+  warning.style.display = 'block';
+}
+
+// Hide stock warning
+function hideStockWarning() {
+  document.getElementById('stockWarning').style.display = 'none';
+}
+
+// Submit direct transfer
+function submitDirectTransfer() {
+  const form = document.getElementById('directTransferForm');
+  const submitBtn = document.querySelector('#directTransferModal .btn-primary');
+  const spinner = submitBtn.querySelector('.spinner-border');
+  
+  // Validate form
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+  
+  // Check if at least one item is added
+  const tbody = document.getElementById('transferItemsBody');
+  if (tbody.children.length === 0) {
+    alert('Please add at least one item to transfer.');
+    return;
+  }
+  
+  // Show loading state
+  submitBtn.disabled = true;
+  spinner.classList.remove('d-none');
+  
+  // Collect form data
+  const formData = new FormData(form);
+  
+  // Submit via AJAX
+  fetch('/stock_transfers/create/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+    },
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Close modal and redirect
+      const modal = bootstrap.Modal.getInstance(document.getElementById('directTransferModal'));
+      modal.hide();
+      
+      // Show success message and reload
+      alert(`Transfer #ST${String(data.transfer_id).padStart(4, '0')} created successfully!`);
+      location.reload();
+    } else {
+      alert('Error creating transfer: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An error occurred while creating the transfer.');
+  })
+  .finally(() => {
+    submitBtn.disabled = false;
+    spinner.classList.add('d-none');
+  });
+}
+
+// Store change handler to update available stock
+document.getElementById('from_store').addEventListener('change', function() {
+  // Update all product info when source store changes
+  const productSelects = document.querySelectorAll('.product-select');
+  productSelects.forEach((select, index) => {
+    if (select.value) {
+      const itemId = select.name.match(/items-(\d+)-product/)[1];
+      updateProductInfo(itemId);
+    }
+  });
+});
+
 // Create single transfer from request
 function createSingleTransfer(requestId) {
   if (confirm('Create stock transfer from this approved request?')) {
@@ -594,7 +967,6 @@ function cancelTransfer(transferId) {
 }
 
 function trackTransfer(transferId) {
-  // Implementation for transfer tracking
   alert('Transfer tracking feature coming soon.');
 }
 
@@ -640,6 +1012,9 @@ document.addEventListener('DOMContentLoaded', function() {
       return new bootstrap.Tooltip(tooltipTriggerEl);
     });
   }
+  
+  // Load products for direct transfer modal
+  loadAvailableProducts();
 });
 </script>
 
@@ -688,6 +1063,29 @@ document.addEventListener('DOMContentLoaded', function() {
   height: 12px;
 }
 
+/* Direct Transfer Modal Styles */
+#transferItemsTable .form-select-sm,
+#transferItemsTable .form-control-sm {
+  font-size: 0.875rem;
+}
+
+.available-stock {
+  font-weight: 600;
+}
+
+.item-total {
+  color: #0d6efd;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+.is-invalid {
+  border-color: #dc3545;
+}
+
 @media (max-width: 768px) {
   .table-responsive {
     font-size: 0.875rem;
@@ -699,6 +1097,10 @@ document.addEventListener('DOMContentLoaded', function() {
   
   .btn-sm {
     padding: 0.25rem 0.5rem;
+  }
+  
+  .modal-xl {
+    max-width: 95%;
   }
 }
 </style>

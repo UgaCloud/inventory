@@ -49,9 +49,6 @@
                         <td>{{unit.conversion_factor}}</td>
                         <td class="action-table-data">
                             <div class="edit-delete-action">
-                                <a class="me-2 edit-icon p-2" href="{% url 'product_details_page' unit.id %}" title="View Details">
-                                    <i data-feather="eye" class="feather-eye"></i>
-                                </a>
                                 <a class="me-2 edit-icon p-2" href="javascript:void(0);" 
                                    onclick="editUnit({{ unit.id }}, '{{ unit.unit }}', {{ unit.price }}, {{ unit.conversion_factor }}, '{{ unit.product.id|default:'' }}')" 
                                    title="Edit Unit">
@@ -130,23 +127,29 @@
                         <form method="post" id="edit-unit-form">
                             {% csrf_token %}
                             <input type="hidden" id="edit-unit-id" name="unit_id">
+                            <input type="hidden" id="edit-product" name="product">
                             
                             <div class="row">
                                 <div class="col-lg-6">
                                     <div class="input-blocks">
-                                        <label class="form-label">Product <span class="text-danger">*</span></label>
-                                        <select id="edit-product" name="product" class="form-control" required>
-                                            <option value="">Select Product</option>
-                                            {% for product in products %}
-                                            <option value="{{ product.id }}">{{ product.name }} ({{ product.sku }})</option>
-                                            {% endfor %}
-                                        </select>
+                                        <label class="form-label">Product</label>
+                                        <input type="text" id="edit-product-display" class="form-control" readonly value="{{ product.name }}">
+                                        <small class="form-text text-muted">Product cannot be changed when editing unit</small>
                                     </div>
                                 </div>
                                 <div class="col-lg-6">
                                     <div class="input-blocks">
                                         <label class="form-label">Unit <span class="text-danger">*</span></label>
-                                        <input type="text" id="edit-unit-name" name="unit" class="form-control" placeholder="e.g., Box, Pack, Piece" required>
+                                        <select id="edit-unit-name" name="unit" class="form-select" required>
+                                            <option value="">Select unit...</option>
+                                            {% for unit in units %}
+                                                <option value="{{ unit.id }}">{{ unit }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="mt-2" id="edit-custom-unit-container" style="display: none;">
+                                            <input type="text" id="edit-custom-unit" class="form-control" placeholder="Enter custom unit name...">
+                                            <small class="form-text text-muted">Enter your custom unit name</small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -250,27 +253,86 @@
 // Global variables for delete functionality
 let deleteUnitId = null;
 
-// Edit unit function
+// Edit unit function - Updated to handle dropdown selection
 function editUnit(unitId, unitName, price, conversionFactor, productId) {
     // Set form action URL
-    document.getElementById('edit-unit-form').action = `/products/unit-prices/${unitId}/update/`;
+    document.getElementById('edit-unit-form').action = `/edit_product_unit_price/${unitId}/`;
     
     // Populate form fields
     document.getElementById('edit-unit-id').value = unitId;
-    document.getElementById('edit-unit-name').value = unitName;
     document.getElementById('edit-price').value = price;
     document.getElementById('edit-conversion-factor').value = conversionFactor;
     
-    // Set selected product
-    const productSelect = document.getElementById('edit-product');
+    // Handle unit selection
+    const unitSelect = document.getElementById('edit-unit-name');
+    const customUnitContainer = document.getElementById('edit-custom-unit-container');
+    const customUnitInput = document.getElementById('edit-custom-unit');
+    
+    // Check if the current unit exists in the dropdown options
+    let unitFound = false;
+    for (let option of unitSelect.options) {
+        if (option.value === unitName) {
+            unitSelect.value = unitName;
+            unitFound = true;
+            break;
+        }
+    }
+    
+    // If unit not found in predefined options, select "Other" and show custom input
+    if (!unitFound) {
+        unitSelect.value = 'Other';
+        customUnitContainer.style.display = 'block';
+        customUnitInput.value = unitName;
+        customUnitInput.required = true;
+    } else {
+        customUnitContainer.style.display = 'none';
+        customUnitInput.required = false;
+        customUnitInput.value = '';
+    }
+    
+    // Set hidden product field and display field
+    const productHiddenInput = document.getElementById('edit-product');
+    const productDisplayInput = document.getElementById('edit-product-display');
+    
     if (productId) {
-        productSelect.value = productId;
+        productHiddenInput.value = productId;
+        
+        // Find the product name from the available products
+        const productOptions = document.querySelectorAll('#add-unit select[name="product"] option');
+        let productName = 'Unknown Product';
+        
+        productOptions.forEach(option => {
+            if (option.value === productId) {
+                productName = option.textContent;
+            }
+        });
+        
+        productDisplayInput.value = productName;
+    } else {
+        productHiddenInput.value = '';
+        productDisplayInput.value = 'No Product Selected';
     }
     
     // Show modal
     const editModal = new bootstrap.Modal(document.getElementById('edit-unit'));
     editModal.show();
 }
+
+// Handle unit dropdown change
+document.getElementById('edit-unit-name').addEventListener('change', function() {
+    const customUnitContainer = document.getElementById('edit-custom-unit-container');
+    const customUnitInput = document.getElementById('edit-custom-unit');
+    
+    if (this.value === 'Other') {
+        customUnitContainer.style.display = 'block';
+        customUnitInput.required = true;
+        customUnitInput.focus();
+    } else {
+        customUnitContainer.style.display = 'none';
+        customUnitInput.required = false;
+        customUnitInput.value = '';
+    }
+});
 
 // Delete unit function
 function deleteUnit(unitId, unitName) {
@@ -295,7 +357,7 @@ function confirmDelete() {
     // Create form and submit
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = `/products/unit-prices/${deleteUnitId}/delete/`;
+    //form.action = `/products/unit-prices/${deleteUnitId}/delete/`;
     
     const csrfToken = document.createElement('input');
     csrfToken.type = 'hidden';
@@ -335,6 +397,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const editForm = document.getElementById('edit-unit-form');
     if (editForm) {
         editForm.addEventListener('submit', function(e) {
+            // Handle custom unit before submission
+            const unitSelect = document.getElementById('edit-unit-name');
+            const customUnitInput = document.getElementById('edit-custom-unit');
+            
+            if (unitSelect.value === 'Other' && customUnitInput.value.trim()) {
+                // Create a hidden input with the custom unit value
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'unit';
+                hiddenInput.value = customUnitInput.value.trim();
+                this.appendChild(hiddenInput);
+                
+                // Remove the name attribute from the select to avoid conflict
+                unitSelect.removeAttribute('name');
+            }
+            
             const submitBtn = this.querySelector('button[type="submit"]');
             const spinner = submitBtn.querySelector('.spinner-border');
             
@@ -379,6 +457,20 @@ function validateEditForm() {
     const form = document.getElementById('edit-unit-form');
     const price = parseFloat(form.price.value);
     const conversionFactor = parseFloat(form.conversion_factor.value);
+    const unitSelect = document.getElementById('edit-unit-name');
+    const customUnitInput = document.getElementById('edit-custom-unit');
+    
+    // Validate unit selection
+    if (!unitSelect.value) {
+        alert('Please select a unit');
+        return false;
+    }
+    
+    if (unitSelect.value === 'Other' && !customUnitInput.value.trim()) {
+        alert('Please enter a custom unit name');
+        customUnitInput.focus();
+        return false;
+    }
     
     if (price <= 0) {
         alert('Price must be greater than 0');
@@ -462,6 +554,44 @@ button:disabled {
     justify-content: center;
 }
 
+/* Readonly input styling */
+#edit-product-display {
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+}
+
+#edit-product-display:focus {
+    background-color: #f8f9fa;
+    border-color: #ced4da;
+    box-shadow: none;
+}
+
+/* Custom unit input styling */
+#edit-custom-unit-container {
+    transition: all 0.3s ease;
+}
+
+#edit-custom-unit {
+    border: 2px dashed #dee2e6;
+    background-color: #f8f9fa;
+}
+
+#edit-custom-unit:focus {
+    border-color: #007bff;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Select dropdown styling */
+.form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+}
+
+.form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
 /* Responsive table improvements */
 @media (max-width: 768px) {
     .table-responsive {
@@ -475,6 +605,10 @@ button:disabled {
     
     .modal-dialog {
         margin: 0.5rem;
+    }
+    
+    .modal-body .col-lg-6 {
+        margin-bottom: 1rem;
     }
 }
 </style>

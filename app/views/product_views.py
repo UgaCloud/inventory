@@ -150,7 +150,9 @@ def product_details_view(request, _product_id):
     product_unit_prices = item.unit_prices.all()
     inventories = item.inventories.all()
     stock_movements = item.stock_movements.all()
-        
+
+    units = get_all_units_of_measurement()
+
     context = {
         'product_form': product_form,
         'product_unit_price_form': product_unit_price_form,
@@ -158,7 +160,8 @@ def product_details_view(request, _product_id):
         'product': item,
         'unit_prices':product_unit_prices,
         'inventories': inventories,
-        'stock_movements': stock_movements,    
+        'stock_movements': stock_movements,   
+        'units': units, 
     }
     return render(request, 'products/product_details.html', context)
 
@@ -173,6 +176,20 @@ def add_product_unit_price_view(request):
         else:
             messages.error(request, form.errors)
             
+            return redirect(product_details_view, request.POST.get('product'))
+    else:
+        pass
+
+def update_product_unit_price_view(request, pup_id):
+    pup = get_object_or_404(ProductUnitPrice, id=pup_id)
+    if request.method == 'POST':
+        form = ProductUnitPriceForm(request.POST, instance=pup)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Product unit price updated successfully.')
+            return redirect(product_details_view, request.POST.get('product'))
+        else:
+            messages.error(request, form.errors)
             return redirect(product_details_view, request.POST.get('product'))
     else:
         pass

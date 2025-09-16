@@ -130,10 +130,11 @@ def stock_transfer_create(request):
 
 @login_required
 def stock_transfer_detail(request, pk):
+    print(pk)
     transfer_obj = get_stock_transfer_by_id(pk)
     if not transfer_obj:
         return render(request, '404.html', status=404)
-    return render(request, 'stock_transfer_detail.html', {'transfer_obj': transfer_obj})
+    return render(request, 'transfers/stock_transfer_detail.html', {'transfer_obj': transfer_obj})
 
 @login_required
 def stock_transfer_update(request, pk):

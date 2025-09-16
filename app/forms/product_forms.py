@@ -1,4 +1,4 @@
-from django.forms import ModelForm
+from django.forms import ModelForm, HiddenInput
 from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice, Inventory, StoreLocation
 
 class UnitOfMeasureForm(ModelForm):
@@ -20,6 +20,11 @@ class ProductUnitPriceForm(ModelForm):
     class Meta:
         model = ProductUnitPrice
         fields = ("__all__")
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['product'].queryset = Product.objects.filter(is_active=True)
+        self.fields['product'].widget=HiddenInput()
 
 class InventoryForm(ModelForm):
     class Meta:

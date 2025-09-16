@@ -167,12 +167,12 @@ class TransferRequest(models.Model):
         ("rejected", "Rejected"),
         ("fulfilled", "Fulfilled"),
     ]
-    requested_by = models.CharField(max_length=100)
+    requested_by = models.ForeignKey("auth.User", on_delete=models.DO_NOTHING)
     from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfer_requests_out")
     to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfer_requests_in")
     status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default="pending")
     request_date = models.DateTimeField(auto_now_add=True)
-    approved_by = models.CharField(max_length=100, blank=True, null=True)
+    approved_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_transfer_requests')
     approved_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     note = models.TextField(blank=True, null=True)
 
@@ -198,10 +198,20 @@ class TransferRequestItem(models.Model):
 
 
 class StockTransfer(models.Model):
+    TRANSFER_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("in_transit", "In Transit"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+    ]
     transfer_request = models.ForeignKey(TransferRequest, on_delete=models.CASCADE, related_name="stock_transfers")
     transfer_date = models.DateField(auto_now_add=True)
+    from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfers_out")
+    to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfers_in")
     completed_by = models.CharField(max_length=100, blank=True, null=True)
     note = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=TRANSFER_STATUS_CHOICES, default="pending")
+    created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"Transfer {self.id} for Request {self.transfer_request.id}"
@@ -219,7 +229,7 @@ class StockTransferItem(models.Model):
     stock_transfer = models.ForeignKey(StockTransfer, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
-    units = models.ForeignKey("app.ProductUnitPrice", on_delete=models.SET_NULL, null=True, blank=True)
+    units = models.ForeignKey("app.UnitOfMeasure", on_delete=models.SET_NULL, null=True, blank=True)
     transfer_request_item = models.ForeignKey(
         "app.TransferRequestItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="fulfilled_transfer_items"
     )
