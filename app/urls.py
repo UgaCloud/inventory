@@ -12,12 +12,14 @@ from .views.transactions_views import purchase_order_view, sales_view, stock_tra
 from .views.organization_views import *
 from .views.stock_views import *
 from .views.transfer_views import *
+from .views.transfers import *
 from .views.sales_views import *
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
 from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
+
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
@@ -42,6 +44,7 @@ urlpatterns = [
     path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
     path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
     path('add_product_unit_price/', add_product_unit_price_view, name = 'add_product_unit_price_page'),
+    path('edit_product_unit_price/<int:pup_id>/', update_product_unit_price_view, name = 'edit_product_unit_price_page'),
     path('edit_unit_of_measure/<int:unit_id>', edit_unit_of_measure_view, name = 'edit_unit_of_measure_page'),
     path('edit_store/<int:store_id>/', edit_store_view, name = 'edit_store_page'),
     
@@ -85,9 +88,12 @@ urlpatterns = [
 
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
-    path('stock_transfers/<int:pk>/', stock_transfer_detail, name='stock_transfer_detail'),
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
-    path('stock_transfers/<int:pk>/update/', stock_transfer_update, name='stock_transfer_update'),
+    path('stock_transfers/create/bulk/', stock_transfer_create_bulk, name='stock_transfer_create_bulk'),
+    path('stock_transfers/<int:transfer_id>/', stock_transfer_detail, name='stock_transfer_detail'),
+    path('stock_transfers/<int:transfer_id>/update/', stock_transfer_update, name='stock_transfer_update'),
+    path('stock_transfers/<int:transfer_id>/update_status/',update_transfer_status, name='update_transfer_status'),
+    path('approved_transfer_requests/', approved_transfer_requests_api, name='approved_transfer_requests'),
 
     # Stock Adjustments
     path('stock_adjustments/', stock_adjustment_list, name='stock_adjustment_list'),

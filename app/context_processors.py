@@ -1,4 +1,5 @@
 from app.models.organization import OrganizationSetting, Branch, Currency
+from .models.transactions import TransferRequest
 
 
 def organization_setting(request):
@@ -155,3 +156,23 @@ def app_menu(request):
     return {
         'app_menu': filtered,
     }
+
+def transfer_notifications(request):
+    """Add transfer-related notifications to template context"""
+    
+    if request.user.is_authenticated:
+        pending_approvals = TransferRequest.objects.filter(
+            status='pending'
+        ).count()
+        
+        pending_transfers = TransferRequest.objects.filter(
+            status='approved',
+            stock_transfers__isnull=True
+        ).count()
+        
+        return {
+            'pending_approvals': pending_approvals,
+            'pending_transfers': pending_transfers,
+        }
+    
+    return {}
