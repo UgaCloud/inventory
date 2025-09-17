@@ -179,6 +179,13 @@ urlpatterns = [
     path('stores/<int:store_id>/products/<int:product_id>/detail/', product_inventory_detail_view, name='product_inventory_detail'),
     path('stores/<int:store_id>/aging-report/', store_inventory_aging_report_view, name='store_inventory_aging'),
     path('stores/<int:store_id>/products/<int:product_id>/batches-api/', store_inventory_batch_api, name='store_inventory_batch_api'),
+
+    # Product API endpoints
+    path('api/products/', products_api, name='products_api'),
+    path('api/products/search/', products_search_api, name='products_search_api'),
+    path('api/products/<int:product_id>/stock/', product_stock_api, name='product_stock_api'),
+    path('api/products/category/<int:category_id>/', products_by_category_api, name='products_by_category_api'),
+    path('api/products/suggestions/', product_suggestions_api, name='product_suggestions_api'),
 ]
 
 if settings.DEBUG:

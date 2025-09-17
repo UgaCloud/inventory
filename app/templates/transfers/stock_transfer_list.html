@@ -689,12 +689,11 @@ function showDirectTransferModal() {
 
 // Load available products
 function loadAvailableProducts() {
-  fetch('/api/products/')
+  // Load all active products
+  fetch('/api/products/?active_only=true&limit=100')
     .then(response => response.json())
     .then(data => {
-      if (data.success) {
-        availableProducts = data.products;
-      }
+      availableProducts = data.products;
     })
     .catch(error => {
       console.error('Error loading products:', error);
@@ -779,11 +778,11 @@ function updateProductInfo(itemId) {
     costInput.value = parseFloat(productCost).toFixed(2);
     
     // Get available stock
-    fetch(`/api/products/${productSelect.value}/info/?from_store=${fromStoreSelect.value}`)
+    fetch(`/api/products/${productSelect.value}/stock/?store_id=${fromStoreSelect.value}`)
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          const available = data.product.available_stock;
+          const available = data.stock.available_stock;
           availableSpan.textContent = available;
           availableSpan.className = available > 0 ? 'available-stock text-success' : 'available-stock text-danger';
           

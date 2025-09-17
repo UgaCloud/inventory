@@ -15,6 +15,8 @@ import json
 from app.forms.transaction_forms import StockTransferForm, StockTransferItemFormSet
 from app.models.transactions import TransferRequest, StockTransfer, StockTransferItem
 from app.models.products import StoreLocation as Store
+from app.selectors.transfer_selectors import *
+from app.selectors.product_selectors import get_stores, get_all_products
 
 
 @login_required
@@ -69,6 +71,8 @@ def stock_transfer_list(request):
 
     stock_form = StockTransferForm()
     item_formset = StockTransferItemFormSet()
+    stores = get_stores()
+    products = get_all_products()
     
     # Pagination
     paginator = Paginator(transfers, 25)
@@ -84,6 +88,8 @@ def stock_transfer_list(request):
         'search_query': search,
         'stock_form': stock_form,
         'item_formset': item_formset,
+        'stores': stores,
+        'products': products,
     }
     
     return render(request, 'transfers/stock_transfer_list.html', context)
