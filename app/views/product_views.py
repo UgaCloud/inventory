@@ -55,6 +55,8 @@ def edit_product_view(request, product_id):
 
         return redirect(product_details_view, product.id)
 
+
+
 @login_required
 def add_category_view(request):
     if request.method == "POST":
@@ -748,4 +750,351 @@ def store_low_stock_api(request, store_id):
         'store_name': store.name,
         'low_stock_count': len(results),
         'results': results
+    })
+
+@login_required
+def products_api(request):
+    """
+    API endpoint to get products with their basic information.
+    Supports filtering and search for AJAX requests like the direct transfer modal.
+    """
+    
+    # Get query parameters
+    search_query = request.GET.get('q', '').strip()
+    category_id = request.GET.get('category')
+    active_only = request.GET.get('active_only', 'true').lower() == 'true'
+    limit = int(request.GET.get('limit', 100))
+    store_id = request.GET.get('store_id')  # For stock availability
+    
+    # Base queryset
+    products = Product.objects.select_related('category')
+    
+    # Apply filters
+    if active_only:
+        products = products.filter(is_active=True)
+    
+    if category_id:
+        products = products.filter(category_id=category_id)
+    
+    # Apply search filter
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(sku__icontains=search_query) |
+            Q(brand__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
+    
+    # Order and limit
+    products = products.order_by('name')[:limit]
+    
+    # Build response data
+    results = []
+    for product in products:
+        product_data = {
+            'id': product.id,
+            'name': product.name,
+            'sku': product.sku,
+            'brand': product.brand or '',
+            'description': product.description or '',
+            'category': product.category.name if product.category else '',
+            'category_id': product.category.id if product.category else None,
+            # 'cost_price': float(product.cost_price or 0),
+            # 'selling_price': float(product.selling_price or 0),
+            # 'unit': product.unit or 'Piece',
+            'is_active': product.is_active,
+        }
+        
+        # Add stock information if store_id is provided
+        if store_id:
+            try:
+                from app.models.inventory import Inventory
+                inventory = Inventory.objects.get(
+                    product=product,
+                    store_id=store_id
+                )
+                product_data.update({
+                    'available_stock': inventory.quantity_available,
+                    'reorder_level': inventory.reorder_level or 0,
+                    'max_stock_level': inventory.max_stock_level or 0,
+                    'stock_status': 'in_stock' if inventory.quantity_available > 0 else 'out_of_stock'
+                })
+            except Inventory.DoesNotExist:
+                product_data.update({
+                    'available_stock': 0,
+                    'reorder_level': 0,
+                    'max_stock_level': 0,
+                    'stock_status': 'not_tracked'
+                })
+        
+        # Add unit prices if available
+        unit_prices = []
+        for unit_price in product.unit_prices.select_related('unit').all():
+            unit_prices.append({
+                'unit_id': unit_price.unit.id,
+                'unit_name': str(unit_price.unit),
+                'price': float(unit_price.price),
+                'conversion_factor': float(unit_price.conversion_factor),
+            })
+        
+        if unit_prices:
+            product_data['unit_prices'] = unit_prices
+        
+        results.append(product_data)
+    
+    # Response metadata
+    response_data = {
+        'success': True,
+        'count': len(results),
+        'total_available': Product.objects.filter(is_active=True).count() if active_only else Product.objects.count(),
+        'filters_applied': {
+            'search': search_query,
+            'category_id': category_id,
+            'active_only': active_only,
+            'store_id': store_id,
+        },
+        'products': results
+    }
+    
+    return JsonResponse(response_data)
+
+
+@login_required
+def products_search_api(request):
+    """
+    Simplified product search API for autocomplete/select2 widgets.
+    Returns minimal product info for dropdown population.
+    """
+    
+    search_query = request.GET.get('q', '').strip()
+    limit = int(request.GET.get('limit', 20))
+    
+    if not search_query:
+        return JsonResponse({'results': []})
+    
+    # Search products
+    products = Product.objects.filter(
+        Q(name__icontains=search_query) |
+        Q(sku__icontains=search_query) |
+        Q(brand__icontains=search_query),
+        is_active=True
+    ).order_by('name')[:limit]
+    
+    results = []
+    for product in products:
+        results.append({
+            'id': product.id,
+            'text': f"{product.name} ({product.sku})",
+            'name': product.name,
+            'sku': product.sku,
+            'brand': product.brand or '',
+            'cost_price': float(product.cost_price or 0),
+        })
+    
+    return JsonResponse({'results': results})
+
+
+@login_required
+def product_stock_api(request, product_id):
+    """
+    Get stock levels for a specific product across all stores or a specific store.
+    Enhanced version of existing get_product_info view.
+    """
+    
+    product = get_object_or_404(Product, id=product_id)
+    store_id = request.GET.get('store_id')
+    
+    try:
+        if store_id:
+            # Get stock for specific store
+            try:
+                from app.models.inventory import Inventory
+                inventory = Inventory.objects.get(
+                    product=product,
+                    store_id=store_id
+                )
+                
+                stock_data = {
+                    'store_id': int(store_id),
+                    'store_name': inventory.store.name,
+                    'available_stock': inventory.quantity_available,
+                    'reorder_level': inventory.reorder_level or 0,
+                    'max_stock_level': inventory.max_stock_level or 0,
+                    'last_updated': inventory.last_updated.isoformat() if hasattr(inventory, 'last_updated') else None,
+                }
+                
+                # Add stock status
+                if inventory.quantity_available == 0:
+                    stock_data['status'] = 'out_of_stock'
+                elif inventory.quantity_available <= (inventory.reorder_level or 0):
+                    stock_data['status'] = 'low_stock'
+                else:
+                    stock_data['status'] = 'in_stock'
+                
+            except Inventory.DoesNotExist:
+                stock_data = {
+                    'store_id': int(store_id),
+                    'available_stock': 0,
+                    'status': 'not_tracked',
+                    'error': 'Product not tracked in this store'
+                }
+        
+        else:
+            # Get stock across all stores
+            from app.models.inventory import Inventory
+            inventories = Inventory.objects.filter(product=product).select_related('store')
+            
+            stock_data = {
+                'total_stock': sum(inv.quantity_available for inv in inventories),
+                'stores': []
+            }
+            
+            for inventory in inventories:
+                store_stock = {
+                    'store_id': inventory.store.id,
+                    'store_name': inventory.store.name,
+                    'available_stock': inventory.quantity_available,
+                    'reorder_level': inventory.reorder_level or 0,
+                }
+                
+                if inventory.quantity_available == 0:
+                    store_stock['status'] = 'out_of_stock'
+                elif inventory.quantity_available <= (inventory.reorder_level or 0):
+                    store_stock['status'] = 'low_stock'
+                else:
+                    store_stock['status'] = 'in_stock'
+                
+                stock_data['stores'].append(store_stock)
+        
+        response_data = {
+            'success': True,
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'sku': product.sku,
+                'cost_price': float(product.cost_price or 0),
+                'selling_price': float(product.selling_price or 0),
+                'unit': product.unit or 'Piece',
+            },
+            'stock': stock_data
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'product_id': product_id
+        }, status=500)
+
+
+@login_required
+def products_by_category_api(request, category_id):
+    """
+    Get all products in a specific category.
+    Useful for filtering products by category in forms.
+    """
+    
+    category = get_object_or_404(Category, id=category_id)
+    active_only = request.GET.get('active_only', 'true').lower() == 'true'
+    
+    products = Product.objects.filter(category=category)
+    if active_only:
+        products = products.filter(is_active=True)
+    
+    products = products.order_by('name')
+    
+    results = []
+    for product in products:
+        results.append({
+            'id': product.id,
+            'name': product.name,
+            'sku': product.sku,
+            'brand': product.brand or '',
+            'cost_price': float(product.cost_price or 0),
+            'selling_price': float(product.selling_price or 0),
+            'unit': product.unit or 'Piece',
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'category': {
+            'id': category.id,
+            'name': category.name,
+        },
+        'products': results,
+        'count': len(results)
+    })
+
+
+@login_required
+def product_suggestions_api(request):
+    """
+    Get product suggestions based on various criteria.
+    Useful for recommendation systems or quick access.
+    """
+    
+    suggestion_type = request.GET.get('type', 'recent')
+    limit = int(request.GET.get('limit', 10))
+    store_id = request.GET.get('store_id')
+    
+    if suggestion_type == 'low_stock' and store_id:
+        # Products with low stock in specific store
+        from app.models.inventory import Inventory
+        products = Product.objects.filter(
+            inventories__store_id=store_id,
+            inventories__quantity_available__lte=models.F('inventories__reorder_level'),
+            is_active=True
+        ).distinct().order_by('name')[:limit]
+        
+    elif suggestion_type == 'popular':
+        # Most frequently used products (you might track this in stock movements)
+        products = Product.objects.filter(
+            is_active=True
+        ).order_by('-created_at')[:limit]  # Placeholder - implement based on usage tracking
+        
+    elif suggestion_type == 'recent':
+        # Recently added products
+        products = Product.objects.filter(
+            is_active=True
+        ).order_by('-created_at')[:limit]
+        
+    else:
+        # Default to alphabetical
+        products = Product.objects.filter(
+            is_active=True
+        ).order_by('name')[:limit]
+    
+    results = []
+    for product in products:
+        product_data = {
+            'id': product.id,
+            'name': product.name,
+            'sku': product.sku,
+            'brand': product.brand or '',
+            'category': product.category.name if product.category else '',
+            'cost_price': float(product.cost_price or 0),
+            'unit': product.unit or 'Piece',
+        }
+        
+        # Add stock info if store specified
+        if store_id:
+            try:
+                from app.models.inventory import Inventory
+                inventory = Inventory.objects.get(
+                    product=product,
+                    store_id=store_id
+                )
+                product_data['available_stock'] = inventory.quantity_available
+            except Inventory.DoesNotExist:
+                product_data['available_stock'] = 0
+        
+        results.append(product_data)
+    
+    return JsonResponse({
+        'success': True,
+        'suggestion_type': suggestion_type,
+        'products': results,
+        'count': len(results)
     })

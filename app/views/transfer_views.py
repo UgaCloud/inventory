@@ -9,6 +9,7 @@ from app.forms.transaction_forms import (
     TransferRequestApprovalForm
 )
 from app.selectors.transfer_selectors import *
+from app.selectors.product_selectors import get_stores
 
 @login_required
 def transfer_request_list(request):
@@ -101,12 +102,15 @@ def stock_transfer_list(request):
     form = StockTransferForm(initial={'transfer_request': transfer_request_id} if transfer_request_id else None)
         
     formset = StockTransferItemFormSet(initial=initial_items)
-    
+
+    stores = get_stores()
+
     context = {
         'transfers': transfers,
         'form': form,
         'item_formset': formset,
-        'transfer_request': transfer_request
+        'transfer_request': transfer_request,
+        'stores': stores
     }
 
     return render(request, 'transfers/stock_transfer_list.html', context)
