@@ -17,6 +17,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 import csv
 from django.utils import timezone
+from app.models.products import Inventory
 
 
 @login_required
@@ -758,7 +759,7 @@ def products_api(request):
     API endpoint to get products with their basic information.
     Supports filtering and search for AJAX requests like the direct transfer modal.
     """
-    
+    print("products_api called")
     # Get query parameters
     search_query = request.GET.get('q', '').strip()
     category_id = request.GET.get('category')
@@ -808,16 +809,15 @@ def products_api(request):
         # Add stock information if store_id is provided
         if store_id:
             try:
-                from app.models.inventory import Inventory
                 inventory = Inventory.objects.get(
                     product=product,
                     store_id=store_id
                 )
                 product_data.update({
-                    'available_stock': inventory.quantity_available,
+                    'available_stock': inventory.quantity_in_stock,
                     'reorder_level': inventory.reorder_level or 0,
                     'max_stock_level': inventory.max_stock_level or 0,
-                    'stock_status': 'in_stock' if inventory.quantity_available > 0 else 'out_of_stock'
+                    'stock_status': 'in_stock' if inventory.quantity_in_stock > 0 else 'out_of_stock'
                 })
             except Inventory.DoesNotExist:
                 product_data.update({
@@ -900,93 +900,92 @@ def product_stock_api(request, product_id):
     Get stock levels for a specific product across all stores or a specific store.
     Enhanced version of existing get_product_info view.
     """
-    
+    print("product_stock_api called")
     product = get_object_or_404(Product, id=product_id)
     store_id = request.GET.get('store_id')
-    
-    try:
-        if store_id:
-            # Get stock for specific store
-            try:
-                from app.models.inventory import Inventory
-                inventory = Inventory.objects.get(
-                    product=product,
-                    store_id=store_id
-                )
-                
-                stock_data = {
-                    'store_id': int(store_id),
-                    'store_name': inventory.store.name,
-                    'available_stock': inventory.quantity_available,
-                    'reorder_level': inventory.reorder_level or 0,
-                    'max_stock_level': inventory.max_stock_level or 0,
-                    'last_updated': inventory.last_updated.isoformat() if hasattr(inventory, 'last_updated') else None,
-                }
-                
-                # Add stock status
-                if inventory.quantity_available == 0:
-                    stock_data['status'] = 'out_of_stock'
-                elif inventory.quantity_available <= (inventory.reorder_level or 0):
-                    stock_data['status'] = 'low_stock'
-                else:
-                    stock_data['status'] = 'in_stock'
-                
-            except Inventory.DoesNotExist:
-                stock_data = {
-                    'store_id': int(store_id),
-                    'available_stock': 0,
-                    'status': 'not_tracked',
-                    'error': 'Product not tracked in this store'
-                }
-        
-        else:
-            # Get stock across all stores
-            from app.models.inventory import Inventory
-            inventories = Inventory.objects.filter(product=product).select_related('store')
-            
+
+    print("Store ID: " + str(store_id))
+    # try:
+    if store_id:
+        # Get stock for specific store
+        try:
+            inventory = Inventory.objects.get(
+                product=product,
+                store_id=store_id
+            )
+            print("Quantity: " + str(inventory.quantity_in_stock))
             stock_data = {
-                'total_stock': sum(inv.quantity_available for inv in inventories),
-                'stores': []
+                'store_id': int(store_id),
+                'store_name': inventory.store.name,
+                'available_stock': inventory.quantity_in_stock,
+                'reorder_level': inventory.reorder_level or 0,
+                # 'max_stock_level': inventory.max_stock_level or 0,
+                # 'last_updated': inventory.last_updated.isoformat() if hasattr(inventory, 'last_updated') else None,
             }
             
-            for inventory in inventories:
-                store_stock = {
-                    'store_id': inventory.store.id,
-                    'store_name': inventory.store.name,
-                    'available_stock': inventory.quantity_available,
-                    'reorder_level': inventory.reorder_level or 0,
-                }
-                
-                if inventory.quantity_available == 0:
-                    store_stock['status'] = 'out_of_stock'
-                elif inventory.quantity_available <= (inventory.reorder_level or 0):
-                    store_stock['status'] = 'low_stock'
-                else:
-                    store_stock['status'] = 'in_stock'
-                
-                stock_data['stores'].append(store_stock)
+            # Add stock status
+            if inventory.quantity_in_stock == 0:
+                stock_data['status'] = 'out_of_stock'
+            elif inventory.quantity_in_stock <= (inventory.reorder_level or 0):
+                stock_data['status'] = 'low_stock'
+            else:
+                stock_data['status'] = 'in_stock'
+            
+        except Inventory.DoesNotExist:
+            print("No inventory record found for product in store.")
+            stock_data = {
+                'store_id': int(store_id),
+                'available_stock': 0,
+                'status': 'not_tracked',
+                'error': 'Product not tracked in this store'
+            }
+    
+    else:
+        inventories = Inventory.objects.filter(product=product).select_related('store')
         
-        response_data = {
-            'success': True,
-            'product': {
-                'id': product.id,
-                'name': product.name,
-                'sku': product.sku,
-                'cost_price': float(product.cost_price or 0),
-                'selling_price': float(product.selling_price or 0),
-                'unit': product.unit or 'Piece',
-            },
-            'stock': stock_data
+        stock_data = {
+            'total_stock': sum(inv.quantity_in_stock for inv in inventories),
+            'stores': []
         }
         
-        return JsonResponse(response_data)
+        for inventory in inventories:
+            store_stock = {
+                'store_id': inventory.store.id,
+                'store_name': inventory.store.name,
+                'available_stock': inventory.quantity_in_stock,
+                'reorder_level': inventory.reorder_level or 0,
+            }
+            
+            if inventory.quantity_in_stock == 0:
+                store_stock['status'] = 'out_of_stock'
+            elif inventory.quantity_in_stock <= (inventory.reorder_level or 0):
+                store_stock['status'] = 'low_stock'
+            else:
+                store_stock['status'] = 'in_stock'
+            
+            stock_data['stores'].append(store_stock)
+    
+    response_data = {
+        'success': True,
+        'product': {
+            'id': product.id,
+            'name': product.name,
+            'sku': product.sku,
+            # 'cost_price': float(product.cost_price or 0),
+            # 'selling_price': float(product.selling_price or 0),
+            'unit': product.default_price,
+        },
+        'stock': stock_data
+    }
+    
+    return JsonResponse(response_data)
         
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e),
-            'product_id': product_id
-        }, status=500)
+    # except Exception as e:
+    #     return JsonResponse({
+    #         'success': False,
+    #         'error': str(e),
+    #         'product_id': product_id
+    #     }, status=500)
 
 
 @login_required
@@ -1041,10 +1040,9 @@ def product_suggestions_api(request):
     
     if suggestion_type == 'low_stock' and store_id:
         # Products with low stock in specific store
-        from app.models.inventory import Inventory
         products = Product.objects.filter(
             inventories__store_id=store_id,
-            inventories__quantity_available__lte=models.F('inventories__reorder_level'),
+            inventories__quantity_in_stock__lte=models.F('inventories__reorder_level'),
             is_active=True
         ).distinct().order_by('name')[:limit]
         
@@ -1086,7 +1084,7 @@ def product_suggestions_api(request):
                     product=product,
                     store_id=store_id
                 )
-                product_data['available_stock'] = inventory.quantity_available
+                product_data['available_stock'] = inventory.quantity_in_stock
             except Inventory.DoesNotExist:
                 product_data['available_stock'] = 0
         
