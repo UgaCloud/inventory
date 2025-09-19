@@ -42,6 +42,9 @@ class Product(models.Model):
     def total_stock(self): # Total units across all stores
         return sum(item.quantity_in_stock for item in self.inventories.all())
 
+    def default_unit(self):
+        unit = self.unit_prices.order_by('id').first()
+        return unit if unit else "Piece"
     
     @property
     def default_price(self):
