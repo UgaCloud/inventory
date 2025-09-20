@@ -759,7 +759,6 @@ def products_api(request):
     API endpoint to get products with their basic information.
     Supports filtering and search for AJAX requests like the direct transfer modal.
     """
-    print("products_api called")
     # Get query parameters
     search_query = request.GET.get('q', '').strip()
     category_id = request.GET.get('category')
@@ -900,11 +899,9 @@ def product_stock_api(request, product_id):
     Get stock levels for a specific product across all stores or a specific store.
     Enhanced version of existing get_product_info view.
     """
-    print("product_stock_api called")
     product = get_object_or_404(Product, id=product_id)
     store_id = request.GET.get('store_id')
 
-    print("Store ID: " + str(store_id))
     # try:
     if store_id:
         # Get stock for specific store

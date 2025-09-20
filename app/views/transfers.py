@@ -262,7 +262,6 @@ def stock_transfer_create(request):
     
     if request.method == 'POST':
         # Handle form submission
-        print("Form submitted")
         stock_form = StockTransferForm(request.POST)
         item_formset = StockTransferItemFormSet(request.POST)
         
@@ -558,6 +557,8 @@ def transfer_request_list(request):
         requests = requests.filter(status=status_filter)
     
     requests = requests.order_by('-request_date')
+
+    stores = Store.objects.filter(is_active=True)   
     
     # Pagination
     paginator = Paginator(requests, 25)
@@ -567,6 +568,7 @@ def transfer_request_list(request):
     context = {
         'requests': page_obj,
         'current_status': status_filter,
+        'stores': stores,
     }
     
     return render(request, 'transfers/transfer_request_list.html', context)
@@ -587,7 +589,7 @@ def transfer_request_detail(request, request_id):
         'request': transfer_request,
     }
     
-    return render(request, 'transfers/transfer_request_detail.html', context)
+    return render(request, 'transfers/transfer_request_details.html', context)
 
 
 # Helper view for AJAX product info
