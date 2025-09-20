@@ -26,6 +26,7 @@
               Filter
             </button>
             <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="?status=all">All Requests</a></li>
               <li><a class="dropdown-item" href="?status=pending">Pending</a></li>
               <li><a class="dropdown-item" href="?status=approved">Approved</a></li>
               <li><a class="dropdown-item" href="?status=rejected">Rejected</a></li>
@@ -34,10 +35,10 @@
           </div>
         </li>
         <li>
-          <a href="{% url 'add_transfer_request' %}" class="btn btn-primary">
+          <button class="btn btn-primary" onclick="showNewRequestModal()">
             <i data-feather="plus" class="feather-16"></i>
             New Request
-          </a>
+          </button>
         </li>
       </ul>
     </div>
@@ -47,6 +48,9 @@
       <div class="col-lg-3 col-md-6">
         <div class="card border-warning">
           <div class="card-body text-center">
+            <div class="mb-2">
+              <i data-feather="clock" class="feather-24 text-warning"></i>
+            </div>
             <h3 class="text-warning">{{ status_counts.pending }}</h3>
             <p class="mb-0">Pending Approval</p>
           </div>
@@ -55,6 +59,9 @@
       <div class="col-lg-3 col-md-6">
         <div class="card border-success">
           <div class="card-body text-center">
+            <div class="mb-2">
+              <i data-feather="check-circle" class="feather-24 text-success"></i>
+            </div>
             <h3 class="text-success">{{ status_counts.approved }}</h3>
             <p class="mb-0">Approved</p>
           </div>
@@ -63,6 +70,9 @@
       <div class="col-lg-3 col-md-6">
         <div class="card border-info">
           <div class="card-body text-center">
+            <div class="mb-2">
+              <i data-feather="truck" class="feather-24 text-info"></i>
+            </div>
             <h3 class="text-info">{{ status_counts.in_transit }}</h3>
             <p class="mb-0">In Transit</p>
           </div>
@@ -71,6 +81,9 @@
       <div class="col-lg-3 col-md-6">
         <div class="card border-primary">
           <div class="card-body text-center">
+            <div class="mb-2">
+              <i data-feather="package" class="feather-24 text-primary"></i>
+            </div>
             <h3 class="text-primary">{{ status_counts.completed }}</h3>
             <p class="mb-0">Completed</p>
           </div>
@@ -80,8 +93,17 @@
 
     <!-- Requests Table -->
     <div class="card">
-      <div class="card-header">
-        <h5 class="mb-0">Transfer Requests</h5>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <i data-feather="file-text" class="feather-16 me-2"></i>
+          Transfer Requests ({{ requests.count }})
+        </h5>
+        <div>
+          <button class="btn btn-outline-secondary btn-sm me-2" onclick="refreshRequests()">
+            <i data-feather="refresh-cw" class="feather-16"></i>
+          </button>
+          <span class="badge bg-info">{{ current_status|title }} View</span>
+        </div>
       </div>
       <div class="card-body">
         <div class="table-responsive">
@@ -89,51 +111,99 @@
             <thead class="table-light">
               <tr>
                 <th>Request ID</th>
-                <th>From Store</th>
-                <th>To Store</th>
+                <th>Route</th>
                 <th>Items</th>
-                <th>Requested By</th>
-                <th>Date</th>
                 <th>Priority</th>
+                <th>Requested By</th>
+                <th>Request Date</th>
+                <th>Required Date</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {% for request in requests %}
-              <tr>
+              <tr class="{% if request.priority == 'urgent' and request.status == 'pending' %}table-warning{% endif %}">
                 <td>
                   <a href="{% url 'transfer_request_detail' request.id %}" class="fw-bold text-primary">
                     #TR{{ request.id|stringformat:"04d" }}
                   </a>
-                </td>
-                <td>{{ request.from_store.name }}</td>
-                <td>{{ request.to_store.name }}</td>
-                <td>
-                  <span class="badge bg-info">{{ request.items.count }} item{{ request.items.count|pluralize }}</span>
+                  {% if request.is_overdue %}
+                    <span class="badge bg-danger ms-1">Overdue</span>
+                  {% endif %}
                 </td>
                 <td>
-                    {% comment %} {{ request.user.get_full_name|default:request.user.username }} {% endcomment %}
+                  <div class="d-flex flex-column">
+                    <div class="transfer-route">
+                      <small class="text-muted">From:</small> <strong>{{ request.from_store.name }}</strong>
+                    </div>
+                    <div class="transfer-route">
+                      <small class="text-muted">To:</small> <strong>{{ request.to_store.name }}</strong>
+                    </div>
+                  </div>
                 </td>
-                <td>{{ request.request_date|date:"M d, Y" }}</td>
+                <td>
+                  <div class="d-flex align-items-center">
+                    <span class="badge bg-info me-2">{{ request.items.count }}</span>
+                    <small class="text-muted">item{{ request.items.count|pluralize }}</small>
+                  </div>
+                </td>
                 <td>
                   {% if request.priority == 'urgent' %}
-                    <span class="badge bg-danger">Urgent</span>
+                    <span class="badge bg-danger">
+                      <i data-feather="alert-triangle" class="feather-12 me-1"></i>Urgent
+                    </span>
                   {% elif request.priority == 'high' %}
-                    <span class="badge bg-warning">High</span>
+                    <span class="badge bg-warning">
+                      <i data-feather="arrow-up" class="feather-12 me-1"></i>High
+                    </span>
                   {% else %}
                     <span class="badge bg-secondary">Normal</span>
                   {% endif %}
                 </td>
                 <td>
+                  <div class="d-flex flex-column">
+                    <span>{{ request.requested_by.get_full_name|default:request.requested_by.username }}</span>
+                    <small class="text-muted">{{ request.requested_by.profile.department|default:"N/A" }}</small>
+                  </div>
+                </td>
+                <td>
+                  <div class="d-flex flex-column">
+                    <span>{{ request.request_date|date:"M d, Y" }}</span>
+                    <small class="text-muted">{{ request.request_date|time:"g:i A" }}</small>
+                  </div>
+                </td>
+                <td>
+                  <div class="d-flex flex-column">
+                    {% if request.required_date %}
+                      <span class="{% if request.is_overdue %}text-danger{% endif %}">
+                        {{ request.required_date|date:"M d, Y" }}
+                      </span>
+                      {% if request.is_overdue and request.status == 'pending' %}
+                        <small class="text-danger">Overdue</small>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">Not specified</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>
                   {% if request.status == 'pending' %}
-                    <span class="badge bg-warning">Pending</span>
+                    <span class="badge bg-warning">
+                      <i data-feather="clock" class="feather-12 me-1"></i>Pending
+                    </span>
                   {% elif request.status == 'approved' %}
-                    <span class="badge bg-success">Approved</span>
+                    <span class="badge bg-success">
+                      <i data-feather="check-circle" class="feather-12 me-1"></i>Approved
+                    </span>
                   {% elif request.status == 'rejected' %}
-                    <span class="badge bg-danger">Rejected</span>
+                    <span class="badge bg-danger">
+                      <i data-feather="x-circle" class="feather-12 me-1"></i>Rejected
+                    </span>
                   {% elif request.status == 'completed' %}
-                    <span class="badge bg-primary">Completed</span>
+                    <span class="badge bg-primary">
+                      <i data-feather="package" class="feather-12 me-1"></i>Completed
+                    </span>
                   {% endif %}
                 </td>
                 <td>
@@ -142,35 +212,673 @@
                       <a href="{% url 'transfer_request_detail' request.id %}" class="btn btn-sm btn-info me-1" title="View Details">
                         <i data-feather="eye" class="feather-14"></i>
                       </a>
+                      
                       {% if request.status == 'pending' and perms.app.approve_transfer_request %}
-                      <a href="{% url 'approve_transfer_request' request.id %}" class="btn btn-sm btn-success me-1" title="Approve">
-                        <i data-feather="check" class="feather-14"></i>
-                      </a>
+                        <button class="btn btn-sm btn-success me-1" onclick="approveRequest({{ request.id }})" title="Approve">
+                          <i data-feather="check" class="feather-14"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger me-1" onclick="rejectRequest({{ request.id }})" title="Reject">
+                          <i data-feather="x" class="feather-14"></i>
+                        </button>
                       {% endif %}
+                      
                       {% if request.status == 'pending' and request.requested_by == user %}
-                      <a href="{% url 'update_transfer_request' request.id %}" class="btn btn-sm btn-warning me-1" title="Edit">
-                        <i data-feather="edit" class="feather-14"></i>
-                      </a>
+                        <button class="btn btn-sm btn-warning me-1" onclick="editRequest({{ request.id }})" title="Edit">
+                          <i data-feather="edit" class="feather-14"></i>
+                        </button>
                       {% endif %}
+                      
+                      {% if request.status == 'approved' %}
+                        <a href="{% url 'stock_transfer_create' %}?request={{ request.id }}" class="btn btn-sm btn-primary me-1" title="Create Transfer">
+                          <i data-feather="truck" class="feather-14"></i>
+                        </a>
+                      {% endif %}
+                      
+                      <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                          <i data-feather="more-horizontal" class="feather-14"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                          <li><a class="dropdown-item" href="#">
+                            <i data-feather="printer" class="feather-14 me-2"></i>Print Request
+                          </a></li>
+                          <li><a class="dropdown-item" href="#">
+                            <i data-feather="copy" class="feather-14 me-2"></i>Duplicate Request
+                          </a></li>
+                          {% if request.status == 'pending' and request.requested_by == user %}
+                          <li><hr class="dropdown-divider"></li>
+                          <li><a class="dropdown-item text-danger" href="#" onclick="cancelRequest({{ request.id }})">
+                            <i data-feather="trash-2" class="feather-14 me-2"></i>Cancel Request
+                          </a></li>
+                          {% endif %}
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="9" class="text-center py-4">
-                  <i data-feather="inbox" class="feather-48 text-muted mb-3"></i>
-                  <h5 class="text-muted">No transfer requests found</h5>
-                  <a href="{% url 'add_transfer_request' %}" class="btn btn-primary">Create First Request</a>
+                <td colspan="9" class="text-center py-5">
+                  <div class="empty-state">
+                    <i data-feather="inbox" class="feather-48 text-muted mb-3"></i>
+                    <h5 class="text-muted">No transfer requests found</h5>
+                    <p class="text-muted">Create your first transfer request to get started.</p>
+                    <button class="btn btn-primary" onclick="showNewRequestModal()">
+                      <i data-feather="plus" class="feather-16 me-1"></i>
+                      Create First Request
+                    </button>
+                  </div>
                 </td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination -->
+        {% if requests.has_other_pages %}
+        <div class="d-flex justify-content-between align-items-center mt-4">
+          <div class="datatable-info">
+            <span>Showing {{ requests.start_index }} to {{ requests.end_index }} of {{ requests.paginator.count }} requests</span>
+          </div>
+          <nav aria-label="Page navigation">
+            <ul class="pagination pagination-sm justify-content-end">
+              {% if requests.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ requests.previous_page_number }}&{{ request.GET.urlencode }}">
+                  <i data-feather="chevron-left" class="feather-14"></i>
+                </a>
+              </li>
+              {% endif %}
+              
+              {% for page_num in requests.paginator.page_range %}
+                {% if page_num == requests.number %}
+                <li class="page-item active">
+                  <span class="page-link">{{ page_num }}</span>
+                </li>
+                {% elif page_num > requests.number|add:'-3' and page_num < requests.number|add:'3' %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ page_num }}&{{ request.GET.urlencode }}">{{ page_num }}</a>
+                </li>
+                {% endif %}
+              {% endfor %}
+              
+              {% if requests.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ requests.next_page_number }}&{{ request.GET.urlencode }}">
+                  <i data-feather="chevron-right" class="feather-14"></i>
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
+
+<!-- New Transfer Request Modal -->
+<div class="modal fade" id="newRequestModal" tabindex="-1" aria-labelledby="newRequestModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="newRequestModalLabel">
+          <i data-feather="plus-circle" class="feather-16 me-2"></i>
+          Create New Transfer Request
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="newRequestForm" method="post">
+          {% csrf_token %}
+          
+          <!-- Request Basic Info -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="from_store" class="form-label">From Store <span class="text-danger">*</span></label>
+                <select id="from_store" name="from_store" class="form-select" required>
+                  <option value="">Select source store</option>
+                  {% for store in stores %}
+                  <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="to_store" class="form-label">To Store <span class="text-danger">*</span></label>
+                <select id="to_store" name="to_store" class="form-select" required>
+                  <option value="">Select destination store</option>
+                  {% for store in stores %}
+                  <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="priority" class="form-label">Priority <span class="text-danger">*</span></label>
+                <select id="priority" name="priority" class="form-select" required>
+                  <option value="normal">Normal</option>
+                  <option value="high">High Priority</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="required_date" class="form-label">Required Date</label>
+                <input type="date" id="required_date" name="required_date" class="form-control">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="department" class="form-label">Department</label>
+                <input type="text" id="department" name="department" class="form-control" placeholder="Your department">
+              </div>
+            </div>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-12">
+              <div class="mb-3">
+                <label for="reason" class="form-label">Reason for Transfer <span class="text-danger">*</span></label>
+                <textarea id="reason" name="reason" class="form-control" rows="3" placeholder="Explain why this transfer is needed..." required></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Request Items Section -->
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Request Items</h6>
+              <button type="button" class="btn btn-sm btn-primary" onclick="addRequestItem()">
+                <i data-feather="plus" class="feather-12 me-1"></i>
+                Add Item
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm" id="requestItemsTable">
+                  <thead class="table-light">
+                    <tr>
+                      <th width="35%">Product</th>
+                      <th width="15%">Available</th>
+                      <th width="15%">Requested Qty</th>
+                      <th width="15%">Unit</th>
+                      <th width="15%">Notes</th>
+                      <th width="5%">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="requestItemsBody">
+                    <!-- Dynamic rows will be added here -->
+                  </tbody>
+                </table>
+              </div>
+              
+              <div class="alert alert-warning mt-3" style="display: none;" id="stockAlert">
+                <i data-feather="alert-triangle" class="feather-16 me-2"></i>
+                <span id="stockAlertMessage"></span>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitNewRequest()">
+          <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+          <i data-feather="send" class="feather-16 me-1"></i>
+          Submit Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Approve/Reject Modal -->
+<div class="modal fade" id="approveRejectModal" tabindex="-1" aria-labelledby="approveRejectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="approveRejectModalLabel">Request Action</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="approveRejectForm">
+          {% csrf_token %}
+          <input type="hidden" id="actionRequestId" name="request_id">
+          <input type="hidden" id="actionType" name="action">
+          
+          <div class="mb-3">
+            <label for="actionComments" class="form-label">Comments</label>
+            <textarea id="actionComments" name="comments" class="form-control" rows="3" placeholder="Optional comments..."></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmActionBtn" onclick="confirmAction()">
+          <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let requestItemCounter = 0;
+let availableProducts = [];
+
+// Show new request modal
+function showNewRequestModal() {
+  // Reset form and counter
+  requestItemCounter = 0;
+  document.getElementById('newRequestForm').reset();
+  document.getElementById('requestItemsBody').innerHTML = '';
+  document.getElementById('stockAlert').style.display = 'none';
+  
+  // Load available products
+  loadAvailableProducts();
+  
+  // Add initial item row
+  addRequestItem();
+  
+  const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
+  modal.show();
+}
+
+// Load available products
+function loadAvailableProducts() {
+  fetch('/api/products/?active_only=true')
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        availableProducts = data.products;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading products:', error);
+    });
+}
+
+// Add request item row
+function addRequestItem() {
+  requestItemCounter++;
+  const tbody = document.getElementById('requestItemsBody');
+  
+  const row = document.createElement('tr');
+  row.id = `request-item-row-${requestItemCounter}`;
+  row.innerHTML = `
+    <td>
+      <select name="items-${requestItemCounter}-product" class="form-select form-select-sm product-select" 
+              onchange="updateProductAvailability(${requestItemCounter})" required>
+        <option value="">Select product...</option>
+        ${availableProducts.map(product => 
+          `<option value="${product.id}">${product.name} (${product.sku})</option>`
+        ).join('')}
+      </select>
+    </td>
+    <td>
+      <span class="available-stock text-muted" id="available-${requestItemCounter}">-</span>
+    </td>
+    <td>
+      <input type="number" name="items-${requestItemCounter}-quantity" 
+             class="form-control form-control-sm" 
+             min="1" step="1" placeholder="0" required>
+    </td>
+    <td>
+      <input type="text" name="items-${requestItemCounter}-units" 
+             class="form-control form-control-sm" 
+             placeholder="Piece" value="Piece">
+    </td>
+    <td>
+      <input type="text" name="items-${requestItemCounter}-notes" 
+             class="form-control form-control-sm" 
+             placeholder="Optional notes...">
+    </td>
+    <td>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRequestItem(${requestItemCounter})">
+        <i data-feather="trash-2" class="feather-12"></i>
+      </button>
+    </td>
+  `;
+  
+  tbody.appendChild(row);
+  
+  // Re-initialize feather icons
+  if (typeof feather !== 'undefined') {
+    feather.replace();
+  }
+}
+
+// Remove request item row
+function removeRequestItem(itemId) {
+  const row = document.getElementById(`request-item-row-${itemId}`);
+  if (row) {
+    row.remove();
+  }
+  
+  // Ensure at least one row exists
+  const tbody = document.getElementById('requestItemsBody');
+  if (tbody.children.length === 0) {
+    addRequestItem();
+  }
+}
+
+// Update product availability when product is selected
+function updateProductAvailability(itemId) {
+  const productSelect = document.querySelector(`select[name="items-${itemId}-product"]`);
+  const availableSpan = document.getElementById(`available-${itemId}`);
+  const fromStoreSelect = document.getElementById('from_store');
+  
+  if (productSelect.value && fromStoreSelect.value) {
+    fetch(`/api/products/${productSelect.value}/stock/?store_id=${fromStoreSelect.value}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const available = data.stock.available_stock;
+          availableSpan.textContent = available;
+          availableSpan.className = available > 0 ? 'available-stock text-success' : 'available-stock text-danger';
+          
+          if (available === 0) {
+            showStockAlert(`${data.product.name} is out of stock in the selected store.`);
+          } else {
+            hideStockAlert();
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching stock info:', error);
+        availableSpan.textContent = '-';
+        availableSpan.className = 'available-stock text-muted';
+      });
+  } else {
+    availableSpan.textContent = '-';
+    availableSpan.className = 'available-stock text-muted';
+  }
+}
+
+// Store change handler to update all product availability
+document.getElementById('from_store')?.addEventListener('change', function() {
+  const productSelects = document.querySelectorAll('.product-select');
+  productSelects.forEach((select, index) => {
+    if (select.value) {
+      const itemId = select.name.match(/items-(\d+)-product/)[1];
+      updateProductAvailability(itemId);
+    }
+  });
+});
+
+// Show stock alert
+function showStockAlert(message) {
+  const alert = document.getElementById('stockAlert');
+  const messageSpan = document.getElementById('stockAlertMessage');
+  messageSpan.textContent = message;
+  alert.style.display = 'block';
+}
+
+// Hide stock alert
+function hideStockAlert() {
+  document.getElementById('stockAlert').style.display = 'none';
+}
+
+// Submit new request
+function submitNewRequest() {
+  const form = document.getElementById('newRequestForm');
+  const submitBtn = document.querySelector('#newRequestModal .btn-primary');
+  const spinner = submitBtn.querySelector('.spinner-border');
+  
+  // Validate form
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+  
+  // Check if at least one item is added
+  const tbody = document.getElementById('requestItemsBody');
+  if (tbody.children.length === 0) {
+    alert('Please add at least one item to request.');
+    return;
+  }
+  
+  // Show loading state
+  submitBtn.disabled = true;
+  spinner.classList.remove('d-none');
+  
+  // Collect form data
+  const formData = new FormData(form);
+  
+  // Submit via AJAX
+  fetch('/transfer_requests/create/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+    },
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Close modal and redirect/reload
+      const modal = bootstrap.Modal.getInstance(document.getElementById('newRequestModal'));
+      modal.hide();
+      
+      // Show success message and reload
+      alert(`Transfer request #TR${String(data.request_id).padStart(4, '0')} created successfully!`);
+      location.reload();
+    } else {
+      alert('Error creating request: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An error occurred while creating the request.');
+  })
+  .finally(() => {
+    submitBtn.disabled = false;
+    spinner.classList.add('d-none');
+  });
+}
+
+// Approve request
+function approveRequest(requestId) {
+  document.getElementById('actionRequestId').value = requestId;
+  document.getElementById('actionType').value = 'approve';
+  document.getElementById('approveRejectModalLabel').textContent = 'Approve Transfer Request';
+  document.getElementById('confirmActionBtn').textContent = 'Approve';
+  document.getElementById('confirmActionBtn').className = 'btn btn-success';
+  
+  const modal = new bootstrap.Modal(document.getElementById('approveRejectModal'));
+  modal.show();
+}
+
+// Reject request
+function rejectRequest(requestId) {
+  document.getElementById('actionRequestId').value = requestId;
+  document.getElementById('actionType').value = 'reject';
+  document.getElementById('approveRejectModalLabel').textContent = 'Reject Transfer Request';
+  document.getElementById('confirmActionBtn').textContent = 'Reject';
+  document.getElementById('confirmActionBtn').className = 'btn btn-danger';
+  
+  const modal = new bootstrap.Modal(document.getElementById('approveRejectModal'));
+  modal.show();
+}
+
+// Confirm action (approve/reject)
+function confirmAction() {
+  const form = document.getElementById('approveRejectForm');
+  const formData = new FormData(form);
+  const requestId = formData.get('request_id');
+  const action = formData.get('action');
+  
+  const submitBtn = document.getElementById('confirmActionBtn');
+  const spinner = submitBtn.querySelector('.spinner-border');
+  
+  submitBtn.disabled = true;
+  spinner.classList.remove('d-none');
+  
+  fetch(`/transfer_requests/${requestId}/${action}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+    },
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      const modal = bootstrap.Modal.getInstance(document.getElementById('approveRejectModal'));
+      modal.hide();
+      location.reload();
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An error occurred while processing the request.');
+  })
+  .finally(() => {
+    submitBtn.disabled = false;
+    spinner.classList.add('d-none');
+  });
+}
+
+// Other action functions
+function editRequest(requestId) {
+  // Redirect to edit page for now (could be made modal in future)
+  window.location.href = `/transfer_requests/${requestId}/edit/`;
+}
+
+function cancelRequest(requestId) {
+  if (confirm('Are you sure you want to cancel this transfer request?')) {
+    // Implementation for canceling request
+    console.log('Cancel request:', requestId);
+  }
+}
+
+function refreshRequests() {
+  location.reload();
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize feather icons
+  if (typeof feather !== 'undefined') {
+    feather.replace();
+  }
+  
+  // Initialize tooltips
+  if (typeof bootstrap !== 'undefined') {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  }
+  
+  // Load products for new request modal
+  loadAvailableProducts();
+});
+</script>
+
+<style>
+.transfer-route {
+  font-size: 0.875rem;
+  margin-bottom: 2px;
+}
+
+.empty-state {
+  padding: 3rem 1rem;
+}
+
+.table-warning {
+  --bs-table-bg: rgba(255, 193, 7, 0.1);
+}
+
+.action-table-data .btn {
+  margin: 0 2px;
+}
+
+.feather-48 {
+  width: 48px;
+  height: 48px;
+}
+
+.feather-24 {
+  width: 24px;
+  height: 24px;
+}
+
+.feather-12 {
+  width: 12px;
+  height: 12px;
+}
+
+/* New Request Modal Styles */
+#requestItemsTable .form-select-sm,
+#requestItemsTable .form-control-sm {
+  font-size: 0.875rem;
+}
+
+.available-stock {
+  font-weight: 600;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Priority badge animations */
+.badge {
+  transition: all 0.3s ease;
+}
+
+.badge:hover {
+  transform: scale(1.05);
+}
+
+/* Card hover effects */
+.card {
+  transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+  
+  .transfer-route {
+    font-size: 0.75rem;
+  }
+  
+  .btn-sm {
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .modal-xl {
+    max-width: 95%;
+  }
+  
+  .action-table-data .edit-delete-action {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+}
+</style>
 {% endblock %}
 
