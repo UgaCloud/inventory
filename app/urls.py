@@ -19,6 +19,7 @@ from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
 from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
+from .views.reports import sales_report_views
 
 
 urlpatterns = [
@@ -186,6 +187,14 @@ urlpatterns = [
     path('api/products/<int:product_id>/stock/', product_stock_api, name='product_stock_api'),
     path('api/products/category/<int:category_id>/', products_by_category_api, name='products_by_category_api'),
     path('api/products/suggestions/', product_suggestions_api, name='product_suggestions_api'),
+
+    # Sales Report URLs
+    path('reports/branch-sales/', sales_report_views.branch_sales_report, name='branch_sales_report'),
+    path('reports/branch-sales/api/', sales_report_views.branch_sales_report_api, name='branch_sales_report_api'),
+    path('reports/branch-sales/export/csv/', sales_report_views.export_branch_sales_csv, name='export_branch_sales_csv'),
+    path('reports/branch-sales/export/pdf/', sales_report_views.export_branch_sales_pdf, name='export_branch_sales_pdf'),
+    path('reports/branch-comparison/', sales_report_views.branch_comparison_report, name='branch_comparison_report'),
+    
 ]
 
 if settings.DEBUG:

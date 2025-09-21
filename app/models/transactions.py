@@ -90,7 +90,7 @@ class Sales(models.Model):
     sale_date = models.DateField(auto_now_add=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=SALE_ORDER_OPTIONS)
-    recorded_by = models.CharField(max_length=50)
+    recorded_by = models.ForeignKey("auth.User", on_delete=models.DO_NOTHING)
     amount_paid = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     balance = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     amount_received = models.DecimalField(max_digits=12, decimal_places=0, default=0)
