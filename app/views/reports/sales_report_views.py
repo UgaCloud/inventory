@@ -493,7 +493,7 @@ def branch_comparison_report(request):
             date_from_obj = date_to_obj - timedelta(days=30)
     
     # Get branch performance data
-    branch_performance = Store.objects.filter(
+    branch_performance = StoreLocation.objects.filter(
         is_active=True
     ).annotate(
         total_sales=Sum('sales__total_amount', filter=Q(sales__date__gte=date_from_obj, sales__date__lte=date_to_obj)),
@@ -516,3 +516,172 @@ def branch_comparison_report(request):
     }
     
     return render(request, 'reports/branch_comparison_report.html', context)
+
+@login_required
+def sales_item_unit_report(request):
+    """
+    General sales item report with breakdown of quantities sold unit wise.
+    """
+    # Optional filters
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    product_id = request.GET.get('product')
+
+    sales_items = SalesItem.objects.select_related('product', 'order', 'unit')
+
+    # Filter by date range if provided
+    if date_from:
+        sales_items = sales_items.filter(order__sale_date__gte=date_from)
+    if date_to:
+        sales_items = sales_items.filter(order__sale_date__lte=date_to)
+    if product_id:
+        sales_items = sales_items.filter(product_id=product_id)
+
+    # Group by product and unit, sum quantities
+    report_data = sales_items.values(
+        'product__id',
+        'product__name',
+        'product__sku',
+        'unit__name'
+    ).annotate(
+        total_quantity=Sum('quantity'),
+        total_sales=Sum(F('quantity') * F('sale_price'))
+    ).order_by('product__name', 'unit__name')
+
+    # Get products for filter dropdown
+    products = Product.objects.filter(is_active=True).order_by('name')
+
+    context = {
+        'report_data': report_data,
+        'products': products,
+        'filters': {
+            'date_from': date_from,
+            'date_to': date_to,
+            'product_id': product_id,
+        }
+    }
+    return render(request, 'reports/sales_item_unit_report.html', context)
+
+@login_required
+def export_sales_item_unit_csv(request):
+    """
+    Export general sales item unit report to CSV.
+    """
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    product_id = request.GET.get('product')
+
+    sales_items = SalesItem.objects.select_related('product', 'order', 'unit')
+    if date_from:
+        sales_items = sales_items.filter(order__sale_date__gte=date_from)
+    if date_to:
+        sales_items = sales_items.filter(order__sale_date__lte=date_to)
+    if product_id:
+        sales_items = sales_items.filter(product_id=product_id)
+
+    report_data = sales_items.values(
+        'product__name',
+        'product__sku',
+        'unit__name'
+    ).annotate(
+        total_quantity=Sum('quantity'),
+        total_sales=Sum(F('quantity') * F('sale_price'))
+    ).order_by('product__name', 'unit__name')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="sales_item_unit_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['Product', 'SKU', 'Unit', 'Quantity Sold', 'Total Sales (UGX)'])
+    for row in report_data:
+        writer.writerow([
+            row['product__name'],
+            row['product__sku'],
+            row['unit__name'],
+            row['total_quantity'],
+            f"{row['total_sales']:.2f}" if row['total_sales'] else "0.00"
+        ])
+    return response
+
+@login_required
+def export_sales_item_unit_pdf(request):
+    """
+    Export general sales item unit report to PDF.
+    """
+    from io import BytesIO
+
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    product_id = request.GET.get('product')
+
+    sales_items = SalesItem.objects.select_related('product', 'order', 'unit')
+    if date_from:
+        sales_items = sales_items.filter(order__sale_date__gte=date_from)
+    if date_to:
+        sales_items = sales_items.filter(order__sale_date__lte=date_to)
+    if product_id:
+        sales_items = sales_items.filter(product_id=product_id)
+
+    report_data = sales_items.values(
+        'product__name',
+        'product__sku',
+        'unit__name'
+    ).annotate(
+        total_quantity=Sum('quantity'),
+        total_sales=Sum(F('quantity') * F('sale_price'))
+    ).order_by('product__name', 'unit__name')
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+
+    title = Paragraph("<b>Sales Item Unit Report</b>", styles['Title'])
+    story.append(title)
+    story.append(Spacer(1, 12))
+
+    # Report info
+    info = [
+        ['Date From:', date_from or 'N/A'],
+        ['Date To:', date_to or 'N/A'],
+        ['Generated:', timezone.now().strftime('%Y-%m-%d %H:%M:%S')],
+    ]
+    info_table = Table(info, colWidths=[2*72, 4*72])
+    info_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 12))
+
+    # Table headers
+    table_data = [['Product', 'SKU', 'Unit', 'Quantity Sold', 'Total Sales (UGX)']]
+    for row in report_data:
+        table_data.append([
+            row['product__name'],
+            row['product__sku'],
+            row['unit__name'],
+            str(row['total_quantity']),
+            f"UGX {row['total_sales']:,.2f}" if row['total_sales'] else "UGX 0.00"
+        ])
+
+    data_table = Table(table_data, colWidths=[2*72, 1.2*72, 1.2*72, 1.2*72, 2*72])
+    data_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(data_table)
+
+    doc.build(story)
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="sales_item_unit_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.pdf"'
+    return response
+

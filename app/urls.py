@@ -194,7 +194,9 @@ urlpatterns = [
     path('reports/branch-sales/export/csv/', sales_report_views.export_branch_sales_csv, name='export_branch_sales_csv'),
     path('reports/branch-sales/export/pdf/', sales_report_views.export_branch_sales_pdf, name='export_branch_sales_pdf'),
     path('reports/branch-comparison/', sales_report_views.branch_comparison_report, name='branch_comparison_report'),
-    
+    path('reports/sales-item-unit/', sales_report_views.sales_item_unit_report, name='sales_item_unit_report'),
+    path('reports/sales-item-unit/export/csv/', sales_report_views.export_sales_item_unit_csv, name='export_sales_item_unit_csv'),
+    path('reports/sales-item-unit/export/pdf/', sales_report_views.export_sales_item_unit_pdf, name='export_sales_item_unit_pdf'),
 ]
 
 if settings.DEBUG:
