@@ -6,7 +6,7 @@ import pymysql
 pymysql.install_as_MySQLdb()
 
 
-DEBUG = False
+DEBUG = True
 
 SECRET_KEY = config('SECRET_KEY')
 
