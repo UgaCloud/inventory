@@ -71,6 +71,8 @@ instance/
 # Sphinx documentation
 docs/_build/
 
+core/settings/production.py
+
 # PyBuilder
 .pybuilder/
 target/
