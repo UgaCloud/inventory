@@ -30,7 +30,6 @@ class Product(models.Model):
     brand = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     barcode = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    uuid_code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
