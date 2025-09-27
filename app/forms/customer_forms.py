@@ -1,6 +1,6 @@
 from django.forms import ModelForm
 from django import forms
-from app.models.customers import Customer
+from app.models.customers import Customer, Payment
 
 class CustomerForm(ModelForm):
     class Meta:
@@ -19,5 +19,8 @@ class QuickCustomerForm(forms.ModelForm):
 
 class PaymentForm(ModelForm):
     class Meta:
-        model = Customer
-        fields = ['name', 'email', 'phone', 'address', 'company', 'is_active', 'balance']
+        model = Payment
+        fields = ['customer', 'amount', 'payment_method', 'reference', 'note']
+
+        widgets = {
+            'customer': forms.HiddenInput(),}
