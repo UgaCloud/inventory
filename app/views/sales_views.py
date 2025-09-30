@@ -38,10 +38,10 @@ def record_sales_view(request):
                 amount_received=sale_data.amount_received,
                 change=sale_data.change,
                 payment_method=sale_data.payment_method,
+                user=request.user,
                 note=sale_data.note
             )
             
-            sale.recorded_by = request.user.username
             sale.save()
             
             sale_items = formset.save(commit=False)
