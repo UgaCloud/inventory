@@ -25,10 +25,12 @@ def manage_product_view(request):
     product_form = ProductForm()
 
     products = get_all_products()
+    categories = get_all_categories()
 
     context = {
         'form': product_form,
         'products': products,
+        'categories': categories,
     }
     return render(request, 'products/products.html', context)
 

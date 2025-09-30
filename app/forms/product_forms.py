@@ -1,4 +1,4 @@
-from django.forms import ModelForm, HiddenInput
+from django.forms import forms, ModelForm, HiddenInput, Select
 from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice, Inventory, StoreLocation
 
 class UnitOfMeasureForm(ModelForm):
@@ -11,6 +11,13 @@ class ProductForm(ModelForm):
         model = Product
         fields = ("__all__")
 
+        widgets = {
+            'category': Select(attrs={
+                'class': 'select2',
+                'style': 'width:100%'
+            }),
+        }
+
 class CategoryForm(ModelForm):
     class Meta:
         model = Category
@@ -20,6 +27,7 @@ class ProductUnitPriceForm(ModelForm):
     class Meta:
         model = ProductUnitPrice
         fields = ("__all__")
+
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

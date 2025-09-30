@@ -207,6 +207,15 @@
                             <form method="post" action="{% url 'add_products_page'%}">
                                 {% csrf_token %}
                                 {{form|crispy}}
+                                                                <!-- filepath: /Users/abdulhakiim/Me/UGACloud/Projects/inventory/app/templates/products/products.html -->
+                                <div class="dropdown me-2">
+                                    <select id="id_category" class="form-select select2" style="min-width: 180px;">
+                                        <option value="">All Categories</option>
+                                        {% for category in categories %}
+                                        <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
@@ -252,5 +261,18 @@
             </div>
         </div>
     </div>
+
+    <script>
+                // Place inside your <script> block
+        document.addEventListener('DOMContentLoaded', function() {
+            $('#id_category').on('change', function() {
+                var selected = $(this).val();
+                // You can reload the page with the selected category as a GET param
+                var url = new URL(window.location.href);
+                url.searchParams.set('category', selected);
+                window.location.href = url.toString();
+            });
+        });
+    </script>
 {% endblock %}
 

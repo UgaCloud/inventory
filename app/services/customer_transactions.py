@@ -4,7 +4,7 @@ from app.models.customers import Payment, CustomerLedger, PaymentAllocation
 from app.models.customers import Customer
 from decimal import Decimal
 
-def record_sale_and_payment(receipt_no, store, customer, total_amount, amount_paid, amount_received, change, payment_method, sale_instance=None, note=None):
+def record_sale_and_payment(receipt_no, store, customer, total_amount, amount_paid, amount_received, change, payment_method, user, sale_instance=None, note=None):
     """
     Create or update a sale for a customer, handling partial/zero balance and ledger entries.
     Returns the sale instance.
@@ -30,6 +30,7 @@ def record_sale_and_payment(receipt_no, store, customer, total_amount, amount_pa
                 change=change,
                 note=note or '',
                 status='Pending' if new_balance > 0 else 'Fulfilled',
+                recorded_by=user
             )
             # New sale increases customer balance by the unpaid amount (total - paid)
             if new_balance != Decimal('0'):
