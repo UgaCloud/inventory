@@ -72,6 +72,9 @@ instance/
 docs/_build/
 
 core/settings/production.py
+core/asgi.py
+core/wsgi.py
+manage.py
 
 # PyBuilder
 .pybuilder/
