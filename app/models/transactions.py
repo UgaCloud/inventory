@@ -340,7 +340,7 @@ class StockAdjustmentItem(models.Model):
     # positive -> add stock, negative -> reduce stock
     quantity_change = models.IntegerField()
     reason = models.CharField(max_length=255, blank=True, null=True)
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True)
+    unit_cost = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
