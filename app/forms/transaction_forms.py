@@ -271,6 +271,7 @@ class StockAdjustmentItemForm(ModelForm):
     class Meta:
         model = StockAdjustmentItem
         fields = ['product', 'unit', 'quantity_change', 'unit_cost', 'reason']
+        
         widgets = {
             'product': forms.Select(attrs={'class': 'select2', 'style': 'width:100%'}),
             'unit': forms.Select(attrs={'class': 'select2'}),
