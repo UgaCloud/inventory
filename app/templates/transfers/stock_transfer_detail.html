@@ -190,7 +190,7 @@
                 <table class="table table-borderless">
                   <tr>
                     <td class="fw-bold">Transfer Date:</td>
-                    <td>{{ transfer.transfer_date|date:"M d, Y g:i A" }}</td>
+                    <td>{{ transfer.transfer_date|date:"M d, Y" }} {{ transfer.transfer_date|time:" h:i A" }}</td>
                   </tr>
                   <tr>
                     <td class="fw-bold">Expected Delivery:</td>
@@ -366,7 +366,9 @@
                 <div class="timeline-marker bg-primary"></div>
                 <div class="timeline-content">
                   <h6>Transfer Created</h6>
-                  <p class="text-muted mb-1">{{ transfer.transfer_date|date:"M d, Y g:i A" }}</p>
+                  <p class="text-muted mb-1">
+                    {{ transfer.transfer_date|date:"M d" }} {{ transfer.transfer_date|time:"g:i A" }}
+                  </p>
                   <small class="text-muted">by {{ transfer.created_by.get_full_name|default:transfer.created_by.username }}</small>
                 </div>
               </div>

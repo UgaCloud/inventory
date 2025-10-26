@@ -210,12 +210,12 @@ class StockTransferForm(forms.ModelForm):
             'transfer_request': forms.HiddenInput(),
         }
 
-    def clean(self):
-        cleaned_data = super().clean()
-        # Ensure transfer_request is set
-        if not cleaned_data.get('transfer_request'):
-            raise forms.ValidationError("A transfer request must be selected.")
-        return cleaned_data
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     # Ensure transfer_request is set
+    #     if not cleaned_data.get('transfer_request'):
+    #         raise forms.ValidationError("A transfer request must be selected.")
+    #     return cleaned_data
 
 class StockTransferItemForm(forms.ModelForm):
     class Meta:
@@ -224,6 +224,10 @@ class StockTransferItemForm(forms.ModelForm):
         widgets = {
             'stock_transfer': forms.HiddenInput(),
             'transfer_request_item': forms.HiddenInput(),
+            'product': forms.Select(attrs={
+                'class': 'select2',
+                'style': 'width:100%'
+            }),
         }
 
     def clean(self):
@@ -291,7 +295,7 @@ PurchaseOrderItemFormSet = inlineformset_factory(
 )
 
 StockTransferItemFormSet = inlineformset_factory(
-    StockTransfer, StockTransferItem, fields='__all__', extra=1
+    StockTransfer, StockTransferItem, form=StockTransferItemForm, extra=1, can_delete=True
 )
 
 TransferRequestItemFormSet = inlineformset_factory(

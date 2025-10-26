@@ -11,12 +11,16 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import datetime, timedelta
 import json
+from django.db import transaction
+from django.core.exceptions import ValidationError
 
 from app.forms.transaction_forms import StockTransferForm, StockTransferItemFormSet
 from app.models.transactions import TransferRequest, StockTransfer, StockTransferItem
 from app.models.products import StoreLocation as Store
 from app.selectors.transfer_selectors import *
 from app.selectors.product_selectors import get_stores, get_all_products
+from app.models.products import Inventory
+
 
 
 @login_required
@@ -70,7 +74,7 @@ def stock_transfer_list(request):
     # )['total'] or 0
 
     stock_form = StockTransferForm()
-    item_formset = StockTransferItemFormSet()
+    item_formset = StockTransferItemFormSet(queryset=StockTransferItem.objects.none())
     stores = get_stores()
     products = get_all_products()
     
@@ -107,12 +111,12 @@ def stock_transfer_detail(request, transfer_id):
     )
     
     # Calculate additional properties
-    transfer.total_quantity = sum(item.quantity for item in transfer.items.all())
-    transfer.is_overdue = (
-        transfer.expected_delivery_date and 
-        transfer.expected_delivery_date < timezone.now().date() and
-        transfer.status != 'completed'
-    )
+    # transfer.total_quantity = sum(item.quantity for item in transfer.items.all())
+    # transfer.is_overdue = (
+    #     transfer.expected_delivery_date and 
+    #     transfer.expected_delivery_date < timezone.now().date() and
+    #     transfer.status != 'completed'
+    # )
     
     context = {
         'transfer': transfer,
@@ -168,6 +172,7 @@ def approved_transfer_requests_api(request):
 def update_transfer_status(request, transfer_id):
     """API endpoint to update stock transfer status"""
     
+    print("Update Transfer Status Called")
     try:
         transfer = get_object_or_404(StockTransfer, id=transfer_id)
         
@@ -264,10 +269,10 @@ def stock_transfer_create(request):
         # Handle form submission
         stock_form = StockTransferForm(request.POST)
         item_formset = StockTransferItemFormSet(request.POST)
-        
+
         if stock_form.is_valid() and item_formset.is_valid():
             try:
-                # Create the stock transfer
+            # Create the stock transfer
                 stock_transfer = stock_form.save(commit=False)
                 stock_transfer.created_by = request.user
                 stock_transfer.transfer_request = transfer_request
@@ -308,19 +313,14 @@ def stock_transfer_create(request):
                     # No items were created, delete the transfer
                     stock_transfer.delete()
                     messages.error(request, 'At least one item must be added to create a transfer.')
-                    return render(request, 'transfers/stock_transfer_form.html', {
-                        'stock_form': stock_form,
-                        'item_formset': item_formset,
-                        'transfer_request': transfer_request,
-                        'stores': Store.objects.filter(is_active=True),
-                    })
+                    return redirect('stock_transfer_list')
                 
                 messages.success(
                     request, 
                     f'Stock transfer #{stock_transfer.id} created successfully with {items_created} item(s).'
                 )
                 return redirect('stock_transfer_detail', transfer_id=stock_transfer.id)
-                
+            
             except Exception as e:
                 messages.error(request, f'Error creating transfer: {str(e)}')
         
@@ -379,6 +379,121 @@ def stock_transfer_create(request):
     
     # return render(request, 'transfers/stock_transfer_form.html')
 
+@login_required
+def direct_stock_transfer_create(request):
+    """Handle creation of direct stock transfers (without prior request)"""
+    
+    if request.method == 'POST':
+        stock_form = StockTransferForm(request.POST)
+        item_formset = StockTransferItemFormSet(request.POST)
+
+        # Add debug logging
+        print('Stock Form Valid:', stock_form.is_valid())
+        if not stock_form.is_valid():
+            print('Stock Form Errors:', stock_form.errors)
+        
+        print('Item Formset Valid:', item_formset.is_valid())
+        if not item_formset.is_valid():
+            print('Item Formset Errors:', item_formset.errors)
+
+        if stock_form.is_valid() and item_formset.is_valid():
+            try:
+                with transaction.atomic():
+                    # Create stock transfer
+                    stock_transfer = stock_form.save(commit=False)
+                    stock_transfer.created_by = request.user
+                    stock_transfer.transfer_date = timezone.now()
+                    stock_transfer.save()
+
+                    # Process items
+                    items_created = 0
+                    validation_errors = []
+
+                    for form in item_formset:
+                        if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
+                            # Get the product and quantity first
+                            product = form.cleaned_data.get('product')
+                            quantity = form.cleaned_data.get('quantity')
+
+                            if not product or not quantity:
+                                continue
+
+                            # Create transfer item
+                            transfer_item = form.save(commit=False)
+                            transfer_item.stock_transfer = stock_transfer
+                            
+                            # Validate stock
+                            available_stock = get_available_stock(product, stock_transfer.from_store)
+                            if quantity > available_stock:
+                                validation_errors.append(
+                                    f'Insufficient stock for {product.name}: '
+                                    f'Available: {available_stock}, Requested: {quantity}'
+                                )
+                                continue
+
+                            # Set unit cost if not provided
+                            if not transfer_item.unit_cost:
+                                transfer_item.unit_cost = product.cost_price or 0
+
+                            # Save the transfer item
+                            try:
+                                transfer_item.save()
+                                print(f'Transfer item saved: {transfer_item.id}')
+                                items_created += 1
+                            except Exception as e:
+                                print(f'Error saving transfer item: {str(e)}')
+                                validation_errors.append(f'Error saving item: {str(e)}')
+            
+                if validation_errors:
+                    # If we have validation errors, rollback the transaction
+                    raise ValidationError('\n'.join(validation_errors))
+                
+                if items_created == 0:
+                    # If no items were created, rollback the transaction
+                    raise ValidationError('At least one valid item must be added to create a transfer.',)
+                # {stock_transfer.id}
+                messages.success(
+                    request, 
+                    f'Direct stock transfer # created successfully with {items_created} item(s).'
+                )
+                return redirect('stock_transfer_list')
+                    
+            except ValidationError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, f'Error creating transfer: {str(e)}')
+                
+        else:
+            # Form validation errors
+            for field, errors in stock_form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+            
+            for i, form in enumerate(item_formset):
+                if form.errors:
+                    for field, errors in form.errors.items():
+                        for error in errors:
+                            messages.error(request, f'Item {i+1} - {field}: {error}')
+    
+    # For both GET requests and form validation failures
+    context = {
+        'stock_form': StockTransferForm(),
+        'item_formset': StockTransferItemFormSet(queryset=StockTransferItem.objects.none()),
+        'stores': Store.objects.filter(is_active=True),
+        'products': get_all_products(),
+        'is_direct': True
+    }
+    
+    # Return to the list view with the modal context
+    return render(request, 'transfers/stock_transfer_list.html', context)
+
+def get_available_stock(product, store):
+    """Helper function to get available stock for a product in a store"""
+    try:
+        inventory = Inventory.objects.get(product=product, store=store)
+        return inventory.quantity_in_stock
+    except Inventory.DoesNotExist:
+        return 0
 
 @login_required
 def stock_transfer_create_bulk(request):

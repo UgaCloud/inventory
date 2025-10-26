@@ -1,6 +1,9 @@
 from django.db import models
 from datetime import date, timedelta
 import re
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 
@@ -204,7 +207,7 @@ class StockTransfer(models.Model):
         ("completed", "Completed"),
         ("cancelled", "Cancelled"),
     ]
-    transfer_request = models.ForeignKey(TransferRequest, on_delete=models.CASCADE, related_name="stock_transfers")
+    transfer_request = models.ForeignKey(TransferRequest, on_delete=models.CASCADE, related_name="stock_transfers", null=True, blank=True)
     transfer_date = models.DateField(auto_now_add=True)
     from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfers_out")
     to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfers_in")
@@ -214,7 +217,7 @@ class StockTransfer(models.Model):
     created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
-        return f"Transfer {self.id} for Request {self.transfer_request.id}"
+        return f"Transfer {self.from_store.name} → {self.to_store.name}"
 
     @property
     def total_items(self):
@@ -223,6 +226,81 @@ class StockTransfer(models.Model):
     @property
     def total_quantity(self):
         return sum(item.quantity for item in self.items.all())
+
+    def apply_inventory_changes(self):
+        """
+        Apply inventory changes when a transfer is completed.
+        Deducts stock from source store and adds to destination store.
+        """
+        if self.status != 'completed':
+            raise ValidationError("Can only apply inventory changes for completed transfers")
+
+        try:
+            with transaction.atomic():
+                for transfer_item in self.items.all():
+                    # Deduct from source store
+                    source_inventory, _ = Inventory.objects.get_or_create(
+                        store=self.from_store,
+                        product=transfer_item.product,
+                        defaults={'quantity_in_stock': 0}
+                    )
+
+                    if source_inventory.quantity_in_stock < transfer_item.quantity:
+                        raise ValidationError(
+                            f"Insufficient stock for {transfer_item.product.name} "
+                            f"in {self.from_store.name}. "
+                            f"Available: {source_inventory.quantity_in_stock}, "
+                            f"Required: {transfer_item.quantity}"
+                        )
+
+                    source_inventory.quantity_in_stock -= transfer_item.quantity
+                    source_inventory.last_updated = timezone.now()
+                    source_inventory.save()
+
+                    # Add to destination store
+                    dest_inventory, _ = Inventory.objects.get_or_create(
+                        store=self.to_store,
+                        product=transfer_item.product,
+                        defaults={'quantity_in_stock': 0}
+                    )
+
+                    dest_inventory.quantity_in_stock += transfer_item.quantity
+                    dest_inventory.last_updated = timezone.now()
+                    dest_inventory.save()
+
+                    # Create inventory movement records
+                    from app.models.inventory import InventoryMovement
+                    
+                    # Record deduction from source
+                    InventoryMovement.objects.create(
+                        inventory=source_inventory,
+                        movement_type='transfer_out',
+                        quantity=-transfer_item.quantity,
+                        reference_id=self.id,
+                        reference_type='stock_transfer',
+                        unit_cost=transfer_item.unit_cost,
+                        notes=f"Transfer #{self.id} to {self.to_store.name}"
+                    )
+
+                    # Record addition to destination
+                    InventoryMovement.objects.create(
+                        inventory=dest_inventory,
+                        movement_type='transfer_in',
+                        quantity=transfer_item.quantity,
+                        reference_id=self.id,
+                        reference_type='stock_transfer',
+                        unit_cost=transfer_item.unit_cost,
+                        notes=f"Transfer #{self.id} from {self.from_store.name}"
+                    )
+
+                # Update transfer completion details
+                self.completion_date = timezone.now()
+                self.save()
+
+        except ValidationError as e:
+            raise e
+        except Exception as e:
+            raise ValidationError(f"Error applying inventory changes: {str(e)}")
 
 
 class StockTransferItem(models.Model):
@@ -237,9 +315,9 @@ class StockTransferItem(models.Model):
     class Meta:
         unique_together = ("stock_transfer", "product")
 
-    def __str__(self):
+    '''def __str__(self):
         return f"{self.product.name} x {self.quantity} (Transfer {self.stock_transfer.id})"
-
+'''
     @property
     def total_quantity(self):
         return self.quantity
@@ -248,7 +326,7 @@ class StockTransferItem(models.Model):
         # Deduct from source store using FIFO and expiry
         batches = InventoryBatch.objects.filter(
             product=self.product,
-            store=self.stock_transfer.transfer_request.from_store,
+            store=self.stock_transfer.from_store,
             remaining_quantity__gt=0,
             expiry_date__gte=date.today()
         ).order_by('expiry_date', 'received_date')
@@ -262,16 +340,15 @@ class StockTransferItem(models.Model):
                 to_deduct -= batch.remaining_quantity
                 batch.remaining_quantity = 0
                 batch.save()
-        # Add to destination store as new batch (preserve expiry)
-        InventoryBatch.objects.create(
-            product=self.product,
-            store=self.stock_transfer.transfer_request.to_store,
-            quantity=self.quantity,
-            unit_cost=batch.unit_cost if batch else 0,
-            remaining_quantity=self.quantity,
-            expiry_date=batch.expiry_date if batch else None,
-            purchase_order_item=None
-        )
+            # Add to destination store as new batch (preserve expiry)
+            InventoryBatch.objects.create(
+                product=self.product,
+                store=self.stock_transfer.to_store,
+                quantity=self.quantity,
+                remaining_quantity=self.quantity,
+                expiry_date=batch.expiry_date if batch else None,
+                purchase_order_item=None
+            )
 
 
 class StockAdjustment(models.Model):

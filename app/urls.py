@@ -3,6 +3,8 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from api import views
+
 from .views.product_views import * 
 from .views.accounts_views import manage_accounts_view
 from .views.general_views import *
@@ -90,6 +92,7 @@ urlpatterns = [
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
+    path('stock-transfer/direct/create/', direct_stock_transfer_create, name='direct_stock_transfer_create'),
     path('stock_transfers/create/bulk/', stock_transfer_create_bulk, name='stock_transfer_create_bulk'),
     path('stock_transfers/<int:transfer_id>/', stock_transfer_detail, name='stock_transfer_detail'),
     path('stock_transfers/<int:transfer_id>/update/', stock_transfer_update, name='stock_transfer_update'),

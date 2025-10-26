@@ -121,8 +121,9 @@ def stock_transfer_create(request):
     if request.method == 'POST':
         form = StockTransferForm(request.POST)
         formset = StockTransferItemFormSet(request.POST)
-        
+        print("in post")
         if form.is_valid() and formset.is_valid():
+            print("Insave")
             transfer = form.save()
             formset.instance = transfer
             formset.save()
