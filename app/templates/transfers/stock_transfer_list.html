@@ -485,60 +485,82 @@
           <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0">Transfer Items</h6>
-              <button type="button" class="btn btn-sm btn-primary" id="add-item-btn">
+              <button type="button" class="btn btn-sm btn-primary" onclick="addFormsetRow()">
                 <i data-feather="plus" class="feather-12 me-1"></i>
                 Add Item
               </button>
             </div>
             <div class="card-body">
+              {{ item_formset.management_form }}
+              <input type="hidden" name="{{ item_formset.prefix }}-TOTAL_FORMS" value="0" id="id_{{ item_formset.prefix }}-TOTAL_FORMS">
+              <input type="hidden" name="{{ item_formset.prefix }}-INITIAL_FORMS" value="0" id="id_{{ item_formset.prefix }}-INITIAL_FORMS">
+              <input type="hidden" name="{{ item_formset.prefix }}-MIN_NUM_FORMS" value="0" id="id_{{ item_formset.prefix }}-MIN_NUM_FORMS">
+              <input type="hidden" name="{{ item_formset.prefix }}-MAX_NUM_FORMS" value="1000" id="id_{{ item_formset.prefix }}-MAX_NUM_FORMS">
               <div class="table-responsive">
-                <table class="table table-sm" id="transferItemsTable">
+                <table class="table table-sm" id="formset-table">
                   <thead class="table-light">
                     <tr>
                       <th>Product</th>
                       <th>Available</th>
                       <th>Quantity</th>
-                      <th>Unit Cost</th>
+                      <th>Units</th>
                       <th>Total</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
-                  <tbody id="transferItemsBody">
-                    {% for form in item_formset.forms %}
-                    <tr>
-                      <td>{{ form.product|as_crispy_field }}</td>
-                      <td>
-                        <span class="available-stock text-muted" id="available-{{ forloop.counter0 }}">-</span>
-                      </td>
-                      <td>{{ form.quantity|as_crispy_field }}</td>
-                      <td>
-                        {% comment %} {{ form.unit_cost|as_crispy_field }} {% endcomment %}
-                      </td>
-                      <td>
-                        <span class="item-total fw-bold" id="total-{{ forloop.counter0 }}">UGX 0</span>
-                      </td>
-                      <td>
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn">
-                          <i data-feather="trash-2" class="feather-12"></i>
-                        </button>
-                      </td>
+                  <tbody id="formset-tbody">
+                    {% for form in item_formset %}
+                    <tr class="formset-row" id="row-{{ forloop.counter0 }}">
+                        <td>
+                            {{ form.id }}
+                            <select name="{{ form.product.html_name }}" 
+                                  id="{{ form.product.auto_id }}" 
+                                  class="form-select form-select-sm product-select">
+                              <option value="">Select Product</option>
+                              {% for product in products %}
+                              <option value="{{ product.id }}" 
+                                      data-cost="{{ product.cost_price|default:'0' }}"
+                                      data-sku="{{ product.sku }}">
+                                  {{ product.name }} ({{ product.sku }})
+                              </option>
+                              {% endfor %}
+                          </select>
+                        </td>
+                        <td>
+                            <span class="available-stock text-muted" id="available-{{ forloop.counter0 }}">-</span>
+                        </td>
+                        <td>
+                            {{ form.quantity|as_crispy_field }}
+                        </td>
+                        <td>
+                            <select name="{{ form.units.html_name }}"
+                                  id="{{ form.units.auto_id }}"
+                                  class="form-select form-select-sm">
+                              <option value="">Select Unit</option>
+                              {% for unit in units %}
+                              <option value="{{ unit }}">{{ unit.name }}</option>
+                              {% endfor %}
+                          </select>
+                        </td>
+                        <td>
+                            <span class="row-total">UGX 0.00</span>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFormsetRow(this)">
+                                <i data-feather="trash-2" class="feather-12"></i>
+                            </button>
+                        </td>
                     </tr>
                     {% endfor %}
                   </tbody>
                   <tfoot>
                     <tr class="table-info">
-                      <td colspan="4" class="text-end fw-bold">Total Transfer Value:</td>
-                      <td class="fw-bold" id="totalTransferValue">UGX 0</td>
-                      <td></td>
+                      <td colspan="4" class="text-end fw-bold">Total Value:</td>
+                      <td colspan="2" class="fw-bold" id="grand-total">UGX 0.00</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-              <div class="alert alert-info mt-3" style="display: none;" id="stockWarning">
-                <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-                <span id="stockWarningMessage"></span>
-              </div>
-              {{ item_formset.management_form }}
             </div>
           </div>
         </div>
@@ -558,6 +580,10 @@
 <script>
 let transferItemCounter = 0;
 let availableProducts = [];
+
+// Add these variables at the start of your script section
+let rowTemplate = null;
+let formsetPrefix = 'items';
 
 // Show approved requests modal
 function showApprovedRequestsModal() {
@@ -674,343 +700,148 @@ function showApprovedRequestsModal() {
 
 // Show direct transfer modal
 function showDirectTransferModal() {
-  // Reset form and counter
-  transferItemCounter = 0;
-  document.getElementById('directTransferForm').reset();
-  document.getElementById('transferItemsBody').innerHTML = '';
-  document.getElementById('totalTransferValue').textContent = 'UGX 0';
-  document.getElementById('stockWarning').style.display = 'none';
-  
-  // Load available products
-  loadAvailableProducts();
-  
-  // Add initial item row
-  addTransferItem();
-  
-  const modal = new bootstrap.Modal(document.getElementById('directTransferModal'));
-  modal.show();
-}
-
-// Load available products
-function loadAvailableProducts() {
-  // Load all active products
-  fetch('/api/products/?active_only=true&limit=100')
-    .then(response => response.json())
-    .then(data => {
-      availableProducts = data.products;
-    })
-    .catch(error => {
-      console.error('Error loading products:', error);
-    });
-}
-
-// Add transfer item row
-function addTransferItem() {
-  transferItemCounter++;
-  const tbody = document.getElementById('transferItemsBody');
-  
-  const row = document.createElement('tr');
-  row.id = `item-row-${transferItemCounter}`;
-  row.innerHTML = `
-    <td>
-      <select name="items-${transferItemCounter}-product" class="form-select form-select-sm product-select" 
-              onchange="updateProductInfo(${transferItemCounter})" required>
-        <option value="">Select product...</option>
-        ${availableProducts.map(product => 
-          `<option value="${product.id}" data-cost="${product.cost_price}">${product.name} (${product.sku})</option>`
-        ).join('')}
-      </select>
-    </td>
-    <td>
-      <span class="available-stock text-muted" id="available-${transferItemCounter}">-</span>
-    </td>
-    <td>
-      <input type="number" name="items-${transferItemCounter}-quantity" 
-             class="form-control form-control-sm quantity-input" 
-             min="1" step="1" onchange="updateItemTotal(${transferItemCounter})" required>
-    </td>
-    <td>
-      <input type="number" name="items-${transferItemCounter}-unit_cost" 
-             class="form-control form-control-sm cost-input" 
-             min="0" step="0.01" onchange="updateItemTotal(${transferItemCounter})" required>
-    </td>
-    <td>
-      <span class="item-total fw-bold" id="total-${transferItemCounter}">UGX 0</span>
-    </td>
-    <td>
-      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTransferItem(${transferItemCounter})">
-        <i data-feather="trash-2" class="feather-12"></i>
-      </button>
-    </td>
-  `;
-  
-  tbody.appendChild(row);
-  
-  // Re-initialize feather icons
-  if (typeof feather !== 'undefined') {
-    feather.replace();
-  }
-}
-
-// Remove transfer item row
-function removeTransferItem(itemId) {
-  const row = document.getElementById(`item-row-${itemId}`);
-  if (row) {
-    row.remove();
-    updateTransferTotal();
-  }
-  
-  // Ensure at least one row exists
-  const tbody = document.getElementById('transferItemsBody');
-  if (tbody.children.length === 0) {
-    addTransferItem();
-  }
-}
-
-// Update product info when product is selected
-function updateProductInfo(itemId) {
-  const productSelect = document.querySelector(`select[name="items-${itemId}-product"]`);
-  const costInput = document.querySelector(`input[name="items-${itemId}-unit_cost"]`);
-  const availableSpan = document.getElementById(`available-${itemId}`);
-  const fromStoreSelect = document.getElementById('from_store');
-  
-  if (productSelect.value && fromStoreSelect.value) {
-    const selectedOption = productSelect.selectedOptions[0];
-    const productCost = selectedOption.dataset.cost || 0;
-    
-    // Set cost
-    costInput.value = parseFloat(productCost).toFixed(2);
-    
-    // Get available stock
-    fetch(`/api/products/${productSelect.value}/stock/?store_id=${fromStoreSelect.value}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          const available = data.stock.available_stock;
-          availableSpan.textContent = available;
-          availableSpan.className = available > 0 ? 'available-stock text-success' : 'available-stock text-danger';
-          
-          // Validate quantity against available stock
-          const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
-          quantityInput.max = available;
-          
-          if (quantityInput.value && parseInt(quantityInput.value) > available) {
-            quantityInput.classList.add('is-invalid');
-            showStockWarning(`Insufficient stock for ${data.product.name}. Available: ${available}`);
-          } else {
-            quantityInput.classList.remove('is-invalid');
-            hideStockWarning();
-          }
+    // Get and store the template row if not already stored
+    if (!rowTemplate) {
+        const templateRow = document.querySelector('.formset-row');
+        if (templateRow) {
+            rowTemplate = templateRow.cloneNode(true);
         }
-      })
-      .catch(error => {
-        console.error('Error fetching product info:', error);
-        availableSpan.textContent = '-';
-        availableSpan.className = 'available-stock text-muted';
-      });
+    }
+
+    // Get the modal element
+    const modal = document.getElementById('directTransferModal');
+    if (!modal) {
+        console.error('Modal element not found');
+        return;
+    }
+
+    // Reset the form
+    const form = document.getElementById('directTransferForm');
+    if (form) {
+        form.reset();
+    }
+
+    // Clear and initialize formset
+    const tbody = document.getElementById('formset-tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+    }
+
+    // Reset management form
+    const totalFormsInput = document.querySelector(`[name="${formsetPrefix}-TOTAL_FORMS"]`);
+    const initialFormsInput = document.querySelector(`[name="${formsetPrefix}-INITIAL_FORMS"]`);
+    if (totalFormsInput) totalFormsInput.value = '0';
+    if (initialFormsInput) initialFormsInput.value = '0';
+
+    // Show modal
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    // Add initial row after modal is shown
+    modal.addEventListener('shown.bs.modal', function() {
+        addFormsetRow();
+    }, { once: true });
+}
+
+function addFormsetRow() {
+    if (!rowTemplate) {
+        console.error('Row template not found');
+        return;
+    }
+
+    const totalFormsInput = document.querySelector(`[name="${formsetPrefix}-TOTAL_FORMS"]`);
+    if (!totalFormsInput) {
+        console.error('Total forms input not found');
+        return;
+    }
+
+    const currentForms = parseInt(totalFormsInput.value);
+    const newRow = rowTemplate.cloneNode(true);
     
-    updateItemTotal(itemId);
-  } else {
-    costInput.value = '';
-    availableSpan.textContent = '-';
-    availableSpan.className = 'available-stock text-muted';
-  }
-}
-
-// Update individual item total
-function updateItemTotal(itemId) {
-  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
-  const costInput = document.querySelector(`input[name="items-${itemId}-unit_cost"]`);
-  const totalSpan = document.getElementById(`total-${itemId}`);
-  
-  const quantity = parseFloat(quantityInput.value) || 0;
-  const cost = parseFloat(costInput.value) || 0;
-  const total = quantity * cost;
-  
-  totalSpan.textContent = `UGX ${total.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-  
-  updateTransferTotal();
-}
-
-// Update total transfer value
-function updateTransferTotal() {
-  const itemTotals = document.querySelectorAll('.item-total');
-  let grandTotal = 0;
-  
-  itemTotals.forEach(span => {
-    const value = span.textContent.replace('UGX ', '').replace(/,/g, '');
-    grandTotal += parseFloat(value) || 0;
-  });
-  
-  document.getElementById('totalTransferValue').textContent = 
-    `UGX ${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-}
-
-// Show stock warning
-function showStockWarning(message) {
-  const warning = document.getElementById('stockWarning');
-  const messageSpan = document.getElementById('stockWarningMessage');
-  messageSpan.textContent = message;
-  warning.style.display = 'block';
-}
-
-// Hide stock warning
-function hideStockWarning() {
-  document.getElementById('stockWarning').style.display = 'none';
-}
-
-// Submit direct transfer
-function submitDirectTransfer() {
-  const form = document.getElementById('directTransferForm');
-  const submitBtn = document.querySelector('#directTransferModal .btn-primary');
-  const spinner = submitBtn.querySelector('.spinner-border');
-  
-  // Validate form
-  if (!form.checkValidity()) {
-    form.reportValidity();
-    return;
-  }
-  
-  // Check if at least one item is added
-  const tbody = document.getElementById('transferItemsBody');
-  if (tbody.children.length === 0) {
-    alert('Please add at least one item to transfer.');
-    return;
-  }
-  
-  // Show loading state
-  submitBtn.disabled = true;
-  // spinner.classList.remove('d-none');
-  
-  // Collect form data
-  const formData = new FormData(form);
-  
-  // Submit via AJAX
-  fetch('/stock_transfers/create/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
-    },
-    body: formData
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      // Close modal and redirect
-      const modal = bootstrap.Modal.getInstance(document.getElementById('directTransferModal'));
-      modal.hide();
-      
-      // Show success message and reload
-      alert(`Transfer #ST${String(data.transfer_id).padStart(4, '0')} created successfully!`);
-      location.reload();
-    } else {
-      alert('Error creating transfer: ' + (data.error || 'Unknown error'));
-    }
-  });
-}
-
-// Store change handler to update available stock
-document.getElementById('from_store').addEventListener('change', function() {
-  // Update all product info when source store changes
-  const productSelects = document.querySelectorAll('.product-select');
-  productSelects.forEach((select, index) => {
-    if (select.value) {
-      const itemId = select.name.match(/items-(\d+)-product/)[1];
-      updateProductInfo(itemId);
-    }
-  });
-});
-
-// Create single transfer from request
-function createSingleTransfer(requestId) {
-  if (confirm('Create stock transfer from this approved request?')) {
-    window.location.href = `/stock_transfers/create/?request=${requestId}`;
-  }
-}
-
-// Create bulk transfers
-function createBulkTransfers() {
-  const selected = Array.from(document.querySelectorAll('.request-checkbox:checked')).map(cb => cb.value);
-  
-  if (selected.length === 0) {
-    alert('Please select at least one request.');
-    return;
-  }
-  
-  if (confirm(`Create stock transfers for ${selected.length} selected request${selected.length !== 1 ? 's' : ''}?`)) {
-    window.location.href = `/stock_transfers/create/bulk/?requests=${selected.join(',')}`;
-  }
-}
-
-// Transfer action functions
-function startTransfer(transferId) {
-  if (confirm('Start this stock transfer? This will mark it as in transit.')) {
-    updateTransferStatus(transferId, 'in_transit');
-  }
-}
-
-function completeTransfer(transferId) {
-  if (confirm('Mark this transfer as completed? This will update inventory levels.')) {
-    updateTransferStatus(transferId, 'completed');
-  }
-}
-
-function cancelTransfer(transferId) {
-  if (confirm('Cancel this transfer? This action cannot be undone.')) {
-    updateTransferStatus(transferId, 'cancelled');
-  }
-}
-
-function trackTransfer(transferId) {
-  alert('Transfer tracking feature coming soon.');
-}
-
-// Update transfer status via AJAX
-function updateTransferStatus(transferId, status) {
-  fetch(`/stock_transfers/${transferId}/update_status/`, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ status: status })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      location.reload();
-    } else {
-      alert('Error updating transfer: ' + data.error);
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    alert('An error occurred while updating the transfer.');
-  });
-}
-
-function refreshTransfers() {
-  location.reload();
-}
-
-// Initialize page
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize feather icons
-  if (typeof feather !== 'undefined') {
-    feather.replace();
-  }
-  
-  // Initialize tooltips
-  if (typeof bootstrap !== 'undefined') {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
-    tooltipTriggerList.map(function(tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
+    // Update row ID and form indices
+    newRow.id = `row-${currentForms}`;
+    const inputs = newRow.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        if (input.name) {
+            input.name = input.name.replace(/-\d+-/, `-${currentForms}-`);
+            input.id = input.id.replace(/-\d+-/, `-${currentForms}-`);
+        }
+        // Clear values except hidden fields
+        if (input.type !== 'hidden' && !input.classList.contains('delete-checkbox')) {
+            input.value = '';
+        }
     });
-  }
-  
-  // Load products for direct transfer modal
-  loadAvailableProducts();
-});
+
+    // Reset displays
+    const availableStock = newRow.querySelector('.available-stock');
+    if (availableStock) availableStock.textContent = '-';
+    
+    const rowTotal = newRow.querySelector('.row-total');
+    if (rowTotal) rowTotal.textContent = 'UGX 0.00';
+
+    // Add to table
+    const tbody = document.getElementById('formset-tbody');
+    if (tbody) {
+        tbody.appendChild(newRow);
+        totalFormsInput.value = currentForms + 1;
+        initializeRowFeatures(newRow);
+    }
+
+    // Refresh feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+}
+
+function initializeRowFeatures(row) {
+    // Product select
+    const productSelect = row.querySelector('select[name*="product"]');
+    if (productSelect) {
+        productSelect.addEventListener('change', function() {
+            updateProductInfo(this);
+        });
+    }
+
+    // Quantity input
+    const quantityInput = row.querySelector('input[name*="quantity"]');
+    if (quantityInput) {
+        quantityInput.addEventListener('input', function() {
+            updateRowTotal(row);
+        });
+    }
+
+    // Delete button
+    const deleteBtn = row.querySelector('.btn-outline-danger');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function() {
+            removeFormsetRow(this);
+        });
+    }
+}
+
+function removeFormsetRow(button) {
+    const row = button.closest('tr');
+    const tbody = document.getElementById('formset-tbody');
+    
+    // Don't remove if it's the last row
+    if (tbody.children.length <= 1) {
+        // Just clear the values instead
+        const inputs = row.querySelectorAll('input:not([type="hidden"]), select');
+        inputs.forEach(input => input.value = '');
+        row.querySelector('.available-stock').textContent = '-';
+        row.querySelector('.row-total').textContent = 'UGX 0.00';
+        return;
+    }
+
+    const deleteInput = row.querySelector('[name$="-DELETE"]');
+    if (deleteInput) {
+        deleteInput.value = 'on';
+        row.style.display = 'none';
+    } else {
+        row.remove();
+    }
+    updateGrandTotal();
+}
 </script>
 
 <style>

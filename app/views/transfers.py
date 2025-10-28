@@ -18,7 +18,7 @@ from app.forms.transaction_forms import StockTransferForm, StockTransferItemForm
 from app.models.transactions import TransferRequest, StockTransfer, StockTransferItem
 from app.models.products import StoreLocation as Store
 from app.selectors.transfer_selectors import *
-from app.selectors.product_selectors import get_stores, get_all_products
+from app.selectors.product_selectors import get_stores, get_all_products, get_all_units_of_measurement
 from app.models.products import Inventory
 
 
@@ -74,7 +74,7 @@ def stock_transfer_list(request):
     # )['total'] or 0
 
     stock_form = StockTransferForm()
-    item_formset = StockTransferItemFormSet(queryset=StockTransferItem.objects.none())
+    item_formset = StockTransferItemFormSet(queryset=StockTransferItem.objects.none(), prefix='items')
     stores = get_stores()
     products = get_all_products()
     
@@ -94,6 +94,7 @@ def stock_transfer_list(request):
         'item_formset': item_formset,
         'stores': stores,
         'products': products,
+        'units': get_all_units_of_measurement()
     }
     
     return render(request, 'transfers/stock_transfer_list.html', context)
@@ -172,7 +173,6 @@ def approved_transfer_requests_api(request):
 def update_transfer_status(request, transfer_id):
     """API endpoint to update stock transfer status"""
     
-    print("Update Transfer Status Called")
     try:
         transfer = get_object_or_404(StockTransfer, id=transfer_id)
         
@@ -189,8 +189,8 @@ def update_transfer_status(request, transfer_id):
         valid_transitions = {
             'pending': ['in_transit', 'cancelled'],
             'in_transit': ['completed', 'cancelled'],
-            'completed': [],  # No transitions from completed
-            'cancelled': [],  # No transitions from cancelled
+            'completed': [],  
+            'cancelled': [],  
         }
         
         if new_status not in valid_transitions.get(transfer.status, []):
@@ -382,19 +382,14 @@ def stock_transfer_create(request):
 @login_required
 def direct_stock_transfer_create(request):
     """Handle creation of direct stock transfers (without prior request)"""
+
+    print("In direct stock transfer create view")
     
     if request.method == 'POST':
         stock_form = StockTransferForm(request.POST)
         item_formset = StockTransferItemFormSet(request.POST)
 
-        # Add debug logging
-        print('Stock Form Valid:', stock_form.is_valid())
-        if not stock_form.is_valid():
-            print('Stock Form Errors:', stock_form.errors)
-        
-        print('Item Formset Valid:', item_formset.is_valid())
-        if not item_formset.is_valid():
-            print('Item Formset Errors:', item_formset.errors)
+        print(f"Forms received: {stock_form.data}, items: {item_formset.data}")
 
         if stock_form.is_valid() and item_formset.is_valid():
             try:
@@ -410,7 +405,10 @@ def direct_stock_transfer_create(request):
                     validation_errors = []
 
                     for form in item_formset:
+                        print("Processing form:", form.data)
                         if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
+
+                            print('Processing item form:', form.cleaned_data)
                             # Get the product and quantity first
                             product = form.cleaned_data.get('product')
                             quantity = form.cleaned_data.get('quantity')
@@ -431,9 +429,9 @@ def direct_stock_transfer_create(request):
                                 )
                                 continue
 
-                            # Set unit cost if not provided
-                            if not transfer_item.unit_cost:
-                                transfer_item.unit_cost = product.cost_price or 0
+                            # # Set unit cost if not provided
+                            # if not transfer_item.unit_cost:
+                            #     transfer_item.unit_cost = product.cost_price or 0
 
                             # Save the transfer item
                             try:
