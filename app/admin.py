@@ -58,6 +58,7 @@ admin.site.register(Supplier, get_admin_for_model(Supplier))
 admin.site.register(Customer, get_admin_for_model(Customer))
 admin.site.register(CustomerLedger, get_admin_for_model(CustomerLedger))
 admin.site.register(Payment, get_admin_for_model(Payment))
+admin.site.register(InventoryBatch, get_admin_for_model(InventoryBatch))
 admin.site.register(Employee, EmployeeAdmin)
 
 
