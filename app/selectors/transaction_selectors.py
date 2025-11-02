@@ -1,6 +1,6 @@
 from app.models.transactions import PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement
 from app.models.expense import Expense
-from django.db.models import Sum
+from django.db.models import Sum, Count, F
 from datetime import date
 
 # PurchaseOrder selectors
@@ -123,6 +123,11 @@ def get_net_profit():
 def get_number_of_sales():
     return Sales.objects.count()
 
+def get_todays_number_of_sales():
+    today = date.today()
+    result = Sales.objects.filter(sale_date=today).aggregate(count=Count('id'))
+    return result['count'] or 0
+
 def get_top_selling_products():
     
     return (
@@ -139,3 +144,94 @@ def get_total_payments_received():
 def get_total_outstanding_balances():
     result = Sales.objects.aggregate(total=Sum('balance'))
     return result['total'] or 0
+
+def get_todays_outstanding_balances():
+    today = date.today()
+    result = Sales.objects.filter(sale_date=today).aggregate(total=Sum('balance'))
+    return result['total'] or 0
+
+
+def get_todays_collection_rate():
+   
+    today = date.today()
+    
+    # Get today's totals using aggregate to minimize database queries
+    totals = Sales.objects.filter(sale_date=today).aggregate(
+        total_sales=Sum('total_amount'),
+        total_received=Sum('amount_received')
+    )
+    
+    total_sales = totals['total_sales'] or 0
+    total_received = totals['total_received'] or 0
+    
+    # Avoid division by zero
+    if total_sales == 0:
+        return 0
+        
+    collection_rate = (total_received / total_sales) * 100
+    
+    # Round to 2 decimal places
+    return round(collection_rate, 2)
+
+# ...existing code...
+
+def get_todays_fully_paid_sales():
+    """Get today's fully paid sales data"""
+    today = date.today()
+    
+    fully_paid = Sales.objects.filter(
+        sale_date=today,
+        balance=0,
+        total_amount=F('total_amount')
+    ).aggregate(
+        count=Count('id'),
+        total_amount=Sum('total_amount'),
+    )
+    
+    return {
+        'count': fully_paid['count'] or 0,
+        'total_amount': fully_paid['total_amount'] or 0,
+    }
+
+def get_todays_partially_paid_sales():
+    """Get today's partially paid sales data"""
+    today = date.today()
+    
+    partially_paid = Sales.objects.filter(
+        sale_date=today,
+        balance__gt=0,
+        amount_received__gt=0
+    ).aggregate(
+        count=Count('id'),
+        total_received=Sum('amount_received'),
+    )
+    
+    return {
+        'count': partially_paid['count'] or 0,
+        'total_received': partially_paid['total_received'] or 0,
+    }
+
+def get_todays_unpaid_sales():
+    """Get today's unpaid sales data"""
+    today = date.today()
+
+    unpaid = Sales.objects.filter(
+        sale_date=today,
+        amount_received=0
+    ).aggregate(
+        count=Count('id'),
+        total_amount=Sum('total_amount')
+    )
+    
+    return {
+        'count': unpaid['count'] or 0,
+        'total_amount': unpaid['total_amount'] or 0
+    }
+
+def get_todays_sales_summary():
+    """Get complete summary of today's sales by payment status"""
+    return {
+        'fully_paid': get_todays_fully_paid_sales(),
+        'partially_paid': get_todays_partially_paid_sales(),
+        'unpaid': get_todays_unpaid_sales()
+    }

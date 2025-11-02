@@ -23,6 +23,7 @@ def index_view(request):
     
     total_purchases = get_total_purchases()
     total_sales = get_total_sales()
+    todays_number_sales = get_todays_number_of_sales()
     total_expenses = get_total_expenses()
     net_profit = get_net_profit()
     total_suppliers = get_number_of_suppliers()
@@ -30,7 +31,8 @@ def index_view(request):
     total_sale_orders = get_number_of_sales()
     total_payments_received = get_total_payments_received()
     total_outstanding_balances = get_total_outstanding_balances()
-
+    todays_outstanding_balances = get_todays_outstanding_balances()
+    todays_collection_rate = get_todays_collection_rate()
     low_stock_products = get_low_stock_products()
     top_selling_products = get_top_selling_products()
     recent_sales = get_recent_sales(limit=5)
@@ -51,7 +53,14 @@ def index_view(request):
         'recent_sales': recent_sales,
         'total_payments_received': total_payments_received,
         'total_outstanding_balances': total_outstanding_balances,
+        'todays_number_sales': todays_number_sales,
+        'todays_credit_sales': todays_outstanding_balances,
+        'todays_collection_rate': todays_collection_rate,
+        'todays_fully_paid_sales': get_todays_fully_paid_sales(),
+        'todays_partially_paid_sales': get_todays_partially_paid_sales(),
+        'todays_unpaid_sales': get_todays_unpaid_sales(),
     }
+    print(context['todays_fully_paid_sales'])
     # context = {
     # 'current_store': current_store,
     # 'total_products': total_products,

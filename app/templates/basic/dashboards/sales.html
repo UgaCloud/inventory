@@ -57,7 +57,7 @@
         <div class="ms-2">
           <p class="text-white mb-1">Today's Sales</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
-            <h4 class="text-white">UGX {{ today_sales|default:"0"|intcomma }}</h4>
+            <h4 class="text-white">UGX {{ total_sales|default:"0"|intcomma }}</h4>
             <span class="badge badge-soft-primary">
               <i class="ti ti-arrow-up me-1"></i>Today
             </span>
@@ -75,7 +75,7 @@
         <div class="ms-2">
           <p class="text-white mb-1">Payments Received</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
-            <h4 class="text-white">UGX {{ total_payments_received|default:"0"|intcomma }}</h4>
+            <h4 class="text-white">UGX {{ total_payments_received| default:"0"|intcomma }}</h4>
             <span class="badge badge-soft-success">
               <i class="ti ti-checks me-1"></i>Collected
             </span>
@@ -93,7 +93,7 @@
         <div class="ms-2">
           <p class="text-white mb-1">Outstanding Balance</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
-            <h4 class="text-white">UGX {{ total_outstanding_balance|default:"0"|intcomma }}</h4>
+            <h4 class="text-white">UGX {{ total_outstanding_balances| default:"0"|intcomma }}</h4>
             <span class="badge badge-soft-warning">
               <i class="ti ti-alert-circle me-1"></i>Due
             </span>
@@ -111,7 +111,7 @@
         <div class="ms-2">
           <p class="text-white mb-1">Total Orders</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
-            <h4 class="text-white">{{ total_orders|default:"0" }}</h4>
+            <h4 class="text-white">{{ total_sale_orders|default:"0" }}</h4>
             <span class="badge badge-soft-info">
               <i class="ti ti-calendar me-1"></i>All Time
             </span>
@@ -131,7 +131,7 @@
           <i class="ti ti-cash"></i>
         </div>
         <h5 class="text-success mb-1">Today's Collections</h5>
-        <h3 class="mb-1">UGX {{ today_payments_received|default:"0"|intcomma }}</h3>
+        <h3 class="mb-1">UGX {{ total_payments_received|default:"0"|intcomma }}</h3>
         <p class="text-muted mb-0">
           <span class="text-success">
             <i class="ti ti-trending-up me-1"></i>
@@ -149,7 +149,7 @@
           <i class="ti ti-receipt-off"></i>
         </div>
         <h5 class="text-warning mb-1">Today's Credit Sales</h5>
-        <h3 class="mb-1">UGX {{ today_credit_sales|default:"0"|intcomma }}</h3>
+        <h3 class="mb-1">UGX {{ todays_credit_sales|default:"0"|intcomma }}</h3>
         <p class="text-muted mb-0">
           <span class="text-warning">
             <i class="ti ti-clock me-1"></i>
@@ -167,7 +167,7 @@
           <i class="ti ti-percentage"></i>
         </div>
         <h5 class="text-primary mb-1">Collection Rate</h5>
-        <h3 class="mb-1">{{ collection_rate|default:"0" }}%</h3>
+        <h3 class="mb-1">{{ todays_collection_rate|default:"0" }}%</h3>
         <p class="text-muted mb-0">
           <span class="text-primary">
             <i class="ti ti-chart-line me-1"></i>
@@ -268,11 +268,11 @@
             </div>
             <div>
               <h6 class="mb-1">Fully Paid</h6>
-              <p class="fs-13 text-muted mb-0">{{ fully_paid_count|default:"0" }} transactions</p>
+              <p class="fs-13 text-muted mb-0">{{ todays_fully_paid_sales.count|default:"0" }} transactions</p>
             </div>
           </div>
           <div class="text-end">
-            <h6 class="text-success">UGX {{ fully_paid_amount|default:"0"|intcomma }}</h6>
+            <h6 class="text-success">UGX {{ todays_fully_paid_sales.total_amount|default:"0"|intcomma }}</h6>
           </div>
         </div>
         <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
@@ -282,11 +282,11 @@
             </div>
             <div>
               <h6 class="mb-1">Partial Payment</h6>
-              <p class="fs-13 text-muted mb-0">{{ partial_paid_count|default:"0" }} transactions</p>
+              <p class="fs-13 text-muted mb-0">{{ todays_partially_paid_sales.count|default:"0" }} transactions</p>
             </div>
           </div>
           <div class="text-end">
-            <h6 class="text-warning">UGX {{ partial_paid_amount|default:"0"|intcomma }}</h6>
+            <h6 class="text-warning">UGX {{ todays_partially_paid_sales.total_received|default:"0"|intcomma }}</h6>
           </div>
         </div>
         <div class="d-flex align-items-center justify-content-between">
@@ -296,11 +296,11 @@
             </div>
             <div>
               <h6 class="mb-1">Unpaid</h6>
-              <p class="fs-13 text-muted mb-0">{{ unpaid_count|default:"0" }} transactions</p>
+              <p class="fs-13 text-muted mb-0">{{ todays_unpaid_sales.count|default:"0" }} transactions</p>
             </div>
           </div>
           <div class="text-end">
-            <h6 class="text-danger">UGX {{ unpaid_amount|default:"0"|intcomma }}</h6>
+            <h6 class="text-danger">UGX {{ todays_unpaid_sales.total_amount|default:"0"|intcomma }}</h6>
           </div>
         </div>
       </div>
