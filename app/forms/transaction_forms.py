@@ -89,7 +89,7 @@ class SalesForm(forms.ModelForm):
         try:
             default_store = StoreLocation.objects.filter(is_default=True).first()
             if default_store:
-                self.fields['store'].queryset = StoreLocation.objects.filter(id=default_store.id)
+                self.fields['store'].queryset = StoreLocation.objects.filter(is_default=True)
                 # Optionally set the default store as the initial value
                 self.fields['store'].initial = default_store
             else:
