@@ -91,7 +91,7 @@ urlpatterns = [
     path('transfer_requests/<int:request_id>/reject/', reject_transfer_request, name='reject_transfer_request'),  # NEW
     path('transfer_request_for_approval/', pending_transfer_requests_for_approval, name='transfer_request_for_approval'),
 
-path('debug/transfer-post/', debug_transfer_post, name='debug_transfer_post'),
+
 
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),

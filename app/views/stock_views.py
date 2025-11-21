@@ -449,17 +449,6 @@ def direct_stock_transfer_create(request):
     
     return redirect('stock_transfer_list')
 
-# Add this to your views temporarily for debugging
-@login_required
-def debug_transfer_post(request):
-    """Debug view to see what's in the POST data"""
-    if request.method == 'POST':
-        return JsonResponse({
-            'post_data': dict(request.POST),
-            'user': str(request.user),
-            'user_id': request.user.id
-        })
-    return JsonResponse({'error': 'POST required'})
 
 @login_required
 def start_stock_transfer(request, transfer_id):
@@ -534,7 +523,7 @@ def get_product_stock_info(request):
     except Inventory.DoesNotExist:
         return JsonResponse({'available_stock': 0, 'reorder_level': 0})
 
-# Transfer Request Views
+
 @login_required
 def transfer_request_list(request):
     """List all transfer requests"""
@@ -599,7 +588,7 @@ def edit_transfer_request(request, request_id):
 
 @login_required
 def update_transfer_request(request, request_id):
-    """Update transfer request"""
+
     transfer_request = get_object_or_404(TransferRequest, id=request_id)
     
     if request.method == 'POST':
@@ -628,7 +617,6 @@ def approve_transfer_request(request, request_id):
 
 @login_required
 def reject_transfer_request(request, request_id):
-    """Reject a transfer request"""
     transfer_request = get_object_or_404(TransferRequest, id=request_id)
     
     if request.method == 'POST':
@@ -643,7 +631,6 @@ def reject_transfer_request(request, request_id):
 
 @login_required
 def pending_transfer_requests_for_approval(request):
-    """List pending transfer requests for approval"""
     pending_requests = TransferRequest.objects.filter(status='pending').order_by('-request_date')
     return render(request, 'stock/pending_transfer_requests.html', {'pending_requests': pending_requests})
 
