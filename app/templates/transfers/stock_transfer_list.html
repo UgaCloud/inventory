@@ -133,18 +133,20 @@
           </div>
         </div>
       </div>
+
       <div class="col-lg-2 col-md-4 col-sm-6">
         <div class="card bg-primary text-white">
           <div class="card-body text-center">
-            <div class="mb-2">
+            <!-- <div class="mb-2">
               <i data-feather="dollar-sign" class="feather-24"></i>
-            </div>
-            <h4 class="mb-1">UGX {{ total_value|intcomma }}</h4>
+            </div> -->
+            <h4 class="mb-1">UGX {{ total_value|default:0|intcomma }}</h4>
             <p class="mb-0">Total Value</p>
             <small>Active Transfers</small>
           </div>
         </div>
       </div>
+      
     </div>
 
     <!-- Active Transfers Table -->

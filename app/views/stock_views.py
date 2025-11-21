@@ -40,12 +40,6 @@ def stock_dashboard(request):
 
 
 
-
-
-
-
-
-
 @login_required
 def stock_transfer_list(request):
     """Enhanced stock transfer list view with filtering and statistics"""
@@ -79,25 +73,62 @@ def stock_transfer_list(request):
             status='approved'
         ).count()
         
-        # Calculate total value of active transfers (pending + in_transit)
+        # FIXED: Calculate total value of active transfers (pending + in_transit)
         active_transfers = transfers.filter(status__in=['pending', 'in_transit'])
-        total_value = 0
+        total_value = Decimal('0.00')
         
         for transfer in active_transfers:
             for item in transfer.items.all():
-                product_cost = item.product.default_price or 0
-                total_value += item.quantity * product_cost
+                try:
+                    # Try multiple ways to get the product cost
+                    product_cost = Decimal('0.00')
+                    
+                    # Method 1: Use product's default_price
+                    if item.product.default_price:
+                        product_cost = Decimal(str(item.product.default_price))
+                    # Method 2: Try to get from inventory batches
+                    else:
+                        batch = InventoryBatch.objects.filter(
+                            product=item.product,
+                            store=transfer.from_store
+                        ).order_by('-created_at').first()
+                        if batch and batch.unit_cost:
+                            product_cost = Decimal(str(batch.unit_cost))
+                    
+                    total_value += Decimal(str(item.quantity)) * product_cost
+                    
+                except (AttributeError, ValueError, TypeError) as e:
+                    print(f"Error calculating value for item {item.id}: {e}")
+                    continue
         
         # Pagination
         paginator = Paginator(transfers, 25)
         page_obj = paginator.get_page(page_number)
         
-        # Add calculated properties to each transfer for template
+        # FIXED: Add calculated properties to each transfer for template
         for transfer in page_obj:
-            transfer.total_value = 0
+            transfer_total = Decimal('0.00')
             for item in transfer.items.all():
-                product_cost = item.product.default_price or 0
-                transfer.total_value += item.quantity * product_cost
+                try:
+                    product_cost = Decimal('0.00')
+                    
+                    if item.product.default_price:
+                        product_cost = Decimal(str(item.product.default_price))
+                    else:
+                        batch = InventoryBatch.objects.filter(
+                            product=item.product,
+                            store=transfer.from_store
+                        ).order_by('-created_at').first()
+                        if batch and batch.unit_cost:
+                            product_cost = Decimal(str(batch.unit_cost))
+                    
+                    transfer_total += Decimal(str(item.quantity)) * product_cost
+                    
+                except (AttributeError, ValueError, TypeError) as e:
+                    print(f"Error calculating transfer value for item {item.id}: {e}")
+                    continue
+            
+            transfer.total_value = transfer_total
             
             transfer.is_urgent = (
                 transfer.status == 'pending' and 
@@ -106,9 +137,7 @@ def stock_transfer_list(request):
             
             transfer.is_overdue = False
         
-        # PROPERLY INITIALIZE FORMS WITH ERROR HANDLING
-        from app.forms.transaction_forms import StockTransferForm, StockTransferItemFormSet
-        from app.models.products import Product, UnitOfMeasure
+       
         
         try:
             # Initialize forms safely
@@ -136,7 +165,7 @@ def stock_transfer_list(request):
             'transfers': page_obj,
             'status_counts': status_counts,
             'pending_approved_requests': pending_approved_requests,
-            'total_value': total_value,
+            'total_value': total_value,  
             'status_filter': status_filter,
             'current_date': today,
             'stock_form': stock_form,
@@ -152,7 +181,6 @@ def stock_transfer_list(request):
         print(f"Error in stock_transfer_list: {e}")
         messages.error(request, "An error occurred while loading the stock transfers page.")
         return redirect('dashboard')  # Redirect to a safe page
-
 
 @login_required
 def stock_transfer_create(request):
@@ -354,27 +382,23 @@ def create_bulk_transfers(request):
 
 @login_required
 def direct_stock_transfer_create(request):
-    """Create a stock transfer directly (without a request) - FIXED VERSION"""
+   
     if request.method == 'POST':
-        print('=== DIRECT TRANSFER START ===')
-        print('POST data:', dict(request.POST))
-        
+                
         try:
             with transaction.atomic():
-                # Get form data directly - BYPASS FORM COMPLETELY
+                
                 from_store_id = request.POST.get('from_store')
                 to_store_id = request.POST.get('to_store')
                 note = request.POST.get('note', '')
                 status = request.POST.get('status', 'pending')
                 
-                print(f'Creating transfer: from_store={from_store_id}, to_store={to_store_id}')
-                
-                # Validate required fields
+            
                 if not from_store_id or not to_store_id:
                     messages.error(request, 'From store and To store are required.')
                     return redirect('stock_transfer_list')
                 
-                # Validate stores exist
+          
                 try:
                     from_store = StoreLocation.objects.get(id=from_store_id)
                     to_store = StoreLocation.objects.get(id=to_store_id)
@@ -382,33 +406,25 @@ def direct_stock_transfer_create(request):
                     messages.error(request, 'Invalid store selected.')
                     return redirect('stock_transfer_list')
                 
-                # CREATE TRANSFER DIRECTLY - NO FORM INVOLVED
+                
                 transfer = StockTransfer.objects.create(
                     from_store=from_store,
                     to_store=to_store,
                     note=note,
                     status=status,
-                    created_by=request.user,  # This is required!
-                    transfer_request=None     # Explicitly set to None
+                    created_by=request.user, 
+                    transfer_request=None    
                 )
                 
-                print(f'✓ Transfer created successfully: {transfer.id}')
-                print(f'From store: {transfer.from_store.name}')
-                print(f'To store: {transfer.to_store.name}')
-                print(f'Created by: {transfer.created_by}')
-                
-                # Process items
+            
                 total_forms = int(request.POST.get('items-TOTAL_FORMS', 0))
                 items_created = 0
                 
-                print(f'Processing {total_forms} item forms')
                 for i in range(total_forms):
                     product_id = request.POST.get(f'items-{i}-product')
                     quantity = request.POST.get(f'items-{i}-quantity')
                     unit_id = request.POST.get(f'items-{i}-units')
-                    
-                    print(f'Item {i}: product={product_id}, quantity={quantity}, unit={unit_id}')
-                    
+                        
                     if product_id and quantity and unit_id:
                         try:
                             product = Product.objects.get(id=product_id)
@@ -431,7 +447,7 @@ def direct_stock_transfer_create(request):
                 
                 if items_created > 0:
                     messages.success(request, f'Transfer #{transfer.id} created successfully with {items_created} items!')
-                    print(f'SUCCESS: Transfer #{transfer.id} created with {items_created} items')
+
                     return redirect('stock_transfer_detail', transfer_id=transfer.id)
                 else:
                     transfer.delete()
@@ -445,7 +461,7 @@ def direct_stock_transfer_create(request):
             traceback.print_exc()
             messages.error(request, f'Error creating transfer: {str(e)}')
         
-        print('=== DIRECT TRANSFER END ===')
+       
     
     return redirect('stock_transfer_list')
 

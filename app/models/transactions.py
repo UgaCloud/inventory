@@ -259,7 +259,7 @@ class StockTransfer(models.Model):
         return total
 
 
-        def apply_inventory_changes(self):
+    def apply_inventory_changes(self):
             """
             Apply inventory changes when a transfer is completed using FIFO method.
             Deducts stock from source store's oldest batches first and creates new batches in destination store.
