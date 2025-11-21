@@ -1078,7 +1078,7 @@ def product_suggestions_api(request):
         # Add stock info if store specified
         if store_id:
             try:
-                from app.models.inventory import Inventory
+                from app.models.products import Inventory
                 inventory = Inventory.objects.get(
                     product=product,
                     store_id=store_id

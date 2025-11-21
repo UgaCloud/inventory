@@ -1,5 +1,7 @@
 from app.models.organization import OrganizationSetting, Branch, Currency
 from .models.transactions import TransferRequest
+from app.forms.transaction_forms import *
+from app.models.products import *
 
 
 def organization_setting(request):
@@ -11,6 +13,7 @@ def organization_setting(request):
         'is_accountant': is_accountant(request.user),
         'is_sales': is_sales(request.user),
         'is_stores': is_stores(request.user),
+        'is_superuser': is_superuser(request.user), 
         'branches': Branch.objects.all(),
         'currencies': Currency.objects.all(),
     }
@@ -176,3 +179,25 @@ def transfer_notifications(request):
         }
     
     return {}
+
+
+def stock_transfer_forms(request):
+    """Provide stock transfer forms to templates"""
+    if request.user.is_authenticated:
+        return {
+            'stock_form': StockTransferForm(),
+            'item_formset': StockTransferItemFormSet(),
+            'products': Product.objects.filter(is_active=True),
+            'units': UnitOfMeasure.objects.all(),
+        }
+    return {}
+
+
+
+
+
+
+
+
+
+

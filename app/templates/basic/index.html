@@ -1,12 +1,21 @@
-{% extends 'basic/base.html' %} {% load static %} {% load crispy_forms_tags %}
+{% extends 'basic/base.html' %} 
+{% load static %} 
+{% load crispy_forms_tags %}
 {% load humanize %} 
 
 {% block content %}
-  {% if is_admin %}
+  {% if is_admin or user.is_superuser %}
     {% include 'basic/dashboards/admin.html' %}
   {% elif is_stores %}
     {% include 'basic/dashboards/stores.html' %}
   {% elif is_sales %}
     {% include 'basic/dashboards/sales.html' %}
+  {% else %}
+    <!-- Fallback for users with no specific role -->
+    <div class="alert alert-warning">
+      <h4>No Dashboard Assigned</h4>
+      <p>Your account doesn't have a specific role assigned.</p>
+      <p>Contact administrator to assign you to Admin, Stores, or Sales group.</p>
+    </div>
   {% endif %}
 {% endblock %}

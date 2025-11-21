@@ -15,12 +15,13 @@ from app.selectors.customer_selectors import *
 from app.selectors.supplier_selectors import *
 
 
+
+
 @login_required
 def index_view(request):
     products = get_all_products()
     organization_details = get_organization_settings()
     stores = get_stores()
-    
     total_purchases = get_total_purchases()
     total_sales = get_total_sales()
     todays_number_sales = get_todays_number_of_sales()
@@ -37,6 +38,8 @@ def index_view(request):
     top_selling_products = get_top_selling_products()
     recent_sales = get_recent_sales(limit=5)
 
+
+    
     context = {
         'products': products,
         'organization_details': organization_details,
@@ -59,24 +62,14 @@ def index_view(request):
         'todays_fully_paid_sales': get_todays_fully_paid_sales(),
         'todays_partially_paid_sales': get_todays_partially_paid_sales(),
         'todays_unpaid_sales': get_todays_unpaid_sales(),
+        
+        # ADD THIS LINE to hide sidebar on dashboard:
+        'hide_sidebar': True,
     }
     print(context['todays_fully_paid_sales'])
-    # context = {
-    # 'current_store': current_store,
-    # 'total_products': total_products,
-    # 'low_stock_count': low_stock_count,
-    # 'pending_transfers': pending_transfers,
-    # 'today_sales': today_sales,
-    # 'low_stock_products': low_stock_products,
-    # 'recent_activities': recent_activities,
-    # # 'my_transfer_requests': my_transfer_requests,
-    # # 'stock_received_today': stock_received_today,
-    # 'stock_sold_today': stock_sold_today,
-    # # 'top_moving_products': top_moving_products,
-    # # 'total_inventory_value': total_inventory_value,
-    # 'critical_alerts': critical_alerts,
-# }
+    
     return render(request, 'basic/index.html', context)
+
 
 def login_view(request):
     # Check if user was redirected due to session timeout

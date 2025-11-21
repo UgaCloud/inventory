@@ -80,24 +80,38 @@ urlpatterns = [
     # Bulk upload / template for PurchaseOrderItem
     path('purchase_order/<int:order_id>/items/bulk-upload/', purchase_order_items_bulk_upload, name='purchase_order_items_bulk_upload'),
     path('purchase_order/items/bulk-template/', download_purchase_order_item_template, name='download_purchase_order_item_template'),
-
+    
     # Transfer Requests
     path('transfer_requests/', transfer_request_list, name='transfer_request_list'),
-    path('transfer_requests/add/', add_transfer_request, name='add_transfer_request'),
+    path('transfer_requests/create/', create_transfer_request, name='create_transfer_request'),  # NEW
     path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
+    path('transfer_requests/<int:request_id>/edit/', edit_transfer_request, name='edit_transfer_request'),  # NEW
     path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
     path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
+    path('transfer_requests/<int:request_id>/reject/', reject_transfer_request, name='reject_transfer_request'),  # NEW
     path('transfer_request_for_approval/', pending_transfer_requests_for_approval, name='transfer_request_for_approval'),
+
+path('debug/transfer-post/', debug_transfer_post, name='debug_transfer_post'),
 
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
-    path('stock-transfer/direct/create/', direct_stock_transfer_create, name='direct_stock_transfer_create'),
-    path('stock_transfers/create/bulk/', stock_transfer_create_bulk, name='stock_transfer_create_bulk'),
+    path('stock-transfers/create/from-request/<int:request_id>/', create_transfer_from_request, name='create_transfer_from_request'),  # NEW
+    path('stock-transfers/direct/create/', direct_stock_transfer_create, name='direct_stock_transfer_create'),  # NEW
+    path('stock-transfers/bulk/create/', create_bulk_transfers, name='create_bulk_transfers'),  # NEW
     path('stock_transfers/<int:transfer_id>/', stock_transfer_detail, name='stock_transfer_detail'),
     path('stock_transfers/<int:transfer_id>/update/', stock_transfer_update, name='stock_transfer_update'),
-    path('stock_transfers/<int:transfer_id>/update_status/',update_transfer_status, name='update_transfer_status'),
+    path('stock_transfers/<int:transfer_id>/start/', start_stock_transfer, name='start_stock_transfer'),  # NEW
+    path('stock_transfers/<int:transfer_id>/complete/', complete_stock_transfer, name='complete_stock_transfer'),  # NEW
+    # path('stock_transfers/<int:transfer_id>/cancel/', cancel_stock_transfer, name='cancel_stock_transfer'),  # NEW
+    # path('stock_transfers/<int:transfer_id>/delete/', delete_stock_transfer, name='delete_stock_transfer'),  # NEW
+    path('stock_transfers/<int:transfer_id>/update_status/', update_transfer_status, name='update_transfer_status'),
+
+    # JSON API Endpoints
     path('approved_transfer_requests/', approved_transfer_requests_api, name='approved_transfer_requests'),
+    path('approved-transfer-requests/', approved_transfer_requests_json, name='approved_transfer_requests_json'),  # NEW
+    path('product-stock-info/', get_product_stock_info, name='get_product_stock_info'),  # NEW
+        
 
     # Stock Adjustments
     path('stock_adjustments/', stock_adjustment_list, name='stock_adjustment_list'),

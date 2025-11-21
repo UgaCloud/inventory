@@ -82,6 +82,7 @@ TEMPLATES = [
                 'app.context_processors.organization_setting',  
                 'app.context_processors.app_menu',
                 'app.context_processors.transfer_notifications',
+                'app.context_processors.stock_transfer_forms',
             ],
         },
     },

@@ -202,44 +202,103 @@ class TransferRequestApprovalForm(forms.ModelForm):
         model = TransferRequest
         fields = ['status', 'approved_by', 'note']
 
+
 class StockTransferForm(forms.ModelForm):
     class Meta:
         model = StockTransfer
-        fields = "__all__"
+        fields = ['from_store', 'to_store', 'note', 'status', 'transfer_request', 'created_by']
         widgets = {
+            'from_store': forms.Select(attrs={
+                'class': 'form-control',
+                'required': 'required'
+            }),
+            'to_store': forms.Select(attrs={
+                'class': 'form-control', 
+                'required': 'required'
+            }),
+            'note': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 3, 
+                'placeholder': 'Optional notes about this transfer...'
+            }),
+            'status': forms.Select(attrs={
+                'class': 'form-control'
+            }),
             'transfer_request': forms.HiddenInput(),
+            'created_by': forms.HiddenInput(),
         }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Always set the store queryset
+        self.fields['from_store'].queryset = StoreLocation.objects.filter(is_active=True)
+        self.fields['to_store'].queryset = StoreLocation.objects.filter(is_active=True)
+        
+        # Make these fields not required since we'll set them in the view
+        self.fields['transfer_request'].required = False
+        self.fields['created_by'].required = False
+        
+        # Set initial status for new forms
+        if not self.instance.pk:
+            self.fields['status'].initial = 'pending'
 
-    # def clean(self):
-    #     cleaned_data = super().clean()
-    #     # Ensure transfer_request is set
-    #     if not cleaned_data.get('transfer_request'):
-    #         raise forms.ValidationError("A transfer request must be selected.")
-    #     return cleaned_data
+    def clean(self):
+        cleaned_data = super().clean()
+        from_store = cleaned_data.get('from_store')
+        to_store = cleaned_data.get('to_store')
+        
+        if from_store and to_store and from_store == to_store:
+            raise forms.ValidationError("Source and destination stores cannot be the same.")
+        
+        return cleaned_data
 
 class StockTransferItemForm(forms.ModelForm):
     class Meta:
         model = StockTransferItem
-        fields = "__all__"
+        fields = ['product', 'quantity', 'units']  # REMOVED 'stock_transfer' and 'transfer_request_item'
         widgets = {
-            'stock_transfer': forms.HiddenInput(),
-            'transfer_request_item': forms.HiddenInput(),
             'product': forms.Select(attrs={
                 'class': 'select2',
                 'style': 'width:100%'
             }),
+            'quantity': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 1
+            }),
+            'units': forms.Select(attrs={
+                'class': 'form-control'
+            }),
         }
 
-    def clean(self):
-        cleaned_data = super().clean()
-        quantity = cleaned_data.get('quantity')
-        transfer_request_item = cleaned_data.get('transfer_request_item')
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Limit to active products
+        self.fields['product'].queryset = Product.objects.filter(is_active=True)
+        
+        # Set required attributes
+        self.fields['product'].required = True
+        self.fields['quantity'].required = True
+        self.fields['units'].required = True
+
+    def clean_quantity(self):
+        quantity = self.cleaned_data.get('quantity')
         if quantity is not None and quantity <= 0:
             raise forms.ValidationError("Quantity must be greater than zero.")
-        # Prevent transferring more than requested
-        if transfer_request_item and quantity > transfer_request_item.quantity:
-            raise forms.ValidationError(f"Cannot transfer more than requested ({transfer_request_item.quantity}).")
-        return cleaned_data
+        return quantity
+
+StockTransferItemFormSet = forms.inlineformset_factory(
+    StockTransfer,
+    StockTransferItem,
+    form=StockTransferItemForm,
+    extra=1,  # Number of empty forms to show
+    can_delete=True,
+    min_num=1,
+    validate_min=True,
+    fields=['product', 'quantity', 'units']  # Explicitly specify fields
+)
+
+
 
 class TransferRequestItemForm(forms.ModelForm):
     class Meta:

@@ -25,14 +25,11 @@
       href="{% static 'assets/img/favicon.png' %}"
     />
 
-    <script src="https://cdn.rawgit.com/xcash/bootstrap-autocomplete/3de7ad37/dist/latest/bootstrap-autocomplete.js"></script>
+    <!-- Load jQuery early in head to prevent ReferenceError -->
+    <script src="{% static 'assets/js/jquery-3.7.1.min.js' %}"></script>
 
     <!-- Apple Touch Icon -->
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="{% static 'assets/img/apple-touch-icon.png' %}"
-    />
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'assets/img/apple-touch-icon.png' %}"/>
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}" />
@@ -123,7 +120,6 @@
           <!-- Logo -->
           <div class="header-left active">
             <a href="{% url 'index_page' %}" class="logo logo-normal">
-              <img src="{{organization.organization_logo.url}}" alt="Img" />
             </a>
             <a href="{% url 'index_page' %}" class="logo logo-white">
               <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" />
@@ -654,8 +650,8 @@
     </div>
     <!-- /Main Wrapper -->
 
-    <!-- jQuery -->
-    <script src="{% static 'assets/js/jquery-3.7.1.min.js' %}"></script>
+    <!-- jQuery (already loaded in head, remove duplicate if exists) -->
+    <!-- <script src="{% static 'assets/js/jquery-3.7.1.min.js' %}"></script> -->
 
     <!-- Feather Icon JS -->
     <script src="{% static 'assets/js/feather.min.js' %}"></script>
@@ -663,15 +659,15 @@
     <!-- Slimscroll JS -->
     <script src="{% static 'assets/js/jquery.slimscroll.min.js' %}"></script>
 
+    <!-- Bootstrap Core JS -->
+    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+
     <!-- Datatable JS -->
     <script src="{% static 'assets/js/jquery.dataTables.min.js' %}"></script>
     <script src="{% static 'assets/js/dataTables.bootstrap5.min.js' %}"></script>
 
-    <!-- Summernote JS -->
-    <script src="assets/plugins/summernote/summernote-bs4.min.js"></script>
-
-    <!-- Bootstrap Core JS -->
-    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+    <!-- Summernote JS - FIXED PATH -->
+    <script src="{% static 'assets/plugins/summernote/summernote-bs4.min.js' %}"></script>
 
     <!-- Daterangepikcer JS -->
     <script src="{% static 'assets/js/moment.min.js' %}"></script>
@@ -684,7 +680,8 @@
     <!-- Select2 JS -->
     <script src="{% static 'assets/plugins/select2/js/select2.min.js' %}"></script>
    
-    <script src="{% static 'assets/plugins/select2/js/custom-select.js' %}"></script>
+    <!-- Custom Select JS - FIXED PATH -->
+    <!-- <script src="{% static 'assets/plugins/select2/js/custom-select.js' %}"></script> -->
 
     <!-- Chart JS -->
     <script src="{% static 'assets/plugins/apexchart/apexcharts.min.js' %}"></script>
@@ -700,84 +697,146 @@
     <script src="{% static 'assets/js/theme-colorpicker.js' %}"></script>
     <script src="{% static 'assets/js/script.js' %}"></script>
 
-    <!-- Owl JS -->
+<!-- Owl JS -->
     <script src="{% static 'assets/plugins/owlcarousel/owl.carousel.min.js' %}"></script>
 
-    {% block custom_JS %}{% endblock custom_JS %}
+{% block custom_JS %}{% endblock custom_JS %}
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-          // Initialize select2 with AJAX for product fields
-          $('.select2').select2();
-          
-          // Session timeout management
-          let sessionTimeout = {{ settings.SESSION_COOKIE_AGE|default:300 }} * 1000; // Convert to milliseconds
-          let warningTime = 3 * 60 * 1000; // 3 minutes before timeout
-          let timeoutWarning;
-          let autoLogout;
-          
-          function resetSessionTimer() {
-              // Clear existing timers
-              clearTimeout(timeoutWarning);
-              clearTimeout(autoLogout);
-              
-              // Set warning timer (5 minutes before session expires)
-              timeoutWarning = setTimeout(function() {
-                  showTimeoutWarning();
-              }, sessionTimeout - warningTime);
-              
-              // Set auto logout timer
-              autoLogout = setTimeout(function() {
-                  window.location.href = "{% url 'login' %}?timeout=1";
-              }, sessionTimeout);
-          }
-          
-          function showTimeoutWarning() {
-              if (!document.getElementById('timeout-warning')) {
-                  let warningDiv = document.createElement('div');
-                  warningDiv.id = 'timeout-warning';
-                  warningDiv.className = 'alert alert-warning alert-dismissible fade show';
-                  warningDiv.innerHTML = `
-                      <strong>Warning!</strong> Your session will expire in 5 minutes due to inactivity. 
-                      <a href="javascript:void(0);" onclick="extendSession()" class="alert-link">Click here to extend your session</a>.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
-                          <i class="fas fa-xmark"></i>
-                      </button>
-                  `;
-                  document.querySelector('.content').insertBefore(warningDiv, document.querySelector('.content').firstChild);
-              }
-          }
-          
-          // Extend session function
-          window.extendSession = function() {
-              fetch('{% url "extend_session" %}', {
-                  method: 'POST',
-                  headers: {
-                      'X-CSRFToken': '{{ csrf_token }}',
-                      'Content-Type': 'application/json',
-                  },
-              })
-              .then(response => response.json())
-              .then(data => {
-                  if (data.success) {
-                      resetSessionTimer();
-                      let warning = document.getElementById('timeout-warning');
-                      if (warning) {
-                          warning.remove();
-                      }
-                  }
-              })
-              .catch(error => console.error('Error extending session:', error));
-          }
-          
-          // Reset timer on user activity
-          ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function(event) {
-              document.addEventListener(event, resetSessionTimer, true);
-          });
-          
-          // Initialize session timer
-          resetSessionTimer();
-      });
-    </script>
-  </body>
+
+
+
+
+
+
+<script>
+    // Safe forEach function that handles undefined/null
+    function safeForEach(collection, callback) {
+        if (!collection || typeof collection.forEach !== 'function') {
+            console.warn('safeForEach: Collection is undefined or not iterable', collection);
+            return;
+        }
+        collection.forEach(callback);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if jQuery is loaded
+        if (typeof jQuery === 'undefined') {
+            console.error('jQuery is not loaded. Some features may not work.');
+            return;
+        }
+
+        // Initialize select2 with proper error handling
+        if (typeof jQuery.fn.select2 !== 'undefined') {
+            $('.select2').select2();
+        } else {
+            console.warn('Select2 is not loaded');
+        }
+
+        // Initialize Summernote if available
+        if (typeof jQuery.fn.summernote !== 'undefined') {
+            $('.summernote').summernote();
+        } else {
+            console.warn('Summernote is not loaded');
+        }
+
+        // SAFE ELEMENT PROCESSING - Replace all forEach calls with safe versions
+        try {
+            // Example 1: Safe navigation items processing
+            const navItems = document.querySelectorAll('.nav-item');
+            safeForEach(navItems, function(item) {
+                // Your nav item processing code
+            });
+
+            // Example 2: Safe dropdown processing
+            const dropdowns = document.querySelectorAll('.dropdown');
+            safeForEach(dropdowns, function(dropdown) {
+                // Your dropdown processing code
+            });
+
+            // Example 3: Safe table row processing
+            const tableRows = document.querySelectorAll('tr') || [];
+            safeForEach(tableRows, function(row) {
+                // Your row processing code
+            });
+
+        } catch (error) {
+            console.error('Error in DOM processing:', error);
+        }
+
+        // Session timeout management
+        let sessionTimeout = {{ settings.SESSION_COOKIE_AGE|default:300 }} * 1000;
+        let warningTime = 3 * 60 * 1000;
+        let timeoutWarning;
+        let autoLogout;
+        
+        function resetSessionTimer() {
+            clearTimeout(timeoutWarning);
+            clearTimeout(autoLogout);
+            
+            timeoutWarning = setTimeout(function() {
+                showTimeoutWarning();
+            }, sessionTimeout - warningTime);
+            
+            autoLogout = setTimeout(function() {
+                window.location.href = "{% url 'login' %}?timeout=1";
+            }, sessionTimeout);
+        }
+        
+        function showTimeoutWarning() {
+            if (!document.getElementById('timeout-warning')) {
+                let warningDiv = document.createElement('div');
+                warningDiv.id = 'timeout-warning';
+                warningDiv.className = 'alert alert-warning alert-dismissible fade show';
+                warningDiv.innerHTML = `
+                    <strong>Warning!</strong> Your session will expire in 5 minutes due to inactivity. 
+                    <a href="javascript:void(0);" onclick="extendSession()" class="alert-link">Click here to extend your session</a>.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                `;
+                const content = document.querySelector('.content');
+                if (content) {
+                    content.insertBefore(warningDiv, content.firstChild);
+                }
+            }
+        }
+        
+        window.extendSession = function() {
+            fetch('{% url "extend_session" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resetSessionTimer();
+                    let warning = document.getElementById('timeout-warning');
+                    if (warning) {
+                        warning.remove();
+                    }
+                }
+            })
+            .catch(error => console.error('Error extending session:', error));
+        }
+        
+        // FIXED: Safe event listener attachment - Proper array declaration
+        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+        safeForEach(events, function(event) {
+            if (document && document.addEventListener) {
+                document.addEventListener(event, resetSessionTimer, true);
+            }
+        });
+        
+        resetSessionTimer();
+    });
+</script>
+
+
+
+</body>
+
+
 </html>
