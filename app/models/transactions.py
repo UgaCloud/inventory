@@ -188,7 +188,7 @@ class TransferRequest(models.Model):
     requested_by = models.ForeignKey("auth.User", on_delete=models.DO_NOTHING)
     from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfer_requests_out")
     to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfer_requests_in")
-    department = models.ForeignKey("app.Department", on_delete=models.CASCADE, related_name="transfer_requests")
+    department = models.ForeignKey("app.Department", null=True, blank=True, on_delete=models.CASCADE, related_name="transfer_requests")
     # Priority and required date were added later to support scheduling and urgency
     PRIORITY_CHOICES = [
         ("normal", "Normal"),

@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("app", "0002_add_department_to_transferrequest"),
+        ("app", "0061_transferrequest_department"),
     ]
 
     operations = [
