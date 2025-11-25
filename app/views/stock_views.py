@@ -59,102 +59,15 @@ def stock_dashboard(request):
 
 @login_required
 def stock_transfer_list(request):
-    """Enhanced stock transfer list view with filtering and statistics"""
-    try:
-        # --- Get filter parameters ---
-        status_filter = request.GET.get('status', 'all')
-        page_number = request.GET.get('page', 1)
+    """Proxy to canonical `stock_transfer_list` view in `app.views.transfers`.
 
-        # --- Base queryset ---
-        transfers = StockTransfer.objects.select_related(
-            'from_store', 'to_store', 'transfer_request', 'created_by'
-        ).prefetch_related('items__product').all().order_by('-transfer_date')
-
-        # --- Apply status filter ---
-        if status_filter != 'all':
-            transfers = transfers.filter(status=status_filter)
-
-        today = timezone.now().date()
-
-        # --- Status counts ---
-        status_counts = {
-            'pending': StockTransfer.objects.filter(status='pending').count(),
-            'in_transit': StockTransfer.objects.filter(status='in_transit').count(),
-            'completed': StockTransfer.objects.filter(status='completed').count(),
-            'cancelled': StockTransfer.objects.filter(status='cancelled').count(),
-        }
-
-        # --- Pending approved requests ---
-        pending_approved_requests = TransferRequest.objects.filter(status='approved').count()
-
-        # --- Calculate total value of active transfers ---
-        active_transfers = transfers.exclude(status='cancelled')
-        total_value = Decimal('0.00')
-
-        for transfer in active_transfers:
-            transfer_total = Decimal('0.00')
-            for item in transfer.items.all():
-                try:
-                    # Use the item's built-in total_value property which handles FIFO pricing
-                    item_value = item.total_value
-                    if item_value:
-                        transfer_total += Decimal(str(item_value))
-                except Exception as e:
-                    print(f"Error calculating value for item {item.id}: {e}")
-                    continue
-
-            transfer.total_value = transfer_total
-            total_value += transfer_total
-
-        # --- Pagination ---
-        paginator = Paginator(transfers, 25)
-        page_obj = paginator.get_page(page_number)
-
-        # --- Calculate per-transfer flags for template ---
-        for transfer in page_obj:
-            transfer.is_urgent = (
-                transfer.status == 'pending' and
-                transfer.transfer_date >= today - timedelta(days=1)
-            )
-            transfer.is_overdue = False
-
-        # --- Initialize forms ---
-        try:
-            stock_form = StockTransferForm()
-            active_stores = StoreLocation.objects.filter(is_active=True)
-            if active_stores.exists():
-                stock_form.fields['from_store'].queryset = active_stores
-                stock_form.fields['to_store'].queryset = active_stores
-            else:
-                stock_form.fields['from_store'].queryset = StoreLocation.objects.none()
-                stock_form.fields['to_store'].queryset = StoreLocation.objects.none()
-
-            item_formset = StockTransferItemFormSet()
-        except Exception as e:
-            print(f"Form initialization error: {e}")
-            stock_form = StockTransferForm()
-            item_formset = StockTransferItemFormSet()
-
-        # --- Context ---
-        context = {
-            'transfers': page_obj,
-            'status_counts': status_counts,
-            'pending_approved_requests': pending_approved_requests,
-            'total_values': total_value,
-            'status_filter': status_filter,
-            'current_date': today,
-            'stock_form': stock_form,
-            'item_formset': item_formset,
-            'products': Product.objects.filter(is_active=True),
-            'units': UnitOfMeasure.objects.all(),
-        }
-
-        return render(request, 'transfers/stock_transfer_list.html', context)
-
-    except Exception as e:
-        print(f"Error in stock_transfer_list: {e}")
-        messages.error(request, "An error occurred while loading the stock transfers page.")
-        return redirect('dashboard')
+    We keep this thin wrapper for backwards compatibility so URLs that import
+    this view continue to work while the canonical implementation lives in
+    `app.views.transfers.stock_transfer_list`.
+    """
+    # Import locally to avoid circular imports at module load time
+    from app.views.transfers import stock_transfer_list as canonical_stock_transfer_list
+    return canonical_stock_transfer_list(request)
 
 @login_required
 def stock_transfer_create(request):

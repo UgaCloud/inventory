@@ -82,12 +82,29 @@ def stock_transfer_list(request):
     paginator = Paginator(transfers, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
+    # Calculate total value of active (non-cancelled) transfers using item.total_value
+    total_value = 0
+    try:
+        from decimal import Decimal
+        total_value = Decimal('0.00')
+        active_qs = transfers.exclude(status='cancelled')
+        for t in active_qs:
+            for item in t.items.all():
+                try:
+                    iv = item.total_value
+                    if iv is not None:
+                        total_value += Decimal(str(iv))
+                except Exception:
+                    continue
+    except Exception:
+        total_value = 0
     
     context = {
         'transfers': page_obj,
         'status_counts': status_counts,
         'pending_approved_requests': pending_approved_requests,
-        # 'total_value': total_value,
+        'total_values': total_value,
         'current_status': status_filter,
         'search_query': search,
         'stock_form': stock_form,

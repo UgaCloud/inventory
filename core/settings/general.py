@@ -147,7 +147,10 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Session Configuration for Login Timeout
-SESSION_COOKIE_AGE = 3000000  # 5 minutes in seconds 
+# Session length: 10 minutes (600 seconds)
+SESSION_COOKIE_AGE = 600  # 10 minutes in seconds
+# How long before expiry to show an on-page warning (in seconds)
+SESSION_WARNING_SECONDS = 300  # 5 minutes before expiry
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session expires when browser is closed
 SESSION_SAVE_EVERY_REQUEST = True  # Extend session on every request (keeps user active)
 SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS

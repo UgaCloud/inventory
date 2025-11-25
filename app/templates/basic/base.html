@@ -625,6 +625,52 @@
           </div>
           {% endif %}
 
+      <script>
+      // Session timeout client-side helper
+      (function(){
+        try {
+          const warningEl = document.getElementById('timeout-warning');
+          // server provides seconds left in session via session variable
+          {% if request.session.session_seconds_left %}
+            const secondsLeft = {{ request.session.session_seconds_left }};
+          {% else %}
+            const secondsLeft = null;
+          {% endif %}
+          if (warningEl && typeof secondsLeft === 'number') {
+            let sl = secondsLeft;
+            const timerSpan = document.createElement('span');
+            timerSpan.style.marginLeft = '8px';
+            warningEl.appendChild(timerSpan);
+
+            const tick = () => {
+              if (sl <= 0) {
+                timerSpan.textContent = '(expired)';
+                return;
+              }
+              const mins = Math.floor(sl / 60);
+              const secs = sl % 60;
+              timerSpan.textContent = `(expires in ${mins}m ${secs}s)`;
+              sl -= 1;
+              setTimeout(tick, 1000);
+            };
+            tick();
+          }
+        } catch (e) {
+          console.warn('Session timer init failed', e);
+        }
+      })();
+
+      function extendSession(){
+        // Touch the server to extend session (simple GET to home)
+        fetch('/', { credentials: 'same-origin' }).then(()=>{
+          // reload to refresh session flags
+          window.location.reload();
+        }).catch(()=>{
+          window.location.reload();
+        });
+      }
+      </script>
+
           <!-- Messages -->
           {% if messages %} {% for message in messages %}
           <div
@@ -778,9 +824,17 @@
             console.error('Error in DOM processing:', error);
         }
 
-        // Session timeout management
-        let sessionTimeout = {{ settings.SESSION_COOKIE_AGE|default:300 }} * 1000;
-        let warningTime = 3 * 60 * 1000;
+    // Session timeout management
+    {% if settings.SESSION_COOKIE_AGE %}
+      let sessionTimeout = {{ settings.SESSION_COOKIE_AGE }} * 1000;
+    {% else %}
+      let sessionTimeout = 600 * 1000; // default 10 minutes
+    {% endif %}
+    {% if settings.SESSION_WARNING_SECONDS %}
+      let warningTime = {{ settings.SESSION_WARNING_SECONDS }} * 1000;
+    {% else %}
+      let warningTime = 5 * 60 * 1000; // default 5 minutes
+    {% endif %}
         let timeoutWarning;
         let autoLogout;
         
