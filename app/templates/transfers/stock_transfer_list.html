@@ -141,7 +141,7 @@
               <i data-feather="dollar-sign" class="feather-24"></i>
             </div> -->
             
-            <h4 class="mb-1">UGX {{ total_values|default:0|intcomma }}</h4>
+            <h4 class="mb-1">UGX {{ total_values|default:0|floatformat:"0"|intcomma }}</h4>
             <p class="mb-0">Total Value</p>
             <small>Active Transfers</small>
           </div>

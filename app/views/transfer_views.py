@@ -27,74 +27,12 @@ def transfer_request_list(request):
     
     context = {
         'requests': requests,
-        'form': form,
-        'item_formset': formset,
         'departments': departments,
         'stores': stores,
-        'units': UnitOfMeasure.objects.all(),
-        'user_department': request.user.profile.department if hasattr(request.user, 'profile') else None
+        'form': form,
+        'formset': formset,
     }
-    
     return render(request, 'transfers/transfer_request_list.html', context)
-
-@login_required
-def add_transfer_request(request):
-    if request.method == 'POST':
-        form = TransferRequestForm(request.POST, request=request)
-        formset = TransferRequestItemFormSet(request.POST)
-        
-        if form.is_valid() and formset.is_valid():
-            try:
-                with transaction.atomic():
-                    transfer_request = form.save(commit=False)
-                    transfer_request.requested_by = request.user
-                    transfer_request.status = 'pending'
-                    transfer_request.save()
-                    
-                    formset.instance = transfer_request
-                    formset.save()
-                    
-                    messages.success(request, f'Transfer request #{transfer_request.id} created successfully.')
-                    
-                    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                        return JsonResponse({
-                            'success': True,
-                            'request_id': transfer_request.id,
-                            'message': 'Transfer request created successfully!'
-                        })
-                    else:
-                        return redirect('transfer_request_list')
-                        
-            except Exception as e:
-                messages.error(request, f'Error creating transfer request: {str(e)}')
-                if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'success': False,
-                        'error': str(e)
-                    })
-        else:
-            # Handle form errors
-            error_messages = []
-            if form.errors:
-                for field, errors in form.errors.items():
-                    for error in errors:
-                        error_messages.append(f"{field}: {error}")
-            if formset.errors:
-                for i, errors in enumerate(formset.errors):
-                    for field, error in errors.items():
-                        error_messages.append(f"Item {i+1} - {field}: {error}")
-            
-            error_message = "; ".join(error_messages)
-            messages.error(request, f'Please correct the errors: {error_message}')
-            
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False,
-                    'error': error_message
-                })
-    
-    # If not POST or invalid form, return to list with errors
-    return redirect('transfer_request_list')
 
 @login_required
 def update_transfer_request(request, request_id):
@@ -176,41 +114,9 @@ def transfer_request_detail(request, request_id):
 
 @login_required
 def stock_transfer_list(request):
-    transfers = get_approved_transfer_requests()
-
-    transfer_request_id = request.GET.get('transfer_request_id') or request.POST.get('transfer_request')
-
-    transfer_request = None
-    initial_items = []
-
-    if transfer_request_id:
-        transfer_request = get_object_or_404(TransferRequest, id=transfer_request_id)
-        
-        # Get items from the transfer request
-        initial_items = [
-            {
-                'product': item.product,
-                'quantity': item.quantity,
-                'transfer_request_item': item.id
-            }
-            for item in transfer_request.items.all()
-        ]
-
-    form = StockTransferForm(initial={'transfer_request': transfer_request_id} if transfer_request_id else None)
-        
-    formset = StockTransferItemFormSet(initial=initial_items)
-
-    stores = get_stores()
-
-    context = {
-        'transfers': transfers,
-        'form': form,
-        'item_formset': formset,
-        'transfer_request': transfer_request,
-        'stores': stores
-    }
-
-    return render(request, 'transfers/stock_transfer_list.html', context)
+    # Delegate to the canonical stock_transfer_list implementation in app.views.transfers
+    from app.views.transfers import stock_transfer_list as canonical_stock_transfer_list
+    return canonical_stock_transfer_list(request)
 
 @login_required
 def stock_transfer_create(request):
