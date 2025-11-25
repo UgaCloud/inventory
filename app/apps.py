@@ -14,4 +14,5 @@ class AppConfig(AppConfig):
         import app.signals.expense_signals
         import app.signals.transaction_signals
         import app.signals.human_resource_signals
+        import app.signals.user_signals
 

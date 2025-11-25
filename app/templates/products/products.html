@@ -45,6 +45,7 @@
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
             <div class="search-set">
                 <div class="search-input">
+                    <input type="text" placeholder="Search products..." class="form-control" id="search-input">
                     <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
                 </div>
             </div>
@@ -53,45 +54,18 @@
                     <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
                         Category
                     </a>
-                    <ul class="dropdown-menu  dropdown-menu-end p-3">
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Computers</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Electronics</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Shoe</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Electronics</a>
-                        </li>
-                    </ul>
-                </div>
-                <div class="dropdown">
-                    <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-                        Brand
-                    </a>
-                    <ul class="dropdown-menu  dropdown-menu-end p-3">
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Lenovo</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Beats</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Nike</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Apple</a>
-                        </li>
+                    <ul class="dropdown-menu dropdown-menu-end p-3">
+                        <li><a href="?category=all" class="dropdown-item rounded-1">All Categories</a></li>
+                        {% for category in categories %}
+                        <li><a href="?category={{ category.id }}" class="dropdown-item rounded-1">{{ category.name }}</a></li>
+                        {% endfor %}
                     </ul>
                 </div>
             </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table datatable">
+                <table class="table" id="productsTable">
                     <thead class="thead-light">
                         <tr>
                             <th class="no-sort">
@@ -100,71 +74,92 @@
                                     <span class="checkmarks"></span>
                                 </label>
                             </th>
-                            <th>SKU </th>
+                            <th>SKU</th>
                             <th>Product Name</th>
                             <th>Category</th>
                             <th>Brand</th>
                             <th>Qty</th>
                             <th>Base Price</th>
                             <th>Status</th>
-                            <th class="no-sort"></th>
+                            <th class="no-sort">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% if products %}
-                            {% for product in products %}
+                            {% for product_data in products %}
                             <tr>
                                 <td>
                                     <label class="checkboxs">
-                                        <input type="checkbox">
+                                        <input type="checkbox" class="product-checkbox" value="{{ product_data.product.id }}">
                                         <span class="checkmarks"></span>
                                     </label>
                                 </td>
-                                <td>{{product.sku}} </td>
+                                <td>{{ product_data.product.sku }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        {% comment %} <a href="javascript:void(0);" class="avatar avatar-md me-2">
-                                            <img src="assets/img/products/stock-img-01.png" alt="product">
-                                        </a> {% endcomment %}
-                                        <a href="javascript:void(0);">{{product.name}}</a>
+                                        <a href="{% url 'product_details_page' product_data.product.id %}">{{ product_data.product.name }}</a>
                                     </div>												
                                 </td>							
-                                <td>{{product.category}}</td>
-                                <td>{{product.brand}}</td>
-                                <td>{{product.total_stock}}</td>
+                                <td>
+                                    {% if product_data.product.category %}
+                                        {{ product_data.product.category.name }}
+                                    {% else %}
+                                        <span class="text-muted">No Category</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ product_data.product.brand|default:"-" }}</td>
+                                <td>{{ product_data.total_available_stock }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <a href="javascript:void(0);">{{product.default_price|intcomma}}/-</a>
+                                        <a href="javascript:void(0);">{{ product_data.product.default_price|intcomma }}/-</a>
                                     </div>
                                 </td>
                                 <td>
-                                    {% if product.is_active %}
+                                    {% if product_data.product.is_active %}
                                         <span class="badge table-badge bg-success fw-medium fs-10">
                                             Active
                                         </span>
                                     {% else %}
                                         <span class="badge table-badge bg-danger fw-medium fs-10">
-                                            In-Active
+                                            Inactive
                                         </span>
                                     {% endif %}
-                                    
                                 </td>
-                                
-                                <td 
-                                class="action-table-data">
-                                {% if is_admin %}
-                                    <div class="edit-delete-action">
-                                        <a class="me-2 edit-icon  p-2" href="{% url 'product_details_page' product.id %}">
-                                            <i data-feather="eye" class="feather-eye"></i>
-                                        </a>
-                                        <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);">
-                                            <i data-feather="trash-2" class="feather-trash-2"></i>
-                                        </a>
-                                    </div>
+                                <td class="action-table-data">
+                                    {% if is_admin or is_superuser %}
+                                        <div class="edit-delete-action">
+                                            <a class="me-2 edit-icon p-2" href="{% url 'product_details_page' product_data.product.id %}" title="View Details">
+                                                <i data-feather="eye" class="feather-eye"></i>
+                                            </a>
+                                            <a class="me-2 edit-icon p-2" 
+                                               href="#" 
+                                               title="Edit"
+                                               data-bs-toggle="modal" 
+                                               data-bs-target="#edit-product-modal-{{ product_data.product.id }}">
+                                                <i data-feather="edit" class="feather-edit"></i>
+                                            </a>
+                                            <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2 delete-product" href="javascript:void(0);" data-product-id="{{ product_data.product.id }}" title="Delete">
+                                                <i data-feather="trash-2" class="feather-trash-2"></i>
+                                            </a>
+                                        </div>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <div class="empty-state">
+                                        <i class="ti ti-package fs-48 text-muted mb-3"></i>
+                                        <h5 class="text-muted">No products found</h5>
+                                        <p class="text-muted">Get started by adding your first product.</p>
+                                        <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-product">
+                                            <i class="ti ti-circle-plus me-1"></i>
+                                            Add Product
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
                         {% endif %}
                     </tbody>
                 </table>
@@ -172,7 +167,7 @@
         </div>
     </div>
 
-    <!-- delete modal -->
+    <!-- Delete Modal -->
     <div class="modal fade" id="delete-modal">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -180,11 +175,14 @@
                     <div class="content p-5 px-3 text-center">
                         <span class="rounded-circle d-inline-flex p-2 bg-danger-transparent mb-2"><i class="ti ti-trash fs-24 text-danger"></i></span>
                         <h4 class="fs-20 text-gray-9 fw-bold mb-2 mt-1">Delete Product</h4>
-                        <p class="text-gray-6 mb-0 fs-16">Are you sure you want to delete product?</p>
-                        <div class="modal-footer-btn mt-3 d-flex justify-content-center">
-                            <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary fs-13 fw-medium p-2 px-3">Yes Delete</button>
-                        </div>						
+                        <p class="text-gray-6 mb-0 fs-16">Are you sure you want to delete this product?</p>
+                        <form id="delete-form" method="post" action="">
+                            {% csrf_token %}
+                            <div class="modal-footer-btn mt-3 d-flex justify-content-center">
+                                <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger fs-13 fw-medium p-2 px-3">Yes, Delete</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -205,59 +203,53 @@
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-                        <div class="modal-body">
-                            <form method="post" action="{% url 'add_products_page'%}">
-                                {% csrf_token %}
-                                
-                                <!-- Option 1: Use crispy forms with proper styling -->
+                        <form method="post" action="{% url 'add_products_page' %}" id="add-product-form">
+                            {% csrf_token %}
+                            <div class="modal-body">
                                 {{ form|crispy }}
-                                
-                                <!-- OR Option 2: Manual form rendering for better control -->
-                                {% comment %}
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="id_name">Product Name *</label>
-                                            {{ form.name }}
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="id_category">Category *</label>
-                                            {{ form.category }}
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="id_brand">Brand</label>
-                                            {{ form.brand }}
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="id_barcode">Barcode</label>
-                                            {{ form.barcode }}
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="form-group">
-                                            <label for="id_description">Description</label>
-                                            {{ form.description }}
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endcomment %}
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
-                            <button type='submit' class="btn btn-primary fs-13 fw-medium p-2 px-3">Submit</button>
-                        </div>
-                            </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary fs-13 fw-medium p-2 px-3">Add Product</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Edit Product Modals -->
+    {% for product_data in products %}
+    <div class="modal fade" id="edit-product-modal-{{ product_data.product.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="page-wrapper-new p-0">
+                    <div class="content">
+                        <div class="modal-header">
+                            <div class="page-title">
+                                <h4>Edit Product - {{ product_data.product.name }}</h4>
+                            </div>
+                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <form method="post" action="{% url 'edit_product_page' product_data.product.id %}">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                {{ product_data.edit_form|crispy }}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary fs-13 fw-medium p-2 px-3">Update Product</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 
     <!-- Bulk Upload Product Modal -->
     <div class="modal fade" id="bulk-upload-product-modal">
@@ -273,37 +265,139 @@
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-                        <div class="modal-body">
-                            <form method="post" action="{% url 'bulk_add_products' %}" enctype="multipart/form-data">
-                                {% csrf_token %}
+                        <form method="post" action="{% url 'bulk_add_products' %}" enctype="multipart/form-data" id="bulk-upload-form">
+                            {% csrf_token %}
+                            <div class="modal-body">
                                 <div class="mb-3">
                                     <label for="csv_file" class="form-label">Upload CSV File</label>
                                     <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
-                                    <div class="form-text">Download the template and fill in your products.</div>
+                                    <div class="form-text">
+                                        <a href="{% url 'download_product_template' %}" class="text-primary">Download the template</a> and fill in your products.
+                                    </div>
                                 </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-success">Upload</button>
-                        </div>
-                            </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success">Upload Products</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <script>
-                // Place inside your <script> block
-        document.addEventListener('DOMContentLoaded', function() {
-            $('#id_category').on('change', function() {
-                var selected = $(this).val();
-                // You can reload the page with the selected category as a GET param
-                var url = new URL(window.location.href);
-                url.searchParams.set('category', selected);
-                window.location.href = url.toString();
-            });
-        });
-    </script>
 {% endblock %}
 
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Delete modal handler
+    const deleteModal = document.getElementById('delete-modal');
+    const deleteForm = document.getElementById('delete-form');
+    
+    if (deleteModal) {
+        deleteModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const productId = button.getAttribute('data-product-id');
+            if (productId) {
+                deleteForm.action = "{% url 'delete_category' 0 %}".replace('0', productId);
+            }
+        });
+    }
+
+    // Search functionality
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const searchTerm = this.value.trim();
+                if (searchTerm.length >= 2 || searchTerm.length === 0) {
+                    const url = new URL(window.location.href);
+                    if (searchTerm) {
+                        url.searchParams.set('search', searchTerm);
+                    } else {
+                        url.searchParams.delete('search');
+                    }
+                    window.location.href = url.toString();
+                }
+            }, 500);
+        });
+    }
+
+    // Select all checkbox
+    const selectAll = document.getElementById('select-all');
+    const productCheckboxes = document.querySelectorAll('.product-checkbox');
+    
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            productCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+
+    // Initialize DataTable with explicit configuration
+    setTimeout(function() {
+        if (typeof jQuery !== 'undefined') {
+            const $table = jQuery('#productsTable');
+            
+            if ($table.length > 0) {
+                try {
+                    // Destroy existing DataTable if it was already initialized
+                    if (jQuery.fn.DataTable.isDataTable('#productsTable')) {
+                        $table.DataTable().destroy();
+                    }
+                    
+                    // Initialize DataTable
+                    $table.DataTable({
+                        "processing": false,
+                        "serverSide": false,
+                        "paging": true,
+                        "pageLength": 10,
+                        "lengthMenu": [[10, 25, 50, 100], [10, 25, 50, 100]],
+                        "ordering": true,
+                        "searching": true,
+                        "columnDefs": [
+                            { "orderable": false, "targets": 0 },  // Checkbox
+                            { "orderable": false, "targets": 8 }   // Action
+                        ],
+                        "order": [[1, 'asc']], // Sort by SKU by default
+                        "dom": 'fBtlpi',
+                        "language": {
+                            "search": '',
+                            "searchPlaceholder": "Search products...",
+                            "lengthMenu": "Show _MENU_ entries",
+                            "info": "Showing _START_ to _END_ of _TOTAL_ products",
+                            "infoEmpty": "No products to display",
+                            "paginate": {
+                                "first": "First",
+                                "last": "Last",
+                                "next": '<i class="fa fa-angle-right"></i>',
+                                "previous": '<i class="fa fa-angle-left"></i>'
+                            }
+                        },
+                        "initComplete": function(settings, json) {
+                            // Move search box to custom location
+                            const $search = jQuery('.dataTables_filter');
+                            if ($search.length > 0) {
+                                $search.appendTo('.search-input');
+                            }
+                        }
+                    });
+                    
+                    console.log('✓ Products table initialized successfully');
+                } catch (error) {
+                    console.error('✗ Error initializing products table:', error);
+                }
+            } else {
+                console.warn('Products table (#productsTable) not found');
+            }
+        } else {
+            console.error('jQuery not loaded');
+        }
+    }, 500); // Delay to ensure all libraries are loaded
+});
+</script>
+{% endblock %}

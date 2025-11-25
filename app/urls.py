@@ -22,6 +22,16 @@ from app.views.expense_views import *
 from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
 from .views.reports import sales_report_views
+from .views.roles_views import (
+    roles_list_view, role_create_view, role_edit_view, role_detail_view,
+    role_delete_view, role_assign_to_user_view, role_unassign_from_user_view,
+    role_bulk_assign_view
+)
+from .views.user_views import (
+    users_list_view, user_create_view, user_edit_view, user_detail_view,
+    user_delete_view, user_assign_role_view, user_unassign_role_view
+)
+from .views.employee_role_views import employee_manage_roles_view
 
 
 urlpatterns = [
@@ -85,6 +95,7 @@ urlpatterns = [
     path('transfer_requests/', transfer_request_list, name='transfer_request_list'),
     path('transfer_requests/create/', create_transfer_request, name='create_transfer_request'),  # NEW
     path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
+    path('transfer_requests/<int:request_id>/json/', transfer_request_json, name='transfer_request_json'),
     path('transfer_requests/<int:request_id>/edit/', edit_transfer_request, name='edit_transfer_request'),  # NEW
     path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
     path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
@@ -214,6 +225,30 @@ urlpatterns = [
     path('reports/sales-item-unit/', sales_report_views.sales_item_unit_report, name='sales_item_unit_report'),
     path('reports/sales-item-unit/export/csv/', sales_report_views.export_sales_item_unit_csv, name='export_sales_item_unit_csv'),
     path('reports/sales-item-unit/export/pdf/', sales_report_views.export_sales_item_unit_pdf, name='export_sales_item_unit_pdf'),
+    
+    # Role Management URLs (RBAC 2.0)
+    path('roles/', roles_list_view, name='roles_list_page'),
+    path('roles/create/', role_create_view, name='role_create_page'),
+    path('roles/<int:role_id>/', role_detail_view, name='role_detail_page'),
+    path('roles/<int:role_id>/edit/', role_edit_view, name='role_edit_page'),
+    path('roles/<int:role_id>/delete/', role_delete_view, name='role_delete_page'),
+    path('roles/<int:role_id>/assign/<int:user_id>/', role_assign_to_user_view, name='role_assign_to_user_page'),
+    path('roles/<int:role_id>/unassign/<int:user_id>/', role_unassign_from_user_view, name='role_unassign_from_user_page'),
+    path('roles/<int:role_id>/bulk-assign/', role_bulk_assign_view, name='role_bulk_assign_page'),
+    
+    # User Management URLs (RBAC 2.0)
+    path('users/', users_list_view, name='users_list_page'),
+    path('users/create/', user_create_view, name='user_create_page'),
+    path('users/<int:user_id>/', user_detail_view, name='user_detail_page'),
+    path('users/<int:user_id>/edit/', user_edit_view, name='user_edit_page'),
+    path('users/<int:user_id>/delete/', user_delete_view, name='user_delete_page'),
+    path('users/<int:user_id>/assign-role/', user_assign_role_view, name='user_assign_role_page'),
+    path('users/<int:user_id>/unassign-role/', user_unassign_role_view, name='user_unassign_role_page'),
+    path('users/<int:user_id>/unassign-role/<int:role_id>/', user_unassign_role_view, name='user_unassign_role_page'),
+    
+    # Employee Role Management URLs (RBAC 2.0)
+    path('employees/<int:employee_id>/manage-roles/', employee_manage_roles_view, name='employee_manage_roles_page'),
+    
 ]
 
 if settings.DEBUG:

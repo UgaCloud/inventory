@@ -18,47 +18,104 @@ from django.db.models import Q
 import csv
 from django.utils import timezone
 from app.models.products import Inventory
+from app.models.transactions import StockTransferItem
 
 
 @login_required
 def manage_product_view(request):
     product_form = ProductForm()
-
+    
     products = get_all_products()
     categories = get_all_categories()
+    
+    # Create edit forms for each product
+    edit_forms = {}
+    for product in products:
+        edit_forms[product.id] = ProductForm(instance=product)
+    
+    enhanced_products = []
+    for product in products:
+        total_committed_stock = StockTransferItem.objects.filter(
+            product=product,
+            stock_transfer__status__in=['pending', 'in_transit']
+        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        
+        total_physical_stock = sum(inv.quantity_in_stock for inv in product.inventories.all())
+        total_available_stock = max(0, total_physical_stock - total_committed_stock)
+        
+        enhanced_products.append({
+            'product': product,
+            'total_physical_stock': total_physical_stock,
+            'total_committed_stock': total_committed_stock,
+            'total_available_stock': total_available_stock,
+            'edit_form': edit_forms[product.id],  # Add edit form to each product
+        })
 
     context = {
         'form': product_form,
-        'products': products,
+        'products': enhanced_products,
         'categories': categories,
     }
     return render(request, 'products/products.html', context)
 
+
 @login_required
 def add_product_view(request):
     if request.method == 'POST':
-       form = ProductForm(request.POST)
-
-       if form.is_valid():
-           form.save()
-       
-       return redirect(manage_product_view)
-       
+        form = ProductForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Product added successfully!')
+            return redirect('products_page')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ProductForm()
     
+    # If there are errors, return to the products page with the form
+    products = get_all_products()
+    categories = get_all_categories()
+    
+    enhanced_products = []
+    for product in products:
+        total_committed_stock = StockTransferItem.objects.filter(
+            product=product,
+            stock_transfer__status__in=['pending', 'in_transit']
+        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        
+        total_physical_stock = sum(inv.quantity_in_stock for inv in product.inventories.all())
+        total_available_stock = max(0, total_physical_stock - total_committed_stock)
+        
+        enhanced_products.append({
+            'product': product,
+            'total_physical_stock': total_physical_stock,
+            'total_committed_stock': total_committed_stock,
+            'total_available_stock': total_available_stock,
+        })
 
+    context = {
+        'form': form,  # Pass the form with errors
+        'products': enhanced_products,
+        'categories': categories,
+        'is_admin': request.user.is_staff or request.user.is_superuser,
+    }
+    return render(request, 'products/products.html', context)
+
+
+@login_required
 def edit_product_view(request, product_id):
-
     product = get_product_by_id(product_id)
 
     if request.method == "POST":
-        edit_form = ProductForm(request.POST, instance = product)
-        
-        if edit_form.is_valid():
-            edit_form.save()
-
-        return redirect(product_details_view, product.id)
-
-
+        form = ProductForm(request.POST, instance=product)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Product updated successfully!')
+            return redirect('products_page')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    
+    return redirect('products_page')
 
 @login_required
 def add_category_view(request):
@@ -157,16 +214,46 @@ def product_details_view(request, _product_id):
     stock_movements = item.stock_movements.all()
 
     units = get_all_units_of_measurement()
+    
+    # Debug: Check for inventory records with missing store IDs
+    for inventory in inventories:
+        if not inventory.store or not inventory.store.id:
+            print(f"Warning: Inventory {inventory.id} has missing store information")
+    
+    # NEW: Calculate real-time stock data for each inventory
+    inventory_data = []
+    for inventory in inventories:
+        # Calculate committed stock for this store
+        committed_stock = StockTransferItem.objects.filter(
+            product=item,
+            stock_transfer__from_store=inventory.store,
+            stock_transfer__status__in=['pending', 'in_transit']
+        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        
+        available_stock = max(0, inventory.quantity_in_stock - committed_stock)
+        
+        inventory_data.append({
+            'inventory': inventory,
+            'committed_stock': committed_stock,
+            'available_stock': available_stock,
+            'status': 'out_of_stock' if available_stock == 0 else 
+                     'low_stock' if available_stock <= (inventory.reorder_level or 0) else 
+                     'in_stock'
+        })
 
     context = {
         'product_form': product_form,
         'product_unit_price_form': product_unit_price_form,
         'inventory_form': inventory_form,
         'product': item,
-        'unit_prices':product_unit_prices,
-        'inventories': inventories,
+        'unit_prices': product_unit_prices,
+        'inventories': inventory_data,  # Updated to include real-time data
         'stock_movements': stock_movements,   
-        'units': units, 
+        'units': units,
+        # NEW: Overall product stock summary
+        'total_physical_stock': sum(inv.quantity_in_stock for inv in inventories),
+        'total_committed_stock': sum(data['committed_stock'] for data in inventory_data),
+        'total_available_stock': sum(data['available_stock'] for data in inventory_data),
     }
     return render(request, 'products/product_details.html', context)
 
@@ -450,77 +537,10 @@ def product_unit_prices_api(request, product_id):
         })
     return JsonResponse({'results': results})
 
-@login_required
-def store_inventory_view(request, store_id):
-    """
-    Display inventory/product quantities for a specific store.
-    Includes filtering options and inventory summary with InventoryBatch-based calculations.
-    """
-    
-    store = get_object_or_404(StoreLocation, id=store_id)
-    
-    # Get query parameters
-    search_query = request.GET.get('search', '').strip()
-    show_zero_stock = request.GET.get('show_zero_stock', 'false').lower() == 'true'
-    category_filter = request.GET.get('category', '')
-    sort_by = request.GET.get('sort', 'product__name')  # Default sort by product name
-    
-    # Get base inventory queryset
-    inventory_queryset = get_product_quantities_by_store(
-        store_id=store_id, 
-        include_zero_stock=show_zero_stock
-    )
-    
-    # Apply search filter
-    if search_query:
-        inventory_queryset = inventory_queryset.filter(
-            Q(product__name__icontains=search_query) |
-            Q(product__sku__icontains=search_query) |
-            Q(product__brand__icontains=search_query)
-        )
-    
-    # Apply category filter
-    if category_filter:
-        inventory_queryset = inventory_queryset.filter(
-            product__category_id=category_filter
-        )
-    
-    # Apply sorting
-    valid_sort_fields = [
-        'product__name', '-product__name',
-        'quantity_in_stock', '-quantity_in_stock',
-        'reorder_level', '-reorder_level',
-        'product__category__name', '-product__category__name'
-    ]
-    if sort_by in valid_sort_fields:
-        inventory_queryset = inventory_queryset.order_by(sort_by)
-    
-    # Pagination
-    paginator = Paginator(inventory_queryset, 25)  # Show 25 items per page
-    page_number = request.GET.get('page')
-    inventory_page = paginator.get_page(page_number)
-    
-    # Get store inventory summary using optimized InventoryBatch calculation
-    inventory_summary = get_store_inventory_summary_optimized(store_id)
-    
-    # Get categories for filter dropdown
-    categories = Category.objects.filter(
-        products__inventories__store_id=store_id
-    ).distinct().order_by('name')
-    
-    context = {
-        'store': store,
-        'inventory_page': inventory_page,
-        'inventory_summary': inventory_summary,
-        'categories': categories,
-        'search_query': search_query,
-        'show_zero_stock': show_zero_stock,
-        'category_filter': category_filter,
-        'sort_by': sort_by,
-        'total_items': paginator.count,
-    }
-    
-    return render(request, 'products/store_inventory.html', context)
+
+
+
+
 
 
 @login_required
@@ -594,6 +614,81 @@ def store_inventory_export_view(request, store_id):
 
 
 @login_required
+def store_inventory_view(request, store_id):
+    """
+    Display inventory/product quantities for a specific store.
+    """
+    
+    store = get_object_or_404(StoreLocation, id=store_id)
+    
+    # Get query parameters
+    search_query = request.GET.get('search', '').strip()
+    show_zero_stock = request.GET.get('show_zero_stock', 'false').lower() == 'true'
+    category_filter = request.GET.get('category', '')
+    sort_by = request.GET.get('sort', 'product__name')
+    
+    # Get base inventory queryset
+    inventory_queryset = Inventory.objects.filter(store_id=store_id).select_related('product', 'product__category')
+    
+    # Apply zero stock filter
+    if not show_zero_stock:
+        inventory_queryset = inventory_queryset.filter(quantity_in_stock__gt=0)
+    
+    # Apply search filter
+    if search_query:
+        inventory_queryset = inventory_queryset.filter(
+            Q(product__name__icontains=search_query) |
+            Q(product__sku__icontains=search_query) |
+            Q(product__brand__icontains=search_query)
+        )
+    
+    # Apply category filter
+    if category_filter:
+        inventory_queryset = inventory_queryset.filter(
+            product__category_id=category_filter
+        )
+    
+    # Apply sorting
+    valid_sort_fields = [
+        'product__name', '-product__name',
+        'quantity_in_stock', '-quantity_in_stock',
+        'reorder_level', '-reorder_level',
+        'product__category__name', '-product__category__name'
+    ]
+    if sort_by in valid_sort_fields:
+        inventory_queryset = inventory_queryset.order_by(sort_by)
+    else:
+        inventory_queryset = inventory_queryset.order_by('product__name')
+    
+    # Get categories for filter dropdown
+    categories = Category.objects.filter(
+        products__inventories__store_id=store_id
+    ).distinct().order_by('name')
+    
+    # Pagination
+    paginator = Paginator(inventory_queryset, 25)
+    page_number = request.GET.get('page')
+    inventory_page = paginator.get_page(page_number)
+    
+    # USE THE UPDATED OPTIMIZED FUNCTION
+    inventory_summary = get_store_inventory_summary_optimized(store_id)
+    
+    context = {
+        'store': store,
+        'inventory_page': inventory_page,
+        'inventory_summary': inventory_summary,
+        'categories': categories,
+        'search_query': search_query,
+        'show_zero_stock': show_zero_stock,
+        'category_filter': category_filter,
+        'sort_by': sort_by,
+        'total_items': paginator.count,
+    }
+    
+    return render(request, 'products/store_inventory.html', context)
+
+
+@login_required
 def all_stores_inventory_view(request):
     """
     Overview of inventory across all stores with InventoryBatch-based calculations.
@@ -625,6 +720,9 @@ def all_stores_inventory_view(request):
     }
     
     return render(request, 'products/all_stores_inventory.html', context)
+
+
+
 
 
 @login_required
@@ -755,18 +853,19 @@ def store_low_stock_api(request, store_id):
         'results': results
     })
 
+
 @login_required
 def products_api(request):
     """
     API endpoint to get products with their basic information.
-    Supports filtering and search for AJAX requests like the direct transfer modal.
+    Now includes real-time available stock calculations.
     """
     # Get query parameters
     search_query = request.GET.get('q', '').strip()
     category_id = request.GET.get('category')
     active_only = request.GET.get('active_only', 'true').lower() == 'true'
     limit = int(request.GET.get('limit', 100))
-    store_id = request.GET.get('store_id')  # For stock availability
+    store_id = request.GET.get('store_id')
     
     # Base queryset
     products = Product.objects.select_related('category')
@@ -790,7 +889,7 @@ def products_api(request):
     # Order and limit
     products = products.order_by('name')[:limit]
     
-    # Build response data
+    # Build response data with real-time stock
     results = []
     for product in products:
         product_data = {
@@ -801,30 +900,41 @@ def products_api(request):
             'description': product.description or '',
             'category': product.category.name if product.category else '',
             'category_id': product.category.id if product.category else None,
-            # 'cost_price': float(product.cost_price or 0),
-            # 'selling_price': float(product.selling_price or 0),
-            # 'unit': product.unit or 'Piece',
             'is_active': product.is_active,
         }
         
-        # Add stock information if store_id is provided
+        # Add real-time stock information if store_id is provided
         if store_id:
             try:
                 inventory = Inventory.objects.get(
                     product=product,
                     store_id=store_id
                 )
+                
+                # Calculate committed stock for real-time availability
+                committed_stock = StockTransferItem.objects.filter(
+                    product=product,
+                    stock_transfer__from_store_id=store_id,
+                    stock_transfer__status__in=['pending', 'in_transit']
+                ).aggregate(committed=Sum('quantity'))['committed'] or 0
+                
+                available_stock = max(0, inventory.quantity_in_stock - committed_stock)
+                
                 product_data.update({
-                    'available_stock': inventory.quantity_in_stock,
+                    'physical_stock': inventory.quantity_in_stock,
+                    'committed_stock': committed_stock,
+                    'available_stock': available_stock,
                     'reorder_level': inventory.reorder_level or 0,
-                    'max_stock_level': inventory.max_stock_level or 0,
-                    'stock_status': 'in_stock' if inventory.quantity_in_stock > 0 else 'out_of_stock'
+                    'stock_status': 'out_of_stock' if available_stock == 0 else 
+                                   'low_stock' if available_stock <= (inventory.reorder_level or 0) else 
+                                   'in_stock'
                 })
             except Inventory.DoesNotExist:
                 product_data.update({
+                    'physical_stock': 0,
+                    'committed_stock': 0,
                     'available_stock': 0,
                     'reorder_level': 0,
-                    'max_stock_level': 0,
                     'stock_status': 'not_tracked'
                 })
         
@@ -858,6 +968,7 @@ def products_api(request):
     }
     
     return JsonResponse(response_data)
+
 
 
 @login_required
@@ -899,70 +1010,101 @@ def products_search_api(request):
 def product_stock_api(request, product_id):
     """
     Get stock levels for a specific product across all stores or a specific store.
-    Enhanced version of existing get_product_info view.
+    Enhanced with real-time available stock calculations.
     """
     product = get_object_or_404(Product, id=product_id)
     store_id = request.GET.get('store_id')
 
-    # try:
     if store_id:
-        # Get stock for specific store
+        # Get stock for specific store with real-time calculations
         try:
             inventory = Inventory.objects.get(
                 product=product,
                 store_id=store_id
             )
-            print("Quantity: " + str(inventory.quantity_in_stock))
+            
+            # Calculate committed stock for real-time availability
+            committed_stock = StockTransferItem.objects.filter(
+                product=product,
+                stock_transfer__from_store_id=store_id,
+                stock_transfer__status__in=['pending', 'in_transit']
+            ).aggregate(committed=Sum('quantity'))['committed'] or 0
+            
+            available_stock = max(0, inventory.quantity_in_stock - committed_stock)
+            
             stock_data = {
                 'store_id': int(store_id),
                 'store_name': inventory.store.name,
-                'available_stock': inventory.quantity_in_stock,
+                'physical_stock': inventory.quantity_in_stock,
+                'committed_stock': committed_stock,
+                'available_stock': available_stock,
                 'reorder_level': inventory.reorder_level or 0,
-                # 'max_stock_level': inventory.max_stock_level or 0,
-                # 'last_updated': inventory.last_updated.isoformat() if hasattr(inventory, 'last_updated') else None,
             }
             
-            # Add stock status
-            if inventory.quantity_in_stock == 0:
+            # Add stock status based on available stock
+            if available_stock == 0:
                 stock_data['status'] = 'out_of_stock'
-            elif inventory.quantity_in_stock <= (inventory.reorder_level or 0):
+            elif available_stock <= (inventory.reorder_level or 0):
                 stock_data['status'] = 'low_stock'
             else:
                 stock_data['status'] = 'in_stock'
             
         except Inventory.DoesNotExist:
-            print("No inventory record found for product in store.")
             stock_data = {
                 'store_id': int(store_id),
+                'physical_stock': 0,
+                'committed_stock': 0,
                 'available_stock': 0,
                 'status': 'not_tracked',
                 'error': 'Product not tracked in this store'
             }
     
     else:
+        # Get stock across all stores with real-time calculations
         inventories = Inventory.objects.filter(product=product).select_related('store')
         
-        stock_data = {
-            'total_stock': sum(inv.quantity_in_stock for inv in inventories),
-            'stores': []
-        }
+        stores_data = []
+        total_physical = 0
+        total_committed = 0
+        total_available = 0
         
         for inventory in inventories:
+            # Calculate committed stock for each store
+            committed_stock = StockTransferItem.objects.filter(
+                product=product,
+                stock_transfer__from_store=inventory.store,
+                stock_transfer__status__in=['pending', 'in_transit']
+            ).aggregate(committed=Sum('quantity'))['committed'] or 0
+            
+            available_stock = max(0, inventory.quantity_in_stock - committed_stock)
+            
             store_stock = {
                 'store_id': inventory.store.id,
                 'store_name': inventory.store.name,
-                'available_stock': inventory.quantity_in_stock,
+                'physical_stock': inventory.quantity_in_stock,
+                'committed_stock': committed_stock,
+                'available_stock': available_stock,
                 'reorder_level': inventory.reorder_level or 0,
             }
             
-            if inventory.quantity_in_stock == 0:
+            if available_stock == 0:
                 store_stock['status'] = 'out_of_stock'
-            elif inventory.quantity_in_stock <= (inventory.reorder_level or 0):
+            elif available_stock <= (inventory.reorder_level or 0):
                 store_stock['status'] = 'low_stock'
             else:
                 store_stock['status'] = 'in_stock'
             
-            stock_data['stores'].append(store_stock)
+            stores_data.append(store_stock)
+            total_physical += inventory.quantity_in_stock
+            total_committed += committed_stock
+            total_available += available_stock
+        
+        stock_data = {
+            'total_physical_stock': total_physical,
+            'total_committed_stock': total_committed,
+            'total_available_stock': total_available,
+            'stores': stores_data
+        }
     
     response_data = {
         'success': True,
@@ -970,21 +1112,13 @@ def product_stock_api(request, product_id):
             'id': product.id,
             'name': product.name,
             'sku': product.sku,
-            # 'cost_price': float(product.cost_price or 0),
-            # 'selling_price': float(product.selling_price or 0),
-            'unit': product.default_price,
+            'default_price': float(product.default_price or 0),
         },
         'stock': stock_data
     }
     
     return JsonResponse(response_data)
-        
-    # except Exception as e:
-    #     return JsonResponse({
-    #         'success': False,
-    #         'error': str(e),
-    #         'product_id': product_id
-    #     }, status=500)
+
 
 
 @login_required

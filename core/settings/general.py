@@ -147,12 +147,24 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Session Configuration for Login Timeout
-SESSION_COOKIE_AGE = 300  # 5 minutes in seconds 
+SESSION_COOKIE_AGE = 3000000  # 5 minutes in seconds 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session expires when browser is closed
 SESSION_SAVE_EVERY_REQUEST = True  # Extend session on every request (keeps user active)
 SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_HOST_USER = 'your_email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your_password'
+# EMAIL_USE_TLS = True
+# EMAIL_USE_SSL = False
+
 
 
 

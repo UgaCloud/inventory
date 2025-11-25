@@ -25,7 +25,7 @@
       <div class="col-md-12">
         <h5 class="mb-3">Quick Actions</h5>
         <div class="d-flex gap-3 flex-wrap">
-          <a href="{% url 'add_transfer_request' %}" class="btn btn-primary">
+          <a href="{% url 'create_transfer_request' %}" class="btn btn-primary">
             <i class="ti ti-truck me-2"></i>Request Stock
           </a>
           <a href="{% url 'stock_transfer_list' %}" class="btn btn-outline-primary">
@@ -172,7 +172,7 @@
                   {% endif %}
                 </td>
                 <td>
-                  <a href="{% url 'add_transfer_request' %}" class="btn btn-sm btn-outline-primary">
+                  <a href="{% url 'create_transfer_request' %}" class="btn btn-sm btn-outline-primary">
                     <i class="ti ti-plus"></i> Request
                   </a>
                 </td>
@@ -286,7 +286,7 @@
         {% empty %}
         <div class="text-center py-4">
           <p class="text-muted">No pending transfer requests</p>
-          <a href="{% url 'add_transfer_request' %}" class="btn btn-primary btn-sm">Create Request</a>
+          <a href="{% url 'create_transfer_request' %}" class="btn btn-primary btn-sm">Create Request</a>
         </div>
         {% endfor %}
       </div>

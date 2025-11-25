@@ -45,8 +45,8 @@
               <span>Create Transfer</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li class="dropdown-item"><a href="#" onclick="showApprovedRequestsModal()">From Approved Request</a></li>
-              <li class="dropdown-item"><a href="#" onclick="showDirectTransferModal()">Direct Transfer</a></li>
+              <li class="dropdown-item"><a href="#" data-action="showApprovedRequestsModal">From Approved Request</a></li>
+              <li class="dropdown-item"><a href="#" data-action="showDirectTransferModal">Direct Transfer</a></li>
             </ul>
           </div>
         </li>
@@ -63,7 +63,7 @@
           <strong>{{ pending_approved_requests }} approved request{{ pending_approved_requests|pluralize }}</strong> 
           waiting to be converted to stock transfers.
         </div>
-        <button class="btn btn-sm btn-primary me-2" onclick="showApprovedRequestsModal()">
+  <button class="btn btn-sm btn-primary me-2" data-action="showApprovedRequestsModal">
           View Requests
         </button>
       </div>
@@ -140,7 +140,8 @@
             <!-- <div class="mb-2">
               <i data-feather="dollar-sign" class="feather-24"></i>
             </div> -->
-            <h4 class="mb-1">UGX {{ total_value|default:0|intcomma }}</h4>
+            
+            <h4 class="mb-1">UGX {{ total_values|default:0|intcomma }}</h4>
             <p class="mb-0">Total Value</p>
             <small>Active Transfers</small>
           </div>
@@ -157,7 +158,7 @@
           Stock Transfers ({{ transfers.count }})
         </h5>
         <div>
-          <button class="btn btn-outline-secondary btn-sm me-2" onclick="refreshTransfers()">
+          <button class="btn btn-outline-secondary btn-sm me-2" data-action="refreshTransfers">
             <i data-feather="refresh-cw" class="feather-16"></i>
           </button>
           <span class="badge bg-info">Based on Approved Requests</span>
@@ -304,7 +305,7 @@
                       </a>
                       
                       {% if transfer.status == 'pending' %}
-                        <button class="btn btn-sm btn-primary me-1" onclick="startTransfer({{ transfer.id }})" title="Start Transfer">
+                        <button class="btn btn-sm btn-primary me-1" data-action="startTransfer" data-transfer-id="{{ transfer.id }}" title="Start Transfer">
                           <i data-feather="play" class="feather-14"></i>
                         </button>
                         <a href="{% url 'stock_transfer_update' transfer.id %}" class="btn btn-sm btn-warning me-1" title="Edit">
@@ -313,10 +314,10 @@
                       {% endif %}
                       
                       {% if transfer.status == 'in_transit' %}
-                        <button class="btn btn-sm btn-success me-1" onclick="completeTransfer({{ transfer.id }})" title="Mark Complete">
+                        <button class="btn btn-sm btn-success me-1" data-action="completeTransfer" data-transfer-id="{{ transfer.id }}" title="Mark Complete">
                           <i data-feather="check" class="feather-14"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-info me-1" onclick="trackTransfer({{ transfer.id }})" title="Track">
+                        <button class="btn btn-sm btn-outline-info me-1" data-action="trackTransfer" data-transfer-id="{{ transfer.id }}" title="Track">
                           <i data-feather="map-pin" class="feather-14"></i>
                         </button>
                       {% endif %}
@@ -337,7 +338,7 @@
                           {% endif %}
                           {% if transfer.status != 'completed' and transfer.status != 'cancelled' %}
                           <li><hr class="dropdown-divider"></li>
-                          <li><a class="dropdown-item text-danger" href="#" onclick="cancelTransfer({{ transfer.id }})">
+                          <li><a class="dropdown-item text-danger" href="#" data-action="cancelTransfer" data-transfer-id="{{ transfer.id }}">
                             <i data-feather="x-circle" class="feather-14 me-2"></i>Cancel Transfer
                           </a></li>
                           {% endif %}
@@ -359,7 +360,7 @@
                         <i data-feather="list" class="feather-16 me-1"></i>
                         View Approved Requests
                       </a>
-                      <button class="btn btn-outline-primary" onclick="showDirectTransferModal()">
+                      <button class="btn btn-outline-primary" data-action="showDirectTransferModal">
                         <i data-feather="plus" class="feather-16 me-1"></i>
                         Create Direct Transfer
                       </button>
@@ -436,7 +437,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" onclick="createBulkTransfers()">
+  <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
           <i data-feather="truck" class="feather-16 me-1"></i>
           Create Selected Transfers
         </button>
@@ -495,7 +496,7 @@
           <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0">Transfer Items *</h6>
-              <button type="button" class="btn btn-sm btn-primary" onclick="addFormsetRow()">
+              <button type="button" class="btn btn-sm btn-primary" data-action="addFormsetRow">
                 <i data-feather="plus" class="feather-12 me-1"></i>
                 Add Item
               </button>
@@ -551,7 +552,253 @@
 
 
 <script>
-// Show approved requests modal
+// Helper: read CSRF token from cookie
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+// Helper: POST JSON with CSRF and return parsed JSON
+async function postJSON(url, data) {
+  const csrftoken = getCookie('csrftoken');
+  const resp = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrftoken
+    },
+    body: JSON.stringify(data)
+  });
+
+  const text = await resp.text();
+  try { return { ok: resp.ok, status: resp.status, data: JSON.parse(text) }; } catch (e) { return { ok: resp.ok, status: resp.status, data: text }; }
+}
+
+// ========== STOCK MANAGER CLASS ==========
+class StockManager {
+    constructor() {
+        this.pendingRequests = new Map();
+        this.localCache = new Map();
+        this.debounceTimers = new Map();
+    }
+
+    // Debounced stock update to prevent API spam
+    async updateProductStock(selectElement, delay = 300) {
+        const row = selectElement.closest('tr');
+        const cacheKey = this.getCacheKey(selectElement);
+        
+        // Clear any pending request for this row
+        if (this.debounceTimers.has(cacheKey)) {
+            clearTimeout(this.debounceTimers.get(cacheKey));
+        }
+        
+        // Show loading state immediately
+        const availableStock = row.querySelector('.available-stock');
+        this.updateStockDisplay(availableStock, 'Loading...', 'muted');
+        
+        // Set new debounced request
+        const timeoutId = setTimeout(async () => {
+            await this.fetchStockInfo(selectElement);
+            this.debounceTimers.delete(cacheKey);
+        }, delay);
+        
+        this.debounceTimers.set(cacheKey, timeoutId);
+    }
+
+    async fetchStockInfo(selectElement) {
+        const row = selectElement.closest('tr');
+        const productId = selectElement.value;
+        const fromStoreSelect = document.querySelector('#directTransferModal select[name="from_store"]');
+        const storeId = fromStoreSelect ? fromStoreSelect.value : '';
+        
+        const availableStock = row.querySelector('.available-stock');
+        const cacheKey = this.getCacheKey(selectElement);
+        
+        if (!productId || !storeId) {
+            this.updateStockDisplay(availableStock, '-', 'muted');
+            return;
+        }
+        
+        // Check local cache first (1 second cache for rapid updates)
+        const cached = this.localCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp) < 1000) {
+            console.log(`Using cached stock for product ${productId}`);
+            this.updateFromCache(selectElement, cached.data);
+            return;
+        }
+        
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const url = `{% url "get_product_stock_info" %}?product_id=${productId}&store_id=${storeId}&t=${Date.now()}`;
+            console.log('Fetching stock from:', url);
+            
+            const response = await fetch(url, { signal: controller.signal });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Cache the successful response
+            this.localCache.set(cacheKey, {
+                data: data,
+                timestamp: Date.now()
+            });
+            
+            this.updateStockDisplayFromData(availableStock, data);
+            
+            // Validate quantity if already entered
+            const quantityInput = row.querySelector('.quantity-input');
+            if (quantityInput && quantityInput.value) {
+                this.validateQuantity(quantityInput, data.available_stock);
+            }
+            
+        } catch (error) {
+            console.error('Stock fetch error:', error);
+            if (error.name === 'AbortError') {
+                this.updateStockDisplay(availableStock, 'Timeout', 'danger');
+            } else {
+                this.updateStockDisplay(availableStock, 'Error', 'danger');
+            }
+        }
+    }
+
+    updateStockDisplayFromData(element, data) {
+        if (!element) return;
+        
+        const stockLevel = data.available_stock || 0;
+        let status = 'muted';
+        
+        if (stockLevel === 0) {
+            status = 'danger';
+        } else if (stockLevel <= (data.reorder_level || 0)) {
+            status = 'warning';
+        } else {
+            status = 'success';
+        }
+        
+        this.updateStockDisplay(element, stockLevel, status);
+    }
+
+    updateStockDisplay(element, value, status) {
+        if (!element) return;
+        
+        element.textContent = value;
+        element.className = 'available-stock'; // Reset classes
+        
+        if (status === 'success') {
+            element.classList.add('text-success', 'fw-bold');
+        } else if (status === 'warning') {
+            element.classList.add('text-warning', 'fw-bold');
+        } else if (status === 'danger') {
+            element.classList.add('text-danger', 'fw-bold');
+        } else if (status === 'muted') {
+            element.classList.add('text-muted');
+        }
+    }
+
+    updateFromCache(selectElement, data) {
+        const row = selectElement.closest('tr');
+        const availableStock = row.querySelector('.available-stock');
+        
+        this.updateStockDisplayFromData(availableStock, data);
+        
+        // Validate quantity if already entered
+        const quantityInput = row.querySelector('.quantity-input');
+        if (quantityInput && quantityInput.value) {
+            this.validateQuantity(quantityInput, data.available_stock);
+        }
+    }
+
+    validateQuantity(quantityInput, availableStock) {
+        const row = quantityInput.closest('tr');
+        const quantity = parseInt(quantityInput.value) || 0;
+        
+        if (quantity > availableStock) {
+            quantityInput.classList.add('is-invalid');
+            this.showStockWarning(row, `Only ${availableStock} available in stock`);
+        } else if (quantity <= 0) {
+            quantityInput.classList.add('is-invalid');
+            this.showStockWarning(row, 'Quantity must be greater than 0');
+        } else {
+            quantityInput.classList.remove('is-invalid');
+            this.hideStockWarning(row);
+        }
+    }
+
+    showStockWarning(row, message) {
+        let warning = row.querySelector('.stock-warning');
+        if (!warning) {
+            warning = document.createElement('div');
+            warning.className = 'stock-warning text-danger small mt-1';
+            const quantityCell = row.querySelector('.quantity-input').closest('td');
+            quantityCell.appendChild(warning);
+        }
+        warning.textContent = message;
+        warning.style.display = 'block';
+    }
+
+    hideStockWarning(row) {
+        const warning = row.querySelector('.stock-warning');
+        if (warning) {
+            warning.style.display = 'none';
+        }
+    }
+
+    getCacheKey(selectElement) {
+        const productId = selectElement.value;
+        const storeId = document.querySelector('#directTransferModal select[name="from_store"]')?.value || '';
+        return `stock_${productId}_${storeId}`;
+    }
+
+    // Update all products when store changes
+    async updateAllStocks() {
+        console.log('Updating all product stock info...');
+        const productSelects = document.querySelectorAll('#directTransferModal .product-select');
+        
+        const updates = Array.from(productSelects)
+            .filter(select => select.value)
+            .map(select => this.fetchStockInfo(select));
+        
+        // Use Promise.allSettled to handle individual failures gracefully
+        const results = await Promise.allSettled(updates);
+        
+        // Log any failures
+        results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                console.error(`Failed to update stock for product ${index}:`, result.reason);
+            }
+        });
+    }
+
+    // Clear cache when modal closes
+    clearCache() {
+        this.localCache.clear();
+        this.debounceTimers.forEach(timeoutId => clearTimeout(timeoutId));
+        this.debounceTimers.clear();
+        this.pendingRequests.clear();
+    }
+
+    // Force refresh all stocks (bypass cache)
+    async forceRefreshAllStocks() {
+        this.localCache.clear();
+        await this.updateAllStocks();
+    }
+}
+
+// Initialize stock manager globally
+const stockManager = new StockManager();
+
+// ========== APPROVED REQUESTS MODAL ==========
 function showApprovedRequestsModal() {
   const modal = new bootstrap.Modal(document.getElementById('approvedRequestsModal'));
   const modalContent = document.getElementById('approvedRequestsContent');
@@ -612,7 +859,7 @@ function showApprovedRequestsModal() {
               </td>
               <td>${request.approved_date ? new Date(request.approved_date).toLocaleDateString() : 'N/A'}</td>
               <td>
-                <button class="btn btn-sm btn-primary" onclick="createSingleTransfer(${request.id})">
+                <button class="btn btn-sm btn-primary" data-id="createSingleTransfer(${request.id})">
                   <i data-feather="truck" class="feather-12"></i>
                 </button>
               </td>
@@ -664,58 +911,108 @@ function showApprovedRequestsModal() {
     });
 }
 
-// Create single transfer from request
+// ========== TRANSFER ACTIONS ==========
 function createSingleTransfer(requestId) {
-    if (confirm('Create stock transfer from this request?')) {
-        window.location.href = '{% url "create_transfer_from_request" 0 %}'.replace('0', requestId);
+  if (!confirm('Create stock transfer from this request?')) return;
+
+  const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', requestId);
+  const csrftoken = getCookie('csrftoken');
+
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrftoken,
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    credentials: 'same-origin'
+  }).then(resp => {
+    // Expect JSON when called via AJAX
+    if (resp.ok) {
+      return resp.json().then(data => {
+        if (data && data.success) {
+          // Refresh transfers list to show newly created transfer
+          refreshTransfers();
+        } else {
+          alert('Failed to create transfer');
+        }
+      }).catch(() => {
+        // In case server returned HTML but responded 200, still refresh
+        refreshTransfers();
+      });
+    } else {
+      resp.text().then(t => alert('Failed to create transfer: ' + resp.status));
     }
+  }).catch(err => {
+    console.error('Error creating transfer from request:', err);
+    alert('Error creating transfer from request');
+  });
 }
 
-// Create bulk transfers
 function createBulkTransfers() {
-    const selectedRequests = Array.from(document.querySelectorAll('.request-checkbox:checked'))
-        .map(cb => cb.value);
-    
-    if (selectedRequests.length === 0) {
-        alert('Please select at least one transfer request.');
-        return;
-    }
-    
-    // Create form and submit
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '{% url "create_bulk_transfers" %}';
-    
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrfmiddlewaretoken';
-    csrfInput.value = csrfToken;
-    form.appendChild(csrfInput);
-    
-    selectedRequests.forEach(requestId => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'request_ids';
-        input.value = requestId;
-        form.appendChild(input);
+  const selectedRequests = Array.from(document.querySelectorAll('.request-checkbox:checked')).map(cb => cb.value);
+  if (selectedRequests.length === 0) {
+    alert('Please select at least one transfer request.');
+    return;
+  }
+
+  if (!confirm(`Create transfers for ${selectedRequests.length} request(s)?`)) return;
+
+  const csrftoken = getCookie('csrftoken');
+  const results = { success: [], failed: [] };
+
+  // Create each transfer by calling the server endpoint for creating from request
+  const promises = selectedRequests.map(id => {
+    const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', id);
+    return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+      .then(r => r.json().then(j => ({ id, ok: r.ok && j.success, status: r.status, json: j })).catch(() => ({ id, ok: r.ok, status: r.status })))
+      .catch(err => ({ id, ok: false, error: String(err) }));
+  });
+
+  Promise.all(promises).then(resps => {
+    resps.forEach(r => {
+      if (r.ok) results.success.push(r.id); else results.failed.push(r.id);
     });
-    
-    document.body.appendChild(form);
-    form.submit();
+
+    let message = '';
+    if (results.success.length) message += `Created ${results.success.length} transfers.`;
+    if (results.failed.length) message += ` Failed for ${results.failed.length} requests.`;
+    alert(message || 'No action taken');
+    refreshTransfers();
+  });
 }
 
-// Transfer action functions
 function startTransfer(transferId) {
-    if (confirm('Start this transfer? This will mark it as in transit.')) {
-        window.location.href = '{% url "start_stock_transfer" 0 %}'.replace('0', transferId);
+  if (!confirm('Start this transfer? This will mark it as in transit.')) return;
+
+  const url = '{% url "api_stock_transfer_start" %}';
+  postJSON(url, { transfer_id: transferId }).then(result => {
+    if (result.ok) {
+      alert('Transfer started');
+      refreshTransfers();
+    } else {
+      alert('Failed to start transfer: ' + (result.data.detail || result.status));
     }
+  }).catch(err => {
+    console.error('Start transfer error', err);
+    alert('Error starting transfer');
+  });
 }
 
 function completeTransfer(transferId) {
-    if (confirm('Mark this transfer as complete? This will update inventory.')) {
-        window.location.href = '{% url "complete_stock_transfer" 0 %}'.replace('0', transferId);
+  if (!confirm('Mark this transfer as complete? This will update inventory.')) return;
+
+  const url = '{% url "api_stock_transfer_complete" %}';
+  postJSON(url, { transfer_id: transferId }).then(result => {
+    if (result.ok) {
+      alert('Transfer completed');
+      refreshTransfers();
+    } else {
+      alert('Failed to complete transfer: ' + (result.data.detail || result.status));
     }
+  }).catch(err => {
+    console.error('Complete transfer error', err);
+    alert('Error completing transfer');
+  });
 }
 
 function cancelTransfer(transferId) {
@@ -728,21 +1025,25 @@ function refreshTransfers() {
     window.location.reload();
 }
 
-// Direct transfer modal functions
+// ========== DIRECT TRANSFER MODAL ==========
 function showDirectTransferModal() {
+    console.log('🚀 Opening direct transfer modal...');
     const modal = document.getElementById('directTransferModal');
     if (!modal) {
         console.error('Modal element not found');
         return;
     }
 
-    // Reset the form
+    // Reset form and state
     const form = document.getElementById('directTransferForm');
     if (form) {
-        // form.reset();
+        form.reset();
+        // Remove any existing validation classes
+        form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        form.querySelectorAll('.stock-warning').forEach(el => el.remove());
     }
 
-    // Clear and initialize formset
+    // Clear formset
     const tbody = document.getElementById('formset-tbody');
     if (tbody) {
         tbody.innerHTML = '';
@@ -754,7 +1055,7 @@ function showDirectTransferModal() {
     if (totalFormsInput) totalFormsInput.value = '0';
     if (initialFormsInput) initialFormsInput.value = '0';
 
-    // Reset grand total
+    // Reset totals
     const grandTotalElement = document.getElementById('grand-total');
     if (grandTotalElement) {
         grandTotalElement.textContent = 'UGX 0.00';
@@ -764,10 +1065,48 @@ function showDirectTransferModal() {
     const bootstrapModal = new bootstrap.Modal(modal);
     bootstrapModal.show();
 
-    // Add initial row after modal is shown
+    // Set up event listeners when modal is fully shown
     modal.addEventListener('shown.bs.modal', function() {
-        addFormsetRow();
+        console.log('✅ Modal fully shown, setting up real-time stock listeners...');
+        setupRealTimeStockListeners();
+        addFormsetRow(); // Add initial row
     }, { once: true });
+
+    // Clear cache when modal hides
+    modal.addEventListener('hidden.bs.modal', function() {
+        console.log('🗑️ Modal closed, clearing stock cache...');
+        stockManager.clearCache();
+    });
+}
+
+function setupRealTimeStockListeners() {
+    const modal = document.getElementById('directTransferModal');
+    if (!modal) return;
+
+    // Store change listener
+    const fromStoreSelect = modal.querySelector('select[name="from_store"]');
+    if (fromStoreSelect) {
+        fromStoreSelect.addEventListener('change', function() {
+            console.log('🏪 Store changed to:', this.value);
+            stockManager.forceRefreshAllStocks();
+        });
+    }
+
+    // Product change with debouncing
+    modal.addEventListener('change', function(e) {
+        if (e.target.classList.contains('product-select')) {
+            console.log('📦 Product selected:', e.target.value);
+            stockManager.updateProductStock(e.target, 300); // 300ms debounce
+        }
+    });
+
+    // Manual refresh button (optional - add this to your modal UI)
+    const refreshBtn = modal.querySelector('#refreshStockBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            stockManager.forceRefreshAllStocks();
+        });
+    }
 }
 
 function addFormsetRow() {
@@ -803,8 +1142,8 @@ function addFormsetRow() {
         </td>
         <td>
             <input type="number" name="items-${currentForms}-quantity" 
-                   class="form-control form-control-sm" 
-                   min="1" value="" placeholder="Qty" required>
+                   class="form-control form-control-sm quantity-input" 
+                   min="1" step="1" value="" placeholder="Qty" required>
         </td>
         <td>
             <select name="items-${currentForms}-units"
@@ -819,7 +1158,7 @@ function addFormsetRow() {
             <span class="row-total">UGX 0.00</span>
         </td>
         <td>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFormsetRow(this)">
+            <button type="button" class="btn btn-sm btn-outline-danger" data-id="removeFormsetRow(this)">
                 <i data-feather="trash-2" class="feather-12"></i>
             </button>
         </td>
@@ -827,7 +1166,11 @@ function addFormsetRow() {
     
     tbody.appendChild(newRow);
     totalFormsInput.value = currentForms + 1;
+    
+    // Initialize row features
     initializeRowFeatures(newRow);
+    
+    console.log(`✅ Added formset row ${currentForms}, total forms: ${totalFormsInput.value}`);
     
     // Refresh feather icons
     if (typeof feather !== 'undefined') {
@@ -837,19 +1180,34 @@ function addFormsetRow() {
 
 function initializeRowFeatures(row) {
     // Product select
-    const productSelect = row.querySelector('select[name*="product"]');
+    const productSelect = row.querySelector('.product-select');
     if (productSelect) {
         productSelect.addEventListener('change', function() {
-            updateProductInfo(this);
             updateRowTotal(row);
+            
+            // Auto-select first unit if not selected
+            const unitsSelect = row.querySelector('select[name*="units"]');
+            if (unitsSelect && !unitsSelect.value && unitsSelect.options.length > 1) {
+                unitsSelect.selectedIndex = 1;
+            }
         });
     }
 
     // Quantity input
-    const quantityInput = row.querySelector('input[name*="quantity"]');
+    const quantityInput = row.querySelector('.quantity-input');
     if (quantityInput) {
         quantityInput.addEventListener('input', function() {
             updateRowTotal(row);
+            // Validation handled by stock manager
+        });
+
+        // Also validate on blur for immediate feedback
+        quantityInput.addEventListener('blur', function() {
+            const availableStockElement = row.querySelector('.available-stock');
+            const availableStock = parseInt(availableStockElement.textContent);
+            if (!isNaN(availableStock)) {
+                stockManager.validateQuantity(this, availableStock);
+            }
         });
     }
 
@@ -860,27 +1218,23 @@ function initializeRowFeatures(row) {
             updateRowTotal(row);
         });
     }
-
-    // Delete button
-    const deleteBtn = row.querySelector('.btn-outline-danger');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', function() {
-            removeFormsetRow(this);
-        });
-    }
 }
 
 function removeFormsetRow(button) {
     const row = button.closest('tr');
     const tbody = document.getElementById('formset-tbody');
     
-    // Don't remove if it's the last row
     if (tbody.children.length <= 1) {
-        // Just clear the values instead
+        // Clear values but keep the row
         const inputs = row.querySelectorAll('input:not([type="hidden"]), select');
-        inputs.forEach(input => input.value = '');
+        inputs.forEach(input => {
+            input.value = '';
+            input.classList.remove('is-invalid');
+        });
         row.querySelector('.available-stock').textContent = '-';
+        row.querySelector('.available-stock').className = 'available-stock text-muted';
         row.querySelector('.row-total').textContent = 'UGX 0.00';
+        stockManager.hideStockWarning(row);
         updateGrandTotal();
         return;
     }
@@ -897,8 +1251,8 @@ function removeFormsetRow(button) {
     
     // Renumber the remaining rows
     rows.forEach((row, index) => {
-        const productSelect = row.querySelector('select[name*="product"]');
-        const quantityInput = row.querySelector('input[name*="quantity"]');
+        const productSelect = row.querySelector('.product-select');
+        const quantityInput = row.querySelector('.quantity-input');
         const unitsSelect = row.querySelector('select[name*="units"]');
         
         if (productSelect) productSelect.name = `items-${index}-product`;
@@ -907,57 +1261,14 @@ function removeFormsetRow(button) {
         
         row.id = `row-${index}`;
     });
+    
+    console.log(`🗑️ Removed formset row, total forms now: ${totalFormsInput.value}`);
 }
 
-// Update product stock info
-function updateProductInfo(selectElement) {
-    const row = selectElement.closest('tr');
-    const productId = selectElement.value;
-    const fromStoreSelect = document.querySelector('select[name="from_store"]');
-    const storeId = fromStoreSelect ? fromStoreSelect.value : '';
-    
-    if (!productId || !storeId) {
-        const availableStock = row.querySelector('.available-stock');
-        if (availableStock) {
-            availableStock.textContent = '-';
-            availableStock.classList.remove('text-danger');
-        }
-        return;
-    }
-    
-    // Fetch stock info
-    fetch('{% url "get_product_stock_info" %}?product_id=' + productId + '&store_id=' + storeId)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            const availableStock = row.querySelector('.available-stock');
-            if (availableStock) {
-                availableStock.textContent = data.available_stock || 0;
-                if (data.available_stock === 0) {
-                    availableStock.classList.add('text-danger');
-                } else {
-                    availableStock.classList.remove('text-danger');
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching stock info:', error);
-            const availableStock = row.querySelector('.available-stock');
-            if (availableStock) {
-                availableStock.textContent = 'Error';
-                availableStock.classList.add('text-danger');
-            }
-        });
-}
-
-// Update row total
+// ========== CALCULATION FUNCTIONS ==========
 function updateRowTotal(row) {
-    const productSelect = row.querySelector('select[name*="product"]');
-    const quantityInput = row.querySelector('input[name*="quantity"]');
+    const productSelect = row.querySelector('.product-select');
+    const quantityInput = row.querySelector('.quantity-input');
     const rowTotal = row.querySelector('.row-total');
     
     if (productSelect && quantityInput && rowTotal) {
@@ -971,7 +1282,6 @@ function updateRowTotal(row) {
     }
 }
 
-// Update grand total
 function updateGrandTotal() {
     const rowTotals = document.querySelectorAll('.row-total');
     let grandTotal = 0;
@@ -988,12 +1298,18 @@ function updateGrandTotal() {
     }
 }
 
-// Form submission handler
+// ========== FORM SUBMISSION ==========
 function setupFormSubmission() {
     const directTransferForm = document.getElementById('directTransferForm');
-    if (!directTransferForm) return;
+    if (!directTransferForm) {
+        console.error('Direct transfer form not found');
+        return;
+    }
+
+    console.log('🔧 Setting up form submission handler...');
 
     directTransferForm.addEventListener('submit', function(e) {
+        console.log('📤 Form submission started...');
         const submitBtn = document.getElementById('submitTransferBtn');
         const spinner = submitBtn.querySelector('.spinner-border');
         const icon = submitBtn.querySelector('i[data-feather="save"]');
@@ -1005,12 +1321,11 @@ function setupFormSubmission() {
         
         // Validate at least one item exists
         const totalForms = parseInt(document.getElementById('id_items-TOTAL_FORMS').value);
+        console.log(`📋 Total forms: ${totalForms}`);
         if (totalForms === 0) {
             e.preventDefault();
             alert('Please add at least one item to the transfer.');
-            if (spinner) spinner.classList.add('d-none');
-            if (icon) icon.style.display = 'inline';
-            submitBtn.disabled = false;
+            resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
         
@@ -1026,44 +1341,95 @@ function setupFormSubmission() {
             }
         }
         
+        console.log(`✅ Valid items: ${validItems}`);
         if (validItems === 0) {
             e.preventDefault();
             alert('Please fill in product, quantity, and units for at least one item.');
-            if (spinner) spinner.classList.add('d-none');
-            if (icon) icon.style.display = 'inline';
-            submitBtn.disabled = false;
+            resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
         
-        // Validate from_store and to_store are selected and different
+        // Validate from_store and to_store
         const fromStore = document.querySelector('select[name="from_store"]');
         const toStore = document.querySelector('select[name="to_store"]');
         
         if (!fromStore || !fromStore.value || !toStore || !toStore.value) {
             e.preventDefault();
             alert('Please select both From Store and To Store.');
-            if (spinner) spinner.classList.add('d-none');
-            if (icon) icon.style.display = 'inline';
-            submitBtn.disabled = false;
+            resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
         
         if (fromStore.value === toStore.value) {
             e.preventDefault();
             alert('From Store and To Store cannot be the same.');
-            if (spinner) spinner.classList.add('d-none');
-            if (icon) icon.style.display = 'inline';
-            submitBtn.disabled = false;
+            resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
         
-        // Form is valid - allow submission
-        console.log('Direct transfer form submitted successfully');
+        // Check for stock validation errors
+        const invalidQuantities = document.querySelectorAll('.is-invalid');
+        if (invalidQuantities.length > 0) {
+            e.preventDefault();
+            alert('Some items have quantities exceeding available stock. Please adjust the quantities.');
+            resetSubmitButton(submitBtn, spinner, icon);
+            return;
+        }
+        
+    console.log('🎉 Form validation passed, submitting via AJAX...');
+    e.preventDefault();
+
+    const url = directTransferForm.action;
+    const formData = new FormData(directTransferForm);
+    const csrftoken = getCookie('csrftoken');
+
+    fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRFToken': csrftoken
+      },
+      body: formData
+    }).then(async resp => {
+      if (resp.ok) {
+        // Created/redirected; refresh list or navigate to detail if Location header exists
+        try {
+          // Try to detect redirect URL
+          const loc = resp.headers.get('Location');
+          if (loc) {
+            window.location.href = loc;
+            return;
+          }
+        } catch (e) {}
+        // Otherwise just refresh the transfers list
+        resetSubmitButton(submitBtn, spinner, icon);
+        const text = await resp.text();
+        // Best-effort: show success and refresh
+        alert('Transfer created successfully');
+        refreshTransfers();
+      } else {
+        const txt = await resp.text();
+        resetSubmitButton(submitBtn, spinner, icon);
+        alert('Failed to create transfer: ' + resp.status + '\n' + txt);
+      }
+    }).catch(err => {
+      console.error('AJAX create transfer error', err);
+      resetSubmitButton(submitBtn, spinner, icon);
+      alert('Error creating transfer');
+    });
     });
 }
 
-// Initialize when page loads
+function resetSubmitButton(submitBtn, spinner, icon) {
+    if (spinner) spinner.classList.add('d-none');
+    if (icon) icon.style.display = 'inline';
+    submitBtn.disabled = false;
+}
+
+// ========== INITIALIZATION ==========
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🏁 DOM loaded, initializing stock transfer system...');
+    
     // Initialize form submission handler
     setupFormSubmission();
     
@@ -1071,36 +1437,98 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.formset-row').forEach(row => {
         initializeRowFeatures(row);
     });
-    
-    // Add event listener for store changes to update all product stock info
-    const fromStoreSelect = document.querySelector('select[name="from_store"]');
-    if (fromStoreSelect) {
-        fromStoreSelect.addEventListener('change', function() {
-            document.querySelectorAll('.product-select').forEach(select => {
-                if (select.value) {
-                    updateProductInfo(select);
-                }
-            });
-        });
+
+  // Global event delegation for elements with data-action attribute
+  document.body.addEventListener('click', function(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.getAttribute('data-action');
+    if (!action) return;
+
+    try {
+      switch (action) {
+        case 'showApprovedRequestsModal':
+          showApprovedRequestsModal();
+          break;
+        case 'showDirectTransferModal':
+          showDirectTransferModal();
+          break;
+        case 'refreshTransfers':
+          refreshTransfers();
+          break;
+        case 'startTransfer':
+          startTransfer(el.dataset.transferId);
+          break;
+        case 'completeTransfer':
+          completeTransfer(el.dataset.transferId);
+          break;
+        case 'trackTransfer':
+          trackTransfer(el.dataset.transferId);
+          break;
+        case 'cancelTransfer':
+          cancelTransfer(el.dataset.transferId);
+          break;
+        case 'createBulkTransfers':
+          createBulkTransfers();
+          break;
+        case 'addFormsetRow':
+          addFormsetRow();
+          break;
+        default:
+          // no-op
+          break;
+      }
+    } catch (err) {
+      console.error('Error handling action', action, err);
     }
+  });
     
-    // Add event listener for product changes to auto-select default unit
-    document.addEventListener('change', function(e) {
-        if (e.target && e.target.classList.contains('product-select')) {
-            const productSelect = e.target;
-            const row = productSelect.closest('tr');
-            const unitsSelect = row.querySelector('select[name*="units"]');
-            
-            if (productSelect.value && unitsSelect && !unitsSelect.value) {
-                // Auto-select the first available unit
-                if (unitsSelect.options.length > 1) {
-                    unitsSelect.selectedIndex = 1;
-                    updateRowTotal(row);
-                }
-            }
-        }
-    });
+    console.log('✅ Stock transfer system fully initialized');
 });
+
+// Feather icons refresh helper
+function refreshFeatherIcons() {
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+}
+
+
+document.addEventListener('click', function (e) {
+
+    // START TRANSFER
+    const startBtn = e.target.closest('.start-transfer-btn');
+    if (startBtn) {
+        const id = startBtn.dataset.id;
+        startTransfer(id);
+        return;
+    }
+
+    // COMPLETE TRANSFER
+    const completeBtn = e.target.closest('.complete-transfer-btn');
+    if (completeBtn) {
+        const id = completeBtn.dataset.id;
+        completeTransfer(id);
+        return;
+    }
+
+    // CREATE SINGLE TRANSFER FROM REQUEST
+    const createBtn = e.target.closest('.create-single-transfer-btn');
+    if (createBtn) {
+        const id = createBtn.dataset.id;
+        createSingleTransfer(id);
+        return;
+    }
+
+    // CANCEL (if you add later)
+    const cancelBtn = e.target.closest('.cancel-transfer-btn');
+    if (cancelBtn) {
+        const id = cancelBtn.dataset.id;
+        cancelTransfer(id);
+        return;
+    }
+});
+
 </script>
 
 
@@ -1212,6 +1640,43 @@ document.addEventListener('DOMContentLoaded', function() {
 @media (max-width: 576px) {
   .table-top-head { flex-direction: column; gap: 0.4rem; align-items: stretch; }
   .table-top-head .btn { width: 100%; justify-content: flex-start; }
+}
+
+/* Enhanced stock display styles */
+.available-stock.text-success {
+    font-weight: bold;
+}
+
+.available-stock.text-danger {
+    font-weight: bold;
+}
+
+.stock-warning {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+/* Loading animation for stock */
+.available-stock:empty::before {
+    content: 'Loading...';
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Real-time update indicators */
+.product-select:focus + .available-stock::after {
+    content: ' ⟳';
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 </style>
 {% endblock %}

@@ -315,14 +315,14 @@
                         <small class="text-muted d-block">{{ item.units }}</small>
                       {% endif %}
                     </td>
-                    <td>UGX {{ item.unit_cost|floatformat:2|intcomma }}</td>
+                    <td>UGX {{ item.unit_cost|intcomma }}</td>
                     <td>
-                      <span class="fw-bold text-primary">UGX {{ item.total_value|floatformat:2|intcomma }}</span>
+                      <span class="fw-bold text-primary">UGX {{ item.total_value|intcomma }}</span>
                     </td>
                     <td>
                       {% with available=item.get_available_stock %}
                       <span class="{% if available >= item.quantity %}text-success{% elif available > 0 %}text-warning{% else %}text-danger{% endif %}">
-                        {{ available|default:"N/A" }}
+                        {{ item.available_stock|intcomma|default:"N/A"  }}
                       </span>
                       {% endwith %}
                     </td>

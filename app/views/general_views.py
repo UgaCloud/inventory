@@ -13,6 +13,7 @@ from app.selectors.product_selectors import *
 from app.selectors.transaction_selectors import *
 from app.selectors.customer_selectors import *
 from app.selectors.supplier_selectors import *
+from app.models.human_resource import UserProfile
 
 
 
@@ -40,6 +41,47 @@ def index_view(request):
 
 
     
+    # Determine which dashboards to show based on RBAC module access
+    # Uses the flexible dashboard assignment system
+    dashboard_templates = []
+    dashboard_info = []
+    if request.user.is_authenticated:
+        try:
+            from app.utils.dashboard_assignment import (
+                get_dashboard_templates_for_modules,
+                get_dashboard_info_for_modules
+            )
+            accessible_modules = request.user.profile.effective_modules
+            # Get dashboard info (name and template) automatically based on module access
+            dashboard_info = get_dashboard_info_for_modules(accessible_modules)
+            dashboard_templates = [info['template'] for info in dashboard_info]
+            
+            # Debug logging (remove in production if needed)
+            print(f"🔍 User: {request.user.username}")
+            print(f"🔍 Accessible modules: {accessible_modules}")
+            print(f"🔍 Assigned dashboards: {[info['name'] for info in dashboard_info]}")
+            
+        except UserProfile.DoesNotExist:
+            dashboard_templates = []
+            dashboard_info = []
+            print("⚠️ UserProfile does not exist for user:", request.user.username)
+        except AttributeError as e:
+            # Fallback if profile doesn't have effective_modules
+            dashboard_templates = []
+            dashboard_info = []
+            print(f"⚠️ AttributeError accessing effective_modules: {e}")
+    
+    # Superusers: Only give all dashboards if they have no specific module-based dashboards
+    # This prevents showing all dashboards when superuser has specific module access
+    if request.user.is_superuser and not dashboard_templates:
+        from app.utils.dashboard_assignment import DASHBOARD_TEMPLATE_MAP, DASHBOARD_MODULE_MAP
+        dashboard_templates = list(DASHBOARD_TEMPLATE_MAP.values())
+        dashboard_info = [
+            {'name': name, 'template': template}
+            for name, template in DASHBOARD_TEMPLATE_MAP.items()
+        ]
+        print(f"🔍 Superuser with no module dashboards - showing all: {dashboard_templates}")
+
     context = {
         'products': products,
         'organization_details': organization_details,
@@ -65,6 +107,8 @@ def index_view(request):
         
         # ADD THIS LINE to hide sidebar on dashboard:
         'hide_sidebar': True,
+        'dashboard_templates': dashboard_templates,
+        'dashboard_info': dashboard_info,  # List of dicts with 'name' and 'template'
     }
     print(context['todays_fully_paid_sales'])
     

@@ -671,17 +671,34 @@ def transfer_request_list(request):
     
     requests = requests.order_by('-request_date')
 
-    stores = Store.objects.filter(is_active=True)   
+    stores = Store.objects.filter(is_active=True)
+    
+    # Calculate status counts for summary cards
+    all_requests = TransferRequest.objects.all()
+    status_counts = {
+        'pending': all_requests.filter(status='pending').count(),
+        'approved': all_requests.filter(status='approved').count(),
+        'in_transit': all_requests.filter(status='approved').count(),  # Using approved as proxy for in_transit
+        'completed': all_requests.filter(status='fulfilled').count(),
+        'rejected': all_requests.filter(status='rejected').count(),
+    }
     
     # Pagination
     paginator = Paginator(requests, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Import necessary models
+    from app.models.human_resource import Department
+    from app.models.products import UnitOfMeasure
+    
     context = {
         'requests': page_obj,
         'current_status': status_filter,
         'stores': stores,
+        'status_counts': status_counts,
+        'departments': Department.objects.filter(is_active=True),
+        'units': UnitOfMeasure.objects.all(),
     }
     
     return render(request, 'transfers/transfer_request_list.html', context)
@@ -721,7 +738,7 @@ def get_product_info(request, product_id):
         
         if from_store_id:
             try:
-                from app.models.inventory import Inventory
+                from app.models.products import Inventory
                 inventory = Inventory.objects.get(
                     product=product,
                     store_id=from_store_id
@@ -778,7 +795,7 @@ def validate_transfer_items(request):
             
             try:
                 from app.models.products import Product
-                from app.models.inventory import Inventory
+                from app.models.products import Inventory
                 
                 product = Product.objects.get(id=product_id)
                 

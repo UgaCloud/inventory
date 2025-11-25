@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from app.models.transactions import *
 from app.forms.transaction_forms import *
+from app.models.products import *
 from app.selectors.transaction_selectors import (
     get_all_stock_movements, get_stock_movements_by_branch,
     get_all_stock_transfers, get_stock_transfer_by_id, get_stock_transfers_by_branch,
@@ -26,6 +27,20 @@ from django.db.models import Count, Sum, Q
 from django.core.paginator import Paginator
 from django.db import transaction
 
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from django.contrib import messages
+from datetime import timedelta
+
+from app.forms.transaction_forms import StockTransferForm, StockTransferItemFormSet
+
+from django.core.cache import cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -40,132 +55,92 @@ def stock_dashboard(request):
 
 
 
+
+
 @login_required
 def stock_transfer_list(request):
     """Enhanced stock transfer list view with filtering and statistics"""
     try:
-        # Get filter parameters
+        # --- Get filter parameters ---
         status_filter = request.GET.get('status', 'all')
         page_number = request.GET.get('page', 1)
-        
-        # Base queryset
+
+        # --- Base queryset ---
         transfers = StockTransfer.objects.select_related(
             'from_store', 'to_store', 'transfer_request', 'created_by'
         ).prefetch_related('items__product').all().order_by('-transfer_date')
-        
-        # Apply status filter
+
+        # --- Apply status filter ---
         if status_filter != 'all':
             transfers = transfers.filter(status=status_filter)
-        
-        # Calculate statistics
+
         today = timezone.now().date()
-        
-        # Status counts for all transfers
+
+        # --- Status counts ---
         status_counts = {
             'pending': StockTransfer.objects.filter(status='pending').count(),
             'in_transit': StockTransfer.objects.filter(status='in_transit').count(),
             'completed': StockTransfer.objects.filter(status='completed').count(),
             'cancelled': StockTransfer.objects.filter(status='cancelled').count(),
         }
-        
-        # Count approved requests waiting for transfer creation
-        pending_approved_requests = TransferRequest.objects.filter(
-            status='approved'
-        ).count()
-        
-        # FIXED: Calculate total value of active transfers (pending + in_transit)
-        active_transfers = transfers.filter(status__in=['pending', 'in_transit'])
+
+        # --- Pending approved requests ---
+        pending_approved_requests = TransferRequest.objects.filter(status='approved').count()
+
+        # --- Calculate total value of active transfers ---
+        active_transfers = transfers.exclude(status='cancelled')
         total_value = Decimal('0.00')
-        
+
         for transfer in active_transfers:
-            for item in transfer.items.all():
-                try:
-                    # Try multiple ways to get the product cost
-                    product_cost = Decimal('0.00')
-                    
-                    # Method 1: Use product's default_price
-                    if item.product.default_price:
-                        product_cost = Decimal(str(item.product.default_price))
-                    # Method 2: Try to get from inventory batches
-                    else:
-                        batch = InventoryBatch.objects.filter(
-                            product=item.product,
-                            store=transfer.from_store
-                        ).order_by('-created_at').first()
-                        if batch and batch.unit_cost:
-                            product_cost = Decimal(str(batch.unit_cost))
-                    
-                    total_value += Decimal(str(item.quantity)) * product_cost
-                    
-                except (AttributeError, ValueError, TypeError) as e:
-                    print(f"Error calculating value for item {item.id}: {e}")
-                    continue
-        
-        # Pagination
-        paginator = Paginator(transfers, 25)
-        page_obj = paginator.get_page(page_number)
-        
-        # FIXED: Add calculated properties to each transfer for template
-        for transfer in page_obj:
             transfer_total = Decimal('0.00')
             for item in transfer.items.all():
                 try:
-                    product_cost = Decimal('0.00')
-                    
-                    if item.product.default_price:
-                        product_cost = Decimal(str(item.product.default_price))
-                    else:
-                        batch = InventoryBatch.objects.filter(
-                            product=item.product,
-                            store=transfer.from_store
-                        ).order_by('-created_at').first()
-                        if batch and batch.unit_cost:
-                            product_cost = Decimal(str(batch.unit_cost))
-                    
-                    transfer_total += Decimal(str(item.quantity)) * product_cost
-                    
-                except (AttributeError, ValueError, TypeError) as e:
-                    print(f"Error calculating transfer value for item {item.id}: {e}")
+                    # Use the item's built-in total_value property which handles FIFO pricing
+                    item_value = item.total_value
+                    if item_value:
+                        transfer_total += Decimal(str(item_value))
+                except Exception as e:
+                    print(f"Error calculating value for item {item.id}: {e}")
                     continue
-            
+
             transfer.total_value = transfer_total
-            
+            total_value += transfer_total
+
+        # --- Pagination ---
+        paginator = Paginator(transfers, 25)
+        page_obj = paginator.get_page(page_number)
+
+        # --- Calculate per-transfer flags for template ---
+        for transfer in page_obj:
             transfer.is_urgent = (
-                transfer.status == 'pending' and 
+                transfer.status == 'pending' and
                 transfer.transfer_date >= today - timedelta(days=1)
             )
-            
             transfer.is_overdue = False
-        
-       
-        
+
+        # --- Initialize forms ---
         try:
-            # Initialize forms safely
             stock_form = StockTransferForm()
-            
-            # Ensure store locations exist before setting queryset
             active_stores = StoreLocation.objects.filter(is_active=True)
             if active_stores.exists():
                 stock_form.fields['from_store'].queryset = active_stores
                 stock_form.fields['to_store'].queryset = active_stores
             else:
-                # Fallback if no active stores
                 stock_form.fields['from_store'].queryset = StoreLocation.objects.none()
                 stock_form.fields['to_store'].queryset = StoreLocation.objects.none()
-                
+
             item_formset = StockTransferItemFormSet()
-            
         except Exception as e:
-            # If form initialization fails, create empty forms and log the error
             print(f"Form initialization error: {e}")
             stock_form = StockTransferForm()
             item_formset = StockTransferItemFormSet()
-        
+
+        # --- Context ---
         context = {
             'transfers': page_obj,
             'status_counts': status_counts,
             'pending_approved_requests': pending_approved_requests,
-            'total_value': total_value,  
+            'total_values': total_value,
             'status_filter': status_filter,
             'current_date': today,
             'stock_form': stock_form,
@@ -173,14 +148,13 @@ def stock_transfer_list(request):
             'products': Product.objects.filter(is_active=True),
             'units': UnitOfMeasure.objects.all(),
         }
-        
+
         return render(request, 'transfers/stock_transfer_list.html', context)
-        
+
     except Exception as e:
-        # Handle any unexpected errors
         print(f"Error in stock_transfer_list: {e}")
         messages.error(request, "An error occurred while loading the stock transfers page.")
-        return redirect('dashboard')  # Redirect to a safe page
+        return redirect('dashboard')
 
 @login_required
 def stock_transfer_create(request):
@@ -306,16 +280,26 @@ def create_transfer_from_request(request, request_id):
                 transfer_request.status = 'fulfilled'
                 transfer_request.save()
                 
+                # If this was an AJAX call, return JSON so the frontend can update without a redirect
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    return JsonResponse({'success': True, 'transfer_id': stock_transfer.id}, status=201)
+
                 messages.success(request, f'Stock transfer #{stock_transfer.id} created successfully from request #{transfer_request.id}.')
                 return redirect('stock_transfer_detail', transfer_id=stock_transfer.id)
                 
         except Exception as e:
+            # For AJAX callers return a JSON error
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
             messages.error(request, f'Error creating transfer: {str(e)}')
             return redirect('transfer_request_detail', request_id=request_id)
     
     return render(request, 'stock/transfer_from_request_confirm.html', {
         'transfer_request': transfer_request
     })
+
+
 
 @login_required
 def create_bulk_transfers(request):
@@ -373,7 +357,10 @@ def create_bulk_transfers(request):
             messages.success(request, f'Successfully created {created_count} stock transfer(s).')
         if errors:
             messages.warning(request, f'Some transfers failed: {" | ".join(errors[:5])}')
-        
+        # If AJAX caller, return JSON summary
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+            return JsonResponse({'success': True, 'created': created_count, 'errors': errors}, status=200)
+
         return redirect('stock_transfer_list')
     
     return redirect('stock_transfer_list')
@@ -501,7 +488,6 @@ def start_stock_transfer(request, transfer_id):
 
 @login_required
 def complete_stock_transfer(request, transfer_id):
-    """Complete a stock transfer and apply inventory changes"""
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
     
     if transfer.status != 'in_transit':
@@ -518,27 +504,78 @@ def complete_stock_transfer(request, transfer_id):
     
     return redirect('stock_transfer_detail', transfer_id=transfer.id)
 
+
+
 @login_required
 def get_product_stock_info(request):
-    """JSON endpoint to get available stock for a product in a store"""
+    """JSON endpoint for real-time stock with committed stock calculation"""
     product_id = request.GET.get('product_id')
     store_id = request.GET.get('store_id')
+    
+    print(f"🔍 DEBUG: Fetching stock for product {product_id}, store {store_id}")
     
     if not product_id or not store_id:
         return JsonResponse({'error': 'Missing parameters'}, status=400)
     
     try:
+        # Simple query without select_related/only conflict
         inventory = Inventory.objects.get(
             product_id=product_id,
             store_id=store_id
         )
-        return JsonResponse({
-            'available_stock': inventory.quantity_in_stock,
-            'reorder_level': inventory.reorder_level
-        })
+        
+        print(f"📊 DEBUG: Base inventory found: {inventory.quantity_in_stock}")
+        
+        # Calculate committed stock (stock reserved for pending/in-transit transfers)
+        # Use lazy import to avoid circular imports
+        from app.models.transactions import StockTransferItem
+        from django.db.models import Sum
+        
+        committed_stock = StockTransferItem.objects.filter(
+            product_id=product_id,
+            stock_transfer__from_store_id=store_id,
+            stock_transfer__status__in=['pending', 'in_transit']
+        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        
+        print(f"🔄 DEBUG: Committed stock: {committed_stock}")
+        
+        # Calculate truly available stock
+        available_stock = max(0, inventory.quantity_in_stock - committed_stock)
+        
+        print(f"🎯 DEBUG: Available stock: {available_stock} (Base: {inventory.quantity_in_stock} - Committed: {committed_stock})")
+        
+        response_data = {
+            'available_stock': available_stock,
+            'total_stock': inventory.quantity_in_stock,
+            'committed_stock': committed_stock,
+            'reorder_level': inventory.reorder_level,
+            'can_fulfill': available_stock > 0,
+        }
+        
+        return JsonResponse(response_data)
+        
     except Inventory.DoesNotExist:
-        return JsonResponse({'available_stock': 0, 'reorder_level': 0})
-
+        print(f"❌ DEBUG: No inventory record found for product {product_id} in store {store_id}")
+        return JsonResponse({
+            'available_stock': 0,
+            'total_stock': 0,
+            'committed_stock': 0,
+            'reorder_level': 0,
+            'can_fulfill': False,
+        })
+        
+    except Exception as e:
+        print(f"💥 DEBUG: Error in get_product_stock_info: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return JsonResponse({
+            'error': 'Unable to fetch stock information',
+            'available_stock': 0,
+            'total_stock': 0,
+            'committed_stock': 0,
+            'can_fulfill': False
+        }, status=500)
 
 @login_required
 def transfer_request_list(request):
@@ -560,9 +597,27 @@ def create_transfer_request(request):
             
             formset.instance = transfer_request
             formset.save()
-            
+            # If AJAX (JSON) request, return JSON response for modal submission
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({'success': True, 'request_id': transfer_request.id})
+
             messages.success(request, 'Transfer request created successfully.')
             return redirect('transfer_request_detail', request_id=transfer_request.id)
+        else:
+            # Form or formset invalid
+            # If this was an AJAX request (modal submit), return JSON with errors instead of rendering a full template
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                # Collect form and formset errors
+                errors = {
+                    'form_errors': form.errors or {},
+                    'formset_errors': formset.errors or [],
+                }
+                # include non-field errors if present
+                if hasattr(form, 'non_field_errors'):
+                    nf = form.non_field_errors()
+                    if nf:
+                        errors['non_field_errors'] = nf
+                return JsonResponse({'success': False, 'errors': errors}, status=400)
     else:
         form = TransferRequestForm()
         formset = TransferRequestItemFormSet()
@@ -578,6 +633,40 @@ def transfer_request_detail(request, request_id):
     transfer_request = get_object_or_404(TransferRequest, id=request_id)
     return render(request, 'stock/transfer_request_detail.html', {'transfer_request': transfer_request})
 
+
+@login_required
+def transfer_request_json(request, request_id):
+    """Return transfer request data and items as JSON (for modal edit)"""
+    tr = get_object_or_404(TransferRequest, id=request_id)
+    items = []
+    for it in tr.items.all():
+        items.append({
+            'id': it.id,
+            'product_id': it.product.id,
+            'product_name': it.product.name,
+            'quantity': it.quantity,
+            'units_id': it.units.id,
+            'units_name': it.units.name,
+            'notes': getattr(it, 'notes', '')
+        })
+
+    data = {
+        'id': tr.id,
+        'from_store': tr.from_store.id,
+        'from_store_name': tr.from_store.name,
+        'to_store': tr.to_store.id,
+        'to_store_name': tr.to_store.name,
+        'priority': getattr(tr, 'priority', 'normal'),
+        'required_date': getattr(tr, 'required_date', None) and getattr(tr, 'required_date').isoformat() or None,
+        'department': tr.department.id if tr.department else '',
+        'department_name': tr.department.name if tr.department else '',
+        'reason': tr.note or '',
+        'status': tr.status,
+        'items': items,
+    }
+
+    return JsonResponse({'success': True, 'request': data})
+
 @login_required
 def edit_transfer_request(request, request_id):
     """Edit a transfer request"""
@@ -590,8 +679,24 @@ def edit_transfer_request(request, request_id):
         if form.is_valid() and formset.is_valid():
             form.save()
             formset.save()
+            # If AJAX, return JSON for modal callers
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({'success': True, 'request_id': transfer_request.id})
+
             messages.success(request, 'Transfer request updated successfully.')
             return redirect('transfer_request_detail', request_id=transfer_request.id)
+        else:
+            # Invalid form/formset
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                errors = {
+                    'form_errors': form.errors or {},
+                    'formset_errors': formset.errors or [],
+                }
+                if hasattr(form, 'non_field_errors'):
+                    nf = form.non_field_errors()
+                    if nf:
+                        errors['non_field_errors'] = nf
+                return JsonResponse({'success': False, 'errors': errors}, status=400)
     else:
         form = TransferRequestForm(instance=transfer_request)
         formset = TransferRequestItemFormSet(instance=transfer_request)
@@ -616,34 +721,8 @@ def update_transfer_request(request, request_id):
     
     return redirect('transfer_request_detail', request_id=request_id)
 
-@login_required
-def approve_transfer_request(request, request_id):
-    """Approve a transfer request"""
-    transfer_request = get_object_or_404(TransferRequest, id=request_id)
-    
-    if request.method == 'POST':
-        transfer_request.status = 'approved'
-        transfer_request.approved_by = request.user
-        transfer_request.approved_date = timezone.now()
-        transfer_request.save()
-        
-        messages.success(request, 'Transfer request approved successfully.')
-    
-    return redirect('transfer_request_detail', request_id=request_id)
-
-@login_required
-def reject_transfer_request(request, request_id):
-    transfer_request = get_object_or_404(TransferRequest, id=request_id)
-    
-    if request.method == 'POST':
-        transfer_request.status = 'rejected'
-        transfer_request.approved_by = request.user
-        transfer_request.approved_date = timezone.now()
-        transfer_request.save()
-        
-        messages.success(request, 'Transfer request rejected.')
-    
-    return redirect('transfer_request_detail', request_id=request_id)
+# approve_transfer_request and reject_transfer_request moved to transfer_views.py
+# to avoid duplicate function definitions
 
 @login_required
 def pending_transfer_requests_for_approval(request):

@@ -513,6 +513,18 @@
                       class="img-fluid"
                     />
                   </span>
+                  <span class="user-detail d-none d-lg-flex flex-column text-start ms-2">
+                    <span class="user-name fw-semibold text-dark">
+                      {{ user.get_full_name|default:user.username }}
+                    </span>
+                    <span class="text-muted small">
+                      {% if user_roles %}
+                        {{ user_roles|join:", " }}
+                      {% else %}
+                        No roles assigned
+                      {% endif %}
+                    </span>
+                  </span>
                 </span>
               </a>
               <div class="dropdown-menu menu-drop-user">
@@ -526,6 +538,17 @@
                   <div>
                     <h6 class="fw-medium">{{user.first_name}}</h6>
                     <p>{{user.username}}</p>
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                      {% if user_roles %}
+                        {% for role_name in user_roles %}
+                          <span class="badge bg-primary-subtle text-primary fw-semibold">
+                            {{ role_name }}
+                          </span>
+                        {% endfor %}
+                      {% else %}
+                        <span class="text-muted small">No roles assigned yet</span>
+                      {% endif %}
+                    </div>
                   </div>
                 </div>
                 <a
@@ -577,20 +600,12 @@
       <div class="sidebar sidebar-horizontal" id="horizontal-menu">
         <div id="sidebar-menu-3" class="sidebar-menu">
           <div class="main-menu">
-            {% if is_superuser %}
-              {% include "basic/admin_menu.html" %}
-            {% endif %}
-            {% if is_admin %}
-              {% include "basic/admin_menu.html" %}
-            {% endif %}
-            {% if is_sales %}
-              {% include "basic/sales_menu.html" %}
-            {% endif %}
-            {% if is_accountant %}
-              {% include "basic/accountant_menu.html" %}
-            {% endif %}
-            {% if is_stores %}
-              {% include "basic/stores_menu.html" %}
+            {% if app_menu %}
+              {% include "basic/menu_recursive.html" with items=app_menu is_child=False %}
+            {% else %}
+              <div class="p-3 text-muted small">
+                No navigation modules assigned to your roles yet.
+              </div>
             {% endif %}
           </div>
         </div>
