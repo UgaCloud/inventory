@@ -12,7 +12,7 @@ from app.selectors.transaction_selectors import (
     get_items_by_order
 )
 from app.models.products import Product, UnitOfMeasure
-from app.forms.transaction_forms import StockAdjustmentItemFormSet
+# from app.forms.transaction_forms import StockAdjustmentItemFormSet
 
 # Added imports for bulk upload
 import csv

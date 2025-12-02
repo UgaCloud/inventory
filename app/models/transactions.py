@@ -4,6 +4,7 @@ import re
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 
@@ -402,116 +403,86 @@ class StockAdjustment(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     store = models.ForeignKey('app.StoreLocation', on_delete=models.CASCADE, related_name='stock_adjustments')
-    reference = models.CharField(max_length=100, blank=True, null=True)
-    created_by = models.CharField(max_length=100)
+    reference = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    created_by = models.ForeignKey(User, verbose_name=("Created By"), on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    approved_by = models.CharField(max_length=100, blank=True, null=True)
-    approved_at = models.DateTimeField(blank=True, null=True)
     note = models.TextField(blank=True, null=True)
+    product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
+    unit = models.ForeignKey('app.UnitOfMeasure', on_delete=models.SET_NULL, null=True, blank=True)
+    quantity_change = models.IntegerField()
+    reason = models.CharField(max_length=255, blank=True, null=True)
+    unit_cost = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Stock Adjustment'
         verbose_name_plural = 'Stock Adjustments'
+        unique_together = ('reference', 'product', 'unit')
 
     def __str__(self):
-        return f"Adjustment {self.id} @ {self.store.name} ({self.status})"
+        ref = self.reference or f"ADJ-{self.id}"
+        return f"Adjustment {ref}: {self.product.name} {self.quantity_change} ({self.unit}) @ {self.store.name}"
 
     @property
-    def total_items(self):
-        return self.items.count()
+    def is_batch(self):
+        return bool(self.reference)
 
     @property
-    def total_quantity_changed(self):
-        return sum(item.quantity_change for item in self.items.all())
+    def total_items_for_reference(self):
+        """If this row is part of a batch (reference), return count of rows in the same batch."""
+        if not self.reference:
+            return 1
+        return StockAdjustment.objects.filter(reference=self.reference, store=self.store).count()
 
-    def apply(self, applied_by=None):
-        """
-        Apply the stock adjustment: update Inventory.quantity_in_stock and create StockMovement records.
-        Marks adjustment as 'applied' when complete. Uses a database transaction and locks inventory rows.
-        """
-        from django.db import transaction
-        from app.models.products import Inventory
-        from app.models.products import Product, UnitOfMeasure
-        # import StockMovement here to avoid circular import at module load
-        from app.models.transactions import StockMovement
-
-        if self.status == 'applied':
-            return False
-
-        with transaction.atomic():
-            for item in self.items.select_for_update():
-                item.apply_to_inventory()
-
-            self.status = 'applied'
-            if applied_by:
-                self.approved_by = applied_by
-            from django.utils import timezone
-            self.approved_at = timezone.now()
-            self.save(update_fields=['status', 'approved_by', 'approved_at'])
-        return True
-
-
-class StockAdjustmentItem(models.Model):
-    adjustment = models.ForeignKey(StockAdjustment, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
-    unit = models.ForeignKey('app.UnitOfMeasure', on_delete=models.SET_NULL, null=True, blank=True)
-    # positive -> add stock, negative -> reduce stock
-    quantity_change = models.IntegerField()
-    reason = models.CharField(max_length=255, blank=True, null=True)
-    unit_cost = models.PositiveIntegerField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = 'Stock Adjustment Item'
-        verbose_name_plural = 'Stock Adjustment Items'
-        unique_together = ('adjustment', 'product', 'unit')
-
-    def __str__(self):
-        return f"{self.product.name} {self.quantity_change} ({self.unit})"
+    @property
+    def total_quantity_changed_for_reference(self):
+        if not self.reference:
+            return self.quantity_change
+        return StockAdjustment.objects.filter(reference=self.reference, store=self.store).aggregate(
+            total=models.Sum('quantity_change')
+        )['total'] or 0
 
     def apply_to_inventory(self):
         """
-        Apply this item to the inventory for the adjustment's store.
-        Creates a StockMovement record for auditing.
+        Apply this single adjustment row to inventory and create a StockMovement record.
+        Locks inventory row to avoid race conditions.
         """
         from django.db import transaction
-        from app.models.products import Inventory
         from django.utils import timezone
+        from app.models.products import Inventory
+        # import StockMovement here to avoid circular import at module load
+        from app.models.transactions import StockMovement
 
-        store = self.adjustment.store
+        store = self.store
 
         with transaction.atomic():
-            # Get or create inventory row for product+store
             inv, created = Inventory.objects.select_for_update().get_or_create(
                 product=self.product,
                 store=store,
                 defaults={'quantity_in_stock': 0}
             )
 
-            # Apply change
             inv.quantity_in_stock = inv.quantity_in_stock + int(self.quantity_change)
-            # Prevent negative stock unless business allows it
             if inv.quantity_in_stock < 0:
+                # Business decision: prevent negative stock; clamp to zero
                 inv.quantity_in_stock = 0
             inv.save(update_fields=['quantity_in_stock'])
 
-            # Record stock movement for audit
+            # Record movement for audit
             StockMovement.objects.create(
                 product=self.product,
                 store=store,
                 transaction_type='ADJUSTMENT',
                 quantity=self.quantity_change,
-                transaction_id=self.adjustment.id,
-                note=self.reason or f'Adjustment {self.adjustment.id}',
+                transaction_id=self.id,
+                note=self.reason or f'Adjustment {self.reference or self.id}',
                 units_in_stock=inv.quantity_in_stock,
-                user=self.adjustment.created_by
+                user=self.created_by
             )
-            # Optionally, if positive change and unit_cost provided, create a batch (preserve simple behaviour)
+
+            # If positive change and unit_cost provided, create a batch for traceability
             if self.quantity_change > 0 and self.unit_cost:
-                from app.models.transactions import InventoryBatch
                 InventoryBatch.objects.create(
                     product=self.product,
                     store=store,
@@ -521,6 +492,36 @@ class StockAdjustmentItem(models.Model):
                     expiry_date=None,
                     purchase_order_item=None
                 )
+
+    def apply(self, applied_by=None):
+        """
+        Apply this adjustment. If this row has a `reference`, apply all pending rows with the same reference.
+        Otherwise apply only this row.
+        Marks affected rows as 'applied' and sets approved_by/approved_at.
+        """
+        from django.db import transaction
+        from django.utils import timezone
+
+        # Gather target rows to apply
+        if self.reference:
+            qs = StockAdjustment.objects.select_for_update().filter(
+                reference=self.reference, store=self.store, status='pending'
+            )
+        else:
+            qs = StockAdjustment.objects.select_for_update().filter(pk=self.pk, status='pending')
+
+        if not qs.exists():
+            return False
+
+        with transaction.atomic():
+            for adj in qs:
+                adj.apply_to_inventory()
+                adj.status = 'applied'
+                if applied_by:
+                    adj.approved_by = applied_by
+                adj.approved_at = timezone.now()
+                adj.save(update_fields=['status', 'approved_by', 'approved_at'])
+        return True
 
 
 class StockMovement(models.Model):

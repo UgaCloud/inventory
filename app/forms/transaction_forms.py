@@ -2,8 +2,8 @@ from django import forms
 from django.forms import ModelForm, inlineformset_factory
 import app
 from app.models.transactions import (
-    PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement,
-    TransferRequest, StockTransferItem, TransferRequestItem, StockAdjustment, StockAdjustmentItem
+    PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem,
+    TransferRequest, StockTransferItem, TransferRequestItem, StockAdjustment,
 )
 from app.models.finance import PaymentMethod
 from app.models.products import Product, ProductUnitPrice, StoreLocation
@@ -264,32 +264,32 @@ class StockAdjustmentForm(forms.ModelForm):
     class Meta:
         model = StockAdjustment
         # exclude fields managed by system
-        exclude = ['created_at', 'status', 'approved_by', 'approved_at']
+        exclude = ['created_at', 'status']
 
     def clean(self):
         cleaned_data = super().clean()
         # basic validation can be extended
         return cleaned_data
 
-class StockAdjustmentItemForm(ModelForm):
-    class Meta:
-        model = StockAdjustmentItem
-        fields = ['product', 'unit', 'quantity_change', 'unit_cost', 'reason']
+# class StockAdjustmentItemForm(ModelForm):
+#     class Meta:
+#         model = StockAdjustmentItem
+#         fields = ['product', 'unit', 'quantity_change', 'unit_cost', 'reason']
         
-        widgets = {
-            'product': forms.Select(attrs={'class': 'select2', 'style': 'width:100%'}),
-            'unit': forms.Select(attrs={'class': 'select2'}),
-        }
+#         widgets = {
+#             'product': forms.Select(attrs={'class': 'select2', 'style': 'width:100%'}),
+#             'unit': forms.Select(attrs={'class': 'select2'}),
+#         }
 
-    def clean(self):
-        cleaned_data = super().clean()
-        qty = cleaned_data.get('quantity_change')
-        unit_cost = cleaned_data.get('unit_cost')
-        if qty is None or qty == 0:
-            raise forms.ValidationError('Quantity change must be non-zero.')
-        if unit_cost is not None and unit_cost < 0:
-            raise forms.ValidationError('Unit cost cannot be negative.')
-        return cleaned_data
+#     def clean(self):
+#         cleaned_data = super().clean()
+#         qty = cleaned_data.get('quantity_change')
+#         unit_cost = cleaned_data.get('unit_cost')
+#         if qty is None or qty == 0:
+#             raise forms.ValidationError('Quantity change must be non-zero.')
+#         if unit_cost is not None and unit_cost < 0:
+#             raise forms.ValidationError('Unit cost cannot be negative.')
+#         return cleaned_data
 
 PurchaseOrderItemFormSet = inlineformset_factory(
     PurchaseOrder, PurchaseOrderItem, fields='__all__', extra=1
@@ -307,7 +307,7 @@ SalesItemFormSet = inlineformset_factory(
     Sales, SalesItem, form=SalesItemForm, extra=0, can_delete=True
 )
 
-StockAdjustmentItemFormSet = inlineformset_factory(
-    StockAdjustment, StockAdjustmentItem, form=StockAdjustmentItemForm, extra=1, can_delete=True
-)
+# StockAdjustmentItemFormSet = inlineformset_factory(
+#     StockAdjustment, StockAdjustmentItem, form=StockAdjustmentItemForm, extra=1, can_delete=True
+# )
 

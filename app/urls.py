@@ -22,6 +22,7 @@ from app.views.expense_views import *
 from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
 from .views.reports import sales_report_views
+from app.views import stock_adjustments
 
 
 urlpatterns = [
@@ -200,6 +201,8 @@ urlpatterns = [
     path('reports/sales-item-unit/', sales_report_views.sales_item_unit_report, name='sales_item_unit_report'),
     path('reports/sales-item-unit/export/csv/', sales_report_views.export_sales_item_unit_csv, name='export_sales_item_unit_csv'),
     path('reports/sales-item-unit/export/pdf/', sales_report_views.export_sales_item_unit_pdf, name='export_sales_item_unit_pdf'),
+    path('adjust-stock/', stock_adjustments.adjust_stock_view, name='adjust_stock'),
+    path('api/inventory/available/', stock_adjustments.api_inventory_available, name='api_inventory_available'),
 ]
 
 if settings.DEBUG:
