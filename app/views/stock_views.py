@@ -317,12 +317,10 @@ def stock_adjustment_list(request):
     adjustments = StockAdjustment.objects.all().order_by('-created_at')
 
     form = StockAdjustmentForm()
-    formset = StockAdjustmentItemFormSet()
 
     context = {
         'adjustments': adjustments,
         'form': form,
-        'formset': formset,
     }
 
     return render(request, 'stock/stock_adjustment_list.html', context)
@@ -336,8 +334,8 @@ def stock_adjustment_detail(request, adjustment_id):
 def create_stock_adjustment(request):
     if request.method == 'POST':
         form = StockAdjustmentForm(request.POST)
-        formset = StockAdjustmentItemFormSet(request.POST)
-        if form.is_valid() and formset.is_valid():
+        # formset = StockAdjustmentItemFormSet(request.POST)
+        if form.is_valid():
             adj = form.save(commit=False)
             # prefer to record username; fallback to form value
             try:
@@ -345,8 +343,7 @@ def create_stock_adjustment(request):
             except Exception:
                 pass
             adj.save()
-            formset.instance = adj
-            formset.save()
+
             messages.success(request, 'Stock adjustment created successfully.')
             return redirect('stock_adjustment_list')
 
@@ -355,16 +352,14 @@ def edit_stock_adjustment(request, adjustment_id):
     adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
     if request.method == 'POST':
         form = StockAdjustmentForm(request.POST, instance=adjustment)
-        formset = StockAdjustmentItemFormSet(request.POST, instance=adjustment)
-        if form.is_valid() and formset.is_valid():
+
+        if form.is_valid():
             form.save()
-            formset.save()
             messages.success(request, 'Stock adjustment updated successfully.')
             return redirect('stock_adjustment_detail', adjustment_id=adjustment.id)
     else:
         form = StockAdjustmentForm(instance=adjustment)
-        formset = StockAdjustmentItemFormSet(instance=adjustment)
-    return render(request, 'stock/stock_adjustment_form.html', {'form': form, 'formset': formset, 'adjustment': adjustment})
+    return render(request, 'stock/stock_adjustment_form.html', {'form': form, 'adjustment': adjustment})
 
 @login_required
 def apply_stock_adjustment(request, adjustment_id):

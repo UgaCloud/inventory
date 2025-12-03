@@ -411,7 +411,7 @@ class StockAdjustment(models.Model):
     product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
     unit = models.ForeignKey('app.UnitOfMeasure', on_delete=models.SET_NULL, null=True, blank=True)
     quantity_change = models.IntegerField()
-    reason = models.CharField(max_length=255, blank=True, null=True)
+    reason = models.TextField(blank=True, null=True)
     unit_cost = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
@@ -517,10 +517,10 @@ class StockAdjustment(models.Model):
             for adj in qs:
                 adj.apply_to_inventory()
                 adj.status = 'applied'
-                if applied_by:
-                    adj.approved_by = applied_by
-                adj.approved_at = timezone.now()
-                adj.save(update_fields=['status', 'approved_by', 'approved_at'])
+                # if applied_by:
+                #     adj.approved_by = applied_by
+                # adj.approved_at = timezone.now()
+                adj.save(update_fields=['status'])
         return True
 
 

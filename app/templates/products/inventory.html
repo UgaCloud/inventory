@@ -112,44 +112,11 @@
         </div>
 
         <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Store</label>
-            <input type="text" id="adjust-store-name" class="form-control" readonly>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Product</label>
-            <select id="adjust-product" name="product_id" class="form-select" required>
-              <option value="">Select product</option>
-              {% for product in products %}
-                <option value="{{ product.id }}" data-sku="{{ product.sku }}">{{ product.name }} ({{ product.sku }})</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Current Quantity (selected store)</label>
-            <input type="text" id="adjust-current-qty" class="form-control" readonly value="0">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Adjustment Type</label>
-            <select name="adjustment_type" id="adjustment-type" class="form-select" required>
-              <option value="">Select</option>
-              <option value="increase">Increase</option>
-              <option value="decrease">Decrease</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Quantity</label>
-            <input type="number" name="quantity" id="adjust-quantity" class="form-control" min="1" step="1" required>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Reason</label>
-            <textarea name="reason" id="adjust-reason" class="form-control" rows="3" required></textarea>
-          </div>
+          <form method="post" action="{% url 'adjust_stock' %}">
+            {% csrf_token %}
+            {{stock_adjustment_form|crispy}}
+            
+          </form>
         </div>
 
         <div class="modal-footer">
@@ -171,13 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const storeId = this.dataset.storeId;
             const storeName = this.dataset.storeName || '';
 
-            document.getElementById('adjust-store-id').value = storeId;
-            document.getElementById('adjust-store-name').value = storeName;
-            document.getElementById('adjust-current-qty').value = '0';
-            document.getElementById('adjust-product').value = '';
-            document.getElementById('adjust-quantity').value = '';
-            document.getElementById('adjust-reason').value = '';
-            document.getElementById('adjustment-type').value = '';
+            document.getElementById('id_store').value = storeId;
 
             const modalEl = document.getElementById('storeStockAdjustModal');
             const bs = new bootstrap.Modal(modalEl);
@@ -186,11 +147,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // when product changes fetch current qty for the selected store
-    const productSelect = document.getElementById('adjust-product');
+    const productSelect = document.getElementById('id_product');
     if (productSelect) {
         productSelect.addEventListener('change', function() {
             const productId = this.value;
-            const storeId = document.getElementById('adjust-store-id').value;
+            const storeId = document.getElementById('id_store').value;
             if (!productId || !storeId) {
                 document.getElementById('adjust-current-qty').value = '0';
                 return;
@@ -199,6 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
+                        alert(data.available);
                         document.getElementById('adjust-current-qty').value = data.available || 0;
                     } else {
                         document.getElementById('adjust-current-qty').value = '0';

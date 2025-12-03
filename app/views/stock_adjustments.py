@@ -1,4 +1,4 @@
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import redirect, get_object_or_404, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -8,6 +8,21 @@ from django.utils import timezone
 from app.models.products import Product, StoreLocation
 from app.models.products import Inventory
 from app.models.transactions import StockAdjustment
+from app.forms.transaction_forms import StockAdjustmentForm, StockAdjustmentForm2
+
+@login_required
+def stock_adjustment_list(request):
+    adjustments = StockAdjustment.objects.all().order_by('-created_at')
+
+    form = StockAdjustmentForm()
+
+    context = {
+        'adjustments': adjustments,
+        'form': form,
+    }
+
+    return render(request, 'stock/stock_adjustment_list.html', context)
+
 
 @login_required
 def adjust_stock_view(request):

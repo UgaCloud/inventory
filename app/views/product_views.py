@@ -10,6 +10,7 @@ import csv
 from django.http import HttpResponse, JsonResponse
 
 from app.forms.product_forms import *
+from app.forms.transaction_forms import StockAdjustmentForm
 from app.selectors.product_selectors import *
 from app.models.products import *
 
@@ -158,6 +159,8 @@ def product_details_view(request, _product_id):
 
     units = get_all_units_of_measurement()
 
+    stock_adjustment_form = StockAdjustmentForm(initial={'product': item})
+
     context = {
         'product_form': product_form,
         'product_unit_price_form': product_unit_price_form,
@@ -167,6 +170,7 @@ def product_details_view(request, _product_id):
         'inventories': inventories,
         'stock_movements': stock_movements,   
         'units': units, 
+        'stock_adjustment_form': stock_adjustment_form,
     }
     return render(request, 'products/product_details.html', context)
 
