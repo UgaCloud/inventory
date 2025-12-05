@@ -221,17 +221,48 @@
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">Quantity Change:</span>
-                    <strong class="{% if adjustment.quantity_change > 0 %}text-success{% else %}text-danger{% endif %}">
-                        {{ adjustment.quantity_change|stringformat:"+d"|intcomma }}
-                    </strong>
+                    <div class="text-end">
+                        <strong class="{% if actual_quantity_change|default:adjustment.quantity_change > 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ actual_quantity_change|default:adjustment.quantity_change|stringformat:"+d"|intcomma }}
+                        </strong>
+                        {% if record_was_edited %}
+                        <br><small class="text-muted">(Record shows: {{ adjustment.quantity_change|stringformat:"+d"|intcomma }})</small>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">After Adjustment:</span>
                     <strong>{{ quantity_after|intcomma }}</strong>
                 </div>
-                {% if stock_movements.0.quantity != adjustment.quantity_change %}
-                <div class="alert alert-warning mt-2 mb-0 py-2">
-                    <small><i class="ti ti-alert-triangle me-1"></i>Note: Stock movement quantity ({{ stock_movements.0.quantity|intcomma }}) differs from adjustment quantity ({{ adjustment.quantity_change|intcomma }}). Showing adjustment values.</small>
+                {% if record_was_edited %}
+                <div class="alert alert-warning mt-2 mb-0 py-3">
+                    <div class="d-flex align-items-start">
+                        <i class="ti ti-alert-triangle fs-20 me-2 text-warning"></i>
+                        <div>
+                            <strong class="d-block mb-1">Adjustment Record Was Edited After Application</strong>
+                            <small>
+                                This adjustment was edited after it was applied. The values below show what <strong>actually happened</strong> (from the audit trail), 
+                                while the adjustment record now shows different values.
+                            </small>
+                            <div class="mt-2">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <small><strong>Actually Applied:</strong> {{ actual_quantity_change|stringformat:"+d"|intcomma }} units</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small><strong>Record Now Shows:</strong> {{ adjustment.quantity_change|stringformat:"+d"|intcomma }} units</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <i class="ti ti-info-circle me-1"></i>
+                                    <strong>Note:</strong> The values displayed below reflect what was actually applied to inventory. 
+                                    The stock movement record serves as the immutable audit trail.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 {% endif %}
                 {% elif adjustment.status == 'pending' %}
@@ -378,6 +409,7 @@
             <div class="card-header">
                 <h5 class="card-title mb-0">
                     <i data-feather="activity" class="feather-16 me-2"></i>Stock Movement History
+                    <small class="text-muted ms-2">(Immutable Audit Trail)</small>
                 </h5>
             </div>
             <div class="card-body">
@@ -401,15 +433,15 @@
                                     <span class="badge bg-info">{{ movement.get_transaction_type_display }}</span>
                                 </td>
                                 <td>
-                                    {% if adjustment.quantity_change > 0 %}
-                                        <span class="text-success">+{{ adjustment.quantity_change|intcomma }}</span>
-                                        {% if movement.quantity != adjustment.quantity_change %}
-                                        <br><small class="text-muted">(Movement recorded: {{ movement.quantity|intcomma }})</small>
+                                    {% if movement.quantity > 0 %}
+                                        <span class="text-success">+{{ movement.quantity|intcomma }}</span>
+                                        {% if record_was_edited %}
+                                        <br><small class="text-warning">(Record shows: {{ adjustment.quantity_change|intcomma }})</small>
                                         {% endif %}
                                     {% else %}
-                                        <span class="text-danger">{{ adjustment.quantity_change|intcomma }}</span>
-                                        {% if movement.quantity != adjustment.quantity_change %}
-                                        <br><small class="text-muted">(Movement recorded: {{ movement.quantity|intcomma }})</small>
+                                        <span class="text-danger">{{ movement.quantity|intcomma }}</span>
+                                        {% if record_was_edited %}
+                                        <br><small class="text-warning">(Record shows: {{ adjustment.quantity_change|intcomma }})</small>
                                         {% endif %}
                                     {% endif %}
                                 </td>

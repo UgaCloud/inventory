@@ -377,32 +377,33 @@ def stock_adjustment_detail(request, adjustment_id):
     except Inventory.DoesNotExist:
         current_quantity = 0
     
-    # Calculate quantities correctly - use adjustment data as source of truth
+    # Calculate quantities correctly - use MOVEMENT data as source of truth for what actually happened
+    record_was_edited = False
+    actual_quantity_change = None
+    
     if adjustment.status == 'applied' and stock_movements.exists():
-        # If applied, use stock movement to get the actual stock level after adjustment
+        # If applied, use stock movement as the source of truth for what actually happened
+        # Movement records are immutable audit trail - they show what was actually applied
         movement = stock_movements.first()
-        # units_in_stock in movement = stock AFTER the adjustment was applied (this is accurate)
-        quantity_after_from_movement = movement.units_in_stock
         
-        # However, use the ADJUSTMENT's quantity_change as source of truth (not movement.quantity which might be wrong)
-        # Calculate before based on adjustment's quantity_change
-        # before = after - adjustment_change
-        quantity_before = quantity_after_from_movement - adjustment.quantity_change
+        # Movement shows what actually happened:
+        # - movement.quantity = the quantity that was actually changed (immutable audit trail)
+        # - movement.units_in_stock = stock level AFTER this adjustment was applied
+        actual_quantity_change = movement.quantity  # What was actually applied
+        quantity_after_actual = movement.units_in_stock  # Stock after this adjustment
+        
+        # Calculate what stock was BEFORE this adjustment
+        quantity_before = quantity_after_actual - actual_quantity_change
         
         # Ensure quantity_before is not negative (safety check)
         if quantity_before < 0:
             quantity_before = 0
         
-        # Calculate what "After Adjustment" SHOULD be based on adjustment (source of truth)
-        # After = Before + Adjustment Change
-        quantity_after_should_be = quantity_before + adjustment.quantity_change
+        # Use movement data (what actually happened) as source of truth
+        quantity_after = quantity_after_actual
         
-        # Use the calculated value (what this adjustment actually did)
-        # If movement.units_in_stock differs, it means other transactions happened
-        quantity_after = quantity_after_should_be
-        
-        # Note: movement.units_in_stock may differ if other transactions occurred after this adjustment
-        # We show what THIS adjustment did, not necessarily what current stock is
+        # Check if adjustment record was edited after application
+        record_was_edited = (actual_quantity_change != adjustment.quantity_change)
     elif adjustment.status == 'pending':
         # For pending adjustments, show projected values based on current stock
         quantity_before = current_quantity
@@ -413,12 +414,12 @@ def stock_adjustment_detail(request, adjustment_id):
         quantity_before = None
         quantity_after = current_quantity
     
-    # Calculate total value for this adjustment (use absolute quantity for value)
+    # Calculate total value - use actual quantity if available, otherwise use adjustment quantity
     total_value = None
-    if adjustment.unit_cost and adjustment.quantity_change:
+    qty_for_value = actual_quantity_change if actual_quantity_change is not None else adjustment.quantity_change
+    if adjustment.unit_cost and qty_for_value:
         # Use absolute value of quantity change for value calculation
-        # This gives the monetary value of the stock being adjusted
-        total_value = abs(adjustment.quantity_change) * adjustment.unit_cost
+        total_value = abs(qty_for_value) * adjustment.unit_cost
     
     context = {
         'adjustment': adjustment,
@@ -429,6 +430,8 @@ def stock_adjustment_detail(request, adjustment_id):
         'quantity_before': quantity_before,
         'quantity_after': quantity_after,
         'total_value': total_value,
+        'record_was_edited': record_was_edited,
+        'actual_quantity_change': actual_quantity_change,
     }
     return render(request, 'stock/stock_adjustment_detail.html', context)
 
@@ -452,6 +455,12 @@ def create_stock_adjustment(request):
 @login_required
 def edit_stock_adjustment(request, adjustment_id):
     adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
+    
+    # Prevent editing applied adjustments to maintain audit trail integrity
+    if adjustment.status == 'applied':
+        messages.warning(request, 'Cannot edit applied adjustments. The adjustment has already been applied to inventory. Editing would create data inconsistencies.')
+        return redirect('stock_adjustment_detail', adjustment_id=adjustment.id)
+    
     if request.method == 'POST':
         form = StockAdjustmentForm(request.POST, instance=adjustment)
 
