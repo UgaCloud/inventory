@@ -327,45 +327,94 @@ def stock_adjustment_list(request):
 
 @login_required
 def stock_adjustment_detail(request, adjustment_id):
+    # Fetch fresh data from database (real-time)
     adjustment = get_object_or_404(
         StockAdjustment.objects.select_related('product', 'store', 'unit', 'created_by'),
         id=adjustment_id
     )
+    adjustment.refresh_from_db()  # Ensure we have the latest data
     
     # Get all adjustments with the same reference (batch adjustments)
     related_adjustments = []
+    batch_totals = {}
     if adjustment.reference:
         related_adjustments = StockAdjustment.objects.filter(
             reference=adjustment.reference,
             store=adjustment.store
         ).select_related('product', 'unit').order_by('created_at')
+        
+        # Calculate batch totals dynamically from fresh DB data
+        from django.db.models import Sum, Count
+        batch_totals = {
+            'total_items': related_adjustments.count(),
+            'total_quantity_change': related_adjustments.aggregate(
+                total=Sum('quantity_change')
+            )['total'] or 0,
+            'total_value': sum(
+                (abs(adj.quantity_change) * (adj.unit_cost or 0)) 
+                for adj in related_adjustments 
+                if adj.unit_cost
+            ),
+            'applied_count': related_adjustments.filter(status='applied').count(),
+            'pending_count': related_adjustments.filter(status='pending').count(),
+        }
     
-    # Get stock movements related to this adjustment
+    # Get stock movements related to this adjustment (real-time)
     stock_movements = StockMovement.objects.filter(
         transaction_type='ADJUSTMENT',
         transaction_id=adjustment.id
     ).select_related('product', 'store').order_by('-timestamp')
     
-    # Get current inventory for this product/store
+    # Get current inventory for this product/store (real-time - fresh from DB)
     from app.models.products import Inventory
     try:
         current_inventory = Inventory.objects.get(
             product=adjustment.product,
             store=adjustment.store
         )
+        current_inventory.refresh_from_db()  # Get latest inventory data
         current_quantity = current_inventory.quantity_in_stock
     except Inventory.DoesNotExist:
         current_quantity = 0
     
-    # Calculate quantity before adjustment (if already applied)
-    quantity_before = current_quantity - adjustment.quantity_change if adjustment.status == 'applied' else None
+    # Calculate quantities correctly using stock movement data
+    if adjustment.status == 'applied' and stock_movements.exists():
+        # If applied, use stock movement data which is accurate and recorded at apply time
+        movement = stock_movements.first()
+        # units_in_stock in movement = stock AFTER the adjustment was applied
+        quantity_after = movement.units_in_stock
+        # movement.quantity = the change amount (positive for increase, negative for decrease)
+        # So: before = after - change (this works for both + and -)
+        quantity_before = quantity_after - movement.quantity
+        # Ensure quantity_before is not negative (safety check)
+        if quantity_before < 0:
+            quantity_before = 0
+    elif adjustment.status == 'pending':
+        # For pending adjustments, show projected values based on current stock
+        quantity_before = current_quantity
+        # Projected after = current + change (ensure not negative)
+        quantity_after = max(0, current_quantity + adjustment.quantity_change)
+    else:
+        # For other statuses (approved, cancelled), show current stock only
+        quantity_before = None
+        quantity_after = current_quantity
+    
+    # Calculate total value for this adjustment (use absolute quantity for value)
+    total_value = None
+    if adjustment.unit_cost and adjustment.quantity_change:
+        # Use absolute value of quantity change for value calculation
+        # This gives the monetary value of the stock being adjusted
+        total_value = abs(adjustment.quantity_change) * adjustment.unit_cost
     
     context = {
         'adjustment': adjustment,
         'related_adjustments': related_adjustments,
+        'batch_totals': batch_totals,
         'stock_movements': stock_movements,
         'current_quantity': current_quantity,
         'quantity_before': quantity_before,
+        'quantity_after': quantity_after,
+        'total_value': total_value,
     }
     return render(request, 'stock/stock_adjustment_detail.html', context)
 

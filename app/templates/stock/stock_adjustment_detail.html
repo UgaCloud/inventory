@@ -138,8 +138,10 @@
                                 <tr>
                                     <td class="text-muted"><strong>Total Value:</strong></td>
                                     <td>
-                                        {% if adjustment.unit_cost %}
-                                            <strong>UGX {{ adjustment.unit_cost|floatformat:0|intcomma }}</strong>
+                                        {% if total_value %}
+                                            <strong>UGX {{ total_value|floatformat:0|intcomma }}</strong>
+                                        {% elif adjustment.unit_cost and adjustment.quantity_change %}
+                                            <strong>UGX {{ total_value|floatformat:0|intcomma|default:"0" }}</strong>
                                         {% else %}
                                             <span class="text-muted">N/A</span>
                                         {% endif %}
@@ -200,23 +202,49 @@
                     <h3 class="mb-2">{{ current_quantity|intcomma }}</h3>
                     <p class="text-muted mb-0">{{ adjustment.unit.name|default:"units" }}</p>
                     <small class="text-muted">{{ adjustment.product.name }}</small>
+                    {% if adjustment.status == 'pending' %}
+                    <div class="mt-2">
+                        <small class="badge bg-warning">Pending - Not Applied</small>
+                    </div>
+                    {% elif adjustment.status == 'applied' %}
+                    <div class="mt-2">
+                        <small class="badge bg-success">Applied</small>
+                    </div>
+                    {% endif %}
                 </div>
-                {% if adjustment.status == 'applied' and quantity_before is not None %}
+                {% if quantity_before is not None or adjustment.status == 'pending' %}
                 <hr>
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted">Before:</span>
+                {% if adjustment.status == 'applied' and quantity_before is not None %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Before Adjustment:</span>
                     <strong>{{ quantity_before|intcomma }}</strong>
                 </div>
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted">Change:</span>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Quantity Change:</span>
                     <strong class="{% if adjustment.quantity_change > 0 %}text-success{% else %}text-danger{% endif %}">
                         {{ adjustment.quantity_change|stringformat:"+d"|intcomma }}
                     </strong>
                 </div>
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted">After:</span>
-                    <strong>{{ current_quantity|intcomma }}</strong>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">After Adjustment:</span>
+                    <strong>{{ quantity_after|intcomma|default:current_quantity|intcomma }}</strong>
                 </div>
+                {% elif adjustment.status == 'pending' %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Current Stock:</span>
+                    <strong>{{ quantity_before|intcomma }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Projected Change:</span>
+                    <strong class="{% if adjustment.quantity_change > 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ adjustment.quantity_change|stringformat:"+d"|intcomma }}
+                    </strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Projected After:</span>
+                    <strong class="text-info">{{ quantity_after|intcomma }}</strong>
+                </div>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -228,13 +256,47 @@
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                     <i data-feather="list" class="feather-16 me-2"></i>Batch Adjustments
                     <span class="badge bg-info ms-2">{{ related_adjustments|length }} items</span>
                 </h5>
+                {% if batch_totals %}
+                <div class="d-flex gap-3">
+                    <div class="text-end">
+                        <small class="text-muted d-block">Total Quantity Change</small>
+                        <strong class="{% if batch_totals.total_quantity_change > 0 %}text-success{% elif batch_totals.total_quantity_change < 0 %}text-danger{% else %}text-muted{% endif %}">
+                            {{ batch_totals.total_quantity_change|stringformat:"+d"|intcomma }}
+                        </strong>
+                    </div>
+                    {% if batch_totals.total_value %}
+                    <div class="text-end">
+                        <small class="text-muted d-block">Total Value</small>
+                        <strong>UGX {{ batch_totals.total_value|floatformat:0|intcomma }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
             <div class="card-body">
+                {% if batch_totals %}
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="alert alert-info d-flex justify-content-between align-items-center mb-0">
+                            <div>
+                                <strong>Batch Summary:</strong>
+                                <span class="ms-2">{{ batch_totals.total_items }} item{{ batch_totals.total_items|pluralize }}</span>
+                                {% if batch_totals.applied_count > 0 %}
+                                <span class="badge bg-success ms-2">{{ batch_totals.applied_count }} Applied</span>
+                                {% endif %}
+                                {% if batch_totals.pending_count > 0 %}
+                                <span class="badge bg-warning ms-2">{{ batch_totals.pending_count }} Pending</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
