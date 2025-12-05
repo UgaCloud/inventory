@@ -227,8 +227,13 @@
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">After Adjustment:</span>
-                    <strong>{{ quantity_after|intcomma|default:current_quantity|intcomma }}</strong>
+                    <strong>{{ quantity_after|intcomma }}</strong>
                 </div>
+                {% if stock_movements.0.quantity != adjustment.quantity_change %}
+                <div class="alert alert-warning mt-2 mb-0 py-2">
+                    <small><i class="ti ti-alert-triangle me-1"></i>Note: Stock movement quantity ({{ stock_movements.0.quantity|intcomma }}) differs from adjustment quantity ({{ adjustment.quantity_change|intcomma }}). Showing adjustment values.</small>
+                </div>
+                {% endif %}
                 {% elif adjustment.status == 'pending' %}
                 <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">Current Stock:</span>
@@ -396,10 +401,16 @@
                                     <span class="badge bg-info">{{ movement.get_transaction_type_display }}</span>
                                 </td>
                                 <td>
-                                    {% if movement.quantity > 0 %}
-                                        <span class="text-success">+{{ movement.quantity|intcomma }}</span>
+                                    {% if adjustment.quantity_change > 0 %}
+                                        <span class="text-success">+{{ adjustment.quantity_change|intcomma }}</span>
+                                        {% if movement.quantity != adjustment.quantity_change %}
+                                        <br><small class="text-muted">(Movement recorded: {{ movement.quantity|intcomma }})</small>
+                                        {% endif %}
                                     {% else %}
-                                        <span class="text-danger">{{ movement.quantity|intcomma }}</span>
+                                        <span class="text-danger">{{ adjustment.quantity_change|intcomma }}</span>
+                                        {% if movement.quantity != adjustment.quantity_change %}
+                                        <br><small class="text-muted">(Movement recorded: {{ movement.quantity|intcomma }})</small>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 <td><strong>{{ movement.units_in_stock|intcomma }}</strong></td>

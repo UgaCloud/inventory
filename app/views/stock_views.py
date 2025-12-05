@@ -377,18 +377,32 @@ def stock_adjustment_detail(request, adjustment_id):
     except Inventory.DoesNotExist:
         current_quantity = 0
     
-    # Calculate quantities correctly using stock movement data
+    # Calculate quantities correctly - use adjustment data as source of truth
     if adjustment.status == 'applied' and stock_movements.exists():
-        # If applied, use stock movement data which is accurate and recorded at apply time
+        # If applied, use stock movement to get the actual stock level after adjustment
         movement = stock_movements.first()
-        # units_in_stock in movement = stock AFTER the adjustment was applied
-        quantity_after = movement.units_in_stock
-        # movement.quantity = the change amount (positive for increase, negative for decrease)
-        # So: before = after - change (this works for both + and -)
-        quantity_before = quantity_after - movement.quantity
+        # units_in_stock in movement = stock AFTER the adjustment was applied (this is accurate)
+        quantity_after_from_movement = movement.units_in_stock
+        
+        # However, use the ADJUSTMENT's quantity_change as source of truth (not movement.quantity which might be wrong)
+        # Calculate before based on adjustment's quantity_change
+        # before = after - adjustment_change
+        quantity_before = quantity_after_from_movement - adjustment.quantity_change
+        
         # Ensure quantity_before is not negative (safety check)
         if quantity_before < 0:
             quantity_before = 0
+        
+        # Calculate what "After Adjustment" SHOULD be based on adjustment (source of truth)
+        # After = Before + Adjustment Change
+        quantity_after_should_be = quantity_before + adjustment.quantity_change
+        
+        # Use the calculated value (what this adjustment actually did)
+        # If movement.units_in_stock differs, it means other transactions happened
+        quantity_after = quantity_after_should_be
+        
+        # Note: movement.units_in_stock may differ if other transactions occurred after this adjustment
+        # We show what THIS adjustment did, not necessarily what current stock is
     elif adjustment.status == 'pending':
         # For pending adjustments, show projected values based on current stock
         quantity_before = current_quantity
