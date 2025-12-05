@@ -264,9 +264,41 @@ class StockAdjustmentForm(forms.ModelForm):
     class Meta:
         model = StockAdjustment
         fields = ['store', 'product', 'unit', 'quantity_change', 'unit_cost', 'reference', 'reason']
+        widgets = {
+            'store': forms.Select(attrs={'class': 'form-select', 'required': True}),
+            'product': forms.Select(attrs={'class': 'form-select', 'required': True}),
+            'unit': forms.Select(attrs={'class': 'form-select'}),
+            'quantity_change': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'required': True,
+                'step': '1',
+                'placeholder': 'Enter positive for increase, negative for decrease'
+            }),
+            'unit_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'reference': forms.TextInput(attrs={'class': 'form-control'}),
+            'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        labels = {
+            'store': 'Store',
+            'product': 'Product',
+            'unit': 'Unit of Measure',
+            'quantity_change': 'Quantity Change',
+            'unit_cost': 'Unit Cost',
+            'reference': 'Reference',
+            'reason': 'Reason',
+        }
+        help_texts = {
+            'quantity_change': 'Enter positive number to increase stock, negative to decrease (e.g., +10 or -5)',
+        }
 
     def clean(self):
         cleaned_data = super().clean()
+        quantity_change = cleaned_data.get('quantity_change')
+        
+        if quantity_change is not None and quantity_change == 0:
+            raise forms.ValidationError({
+                'quantity_change': 'Quantity change cannot be zero. Use positive number to increase or negative to decrease.'
+            })
         
         return cleaned_data
 

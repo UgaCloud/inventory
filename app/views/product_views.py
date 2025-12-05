@@ -25,13 +25,53 @@ from app.models.products import Inventory
 def manage_product_view(request):
     product_form = ProductForm()
 
-    products = get_all_products()
+    # Get all products with filtering support
+    products = Product.objects.select_related('category').all()
+    
+    # Apply filters from query parameters
+    category_id = request.GET.get('category')
+    brand_filter = request.GET.get('brand')
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status')
+    
+    if category_id:
+        products = products.filter(category_id=category_id)
+    
+    if brand_filter:
+        products = products.filter(brand__iexact=brand_filter)
+    
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(sku__icontains=search_query) |
+            Q(brand__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
+    
+    if status_filter == 'active':
+        products = products.filter(is_active=True)
+    elif status_filter == 'inactive':
+        products = products.filter(is_active=False)
+    
+    # Get all categories for dropdown
     categories = get_all_categories()
-
+    
+    # Get all unique brands for dropdown (excluding empty/null brands)
+    brands = Product.objects.exclude(
+        brand__isnull=True
+    ).exclude(
+        brand=''
+    ).values_list('brand', flat=True).distinct().order_by('brand')
+    
     context = {
         'form': product_form,
         'products': products,
         'categories': categories,
+        'brands': brands,
+        'selected_category': category_id,
+        'selected_brand': brand_filter,
+        'search_query': search_query,
+        'selected_status': status_filter,
     }
     return render(request, 'products/products.html', context)
 
@@ -47,18 +87,53 @@ def add_product_view(request):
        
     
 
+@login_required
 def edit_product_view(request, product_id):
-
     product = get_product_by_id(product_id)
 
     if request.method == "POST":
-        edit_form = ProductForm(request.POST, instance = product)
+        edit_form = ProductForm(request.POST, instance=product)
         
         if edit_form.is_valid():
             edit_form.save()
+            messages.success(request, f'Product "{product.name}" has been updated successfully.')
+            return redirect('product_details_page', _product_id=product.id)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+            # Render form with errors
+            context = {
+                'edit_form': edit_form,
+                'product': product,
+            }
+            return render(request, 'products/edit_product.html', context)
+    
+    # GET request - show edit form
+    edit_form = ProductForm(instance=product)
+    
+    context = {
+        'edit_form': edit_form,
+        'product': product,
+    }
+    return render(request, 'products/edit_product.html', context)
 
-        return redirect(product_details_view, product.id)
 
+@login_required
+def delete_product_view(request, product_id):
+    """Delete a product - only accessible to superusers and admins"""
+    if not (request.user.is_superuser or request.user.groups.filter(name='Admin').exists()):
+        messages.error(request, 'You do not have permission to delete products.')
+        return redirect('products_page')
+    
+    product = get_object_or_404(Product, id=product_id)
+    
+    if request.method == 'POST':
+        product_name = product.name
+        product.delete()
+        messages.success(request, f'Product "{product_name}" has been deleted successfully.')
+        return redirect('products_page')
+    
+    # If GET request, show confirmation (handled by modal in template)
+    return redirect('products_page')
 
 
 @login_required

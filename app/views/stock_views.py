@@ -327,8 +327,47 @@ def stock_adjustment_list(request):
 
 @login_required
 def stock_adjustment_detail(request, adjustment_id):
-    adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
-    return render(request, 'stock/stock_adjustment_detail.html', {'adjustment': adjustment})
+    adjustment = get_object_or_404(
+        StockAdjustment.objects.select_related('product', 'store', 'unit', 'created_by'),
+        id=adjustment_id
+    )
+    
+    # Get all adjustments with the same reference (batch adjustments)
+    related_adjustments = []
+    if adjustment.reference:
+        related_adjustments = StockAdjustment.objects.filter(
+            reference=adjustment.reference,
+            store=adjustment.store
+        ).select_related('product', 'unit').order_by('created_at')
+    
+    # Get stock movements related to this adjustment
+    stock_movements = StockMovement.objects.filter(
+        transaction_type='ADJUSTMENT',
+        transaction_id=adjustment.id
+    ).select_related('product', 'store').order_by('-timestamp')
+    
+    # Get current inventory for this product/store
+    from app.models.products import Inventory
+    try:
+        current_inventory = Inventory.objects.get(
+            product=adjustment.product,
+            store=adjustment.store
+        )
+        current_quantity = current_inventory.quantity_in_stock
+    except Inventory.DoesNotExist:
+        current_quantity = 0
+    
+    # Calculate quantity before adjustment (if already applied)
+    quantity_before = current_quantity - adjustment.quantity_change if adjustment.status == 'applied' else None
+    
+    context = {
+        'adjustment': adjustment,
+        'related_adjustments': related_adjustments,
+        'stock_movements': stock_movements,
+        'current_quantity': current_quantity,
+        'quantity_before': quantity_before,
+    }
+    return render(request, 'stock/stock_adjustment_detail.html', context)
 
 @login_required
 def create_stock_adjustment(request):

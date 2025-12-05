@@ -46,6 +46,7 @@ urlpatterns = [
     path('products/', manage_product_view, name ='products_page'),
     path('add_product/', add_product_view, name = 'add_products_page'),
     path('edit_product/<int:product_id>', edit_product_view, name = 'edit_product_page'),
+    path('delete_product/<int:product_id>/', delete_product_view, name = 'delete_product'),
     path('product_details/<int:_product_id>/', product_details_view, name = 'product_details_page'),
     path('add_product_unit_price/', add_product_unit_price_view, name = 'add_product_unit_price_page'),
     path('edit_product_unit_price/<int:pup_id>/', update_product_unit_price_view, name = 'edit_product_unit_price_page'),

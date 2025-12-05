@@ -1,7 +1,7 @@
-from app.models.transactions import PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement
+from app.models.transactions import PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement, StockAdjustment
 from app.models.expense import Expense
-from django.db.models import Sum, Count, F
-from datetime import date
+from django.db.models import Sum, Count, F, Q
+from datetime import date, timedelta
 
 # PurchaseOrder selectors
 def get_all_orders():
@@ -235,3 +235,33 @@ def get_todays_sales_summary():
         'partially_paid': get_todays_partially_paid_sales(),
         'unpaid': get_todays_unpaid_sales()
     }
+
+# StockAdjustment selectors
+def get_all_stock_adjustments():
+    return StockAdjustment.objects.all().select_related('product', 'store', 'created_by').order_by('-created_at')
+
+def get_recent_stock_adjustments(limit=10):
+    return StockAdjustment.objects.select_related('product', 'store', 'created_by').order_by('-created_at')[:limit]
+
+def get_pending_stock_adjustments():
+    return StockAdjustment.objects.filter(status='pending').select_related('product', 'store', 'created_by').order_by('-created_at')
+
+def get_todays_stock_adjustments():
+    today = date.today()
+    return StockAdjustment.objects.filter(created_at__date=today).select_related('product', 'store', 'created_by')
+
+def get_stock_adjustments_count():
+    return StockAdjustment.objects.count()
+
+def get_pending_stock_adjustments_count():
+    return StockAdjustment.objects.filter(status='pending').count()
+
+def get_todays_stock_adjustments_count():
+    today = date.today()
+    return StockAdjustment.objects.filter(created_at__date=today).count()
+
+def get_total_revenue():
+    """Get total revenue (sales minus expenses)"""
+    total_sales = Sales.objects.aggregate(total=Sum('total_amount'))['total'] or 0
+    total_expenses = Expense.objects.aggregate(total=Sum('amount'))['total'] or 0
+    return total_sales - total_expenses
