@@ -2,11 +2,13 @@
 {% load humanize %} 
 
 {% block content %}
-  {% if is_admin %}
+  {% if user.is_superuser or is_admin %}
     {% include 'basic/dashboards/admin.html' %}
   {% elif is_stores %}
     {% include 'basic/dashboards/stores.html' %}
   {% elif is_sales %}
     {% include 'basic/dashboards/sales.html' %}
+  {% else %}
+    {% include 'basic/dashboards/admin.html' %}
   {% endif %}
 {% endblock %}

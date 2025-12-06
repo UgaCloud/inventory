@@ -1,4 +1,4 @@
-{% extends './basic/base.html' %}
+{% extends 'basic/base.html' %}
 {% load crispy_forms_tags %}
 {% block content %}
         <!-- row -->
@@ -13,10 +13,13 @@
                     <div class="row mt-4 tm-edit-product-row">
                         <div class="col-xl-7 col-lg-7 col-md-12">
 
-                            <form method = "post" class="tm-edit-product-form">
+                            <form method="post" class="tm-edit-product-form">
                                 {% csrf_token %}
                                 {{edit_form|crispy}}
-                                <input type ="submit"></input>
+                                <div class="d-flex gap-2 mt-3">
+                                    <button type="submit" class="btn btn-primary">Update Product</button>
+                                    <a href="{% url 'product_details_page' product.id %}" class="btn btn-secondary">Cancel</a>
+                                </div>
                             </form>
 
                         </div>
@@ -32,16 +35,4 @@
                 </div>
             </div>
         </div>
-        
-    </div>
-
-
     {% endblock %}
-    <script>
-        $(function () {
-            $('#expire_date').datepicker();
-        });
-    </script>
-</body>
-
-</html>

@@ -2,8 +2,8 @@ from django import forms
 from django.forms import ModelForm, inlineformset_factory
 import app
 from app.models.transactions import (
-    PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem, StockMovement,
-    TransferRequest, StockTransferItem, TransferRequestItem, StockAdjustment, StockAdjustmentItem
+    PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem,
+    TransferRequest, StockTransferItem, TransferRequestItem, StockAdjustment,
 )
 from app.models.finance import PaymentMethod
 from app.models.products import Product, ProductUnitPrice, StoreLocation
@@ -263,19 +263,50 @@ class TransferRequestItemForm(forms.ModelForm):
 class StockAdjustmentForm(forms.ModelForm):
     class Meta:
         model = StockAdjustment
-        # exclude fields managed by system
-        exclude = ['created_at', 'status', 'approved_by', 'approved_at']
+        fields = ['store', 'product', 'unit', 'quantity_change', 'unit_cost', 'reference', 'reason']
+        widgets = {
+            'store': forms.Select(attrs={'class': 'form-select', 'required': True}),
+            'product': forms.Select(attrs={'class': 'form-select', 'required': True}),
+            'unit': forms.Select(attrs={'class': 'form-select'}),
+            'quantity_change': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'required': True,
+                'step': '1',
+                'placeholder': 'Enter positive for increase, negative for decrease'
+            }),
+            'unit_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'reference': forms.TextInput(attrs={'class': 'form-control'}),
+            'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        labels = {
+            'store': 'Store',
+            'product': 'Product',
+            'unit': 'Unit of Measure',
+            'quantity_change': 'Quantity Change',
+            'unit_cost': 'Unit Cost',
+            'reference': 'Reference',
+            'reason': 'Reason',
+        }
+        help_texts = {
+            'quantity_change': 'Enter positive number to increase stock, negative to decrease (e.g., +10 or -5)',
+        }
 
     def clean(self):
         cleaned_data = super().clean()
-        # basic validation can be extended
+        quantity_change = cleaned_data.get('quantity_change')
+        
+        if quantity_change is not None and quantity_change == 0:
+            raise forms.ValidationError({
+                'quantity_change': 'Quantity change cannot be zero. Use positive number to increase or negative to decrease.'
+            })
+        
         return cleaned_data
 
-class StockAdjustmentItemForm(ModelForm):
+class StockAdjustmentForm2(forms.ModelForm):
     class Meta:
-        model = StockAdjustmentItem
-        fields = ['product', 'unit', 'quantity_change', 'unit_cost', 'reason']
-        
+        model = StockAdjustment
+        fields = ['store', 'product', 'unit', 'quantity_change', 'unit_cost', 'reference', 'reason']
+
         widgets = {
             'product': forms.Select(attrs={'class': 'select2', 'style': 'width:100%'}),
             'unit': forms.Select(attrs={'class': 'select2'}),
@@ -283,12 +314,7 @@ class StockAdjustmentItemForm(ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        qty = cleaned_data.get('quantity_change')
-        unit_cost = cleaned_data.get('unit_cost')
-        if qty is None or qty == 0:
-            raise forms.ValidationError('Quantity change must be non-zero.')
-        if unit_cost is not None and unit_cost < 0:
-            raise forms.ValidationError('Unit cost cannot be negative.')
+        
         return cleaned_data
 
 PurchaseOrderItemFormSet = inlineformset_factory(
@@ -307,7 +333,7 @@ SalesItemFormSet = inlineformset_factory(
     Sales, SalesItem, form=SalesItemForm, extra=0, can_delete=True
 )
 
-StockAdjustmentItemFormSet = inlineformset_factory(
-    StockAdjustment, StockAdjustmentItem, form=StockAdjustmentItemForm, extra=1, can_delete=True
-)
+# StockAdjustmentItemFormSet = inlineformset_factory(
+#     StockAdjustment, StockAdjustmentItem, form=StockAdjustmentItemForm, extra=1, can_delete=True
+# )
 

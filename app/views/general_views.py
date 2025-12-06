@@ -36,6 +36,13 @@ def index_view(request):
     low_stock_products = get_low_stock_products()
     top_selling_products = get_top_selling_products()
     recent_sales = get_recent_sales(limit=5)
+    
+    # Stock adjustment data
+    recent_stock_adjustments = get_recent_stock_adjustments(limit=10)
+    pending_stock_adjustments = get_pending_stock_adjustments()
+    pending_stock_adjustments_count = get_pending_stock_adjustments_count()
+    todays_stock_adjustments_count = get_todays_stock_adjustments_count()
+    total_revenue = get_total_revenue()
 
     context = {
         'products': products,
@@ -59,6 +66,11 @@ def index_view(request):
         'todays_fully_paid_sales': get_todays_fully_paid_sales(),
         'todays_partially_paid_sales': get_todays_partially_paid_sales(),
         'todays_unpaid_sales': get_todays_unpaid_sales(),
+        'recent_stock_adjustments': recent_stock_adjustments,
+        'pending_stock_adjustments': pending_stock_adjustments,
+        'pending_stock_adjustments_count': pending_stock_adjustments_count,
+        'todays_stock_adjustments_count': todays_stock_adjustments_count,
+        'total_revenue': total_revenue,
     }
     print(context['todays_fully_paid_sales'])
     # context = {

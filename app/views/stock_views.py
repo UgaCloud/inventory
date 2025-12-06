@@ -12,7 +12,7 @@ from app.selectors.transaction_selectors import (
     get_items_by_order
 )
 from app.models.products import Product, UnitOfMeasure
-from app.forms.transaction_forms import StockAdjustmentItemFormSet
+# from app.forms.transaction_forms import StockAdjustmentItemFormSet
 
 # Added imports for bulk upload
 import csv
@@ -317,27 +317,130 @@ def stock_adjustment_list(request):
     adjustments = StockAdjustment.objects.all().order_by('-created_at')
 
     form = StockAdjustmentForm()
-    formset = StockAdjustmentItemFormSet()
 
     context = {
         'adjustments': adjustments,
         'form': form,
-        'formset': formset,
     }
 
     return render(request, 'stock/stock_adjustment_list.html', context)
 
 @login_required
 def stock_adjustment_detail(request, adjustment_id):
-    adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
-    return render(request, 'stock/stock_adjustment_detail.html', {'adjustment': adjustment})
+    # Fetch fresh data from database (real-time)
+    adjustment = get_object_or_404(
+        StockAdjustment.objects.select_related('product', 'store', 'unit', 'created_by'),
+        id=adjustment_id
+    )
+    adjustment.refresh_from_db()  # Ensure we have the latest data
+    
+    # Get all adjustments with the same reference (batch adjustments)
+    related_adjustments = []
+    batch_totals = {}
+    if adjustment.reference:
+        related_adjustments = StockAdjustment.objects.filter(
+            reference=adjustment.reference,
+            store=adjustment.store
+        ).select_related('product', 'unit').order_by('created_at')
+        
+        # Calculate batch totals dynamically from fresh DB data
+        from django.db.models import Sum, Count
+        batch_totals = {
+            'total_items': related_adjustments.count(),
+            'total_quantity_change': related_adjustments.aggregate(
+                total=Sum('quantity_change')
+            )['total'] or 0,
+            'total_value': sum(
+                (abs(adj.quantity_change) * (adj.unit_cost or 0)) 
+                for adj in related_adjustments 
+                if adj.unit_cost
+            ),
+            'applied_count': related_adjustments.filter(status='applied').count(),
+            'pending_count': related_adjustments.filter(status='pending').count(),
+        }
+    
+    # Get stock movements related to this adjustment (real-time)
+    stock_movements = StockMovement.objects.filter(
+        transaction_type='ADJUSTMENT',
+        transaction_id=adjustment.id
+    ).select_related('product', 'store').order_by('-timestamp')
+    
+    # Get current inventory for this product/store (real-time - fresh from DB)
+    from app.models.products import Inventory
+    try:
+        current_inventory = Inventory.objects.get(
+            product=adjustment.product,
+            store=adjustment.store
+        )
+        current_inventory.refresh_from_db()  # Get latest inventory data
+        current_quantity = current_inventory.quantity_in_stock
+    except Inventory.DoesNotExist:
+        current_quantity = 0
+    
+    # Calculate quantities correctly - use MOVEMENT data as source of truth for what actually happened
+    record_was_edited = False
+    actual_quantity_change = None
+    
+    if adjustment.status == 'applied' and stock_movements.exists():
+        # If applied, use stock movement as the source of truth for what actually happened
+        # Movement records are immutable audit trail - they show what was actually applied
+        movement = stock_movements.first()
+        
+        # Movement shows what actually happened:
+        # - movement.quantity = the quantity that was actually changed (immutable audit trail)
+        # - movement.units_in_stock = stock level AFTER this adjustment was applied
+        actual_quantity_change = movement.quantity  # What was actually applied
+        quantity_after_actual = movement.units_in_stock  # Stock after this adjustment
+        
+        # Calculate what stock was BEFORE this adjustment
+        quantity_before = quantity_after_actual - actual_quantity_change
+        
+        # Ensure quantity_before is not negative (safety check)
+        if quantity_before < 0:
+            quantity_before = 0
+        
+        # Use movement data (what actually happened) as source of truth
+        quantity_after = quantity_after_actual
+        
+        # Check if adjustment record was edited after application
+        record_was_edited = (actual_quantity_change != adjustment.quantity_change)
+    elif adjustment.status == 'pending':
+        # For pending adjustments, show projected values based on current stock
+        quantity_before = current_quantity
+        # Projected after = current + change (ensure not negative)
+        quantity_after = max(0, current_quantity + adjustment.quantity_change)
+    else:
+        # For other statuses (approved, cancelled), show current stock only
+        quantity_before = None
+        quantity_after = current_quantity
+    
+    # Calculate total value - use actual quantity if available, otherwise use adjustment quantity
+    total_value = None
+    qty_for_value = actual_quantity_change if actual_quantity_change is not None else adjustment.quantity_change
+    if adjustment.unit_cost and qty_for_value:
+        # Use absolute value of quantity change for value calculation
+        total_value = abs(qty_for_value) * adjustment.unit_cost
+    
+    context = {
+        'adjustment': adjustment,
+        'related_adjustments': related_adjustments,
+        'batch_totals': batch_totals,
+        'stock_movements': stock_movements,
+        'current_quantity': current_quantity,
+        'quantity_before': quantity_before,
+        'quantity_after': quantity_after,
+        'total_value': total_value,
+        'record_was_edited': record_was_edited,
+        'actual_quantity_change': actual_quantity_change,
+    }
+    return render(request, 'stock/stock_adjustment_detail.html', context)
 
 @login_required
 def create_stock_adjustment(request):
     if request.method == 'POST':
         form = StockAdjustmentForm(request.POST)
-        formset = StockAdjustmentItemFormSet(request.POST)
-        if form.is_valid() and formset.is_valid():
+        # formset = StockAdjustmentItemFormSet(request.POST)
+        if form.is_valid():
             adj = form.save(commit=False)
             # prefer to record username; fallback to form value
             try:
@@ -345,26 +448,29 @@ def create_stock_adjustment(request):
             except Exception:
                 pass
             adj.save()
-            formset.instance = adj
-            formset.save()
+
             messages.success(request, 'Stock adjustment created successfully.')
             return redirect('stock_adjustment_list')
 
 @login_required
 def edit_stock_adjustment(request, adjustment_id):
     adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
+    
+    # Prevent editing applied adjustments to maintain audit trail integrity
+    if adjustment.status == 'applied':
+        messages.warning(request, 'Cannot edit applied adjustments. The adjustment has already been applied to inventory. Editing would create data inconsistencies.')
+        return redirect('stock_adjustment_detail', adjustment_id=adjustment.id)
+    
     if request.method == 'POST':
         form = StockAdjustmentForm(request.POST, instance=adjustment)
-        formset = StockAdjustmentItemFormSet(request.POST, instance=adjustment)
-        if form.is_valid() and formset.is_valid():
+
+        if form.is_valid():
             form.save()
-            formset.save()
             messages.success(request, 'Stock adjustment updated successfully.')
             return redirect('stock_adjustment_detail', adjustment_id=adjustment.id)
     else:
         form = StockAdjustmentForm(instance=adjustment)
-        formset = StockAdjustmentItemFormSet(instance=adjustment)
-    return render(request, 'stock/stock_adjustment_form.html', {'form': form, 'formset': formset, 'adjustment': adjustment})
+    return render(request, 'stock/stock_adjustment_form.html', {'form': form, 'adjustment': adjustment})
 
 @login_required
 def apply_stock_adjustment(request, adjustment_id):

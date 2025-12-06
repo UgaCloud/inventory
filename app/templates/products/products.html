@@ -25,6 +25,7 @@
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Collapse" id="collapse-header"><i class="ti ti-chevron-up"></i></a>
             </li>
         </ul>
+        {% if user.is_superuser or is_admin %}
         <div class="page-btn">
             <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-product"> 
                 <i class="ti ti-circle-plus me-1"></i>
@@ -39,55 +40,41 @@
                 <i class="ti ti-upload me-1"></i>Bulk Upload
             </button>
         </div>
+        {% endif %}
     </div>
 
     <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-            <div class="search-set">
-                <div class="search-input">
-                    <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
+            <form method="get" action="{% url 'products_page' %}" class="d-flex gap-2 align-items-center flex-wrap flex-grow-1">
+                <div class="search-set">
+                    <div class="search-input">
+                        <input type="text" name="search" class="form-control" placeholder="Search products..." value="{{ search_query|default:'' }}">
+                        <button type="submit" class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></button>
+                    </div>
                 </div>
-            </div>
-            <div class="d-flex table-dropdown my-xl-auto right-content align-items-center flex-wrap row-gap-3">
-                <div class="dropdown me-2">
-                    <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-                        Category
-                    </a>
-                    <ul class="dropdown-menu  dropdown-menu-end p-3">
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Computers</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Electronics</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Shoe</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Electronics</a>
-                        </li>
-                    </ul>
-                </div>
-                <div class="dropdown">
-                    <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-                        Brand
-                    </a>
-                    <ul class="dropdown-menu  dropdown-menu-end p-3">
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Lenovo</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Beats</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Nike</a>
-                        </li>
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Apple</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+                    <select name="category" class="form-select" style="min-width: 150px;" onchange="this.form.submit()">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if selected_category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="brand" class="form-select" style="min-width: 150px;" onchange="this.form.submit()">
+                        <option value="">All Brands</option>
+                        {% for brand in brands %}
+                        <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="status" class="form-select" style="min-width: 120px;" onchange="this.form.submit()">
+                        <option value="">All Status</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                {% if search_query or selected_category or selected_brand or selected_status %}
+                <a href="{% url 'products_page' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="ti ti-x me-1"></i>Clear Filters
+                </a>
+                {% endif %}
+            </form>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -126,7 +113,7 @@
                                         {% comment %} <a href="javascript:void(0);" class="avatar avatar-md me-2">
                                             <img src="assets/img/products/stock-img-01.png" alt="product">
                                         </a> {% endcomment %}
-                                        <a href="javascript:void(0);">{{product.name}}</a>
+                                        <a href="{% url 'product_details_page' product.id %}">{{product.name}}</a>
                                     </div>												
                                 </td>							
                                 <td>{{product.category}}</td>
@@ -150,15 +137,14 @@
                                     
                                 </td>
                                 
-                                <td 
-                                class="action-table-data">
-                                {% if is_admin %}
+                                <td class="action-table-data">
+                                    {% if user.is_superuser or is_admin %}
                                     <div class="edit-delete-action">
-                                        <a class="me-2 edit-icon  p-2" href="{% url 'product_details_page' product.id %}">
+                                        <a class="me-2 edit-icon p-2" href="{% url 'product_details_page' product.id %}" title="View Details">
                                             <i data-feather="eye" class="feather-eye"></i>
                                         </a>
-                                        <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);">
-                                            <i data-feather="trash-2" class="feather-trash-2"></i>
+                                        <a class="me-2 edit-icon p-2" href="{% url 'edit_product_page' product.id %}" title="Edit Product">
+                                            <i data-feather="edit" class="feather-edit"></i>
                                         </a>
                                     </div>
                                     {% endif %}
@@ -172,24 +158,6 @@
         </div>
     </div>
 
-    <!-- delete modal -->
-    <div class="modal fade" id="delete-modal">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="page-wrapper-new p-0">
-                    <div class="content p-5 px-3 text-center">
-                        <span class="rounded-circle d-inline-flex p-2 bg-danger-transparent mb-2"><i class="ti ti-trash fs-24 text-danger"></i></span>
-                        <h4 class="fs-20 text-gray-9 fw-bold mb-2 mt-1">Delete Product</h4>
-                        <p class="text-gray-6 mb-0 fs-16">Are you sure you want to delete product?</p>
-                        <div class="modal-footer-btn mt-3 d-flex justify-content-center">
-                            <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary fs-13 fw-medium p-2 px-3">Yes Delete</button>
-                        </div>						
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Add Product Modal -->
     <div class="modal fade" id="add-product">
@@ -209,15 +177,6 @@
                             <form method="post" action="{% url 'add_products_page'%}">
                                 {% csrf_token %}
                                 {{form|crispy}}
-                                                                <!-- filepath: /Users/abdulhakiim/Me/UGACloud/Projects/inventory/app/templates/products/products.html -->
-                                <div class="dropdown me-2">
-                                    <select id="id_category" class="form-select select2" style="min-width: 180px;">
-                                        <option value="">All Categories</option>
-                                        {% for category in categories %}
-                                        <option value="{{ category.id }}">{{ category.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
@@ -264,17 +223,5 @@
         </div>
     </div>
 
-    <script>
-                // Place inside your <script> block
-        document.addEventListener('DOMContentLoaded', function() {
-            $('#id_category').on('change', function() {
-                var selected = $(this).val();
-                // You can reload the page with the selected category as a GET param
-                var url = new URL(window.location.href);
-                url.searchParams.set('category', selected);
-                window.location.href = url.toString();
-            });
-        });
-    </script>
 {% endblock %}
 
