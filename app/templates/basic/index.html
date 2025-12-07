@@ -4,16 +4,6 @@
 {% load humanize %} 
 
 {% block content %}
-<<<<<<< HEAD
-  {% if user.is_superuser or is_admin %}
-    {% include 'basic/dashboards/admin.html' %}
-  {% elif is_stores %}
-    {% include 'basic/dashboards/stores.html' %}
-  {% elif is_sales %}
-    {% include 'basic/dashboards/sales.html' %}
-  {% else %}
-    {% include 'basic/dashboards/admin.html' %}
-=======
   {% if dashboard_templates %}
     {% if dashboard_templates|length > 1 %}
       <!-- Multiple dashboards: Show tabs -->
@@ -96,6 +86,5 @@
       <p>Your current roles do not include any dashboard modules.</p>
       <p>Please contact an administrator to update your role assignments.</p>
     </div>
->>>>>>> inv_transfer
   {% endif %}
 {% endblock %}

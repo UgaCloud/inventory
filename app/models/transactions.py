@@ -2,12 +2,13 @@ from django.db import models
 from django.db import transaction
 from datetime import date, timedelta
 import re
-from django.db import transaction
+from django.db.models import F, Sum
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.models import User
 
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
+from app.models.products import StoreLocation
 
 
 class PurchaseOrder(models.Model):
@@ -592,11 +593,10 @@ class StockAdjustment(models.Model):
                 item.apply_to_inventory()
 
             self.status = 'applied'
-            if applied_by:
-                self.approved_by = applied_by
+            
             from django.utils import timezone
             self.approved_at = timezone.now()
-            self.save(update_fields=['status', 'approved_by', 'approved_at'])
+            self.save(update_fields=['status'])
         return True
 
 

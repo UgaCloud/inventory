@@ -111,19 +111,16 @@ def index_view(request):
         'todays_fully_paid_sales': get_todays_fully_paid_sales(),
         'todays_partially_paid_sales': get_todays_partially_paid_sales(),
         'todays_unpaid_sales': get_todays_unpaid_sales(),
-<<<<<<< HEAD
         'recent_stock_adjustments': recent_stock_adjustments,
         'pending_stock_adjustments': pending_stock_adjustments,
         'pending_stock_adjustments_count': pending_stock_adjustments_count,
         'todays_stock_adjustments_count': todays_stock_adjustments_count,
         'total_revenue': total_revenue,
-=======
         
         # ADD THIS LINE to hide sidebar on dashboard:
         'hide_sidebar': True,
         'dashboard_templates': dashboard_templates,
         'dashboard_info': dashboard_info,  # List of dicts with 'name' and 'template'
->>>>>>> inv_transfer
     }
     print(context['todays_fully_paid_sales'])
     
