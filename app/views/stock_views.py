@@ -3,8 +3,9 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from app.models.transactions import StockMovement, StockTransfer, PurchaseOrder, PurchaseOrderItem, StockAdjustment
-from app.forms.transaction_forms import StockTransferForm, PurchaseOrderForm, PurchaseOrderItemForm, StockAdjustmentForm
+from app.models.transactions import *
+from app.forms.transaction_forms import *
+from app.models.products import *
 from app.selectors.transaction_selectors import (
     get_all_stock_movements, get_stock_movements_by_branch,
     get_all_stock_transfers, get_stock_transfer_by_id, get_stock_transfers_by_branch,
@@ -16,9 +17,31 @@ from app.models.products import Product, UnitOfMeasure
 
 # Added imports for bulk upload
 import csv
-import io
+import io, json
 from decimal import Decimal
-from datetime import datetime
+from datetime import *
+
+from django.http import JsonResponse
+
+from django.db.models import Count, Sum, Q
+from django.core.paginator import Paginator
+from django.db import transaction
+
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from django.contrib import messages
+from datetime import timedelta
+
+from app.forms.transaction_forms import StockTransferForm, StockTransferItemFormSet
+
+from django.core.cache import cache
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @login_required
 def stock_dashboard(request):
@@ -30,49 +53,646 @@ def stock_dashboard(request):
     }
     return render(request, 'stock_dashboard.html', context)
 
+
+
+
+
 @login_required
 def stock_transfer_list(request):
-    transfers = get_all_stock_transfers()
-    return render(request, 'stock_transfer_list.html', {'transfers': transfers})
+    """Proxy to canonical `stock_transfer_list` view in `app.views.transfers`.
+
+    We keep this thin wrapper for backwards compatibility so URLs that import
+    this view continue to work while the canonical implementation lives in
+    `app.views.transfers.stock_transfer_list`.
+    """
+    # Import locally to avoid circular imports at module load time
+    from app.views.transfers import stock_transfer_list as canonical_stock_transfer_list
+    return canonical_stock_transfer_list(request)
 
 @login_required
-def stock_transfer_detail(request, transfer_id):
-    transfer = get_stock_transfer_by_id(transfer_id)
-    return render(request, 'stock_transfer_detail.html', {'transfer': transfer})
-
-@login_required
-def create_stock_transfer(request):
+def stock_transfer_create(request):
+    """Create a new stock transfer"""
     if request.method == 'POST':
         form = StockTransferForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Stock transfer recorded successfully.')
+            transfer = form.save(commit=False)
+            transfer.created_by = request.user
+            transfer.save()
+            messages.success(request, 'Stock transfer created successfully.')
             return redirect('stock_transfer_list')
     else:
         form = StockTransferForm()
-    return render(request, 'stock_transfer_form.html', {'form': form})
+    
+    return render(request, 'stock/stock_transfer_form.html', {'form': form})
 
 @login_required
-def edit_stock_transfer(request, transfer_id):
+def stock_transfer_update(request, transfer_id):
+    """Update a stock transfer"""
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
+    
     if request.method == 'POST':
         form = StockTransferForm(request.POST, instance=transfer)
         if form.is_valid():
             form.save()
             messages.success(request, 'Stock transfer updated successfully.')
-            return redirect('stock_transfer_list')
+            return redirect('stock_transfer_detail', transfer_id=transfer.id)
     else:
         form = StockTransferForm(instance=transfer)
-    return render(request, 'stock_transfer_form.html', {'form': form, 'transfer': transfer})
+    
+    return render(request, 'stock/stock_transfer_form.html', {'form': form, 'transfer': transfer})
 
 @login_required
-def delete_stock_transfer(request, transfer_id):
+def update_transfer_status(request, transfer_id):
+    """Update transfer status"""
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
+    
     if request.method == 'POST':
-        transfer.delete()
-        messages.success(request, 'Stock transfer deleted successfully.')
+        new_status = request.POST.get('status')
+        if new_status in dict(StockTransfer.TRANSFER_STATUS_CHOICES):
+            transfer.status = new_status
+            transfer.save()
+            messages.success(request, f'Transfer status updated to {new_status}.')
+        else:
+            messages.error(request, 'Invalid status.')
+    
+    return redirect('stock_transfer_detail', transfer_id=transfer.id)
+
+@login_required
+def stock_transfer_detail(request, transfer_id):
+    """View stock transfer details"""
+    transfer = get_object_or_404(StockTransfer, id=transfer_id)
+    return render(request, 'stock/stock_transfer_detail.html', {'transfer': transfer})
+
+@login_required
+def approved_transfer_requests_api(request):
+    """API for approved transfer requests"""
+    approved_requests = TransferRequest.objects.filter(
+        status='approved'
+    ).select_related('from_store', 'to_store').prefetch_related('items')
+    
+    requests_data = []
+    for req in approved_requests:
+        requests_data.append({
+            'id': req.id,
+            'from_store': req.from_store.name,
+            'to_store': req.to_store.name,
+            'items_count': req.items.count(),
+            'requested_by': req.requested_by.username,
+            'approved_date': req.approved_date.isoformat() if req.approved_date else None,
+        })
+    
+    return JsonResponse({'requests': requests_data})
+
+@login_required
+def approved_transfer_requests_json(request):
+    """JSON endpoint for approved transfer requests (for modal)"""
+    approved_requests = TransferRequest.objects.filter(
+        status='approved'
+    ).select_related('from_store', 'to_store').prefetch_related('items').order_by('-approved_date')
+    
+    requests_data = []
+    for req in approved_requests:
+        requests_data.append({
+            'id': req.id,
+            'from_store_name': req.from_store.name,
+            'to_store_name': req.to_store.name,
+            'items_count': req.items.count(),
+            'priority': getattr(req, 'priority', 'normal'),
+            'approved_date': req.approved_date.isoformat() if req.approved_date else None,
+            'note': req.note or '',
+        })
+    
+    return JsonResponse({'requests': requests_data})
+
+@login_required
+def create_transfer_from_request(request, request_id):
+    """Create a stock transfer from an approved transfer request"""
+    transfer_request = get_object_or_404(TransferRequest, id=request_id, status='approved')
+    
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                stock_transfer = StockTransfer.objects.create(
+                    transfer_request=transfer_request,
+                    from_store=transfer_request.from_store,
+                    to_store=transfer_request.to_store,
+                    created_by=request.user,
+                    note=f"Created from approved request #{transfer_request.id}",
+                    status='pending'
+                )
+                
+                for request_item in transfer_request.items.all():
+                    StockTransferItem.objects.create(
+                        stock_transfer=stock_transfer,
+                        product=request_item.product,
+                        quantity=request_item.quantity,
+                        units=request_item.units,
+                        transfer_request_item=request_item
+                    )
+                
+                transfer_request.status = 'fulfilled'
+                transfer_request.save()
+                
+                # If this was an AJAX call, return JSON so the frontend can update without a redirect
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    return JsonResponse({'success': True, 'transfer_id': stock_transfer.id}, status=201)
+
+                messages.success(request, f'Stock transfer #{stock_transfer.id} created successfully from request #{transfer_request.id}.')
+                return redirect('stock_transfer_detail', transfer_id=stock_transfer.id)
+                
+        except Exception as e:
+            # For AJAX callers return a JSON error
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+            messages.error(request, f'Error creating transfer: {str(e)}')
+            return redirect('transfer_request_detail', request_id=request_id)
+    
+    return render(request, 'stock/transfer_from_request_confirm.html', {
+        'transfer_request': transfer_request
+    })
+
+
+
+@login_required
+def create_bulk_transfers(request):
+    """Create multiple transfers from selected approved requests"""
+    if request.method == 'POST':
+        selected_request_ids = request.POST.getlist('request_ids')
+        
+        if not selected_request_ids:
+            messages.error(request, 'No transfer requests selected.')
+            return redirect('stock_transfer_list')
+        
+        created_count = 0
+        errors = []
+        
+        for request_id in selected_request_ids:
+            try:
+                transfer_request = TransferRequest.objects.get(
+                    id=request_id, 
+                    status='approved'
+                )
+                
+                with transaction.atomic():
+                    if StockTransfer.objects.filter(transfer_request=transfer_request).exists():
+                        errors.append(f"Transfer already exists for request #{request_id}")
+                        continue
+                    
+                    stock_transfer = StockTransfer.objects.create(
+                        transfer_request=transfer_request,
+                        from_store=transfer_request.from_store,
+                        to_store=transfer_request.to_store,
+                        created_by=request.user,
+                        note=f"Bulk created from request #{transfer_request.id}",
+                        status='pending'
+                    )
+                    
+                    for request_item in transfer_request.items.all():
+                        StockTransferItem.objects.create(
+                            stock_transfer=stock_transfer,
+                            product=request_item.product,
+                            quantity=request_item.quantity,
+                            units=request_item.units,
+                            transfer_request_item=request_item
+                        )
+                    
+                    transfer_request.status = 'fulfilled'
+                    transfer_request.save()
+                    created_count += 1
+                    
+            except TransferRequest.DoesNotExist:
+                errors.append(f"Request #{request_id} not found or not approved")
+            except Exception as e:
+                errors.append(f"Error creating transfer from request #{request_id}: {str(e)}")
+        
+        if created_count > 0:
+            messages.success(request, f'Successfully created {created_count} stock transfer(s).')
+        if errors:
+            messages.warning(request, f'Some transfers failed: {" | ".join(errors[:5])}')
+        # If AJAX caller, return JSON summary
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+            return JsonResponse({'success': True, 'created': created_count, 'errors': errors}, status=200)
+
         return redirect('stock_transfer_list')
-    return render(request, 'stock_transfer_confirm_delete.html', {'transfer': transfer})
+    
+    return redirect('stock_transfer_list')
+    
+    
+
+@login_required
+def direct_stock_transfer_create(request):
+   
+    if request.method == 'POST':
+                
+        try:
+            with transaction.atomic():
+                
+                from_store_id = request.POST.get('from_store')
+                to_store_id = request.POST.get('to_store')
+                note = request.POST.get('note', '')
+                status = request.POST.get('status', 'pending')
+                
+            
+                if not from_store_id or not to_store_id:
+                    messages.error(request, 'From store and To store are required.')
+                    return redirect('stock_transfer_list')
+                
+          
+                try:
+                    from_store = StoreLocation.objects.get(id=from_store_id)
+                    to_store = StoreLocation.objects.get(id=to_store_id)
+                except StoreLocation.DoesNotExist:
+                    messages.error(request, 'Invalid store selected.')
+                    return redirect('stock_transfer_list')
+                
+                
+                transfer = StockTransfer.objects.create(
+                    from_store=from_store,
+                    to_store=to_store,
+                    note=note,
+                    status=status,
+                    created_by=request.user, 
+                    transfer_request=None    
+                )
+                
+            
+                total_forms = int(request.POST.get('items-TOTAL_FORMS', 0))
+                items_created = 0
+                
+                for i in range(total_forms):
+                    product_id = request.POST.get(f'items-{i}-product')
+                    quantity = request.POST.get(f'items-{i}-quantity')
+                    unit_id = request.POST.get(f'items-{i}-units')
+                        
+                    if product_id and quantity and unit_id:
+                        try:
+                            product = Product.objects.get(id=product_id)
+                            unit = UnitOfMeasure.objects.get(id=unit_id)
+                            quantity = int(quantity)
+                            
+                            if quantity > 0:
+                                StockTransferItem.objects.create(
+                                    stock_transfer=transfer,
+                                    product=product,
+                                    quantity=quantity,
+                                    units=unit
+                                )
+                                items_created += 1
+                                print(f'✓ Item {items_created} created: {product.name}')
+                                
+                        except (Product.DoesNotExist, UnitOfMeasure.DoesNotExist, ValueError) as e:
+                            print(f'✗ Error creating item {i}: {e}')
+                            continue
+                
+                if items_created > 0:
+                    messages.success(request, f'Transfer #{transfer.id} created successfully with {items_created} items!')
+
+                    return redirect('stock_transfer_detail', transfer_id=transfer.id)
+                else:
+                    transfer.delete()
+                    messages.error(request, 'No valid items were added. Transfer cancelled.')
+                    print('FAILED: No items created, transfer deleted')
+                    return redirect('stock_transfer_list')
+                    
+        except Exception as e:
+            print(f'ERROR DURING TRANSFER CREATION: {str(e)}')
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'Error creating transfer: {str(e)}')
+        
+       
+    
+    return redirect('stock_transfer_list')
+
+
+@login_required
+def start_stock_transfer(request, transfer_id):
+    """Mark a transfer as in transit"""
+    transfer = get_object_or_404(StockTransfer, id=transfer_id)
+    
+    if transfer.status != 'pending':
+        messages.error(request, 'Only pending transfers can be started.')
+        return redirect('stock_transfer_detail', transfer_id=transfer.id)
+    
+    stock_issues = []
+    for item in transfer.items.all():
+        try:
+            inventory = Inventory.objects.get(
+                product=item.product, 
+                store=transfer.from_store
+            )
+            if inventory.quantity_in_stock < item.quantity:
+                stock_issues.append(
+                    f"{item.product.name}: Available {inventory.quantity_in_stock}, Required {item.quantity}"
+                )
+        except Inventory.DoesNotExist:
+            stock_issues.append(f"{item.product.name}: No inventory found")
+    
+    if stock_issues:
+        messages.error(request, f'Insufficient stock: {", ".join(stock_issues)}')
+        return redirect('stock_transfer_detail', transfer_id=transfer.id)
+    
+    transfer.status = 'in_transit'
+    transfer.save()
+    
+    messages.success(request, f'Stock transfer #{transfer.id} marked as in transit.')
+    return redirect('stock_transfer_detail', transfer_id=transfer.id)
+
+@login_required
+def complete_stock_transfer(request, transfer_id):
+    transfer = get_object_or_404(StockTransfer, id=transfer_id)
+    
+    if transfer.status != 'in_transit':
+        messages.error(request, 'Only transfers in transit can be completed.')
+        return redirect('stock_transfer_detail', transfer_id=transfer.id)
+    
+    try:
+        transfer.apply_inventory_changes()
+        messages.success(request, f'Stock transfer #{transfer.id} completed successfully.')
+    except ValidationError as e:
+        messages.error(request, f'Error completing transfer: {str(e)}')
+    except Exception as e:
+        messages.error(request, f'Unexpected error: {str(e)}')
+    
+    return redirect('stock_transfer_detail', transfer_id=transfer.id)
+
+
+
+@login_required
+def get_product_stock_info(request):
+    """JSON endpoint for real-time stock with committed stock calculation"""
+    product_id = request.GET.get('product_id')
+    store_id = request.GET.get('store_id')
+    
+    print(f"🔍 DEBUG: Fetching stock for product {product_id}, store {store_id}")
+    
+    if not product_id or not store_id:
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+    
+    try:
+        # Simple query without select_related/only conflict
+        inventory = Inventory.objects.get(
+            product_id=product_id,
+            store_id=store_id
+        )
+        
+        print(f"📊 DEBUG: Base inventory found: {inventory.quantity_in_stock}")
+        
+        # Calculate committed stock (stock reserved for pending/in-transit transfers)
+        # Use lazy import to avoid circular imports
+        from app.models.transactions import StockTransferItem
+        from django.db.models import Sum
+        
+        committed_stock = StockTransferItem.objects.filter(
+            product_id=product_id,
+            stock_transfer__from_store_id=store_id,
+            stock_transfer__status__in=['pending', 'in_transit']
+        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        
+        print(f"🔄 DEBUG: Committed stock: {committed_stock}")
+        
+        # Calculate truly available stock
+        available_stock = max(0, inventory.quantity_in_stock - committed_stock)
+        
+        print(f"🎯 DEBUG: Available stock: {available_stock} (Base: {inventory.quantity_in_stock} - Committed: {committed_stock})")
+        
+        response_data = {
+            'available_stock': available_stock,
+            'total_stock': inventory.quantity_in_stock,
+            'committed_stock': committed_stock,
+            'reorder_level': inventory.reorder_level,
+            'can_fulfill': available_stock > 0,
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Inventory.DoesNotExist:
+        print(f"❌ DEBUG: No inventory record found for product {product_id} in store {store_id}")
+        return JsonResponse({
+            'available_stock': 0,
+            'total_stock': 0,
+            'committed_stock': 0,
+            'reorder_level': 0,
+            'can_fulfill': False,
+        })
+        
+    except Exception as e:
+        print(f"💥 DEBUG: Error in get_product_stock_info: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return JsonResponse({
+            'error': 'Unable to fetch stock information',
+            'available_stock': 0,
+            'total_stock': 0,
+            'committed_stock': 0,
+            'can_fulfill': False
+        }, status=500)
+
+@login_required
+def transfer_request_list(request):
+    """List all transfer requests"""
+    requests = TransferRequest.objects.all().order_by('-request_date')
+    return render(request, 'stock/transfer_request_list.html', {'transfer_requests': requests})
+
+@login_required
+def create_transfer_request(request):
+    """Create a new transfer request"""
+    if request.method == 'POST':
+        form = TransferRequestForm(request.POST)
+        formset = TransferRequestItemFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            transfer_request = form.save(commit=False)
+            transfer_request.requested_by = request.user
+            transfer_request.save()
+            
+            formset.instance = transfer_request
+            formset.save()
+            # If AJAX (JSON) request, return JSON response for modal submission
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({'success': True, 'request_id': transfer_request.id})
+
+            messages.success(request, 'Transfer request created successfully.')
+            return redirect('transfer_request_detail', request_id=transfer_request.id)
+        else:
+            # Form or formset invalid
+            # If this was an AJAX request (modal submit), return JSON with errors instead of rendering a full template
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                # Collect form and formset errors
+                errors = {
+                    'form_errors': form.errors or {},
+                    'formset_errors': formset.errors or [],
+                }
+                # include non-field errors if present
+                if hasattr(form, 'non_field_errors'):
+                    nf = form.non_field_errors()
+                    if nf:
+                        errors['non_field_errors'] = nf
+                return JsonResponse({'success': False, 'errors': errors}, status=400)
+    else:
+        form = TransferRequestForm()
+        formset = TransferRequestItemFormSet()
+    
+    return render(request, 'stock/transfer_request_form.html', {
+        'form': form,
+        'formset': formset
+    })
+
+@login_required
+def transfer_request_detail(request, request_id):
+    """View transfer request details"""
+    transfer_request = get_object_or_404(TransferRequest, id=request_id)
+    return render(request, 'stock/transfer_request_detail.html', {'transfer_request': transfer_request})
+
+
+@login_required
+def transfer_request_json(request, request_id):
+    """Return transfer request data and items as JSON (for modal edit)"""
+    tr = get_object_or_404(TransferRequest, id=request_id)
+    items = []
+    for it in tr.items.all():
+        items.append({
+            'id': it.id,
+            'product_id': it.product.id,
+            'product_name': it.product.name,
+            'quantity': it.quantity,
+            'units_id': it.units.id,
+            'units_name': it.units.name,
+            'notes': getattr(it, 'notes', '')
+        })
+
+    data = {
+        'id': tr.id,
+        'from_store': tr.from_store.id,
+        'from_store_name': tr.from_store.name,
+        'to_store': tr.to_store.id,
+        'to_store_name': tr.to_store.name,
+        'priority': getattr(tr, 'priority', 'normal'),
+        'required_date': getattr(tr, 'required_date', None) and getattr(tr, 'required_date').isoformat() or None,
+        'department': tr.department.id if tr.department else '',
+        'department_name': tr.department.name if tr.department else '',
+        'reason': tr.note or '',
+        'status': tr.status,
+        'items': items,
+    }
+
+    return JsonResponse({'success': True, 'request': data})
+
+@login_required
+def edit_transfer_request(request, request_id):
+    """Edit a transfer request"""
+    transfer_request = get_object_or_404(TransferRequest, id=request_id)
+    
+    if request.method == 'POST':
+        form = TransferRequestForm(request.POST, instance=transfer_request)
+        formset = TransferRequestItemFormSet(request.POST, instance=transfer_request)
+        
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
+            # If AJAX, return JSON for modal callers
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({'success': True, 'request_id': transfer_request.id})
+
+            messages.success(request, 'Transfer request updated successfully.')
+            return redirect('transfer_request_detail', request_id=transfer_request.id)
+        else:
+            # Invalid form/formset
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                errors = {
+                    'form_errors': form.errors or {},
+                    'formset_errors': formset.errors or [],
+                }
+                if hasattr(form, 'non_field_errors'):
+                    nf = form.non_field_errors()
+                    if nf:
+                        errors['non_field_errors'] = nf
+                return JsonResponse({'success': False, 'errors': errors}, status=400)
+    else:
+        form = TransferRequestForm(instance=transfer_request)
+        formset = TransferRequestItemFormSet(instance=transfer_request)
+    
+    return render(request, 'stock/transfer_request_form.html', {
+        'form': form,
+        'formset': formset,
+        'transfer_request': transfer_request
+    })
+
+@login_required
+def update_transfer_request(request, request_id):
+
+    transfer_request = get_object_or_404(TransferRequest, id=request_id)
+    
+    if request.method == 'POST':
+        form = TransferRequestForm(request.POST, instance=transfer_request)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Transfer request updated successfully.')
+            return redirect('transfer_request_detail', request_id=transfer_request.id)
+    
+    return redirect('transfer_request_detail', request_id=request_id)
+
+# approve_transfer_request and reject_transfer_request moved to transfer_views.py
+# to avoid duplicate function definitions
+
+@login_required
+def pending_transfer_requests_for_approval(request):
+    pending_requests = TransferRequest.objects.filter(status='pending').order_by('-request_date')
+    return render(request, 'stock/pending_transfer_requests.html', {'pending_requests': pending_requests})
+
+
+
+
+
+
+# @login_required
+# def stock_transfer_list(request):
+#     transfers = get_all_stock_transfers()
+#     return render(request, 'stock_transfer_list.html', {'transfers': transfers})
+
+# @login_required
+# def stock_transfer_detail(request, transfer_id):
+#     transfer = get_stock_transfer_by_id(transfer_id)
+#     return render(request, 'stock_transfer_detail.html', {'transfer': transfer})
+
+# @login_required
+# def create_stock_transfer(request):
+#     if request.method == 'POST':
+#         form = StockTransferForm(request.POST)
+#         if form.is_valid():
+#             form.save()
+#             messages.success(request, 'Stock transfer recorded successfully.')
+#             return redirect('stock_transfer_list')
+#     else:
+#         form = StockTransferForm()
+#     return render(request, 'stock_transfer_form.html', {'form': form})
+
+# @login_required
+# def edit_stock_transfer(request, transfer_id):
+#     transfer = get_object_or_404(StockTransfer, id=transfer_id)
+#     if request.method == 'POST':
+#         form = StockTransferForm(request.POST, instance=transfer)
+#         if form.is_valid():
+#             form.save()
+#             messages.success(request, 'Stock transfer updated successfully.')
+#             return redirect('stock_transfer_list')
+#     else:
+#         form = StockTransferForm(instance=transfer)
+#     return render(request, 'stock_transfer_form.html', {'form': form, 'transfer': transfer})
+
+# @login_required
+# def delete_stock_transfer(request, transfer_id):
+#     transfer = get_object_or_404(StockTransfer, id=transfer_id)
+#     if request.method == 'POST':
+#         transfer.delete()
+#         messages.success(request, 'Stock transfer deleted successfully.')
+#         return redirect('stock_transfer_list')
+#     return render(request, 'stock_transfer_confirm_delete.html', {'transfer': transfer})
+
+
+
 
 @login_required
 def purchase_order_list(request):
@@ -101,7 +721,6 @@ def create_purchase_order(request):
             
             return redirect(purchase_order_item_list, order_id = order.id)
     
-
 @login_required
 def edit_purchase_order(request, order_id):
     order = get_object_or_404(PurchaseOrder, id=order_id)
@@ -451,7 +1070,22 @@ def create_stock_adjustment(request):
 
             messages.success(request, 'Stock adjustment created successfully.')
             return redirect('stock_adjustment_list')
-
+        else:
+            # Form is invalid, re-render with errors
+            return render(request, 'transactions/stock_adjustment_form.html', {
+                'form': form,
+                'formset': formset
+            })
+    
+    else:  # GET request - THIS WAS MISSING!
+        form = StockAdjustmentForm()
+        formset = StockAdjustmentItemFormSet()
+        return render(request, 'stock/stock_adjustment_form.html', {
+            'form': form,
+            'formset': formset
+        })
+        
+        
 @login_required
 def edit_stock_adjustment(request, adjustment_id):
     adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)

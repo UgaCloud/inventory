@@ -85,22 +85,25 @@
           </div>
         </div>
       </div>
-      <div class="col-xl-3 col-sm-6">
-        <div class="card bg-info text-white">
-          <div class="card-body">
+
+<div class="col-xl-3 col-sm-6">
+    <div class="card bg-info text-white">
+        <div class="card-body">
             <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <i data-feather="dollar-sign" class="feather-24"></i>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <h4 class="mb-1">UGX {{ inventory_summary.total_inventory_value|intcomma }}</h4>
-                <p class="mb-0">Total Value</p>
-                <small>Based on batch costs</small>
-              </div>
+                <div class="flex-shrink-0">
+                    <i data-feather="dollar-sign" class="feather-24"></i>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <h4 class="mb-1">UGX {{ inventory_summary.total_inventory_value|intcomma }}</h4>
+                    <p class="mb-0">Total Value</p>
+                    <small>Based on product prices</small>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
+    </div>
+</div>
+
+
     </div>
 
     <!-- Filter and Search Section -->
@@ -289,9 +292,15 @@
                       <a href="{% url 'create_stock_adjustment' %}?product={{ item.product.id }}" class="btn btn-sm btn-warning me-1" title="Adjust Stock">
                         <i data-feather="edit" class="feather-14"></i>
                       </a>
+                      {% if item.product.id %}
                       <a href="{% url 'product_inventory_detail' store.id item.product.id %}" class="btn btn-sm btn-info" title="View Details">
                         <i data-feather="eye" class="feather-14"></i>
                       </a>
+                      {% else %}
+                      <span class="btn btn-sm btn-secondary disabled" title="Product details unavailable">
+                        <i data-feather="eye" class="feather-14"></i>
+                      </span>
+                      {% endif %}
                     </div>
                   </div>
                 </td>
@@ -371,7 +380,7 @@
                 <i data-feather="truck" class="feather-16 me-2"></i>
                 Request Stock Transfer
               </a>
-              <a href="{% url 'create_stock_adjustment' %}" class="btn btn-outline-warning">
+              <a href="{% url 'stock_adjustment_list' %}" class="btn btn-outline-warning">
                 <i data-feather="edit" class="feather-16 me-2"></i>
                 Create Stock Adjustment
               </a>

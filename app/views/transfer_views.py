@@ -2,8 +2,12 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.http import JsonResponse
 
 from app.models.transactions import TransferRequest, StockTransfer, StockTransferItem
+from app.models.human_resource import Department
+from app.models.products import StoreLocation, UnitOfMeasure
 from app.forms.transaction_forms import (
     TransferRequestForm, StockTransferForm, StockTransferItemForm, StockTransferItemFormSet, TransferRequestItemFormSet, 
     TransferRequestApprovalForm
@@ -14,35 +18,82 @@ from app.selectors.product_selectors import get_stores
 @login_required
 def transfer_request_list(request):
     requests = get_all_transfer_requests()
+    departments = Department.objects.filter(is_active=True)
+    stores = StoreLocation.objects.filter(is_active=True)
     
-    form = TransferRequestForm()
+    # Initialize forms with request context
+    form = TransferRequestForm(request=request)
     formset = TransferRequestItemFormSet()
- 
+    
     context = {
         'requests': requests,
+        'departments': departments,
+        'stores': stores,
         'form': form,
-        'item_formset': formset
+        'formset': formset,
     }
-    
     return render(request, 'transfers/transfer_request_list.html', context)
 
 @login_required
-def add_transfer_request(request):
+def update_transfer_request(request, request_id):
+    transfer_request = get_object_or_404(TransferRequest, pk=request_id, requested_by=request.user)
     
     if request.method == 'POST':
-        form = TransferRequestForm(request.POST)
-        formset = TransferRequestItemFormSet(request.POST)
+        form = TransferRequestForm(request.POST, instance=transfer_request, request=request)
+        formset = TransferRequestItemFormSet(request.POST, instance=transfer_request)
         
         if form.is_valid() and formset.is_valid():
-            transfer_request = form.save(commit=False)
-            transfer_request.requested_by = request.user  
-            transfer_request.save()
-            formset.instance = transfer_request
-            formset.save()
+            try:
+                with transaction.atomic():
+                    # Only allow editing if status is pending
+                    if transfer_request.status != 'pending':
+                        messages.error(request, 'Cannot edit transfer request that is not pending.')
+                        return redirect('transfer_request_list')
+                    
+                    form.save()
+                    formset.save()
+                    
+                    messages.success(request, f'Transfer request #{transfer_request.id} updated successfully.')
+                    
+                    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'success': True,
+                            'message': 'Transfer request updated successfully!'
+                        })
+                    else:
+                        return redirect('transfer_request_list')
+                        
+            except Exception as e:
+                messages.error(request, f'Error updating transfer request: {str(e)}')
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'error': str(e)
+                    })
+        else:
+            # Handle form errors
+            error_messages = []
+            if form.errors:
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        error_messages.append(f"{field}: {error}")
+            if formset.errors:
+                for i, errors in enumerate(formset.errors):
+                    for field, error in errors.items():
+                        error_messages.append(f"Item {i+1} - {field}: {error}")
             
-            messages.success(request, 'Transfer request created successfully.')
+            error_message = "; ".join(error_messages)
+            messages.error(request, f'Please correct the errors: {error_message}')
             
-            return redirect(transfer_request_list)
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'error': error_message
+                })
+    
+    return redirect('transfer_request_list')
+
+
 
 @login_required
 def transfer_request_detail(request, request_id):
@@ -60,60 +111,12 @@ def transfer_request_detail(request, request_id):
 
     return render(request, 'transfers/transfer_request_details.html', context)
 
-@login_required
-def update_transfer_request(request, request_id):
-    
-    transfer_request = get_object_or_404(TransferRequest, pk=request_id)
-    
-    if request.method == 'POST':
-        form = TransferRequestForm(request.POST, instance=transfer_request)
-        formset = TransferRequestItemFormSet(request.POST, instance=transfer_request)
-       
-        if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
-            
-            messages.success(request, 'Transfer request updated successfully.')
-            
-            return redirect(transfer_request_list)
 
 @login_required
 def stock_transfer_list(request):
-    transfers = get_approved_transfer_requests()
-
-    transfer_request_id = request.GET.get('transfer_request_id') or request.POST.get('transfer_request')
-
-    transfer_request = None
-    initial_items = []
-
-    if transfer_request_id:
-        transfer_request = get_object_or_404(TransferRequest, id=transfer_request_id)
-        
-        # Get items from the transfer request
-        initial_items = [
-            {
-                'product': item.product,
-                'quantity': item.quantity,
-                'transfer_request_item': item.id
-            }
-            for item in transfer_request.items.all()
-        ]
-
-    form = StockTransferForm(initial={'transfer_request': transfer_request_id} if transfer_request_id else None)
-        
-    formset = StockTransferItemFormSet(initial=initial_items)
-
-    stores = get_stores()
-
-    context = {
-        'transfers': transfers,
-        'form': form,
-        'item_formset': formset,
-        'transfer_request': transfer_request,
-        'stores': stores
-    }
-
-    return render(request, 'transfers/stock_transfer_list.html', context)
+    # Delegate to the canonical stock_transfer_list implementation in app.views.transfers
+    from app.views.transfers import stock_transfer_list as canonical_stock_transfer_list
+    return canonical_stock_transfer_list(request)
 
 @login_required
 def stock_transfer_create(request):
@@ -174,26 +177,96 @@ def pending_transfer_requests_for_approval(request):
 
 @login_required
 def approve_transfer_request(request, request_id):
-    transfer_request = get_object_or_404(TransferRequest, pk=request_id)
+    """Approve a transfer request with optional comments - handles AJAX from list page"""
+    from django.http import JsonResponse
+    from django.utils import timezone
     
-    
-    if request.method == 'POST':
-        form = TransferRequestApprovalForm(request.POST, instance=transfer_request)
+    try:
+        # Only allow POST method
+        if request.method != 'POST':
+            return JsonResponse({'success': False, 'error': 'Only POST method allowed'}, status=405)
         
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Transfer request status updated successfully.')
+        try:
+            transfer_request = TransferRequest.objects.get(pk=request_id)
+        except TransferRequest.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Transfer request not found'}, status=404)
+        
+        # Validate that request is in pending status
+        if transfer_request.status != 'pending':
+            error_msg = f'Cannot approve request. Current status is: {transfer_request.get_status_display()}'
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        
+        # Update status and approver info
+        transfer_request.status = 'approved'
+        transfer_request.approved_by = request.user
+        transfer_request.approved_date = timezone.now()
+        
+        # Save comments if provided
+        comments = request.POST.get('comments', '').strip()
+        if comments:
+            existing_note = transfer_request.note or ''
+            approval_note = f"[Approved by {request.user.get_full_name() or request.user.username} on {timezone.now().strftime('%Y-%m-%d %H:%M')}]: {comments}"
+            transfer_request.note = f"{existing_note}\n{approval_note}".strip() if existing_note else approval_note
+        
+        transfer_request.save()
 
-        return redirect(pending_transfer_requests_for_approval)
-    else:
-        form = TransferRequestApprovalForm(instance=transfer_request)
+        # Always return JSON for POST requests (AJAX from list page)
+        return JsonResponse({
+            'success': True,
+            'request_id': transfer_request.id,
+            'message': 'Transfer request approved successfully. It now appears in the Approved Requests list.'
+        })
+    except Exception as e:
+        # Catch any unexpected errors and return JSON
+        import traceback
+        print(f"Error in approve_transfer_request: {e}")
+        print(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Server error: {str(e)}'}, status=500)
 
-        request_items = transfer_request.items.all()
+@login_required
+def reject_transfer_request(request, request_id):
+    """Reject a transfer request with optional comments - handles AJAX from list page"""
+    from django.http import JsonResponse
+    from django.utils import timezone
     
-        context = {
-            'request': transfer_request,
-            'approval_form': form,
-            'items': request_items,
-        }
+    try:
+        # Only allow POST method
+        if request.method != 'POST':
+            return JsonResponse({'success': False, 'error': 'Only POST method allowed'}, status=405)
+        
+        try:
+            transfer_request = TransferRequest.objects.get(pk=request_id)
+        except TransferRequest.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Transfer request not found'}, status=404)
+        
+        # Validate that request is in pending status
+        if transfer_request.status != 'pending':
+            error_msg = f'Cannot reject request. Current status is: {transfer_request.get_status_display()}'
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        
+        # Update status and approver info
+        transfer_request.status = 'rejected'
+        transfer_request.approved_by = request.user
+        transfer_request.approved_date = timezone.now()
+        
+        # Save comments if provided
+        comments = request.POST.get('comments', '').strip()
+        if comments:
+            existing_note = transfer_request.note or ''
+            rejection_note = f"[Rejected by {request.user.get_full_name() or request.user.username} on {timezone.now().strftime('%Y-%m-%d %H:%M')}]: {comments}"
+            transfer_request.note = f"{existing_note}\n{rejection_note}".strip() if existing_note else rejection_note
+        
+        transfer_request.save()
 
-        return render(request, 'transfers/approve_reject.html', context)
+        # Always return JSON for POST requests (AJAX from list page)
+        return JsonResponse({
+            'success': True, 
+            'request_id': transfer_request.id,
+            'message': 'Transfer request rejected.'
+        })
+    except Exception as e:
+        # Catch any unexpected errors and return JSON
+        import traceback
+        print(f"Error in reject_transfer_request: {e}")
+        print(traceback.format_exc())
+        return JsonResponse({'success': False, 'error': f'Server error: {str(e)}'}, status=500)

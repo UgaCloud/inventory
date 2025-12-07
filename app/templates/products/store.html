@@ -84,7 +84,7 @@
                                 <td>{{store.total_stock_items}}</td>
                                 <td class="action-table-data">
                                     <div class="edit-delete-action">
-                                        <a class="me-2 edit-icon  p-2" href="{% url 'store_inventory' store.id %}">
+                                        <a class="me-2 view-icon p-2" href="{% url 'store_inventory' store.id %}" title="View Inventory">
                                             <i data-feather="eye" class="feather-eye"></i>
                                         </a>
                                         <a class="me-2 edit-icon p-2" 
@@ -95,11 +95,12 @@
                                            data-store-name="{{ store.name }}"
                                            data-store-branch="{{ store.branch }}"
                                            data-store-address="{{store.address}}"
-                                           data-store-is-active="{{store.is_active}}">
+                                           data-store-is-active="{{store.is_active}}"
+                                           title="Edit">
                                            
                                             <i data-feather="edit" class="feather-edit"></i>
                                         </a>
-                                        <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);">
+                                        <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2" href="javascript:void(0);" title="Delete">
                                             <i data-feather="trash-2" class="feather-trash-2"></i>
                                         </a>
                                     </div>

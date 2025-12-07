@@ -29,8 +29,13 @@ class SessionTimeoutMiddleware:
             time_since_last_activity = current_time - last_activity
             
             # Get session timeout from settings (default to 1 hour)
-            session_timeout = getattr(settings, 'SESSION_COOKIE_AGE', 300)
-            
+            session_timeout = getattr(settings, 'SESSION_COOKIE_AGE', 3600)
+            # Warning threshold (seconds before expiry) - default to 5 minutes or a half of session
+            warning_threshold = getattr(settings, 'SESSION_WARNING_SECONDS', None)
+            if warning_threshold is None:
+                # default to half of session timeout or 300 seconds whichever is smaller
+                warning_threshold = min(300, int(session_timeout / 2))
+
             # Check if session has expired
             if time_since_last_activity > session_timeout:
                 # Log out the user
@@ -41,12 +46,14 @@ class SessionTimeoutMiddleware:
             # Update last activity time
             request.session['last_activity'] = current_time
             
-            # Add timeout warning if close to expiry (5 minutes before)
-            warning_threshold = 180  # 3 minutes in seconds
-            if (session_timeout - time_since_last_activity) <= warning_threshold:
+            # Add timeout warning if within the configured warning threshold
+            seconds_left = int(session_timeout - time_since_last_activity)
+            if seconds_left <= warning_threshold:
                 request.session['timeout_warning'] = True
+                request.session['session_seconds_left'] = seconds_left
             else:
                 request.session.pop('timeout_warning', None)
+                request.session.pop('session_seconds_left', None)
 
         response = self.get_response(request)
         return response

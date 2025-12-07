@@ -19,36 +19,38 @@
       <ul class="table-top-head">
         <li>
           <div class="dropdown">
-            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i data-feather="filter" class="feather-16"></i>
-              Filter Status
+              <span>Filter Status</span>
             </button>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="?status=all">All Transfers</a></li>
-              <li><a class="dropdown-item" href="?status=pending">Pending</a></li>
-              <li><a class="dropdown-item" href="?status=in_transit">In Transit</a></li>
-              <li><a class="dropdown-item" href="?status=completed">Completed</a></li>
+              <li class="dropdown-item"><a href="?status=all">All Transfers</a></li>
+              <li class="dropdown-item"><a href="?status=pending">Pending</a></li>
+              <li class="dropdown-item"><a href="?status=in_transit">In Transit</a></li>
+              <li class="dropdown-item"><a href="?status=completed">Completed</a></li>
             </ul>
           </div>
         </li>
-        <li>
-          <a href="{% url 'transfer_request_list' %}?status=approved" class="btn btn-outline-info">
+        <button class="btn btn-outline-info btn-sm d-flex align-items-center">
+          <a href="{% url 'transfer_request_list' %}?status=approved">
             <i data-feather="list" class="feather-16"></i>
-            View Approved Requests
+            <span>View Approved Requests</span>
           </a>
-        </li>
+        </button>
+
         <li>
           <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            <button class="btn btn-primary btn-sm dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i data-feather="truck" class="feather-16"></i>
-              Create Transfer
+              <span>Create Transfer</span>
             </button>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="#" onclick="showApprovedRequestsModal()">From Approved Request</a></li>
-              <li><a class="dropdown-item" href="#" onclick="showDirectTransferModal()">Direct Transfer</a></li>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li class="dropdown-item"><a href="#" data-action="showApprovedRequestsModal">From Approved Request</a></li>
+              <li class="dropdown-item"><a href="#" data-action="showDirectTransferModal">Direct Transfer</a></li>
             </ul>
           </div>
         </li>
+        
       </ul>
     </div>
 
@@ -61,7 +63,7 @@
           <strong>{{ pending_approved_requests }} approved request{{ pending_approved_requests|pluralize }}</strong> 
           waiting to be converted to stock transfers.
         </div>
-        <button class="btn btn-sm btn-primary me-2" onclick="showApprovedRequestsModal()">
+  <button class="btn btn-sm btn-primary me-2" data-action="showApprovedRequestsModal">
           View Requests
         </button>
       </div>
@@ -131,18 +133,21 @@
           </div>
         </div>
       </div>
+
       <div class="col-lg-2 col-md-4 col-sm-6">
         <div class="card bg-primary text-white">
           <div class="card-body text-center">
-            <div class="mb-2">
+            <!-- <div class="mb-2">
               <i data-feather="dollar-sign" class="feather-24"></i>
-            </div>
-            <h4 class="mb-1">UGX {{ total_value|intcomma }}</h4>
+            </div> -->
+            
+            <h4 class="mb-1">UGX {{ total_values|default:0|floatformat:"0"|intcomma }}</h4>
             <p class="mb-0">Total Value</p>
             <small>Active Transfers</small>
           </div>
         </div>
       </div>
+      
     </div>
 
     <!-- Active Transfers Table -->
@@ -153,7 +158,7 @@
           Stock Transfers ({{ transfers.count }})
         </h5>
         <div>
-          <button class="btn btn-outline-secondary btn-sm me-2" onclick="refreshTransfers()">
+          <button class="btn btn-outline-secondary btn-sm me-2" data-action="refreshTransfers">
             <i data-feather="refresh-cw" class="feather-16"></i>
           </button>
           <span class="badge bg-info">Based on Approved Requests</span>
@@ -300,7 +305,7 @@
                       </a>
                       
                       {% if transfer.status == 'pending' %}
-                        <button class="btn btn-sm btn-primary me-1" onclick="startTransfer({{ transfer.id }})" title="Start Transfer">
+                        <button class="btn btn-sm btn-primary me-1" data-action="startTransfer" data-transfer-id="{{ transfer.id }}" title="Start Transfer">
                           <i data-feather="play" class="feather-14"></i>
                         </button>
                         <a href="{% url 'stock_transfer_update' transfer.id %}" class="btn btn-sm btn-warning me-1" title="Edit">
@@ -309,10 +314,10 @@
                       {% endif %}
                       
                       {% if transfer.status == 'in_transit' %}
-                        <button class="btn btn-sm btn-success me-1" onclick="completeTransfer({{ transfer.id }})" title="Mark Complete">
+                        <button class="btn btn-sm btn-success me-1" data-action="completeTransfer" data-transfer-id="{{ transfer.id }}" title="Mark Complete">
                           <i data-feather="check" class="feather-14"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-info me-1" onclick="trackTransfer({{ transfer.id }})" title="Track">
+                        <button class="btn btn-sm btn-outline-info me-1" data-action="trackTransfer" data-transfer-id="{{ transfer.id }}" title="Track">
                           <i data-feather="map-pin" class="feather-14"></i>
                         </button>
                       {% endif %}
@@ -333,7 +338,7 @@
                           {% endif %}
                           {% if transfer.status != 'completed' and transfer.status != 'cancelled' %}
                           <li><hr class="dropdown-divider"></li>
-                          <li><a class="dropdown-item text-danger" href="#" onclick="cancelTransfer({{ transfer.id }})">
+                          <li><a class="dropdown-item text-danger" href="#" data-action="cancelTransfer" data-transfer-id="{{ transfer.id }}">
                             <i data-feather="x-circle" class="feather-14 me-2"></i>Cancel Transfer
                           </a></li>
                           {% endif %}
@@ -355,7 +360,7 @@
                         <i data-feather="list" class="feather-16 me-1"></i>
                         View Approved Requests
                       </a>
-                      <button class="btn btn-outline-primary" onclick="showDirectTransferModal()">
+                      <button class="btn btn-outline-primary" data-action="showDirectTransferModal">
                         <i data-feather="plus" class="feather-16 me-1"></i>
                         Create Direct Transfer
                       </button>
@@ -432,7 +437,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" onclick="createBulkTransfers()">
+  <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
           <i data-feather="truck" class="feather-16 me-1"></i>
           Create Selected Transfers
         </button>
@@ -440,6 +445,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- Direct Transfer Modal -->
 <div class="modal fade" id="directTransferModal" tabindex="-1" aria-labelledby="directTransferModalLabel" aria-hidden="true">
@@ -454,104 +460,68 @@
       </div>
       <form id="directTransferForm" method="post" action="{% url 'direct_stock_transfer_create' %}">
         {% csrf_token %}
+        
         <div class="modal-body">
-          <!-- Transfer Basic Info using stock_form -->
+          <!-- Transfer Basic Info -->
           <div class="row mb-4">
             <div class="col-md-6">
               <div class="mb-3">
-                {{ stock_form.from_store|as_crispy_field }}
+                <label for="id_from_store" class="form-label">From Store *</label>
+                {{ stock_form.from_store }}
               </div>
             </div>
             <div class="col-md-6">
               <div class="mb-3">
-                {{ stock_form.to_store|as_crispy_field }}
+                <label for="id_to_store" class="form-label">To Store *</label>
+                {{ stock_form.to_store }}
               </div>
             </div>
           </div>
           <div class="row mb-4">
             <div class="col-md-6">
               <div class="mb-3">
-                {{ stock_form.note|as_crispy_field }}
+                <label for="id_note" class="form-label">Notes</label>
+                {{ stock_form.note }}
               </div>
             </div>
             <div class="col-md-6">
               <div class="mb-3">
-                {{ stock_form.status|as_crispy_field }}
+                <label for="id_status" class="form-label">Status</label>
+                {{ stock_form.status }}
               </div>
             </div>
           </div>
 
-          <!-- Transfer Items Section using item_formset -->
+          <!-- Transfer Items Section -->
           <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h6 class="mb-0">Transfer Items</h6>
-              <button type="button" class="btn btn-sm btn-primary" onclick="addFormsetRow()">
+              <h6 class="mb-0">Transfer Items *</h6>
+              <button type="button" class="btn btn-sm btn-primary" data-action="addFormsetRow">
                 <i data-feather="plus" class="feather-12 me-1"></i>
                 Add Item
               </button>
             </div>
             <div class="card-body">
-              {{ item_formset.management_form }}
-              <input type="hidden" name="{{ item_formset.prefix }}-TOTAL_FORMS" value="0" id="id_{{ item_formset.prefix }}-TOTAL_FORMS">
-              <input type="hidden" name="{{ item_formset.prefix }}-INITIAL_FORMS" value="0" id="id_{{ item_formset.prefix }}-INITIAL_FORMS">
-              <input type="hidden" name="{{ item_formset.prefix }}-MIN_NUM_FORMS" value="0" id="id_{{ item_formset.prefix }}-MIN_NUM_FORMS">
-              <input type="hidden" name="{{ item_formset.prefix }}-MAX_NUM_FORMS" value="1000" id="id_{{ item_formset.prefix }}-MAX_NUM_FORMS">
+              <!-- Formset management data -->
+              <input type="hidden" name="items-TOTAL_FORMS" value="0" id="id_items-TOTAL_FORMS">
+              <input type="hidden" name="items-INITIAL_FORMS" value="0" id="id_items-INITIAL_FORMS">
+              <input type="hidden" name="items-MIN_NUM_FORMS" value="1" id="id_items-MIN_NUM_FORMS">
+              <input type="hidden" name="items-MAX_NUM_FORMS" value="1000" id="id_items-MAX_NUM_FORMS">
+              
               <div class="table-responsive">
                 <table class="table table-sm" id="formset-table">
                   <thead class="table-light">
                     <tr>
-                      <th>Product</th>
+                      <th>Product *</th>
                       <th>Available</th>
-                      <th>Quantity</th>
-                      <th>Units</th>
+                      <th>Quantity *</th>
+                      <th>Units *</th>
                       <th>Total</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody id="formset-tbody">
-                    {% for form in item_formset %}
-                    <tr class="formset-row" id="row-{{ forloop.counter0 }}">
-                        <td>
-                            {{ form.id }}
-                            <select name="{{ form.product.html_name }}" 
-                                  id="{{ form.product.auto_id }}" 
-                                  class="form-select form-select-sm product-select">
-                              <option value="">Select Product</option>
-                              {% for product in products %}
-                              <option value="{{ product.id }}" 
-                                      data-cost="{{ product.cost_price|default:'0' }}"
-                                      data-sku="{{ product.sku }}">
-                                  {{ product.name }} ({{ product.sku }})
-                              </option>
-                              {% endfor %}
-                          </select>
-                        </td>
-                        <td>
-                            <span class="available-stock text-muted" id="available-{{ forloop.counter0 }}">-</span>
-                        </td>
-                        <td>
-                            {{ form.quantity|as_crispy_field }}
-                        </td>
-                        <td>
-                            <select name="{{ form.units.html_name }}"
-                                  id="{{ form.units.auto_id }}"
-                                  class="form-select form-select-sm">
-                              <option value="">Select Unit</option>
-                              {% for unit in units %}
-                              <option value="{{ unit }}">{{ unit.name }}</option>
-                              {% endfor %}
-                          </select>
-                        </td>
-                        <td>
-                            <span class="row-total">UGX 0.00</span>
-                        </td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFormsetRow(this)">
-                                <i data-feather="trash-2" class="feather-12"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                    <!-- Rows will be added dynamically by JavaScript -->
                   </tbody>
                   <tfoot>
                     <tr class="table-info">
@@ -561,12 +531,13 @@
                   </tfoot>
                 </table>
               </div>
+              <small class="text-muted">* Required fields</small>
             </div>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" id="submitTransferBtn">
             <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
             <i data-feather="save" class="feather-16 me-1"></i>
             Create Transfer
@@ -577,15 +548,257 @@
   </div>
 </div>
 
+
+
+
 <script>
-let transferItemCounter = 0;
-let availableProducts = [];
+// Helper: read CSRF token from cookie
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
 
-// Add these variables at the start of your script section
-let rowTemplate = null;
-let formsetPrefix = 'items';
+// Helper: POST JSON with CSRF and return parsed JSON
+async function postJSON(url, data) {
+  const csrftoken = getCookie('csrftoken');
+  const resp = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrftoken
+    },
+    body: JSON.stringify(data)
+  });
 
-// Show approved requests modal
+  const text = await resp.text();
+  try { return { ok: resp.ok, status: resp.status, data: JSON.parse(text) }; } catch (e) { return { ok: resp.ok, status: resp.status, data: text }; }
+}
+
+// ========== STOCK MANAGER CLASS ==========
+class StockManager {
+    constructor() {
+        this.pendingRequests = new Map();
+        this.localCache = new Map();
+        this.debounceTimers = new Map();
+    }
+
+    // Debounced stock update to prevent API spam
+    async updateProductStock(selectElement, delay = 300) {
+        const row = selectElement.closest('tr');
+        const cacheKey = this.getCacheKey(selectElement);
+        
+        // Clear any pending request for this row
+        if (this.debounceTimers.has(cacheKey)) {
+            clearTimeout(this.debounceTimers.get(cacheKey));
+        }
+        
+        // Show loading state immediately
+        const availableStock = row.querySelector('.available-stock');
+        this.updateStockDisplay(availableStock, 'Loading...', 'muted');
+        
+        // Set new debounced request
+        const timeoutId = setTimeout(async () => {
+            await this.fetchStockInfo(selectElement);
+            this.debounceTimers.delete(cacheKey);
+        }, delay);
+        
+        this.debounceTimers.set(cacheKey, timeoutId);
+    }
+
+    async fetchStockInfo(selectElement) {
+        const row = selectElement.closest('tr');
+        const productId = selectElement.value;
+        const fromStoreSelect = document.querySelector('#directTransferModal select[name="from_store"]');
+        const storeId = fromStoreSelect ? fromStoreSelect.value : '';
+        
+        const availableStock = row.querySelector('.available-stock');
+        const cacheKey = this.getCacheKey(selectElement);
+        
+        if (!productId || !storeId) {
+            this.updateStockDisplay(availableStock, '-', 'muted');
+            return;
+        }
+        
+        // Check local cache first (1 second cache for rapid updates)
+        const cached = this.localCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp) < 1000) {
+            console.log(`Using cached stock for product ${productId}`);
+            this.updateFromCache(selectElement, cached.data);
+            return;
+        }
+        
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const url = `{% url "get_product_stock_info" %}?product_id=${productId}&store_id=${storeId}&t=${Date.now()}`;
+            console.log('Fetching stock from:', url);
+            
+            const response = await fetch(url, { signal: controller.signal });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Cache the successful response
+            this.localCache.set(cacheKey, {
+                data: data,
+                timestamp: Date.now()
+            });
+            
+            this.updateStockDisplayFromData(availableStock, data);
+            
+            // Validate quantity if already entered
+            const quantityInput = row.querySelector('.quantity-input');
+            if (quantityInput && quantityInput.value) {
+                this.validateQuantity(quantityInput, data.available_stock);
+            }
+            
+        } catch (error) {
+            console.error('Stock fetch error:', error);
+            if (error.name === 'AbortError') {
+                this.updateStockDisplay(availableStock, 'Timeout', 'danger');
+            } else {
+                this.updateStockDisplay(availableStock, 'Error', 'danger');
+            }
+        }
+    }
+
+    updateStockDisplayFromData(element, data) {
+        if (!element) return;
+        
+        const stockLevel = data.available_stock || 0;
+        let status = 'muted';
+        
+        if (stockLevel === 0) {
+            status = 'danger';
+        } else if (stockLevel <= (data.reorder_level || 0)) {
+            status = 'warning';
+        } else {
+            status = 'success';
+        }
+        
+        this.updateStockDisplay(element, stockLevel, status);
+    }
+
+    updateStockDisplay(element, value, status) {
+        if (!element) return;
+        
+        element.textContent = value;
+        element.className = 'available-stock'; // Reset classes
+        
+        if (status === 'success') {
+            element.classList.add('text-success', 'fw-bold');
+        } else if (status === 'warning') {
+            element.classList.add('text-warning', 'fw-bold');
+        } else if (status === 'danger') {
+            element.classList.add('text-danger', 'fw-bold');
+        } else if (status === 'muted') {
+            element.classList.add('text-muted');
+        }
+    }
+
+    updateFromCache(selectElement, data) {
+        const row = selectElement.closest('tr');
+        const availableStock = row.querySelector('.available-stock');
+        
+        this.updateStockDisplayFromData(availableStock, data);
+        
+        // Validate quantity if already entered
+        const quantityInput = row.querySelector('.quantity-input');
+        if (quantityInput && quantityInput.value) {
+            this.validateQuantity(quantityInput, data.available_stock);
+        }
+    }
+
+    validateQuantity(quantityInput, availableStock) {
+        const row = quantityInput.closest('tr');
+        const quantity = parseInt(quantityInput.value) || 0;
+        
+        if (quantity > availableStock) {
+            quantityInput.classList.add('is-invalid');
+            this.showStockWarning(row, `Only ${availableStock} available in stock`);
+        } else if (quantity <= 0) {
+            quantityInput.classList.add('is-invalid');
+            this.showStockWarning(row, 'Quantity must be greater than 0');
+        } else {
+            quantityInput.classList.remove('is-invalid');
+            this.hideStockWarning(row);
+        }
+    }
+
+    showStockWarning(row, message) {
+        let warning = row.querySelector('.stock-warning');
+        if (!warning) {
+            warning = document.createElement('div');
+            warning.className = 'stock-warning text-danger small mt-1';
+            const quantityCell = row.querySelector('.quantity-input').closest('td');
+            quantityCell.appendChild(warning);
+        }
+        warning.textContent = message;
+        warning.style.display = 'block';
+    }
+
+    hideStockWarning(row) {
+        const warning = row.querySelector('.stock-warning');
+        if (warning) {
+            warning.style.display = 'none';
+        }
+    }
+
+    getCacheKey(selectElement) {
+        const productId = selectElement.value;
+        const storeId = document.querySelector('#directTransferModal select[name="from_store"]')?.value || '';
+        return `stock_${productId}_${storeId}`;
+    }
+
+    // Update all products when store changes
+    async updateAllStocks() {
+        console.log('Updating all product stock info...');
+        const productSelects = document.querySelectorAll('#directTransferModal .product-select');
+        
+        const updates = Array.from(productSelects)
+            .filter(select => select.value)
+            .map(select => this.fetchStockInfo(select));
+        
+        // Use Promise.allSettled to handle individual failures gracefully
+        const results = await Promise.allSettled(updates);
+        
+        // Log any failures
+        results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                console.error(`Failed to update stock for product ${index}:`, result.reason);
+            }
+        });
+    }
+
+    // Clear cache when modal closes
+    clearCache() {
+        this.localCache.clear();
+        this.debounceTimers.forEach(timeoutId => clearTimeout(timeoutId));
+        this.debounceTimers.clear();
+        this.pendingRequests.clear();
+    }
+
+    // Force refresh all stocks (bypass cache)
+    async forceRefreshAllStocks() {
+        this.localCache.clear();
+        await this.updateAllStocks();
+    }
+}
+
+// Initialize stock manager globally
+const stockManager = new StockManager();
+
+// ========== APPROVED REQUESTS MODAL ==========
 function showApprovedRequestsModal() {
   const modal = new bootstrap.Modal(document.getElementById('approvedRequestsModal'));
   const modalContent = document.getElementById('approvedRequestsContent');
@@ -594,7 +807,7 @@ function showApprovedRequestsModal() {
   modal.show();
   
   // Fetch approved requests
-  fetch('/approved_transfer_requests/')
+  fetch('{% url "approved_transfer_requests_json" %}')
     .then(response => response.json())
     .then(data => {
       let content = '';
@@ -626,7 +839,7 @@ function showApprovedRequestsModal() {
                 <input type="checkbox" class="request-checkbox" value="${request.id}">
               </td>
               <td>
-                <a href="/transfer_requests/${request.id}/" class="fw-bold text-primary">
+                <a href="{% url 'transfer_request_detail' 0 %}".replace('0', request.id) class="fw-bold text-primary">
                   #TR${String(request.id).padStart(4, '0')}
                 </a>
               </td>
@@ -644,9 +857,9 @@ function showApprovedRequestsModal() {
                   ${request.priority}
                 </span>
               </td>
-              <td>${new Date(request.approved_date).toLocaleDateString()}</td>
+              <td>${request.approved_date ? new Date(request.approved_date).toLocaleDateString() : 'N/A'}</td>
               <td>
-                <button class="btn btn-sm btn-primary" onclick="createSingleTransfer(${request.id})">
+                <button class="btn btn-sm btn-primary" data-id="createSingleTransfer(${request.id})">
                   <i data-feather="truck" class="feather-12"></i>
                 </button>
               </td>
@@ -698,95 +911,267 @@ function showApprovedRequestsModal() {
     });
 }
 
-// Show direct transfer modal
-function showDirectTransferModal() {
-    // Get and store the template row if not already stored
-    if (!rowTemplate) {
-        const templateRow = document.querySelector('.formset-row');
-        if (templateRow) {
-            rowTemplate = templateRow.cloneNode(true);
-        }
-    }
+// ========== TRANSFER ACTIONS ==========
+function createSingleTransfer(requestId) {
+  if (!confirm('Create stock transfer from this request?')) return;
 
-    // Get the modal element
+  const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', requestId);
+  const csrftoken = getCookie('csrftoken');
+
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrftoken,
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    credentials: 'same-origin'
+  }).then(resp => {
+    // Expect JSON when called via AJAX
+    if (resp.ok) {
+      return resp.json().then(data => {
+        if (data && data.success) {
+          // Refresh transfers list to show newly created transfer
+          refreshTransfers();
+        } else {
+          alert('Failed to create transfer');
+        }
+      }).catch(() => {
+        // In case server returned HTML but responded 200, still refresh
+        refreshTransfers();
+      });
+    } else {
+      resp.text().then(t => alert('Failed to create transfer: ' + resp.status));
+    }
+  }).catch(err => {
+    console.error('Error creating transfer from request:', err);
+    alert('Error creating transfer from request');
+  });
+}
+
+function createBulkTransfers() {
+  const selectedRequests = Array.from(document.querySelectorAll('.request-checkbox:checked')).map(cb => cb.value);
+  if (selectedRequests.length === 0) {
+    alert('Please select at least one transfer request.');
+    return;
+  }
+
+  if (!confirm(`Create transfers for ${selectedRequests.length} request(s)?`)) return;
+
+  const csrftoken = getCookie('csrftoken');
+  const results = { success: [], failed: [] };
+
+  // Create each transfer by calling the server endpoint for creating from request
+  const promises = selectedRequests.map(id => {
+    const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', id);
+    return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+      .then(r => r.json().then(j => ({ id, ok: r.ok && j.success, status: r.status, json: j })).catch(() => ({ id, ok: r.ok, status: r.status })))
+      .catch(err => ({ id, ok: false, error: String(err) }));
+  });
+
+  Promise.all(promises).then(resps => {
+    resps.forEach(r => {
+      if (r.ok) results.success.push(r.id); else results.failed.push(r.id);
+    });
+
+    let message = '';
+    if (results.success.length) message += `Created ${results.success.length} transfers.`;
+    if (results.failed.length) message += ` Failed for ${results.failed.length} requests.`;
+    alert(message || 'No action taken');
+    refreshTransfers();
+  });
+}
+
+function startTransfer(transferId) {
+  if (!confirm('Start this transfer? This will mark it as in transit.')) return;
+
+  const url = '{% url "api_stock_transfer_start" %}';
+  postJSON(url, { transfer_id: transferId }).then(result => {
+    if (result.ok) {
+      alert('Transfer started');
+      refreshTransfers();
+    } else {
+      alert('Failed to start transfer: ' + (result.data.detail || result.status));
+    }
+  }).catch(err => {
+    console.error('Start transfer error', err);
+    alert('Error starting transfer');
+  });
+}
+
+function completeTransfer(transferId) {
+  if (!confirm('Mark this transfer as complete? This will update inventory.')) return;
+
+  const url = '{% url "api_stock_transfer_complete" %}';
+  postJSON(url, { transfer_id: transferId }).then(result => {
+    if (result.ok) {
+      alert('Transfer completed');
+      refreshTransfers();
+    } else {
+      alert('Failed to complete transfer: ' + (result.data.detail || result.status));
+    }
+  }).catch(err => {
+    console.error('Complete transfer error', err);
+    alert('Error completing transfer');
+  });
+}
+
+function cancelTransfer(transferId) {
+    if (confirm('Cancel this transfer?')) {
+        alert('Cancel functionality not yet implemented');
+    }
+}
+
+function refreshTransfers() {
+    window.location.reload();
+}
+
+// ========== DIRECT TRANSFER MODAL ==========
+function showDirectTransferModal() {
+    console.log('🚀 Opening direct transfer modal...');
     const modal = document.getElementById('directTransferModal');
     if (!modal) {
         console.error('Modal element not found');
         return;
     }
 
-    // Reset the form
+    // Reset form and state
     const form = document.getElementById('directTransferForm');
     if (form) {
         form.reset();
+        // Remove any existing validation classes
+        form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        form.querySelectorAll('.stock-warning').forEach(el => el.remove());
     }
 
-    // Clear and initialize formset
+    // Clear formset
     const tbody = document.getElementById('formset-tbody');
     if (tbody) {
         tbody.innerHTML = '';
     }
 
     // Reset management form
-    const totalFormsInput = document.querySelector(`[name="${formsetPrefix}-TOTAL_FORMS"]`);
-    const initialFormsInput = document.querySelector(`[name="${formsetPrefix}-INITIAL_FORMS"]`);
+    const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
+    const initialFormsInput = document.getElementById('id_items-INITIAL_FORMS');
     if (totalFormsInput) totalFormsInput.value = '0';
     if (initialFormsInput) initialFormsInput.value = '0';
+
+    // Reset totals
+    const grandTotalElement = document.getElementById('grand-total');
+    if (grandTotalElement) {
+        grandTotalElement.textContent = 'UGX 0.00';
+    }
 
     // Show modal
     const bootstrapModal = new bootstrap.Modal(modal);
     bootstrapModal.show();
 
-    // Add initial row after modal is shown
+    // Set up event listeners when modal is fully shown
     modal.addEventListener('shown.bs.modal', function() {
-        addFormsetRow();
+        console.log('✅ Modal fully shown, setting up real-time stock listeners...');
+        setupRealTimeStockListeners();
+        addFormsetRow(); // Add initial row
     }, { once: true });
+
+    // Clear cache when modal hides
+    modal.addEventListener('hidden.bs.modal', function() {
+        console.log('🗑️ Modal closed, clearing stock cache...');
+        stockManager.clearCache();
+    });
+}
+
+function setupRealTimeStockListeners() {
+    const modal = document.getElementById('directTransferModal');
+    if (!modal) return;
+
+    // Store change listener
+    const fromStoreSelect = modal.querySelector('select[name="from_store"]');
+    if (fromStoreSelect) {
+        fromStoreSelect.addEventListener('change', function() {
+            console.log('🏪 Store changed to:', this.value);
+            stockManager.forceRefreshAllStocks();
+        });
+    }
+
+    // Product change with debouncing
+    modal.addEventListener('change', function(e) {
+        if (e.target.classList.contains('product-select')) {
+            console.log('📦 Product selected:', e.target.value);
+            stockManager.updateProductStock(e.target, 300); // 300ms debounce
+        }
+    });
+
+    // Manual refresh button (optional - add this to your modal UI)
+    const refreshBtn = modal.querySelector('#refreshStockBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            stockManager.forceRefreshAllStocks();
+        });
+    }
 }
 
 function addFormsetRow() {
-    if (!rowTemplate) {
-        console.error('Row template not found');
-        return;
-    }
-
-    const totalFormsInput = document.querySelector(`[name="${formsetPrefix}-TOTAL_FORMS"]`);
+    const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
     if (!totalFormsInput) {
         console.error('Total forms input not found');
         return;
     }
 
     const currentForms = parseInt(totalFormsInput.value);
-    const newRow = rowTemplate.cloneNode(true);
-    
-    // Update row ID and form indices
-    newRow.id = `row-${currentForms}`;
-    const inputs = newRow.querySelectorAll('input, select');
-    inputs.forEach(input => {
-        if (input.name) {
-            input.name = input.name.replace(/-\d+-/, `-${currentForms}-`);
-            input.id = input.id.replace(/-\d+-/, `-${currentForms}-`);
-        }
-        // Clear values except hidden fields
-        if (input.type !== 'hidden' && !input.classList.contains('delete-checkbox')) {
-            input.value = '';
-        }
-    });
-
-    // Reset displays
-    const availableStock = newRow.querySelector('.available-stock');
-    if (availableStock) availableStock.textContent = '-';
-    
-    const rowTotal = newRow.querySelector('.row-total');
-    if (rowTotal) rowTotal.textContent = 'UGX 0.00';
-
-    // Add to table
     const tbody = document.getElementById('formset-tbody');
-    if (tbody) {
-        tbody.appendChild(newRow);
-        totalFormsInput.value = currentForms + 1;
-        initializeRowFeatures(newRow);
-    }
-
+    
+    const newRow = document.createElement('tr');
+    newRow.className = 'formset-row';
+    newRow.id = `row-${currentForms}`;
+    
+    newRow.innerHTML = `
+        <td>
+            <select name="items-${currentForms}-product" 
+                   class="form-select form-select-sm product-select" required>
+                <option value="">Select Product</option>
+                {% for product in products %}
+                <option value="{{ product.id }}" 
+                        data-cost="{{ product.default_price|default:'0' }}"
+                        data-sku="{{ product.sku }}">
+                    {{ product.name }} ({{ product.sku }})
+                </option>
+                {% endfor %}
+            </select>
+        </td>
+        <td>
+            <span class="available-stock text-muted">-</span>
+        </td>
+        <td>
+            <input type="number" name="items-${currentForms}-quantity" 
+                   class="form-control form-control-sm quantity-input" 
+                   min="1" step="1" value="" placeholder="Qty" required>
+        </td>
+        <td>
+            <select name="items-${currentForms}-units"
+                   class="form-select form-select-sm" required>
+                <option value="">Select Unit</option>
+                {% for unit in units %}
+                <option value="{{ unit.id }}">{{ unit.name }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td>
+            <span class="row-total">UGX 0.00</span>
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-id="removeFormsetRow(this)">
+                <i data-feather="trash-2" class="feather-12"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(newRow);
+    totalFormsInput.value = currentForms + 1;
+    
+    // Initialize row features
+    initializeRowFeatures(newRow);
+    
+    console.log(`✅ Added formset row ${currentForms}, total forms: ${totalFormsInput.value}`);
+    
     // Refresh feather icons
     if (typeof feather !== 'undefined') {
         feather.replace();
@@ -795,26 +1180,42 @@ function addFormsetRow() {
 
 function initializeRowFeatures(row) {
     // Product select
-    const productSelect = row.querySelector('select[name*="product"]');
+    const productSelect = row.querySelector('.product-select');
     if (productSelect) {
         productSelect.addEventListener('change', function() {
-            updateProductInfo(this);
+            updateRowTotal(row);
+            
+            // Auto-select first unit if not selected
+            const unitsSelect = row.querySelector('select[name*="units"]');
+            if (unitsSelect && !unitsSelect.value && unitsSelect.options.length > 1) {
+                unitsSelect.selectedIndex = 1;
+            }
         });
     }
 
     // Quantity input
-    const quantityInput = row.querySelector('input[name*="quantity"]');
+    const quantityInput = row.querySelector('.quantity-input');
     if (quantityInput) {
         quantityInput.addEventListener('input', function() {
             updateRowTotal(row);
+            // Validation handled by stock manager
+        });
+
+        // Also validate on blur for immediate feedback
+        quantityInput.addEventListener('blur', function() {
+            const availableStockElement = row.querySelector('.available-stock');
+            const availableStock = parseInt(availableStockElement.textContent);
+            if (!isNaN(availableStock)) {
+                stockManager.validateQuantity(this, availableStock);
+            }
         });
     }
 
-    // Delete button
-    const deleteBtn = row.querySelector('.btn-outline-danger');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', function() {
-            removeFormsetRow(this);
+    // Units select
+    const unitsSelect = row.querySelector('select[name*="units"]');
+    if (unitsSelect) {
+        unitsSelect.addEventListener('change', function() {
+            updateRowTotal(row);
         });
     }
 }
@@ -823,26 +1224,316 @@ function removeFormsetRow(button) {
     const row = button.closest('tr');
     const tbody = document.getElementById('formset-tbody');
     
-    // Don't remove if it's the last row
     if (tbody.children.length <= 1) {
-        // Just clear the values instead
+        // Clear values but keep the row
         const inputs = row.querySelectorAll('input:not([type="hidden"]), select');
-        inputs.forEach(input => input.value = '');
+        inputs.forEach(input => {
+            input.value = '';
+            input.classList.remove('is-invalid');
+        });
         row.querySelector('.available-stock').textContent = '-';
+        row.querySelector('.available-stock').className = 'available-stock text-muted';
         row.querySelector('.row-total').textContent = 'UGX 0.00';
+        stockManager.hideStockWarning(row);
+        updateGrandTotal();
         return;
     }
 
-    const deleteInput = row.querySelector('[name$="-DELETE"]');
-    if (deleteInput) {
-        deleteInput.value = 'on';
-        row.style.display = 'none';
-    } else {
-        row.remove();
-    }
+    row.remove();
     updateGrandTotal();
+    
+    // Update form indices and TOTAL_FORMS count
+    const rows = tbody.querySelectorAll('.formset-row');
+    const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
+    if (totalFormsInput) {
+        totalFormsInput.value = rows.length;
+    }
+    
+    // Renumber the remaining rows
+    rows.forEach((row, index) => {
+        const productSelect = row.querySelector('.product-select');
+        const quantityInput = row.querySelector('.quantity-input');
+        const unitsSelect = row.querySelector('select[name*="units"]');
+        
+        if (productSelect) productSelect.name = `items-${index}-product`;
+        if (quantityInput) quantityInput.name = `items-${index}-quantity`;
+        if (unitsSelect) unitsSelect.name = `items-${index}-units`;
+        
+        row.id = `row-${index}`;
+    });
+    
+    console.log(`🗑️ Removed formset row, total forms now: ${totalFormsInput.value}`);
 }
+
+// ========== CALCULATION FUNCTIONS ==========
+function updateRowTotal(row) {
+    const productSelect = row.querySelector('.product-select');
+    const quantityInput = row.querySelector('.quantity-input');
+    const rowTotal = row.querySelector('.row-total');
+    
+    if (productSelect && quantityInput && rowTotal) {
+        const selectedOption = productSelect.options[productSelect.selectedIndex];
+        const cost = selectedOption ? parseFloat(selectedOption.dataset.cost || 0) : 0;
+        const quantity = parseFloat(quantityInput.value) || 0;
+        const total = cost * quantity;
+        
+        rowTotal.textContent = `UGX ${total.toLocaleString()}`;
+        updateGrandTotal();
+    }
+}
+
+function updateGrandTotal() {
+    const rowTotals = document.querySelectorAll('.row-total');
+    let grandTotal = 0;
+    
+    rowTotals.forEach(rowTotal => {
+        const text = rowTotal.textContent.replace('UGX ', '').replace(/,/g, '');
+        const value = parseFloat(text) || 0;
+        grandTotal += value;
+    });
+    
+    const grandTotalElement = document.getElementById('grand-total');
+    if (grandTotalElement) {
+        grandTotalElement.textContent = `UGX ${grandTotal.toLocaleString()}`;
+    }
+}
+
+// ========== FORM SUBMISSION ==========
+function setupFormSubmission() {
+    const directTransferForm = document.getElementById('directTransferForm');
+    if (!directTransferForm) {
+        console.error('Direct transfer form not found');
+        return;
+    }
+
+    console.log('🔧 Setting up form submission handler...');
+
+    directTransferForm.addEventListener('submit', function(e) {
+        console.log('📤 Form submission started...');
+        const submitBtn = document.getElementById('submitTransferBtn');
+        const spinner = submitBtn.querySelector('.spinner-border');
+        const icon = submitBtn.querySelector('i[data-feather="save"]');
+        
+        // Show spinner, hide icon
+        if (spinner) spinner.classList.remove('d-none');
+        if (icon) icon.style.display = 'none';
+        submitBtn.disabled = true;
+        
+        // Validate at least one item exists
+        const totalForms = parseInt(document.getElementById('id_items-TOTAL_FORMS').value);
+        console.log(`📋 Total forms: ${totalForms}`);
+        if (totalForms === 0) {
+            e.preventDefault();
+            alert('Please add at least one item to the transfer.');
+            resetSubmitButton(submitBtn, spinner, icon);
+            return;
+        }
+        
+        // Validate all items have product, quantity, and units
+        let validItems = 0;
+        for (let i = 0; i < totalForms; i++) {
+            const product = document.querySelector(`select[name="items-${i}-product"]`);
+            const quantity = document.querySelector(`input[name="items-${i}-quantity"]`);
+            const units = document.querySelector(`select[name="items-${i}-units"]`);
+            
+            if (product && product.value && quantity && quantity.value && units && units.value) {
+                validItems++;
+            }
+        }
+        
+        console.log(`✅ Valid items: ${validItems}`);
+        if (validItems === 0) {
+            e.preventDefault();
+            alert('Please fill in product, quantity, and units for at least one item.');
+            resetSubmitButton(submitBtn, spinner, icon);
+            return;
+        }
+        
+        // Validate from_store and to_store
+        const fromStore = document.querySelector('select[name="from_store"]');
+        const toStore = document.querySelector('select[name="to_store"]');
+        
+        if (!fromStore || !fromStore.value || !toStore || !toStore.value) {
+            e.preventDefault();
+            alert('Please select both From Store and To Store.');
+            resetSubmitButton(submitBtn, spinner, icon);
+            return;
+        }
+        
+        if (fromStore.value === toStore.value) {
+            e.preventDefault();
+            alert('From Store and To Store cannot be the same.');
+            resetSubmitButton(submitBtn, spinner, icon);
+            return;
+        }
+        
+        // Check for stock validation errors
+        const invalidQuantities = document.querySelectorAll('.is-invalid');
+        if (invalidQuantities.length > 0) {
+            e.preventDefault();
+            alert('Some items have quantities exceeding available stock. Please adjust the quantities.');
+            resetSubmitButton(submitBtn, spinner, icon);
+            return;
+        }
+        
+    console.log('🎉 Form validation passed, submitting via AJAX...');
+    e.preventDefault();
+
+    const url = directTransferForm.action;
+    const formData = new FormData(directTransferForm);
+    const csrftoken = getCookie('csrftoken');
+
+    fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRFToken': csrftoken
+      },
+      body: formData
+    }).then(async resp => {
+      if (resp.ok) {
+        // Created/redirected; refresh list or navigate to detail if Location header exists
+        try {
+          // Try to detect redirect URL
+          const loc = resp.headers.get('Location');
+          if (loc) {
+            window.location.href = loc;
+            return;
+          }
+        } catch (e) {}
+        // Otherwise just refresh the transfers list
+        resetSubmitButton(submitBtn, spinner, icon);
+        const text = await resp.text();
+        // Best-effort: show success and refresh
+        alert('Transfer created successfully');
+        refreshTransfers();
+      } else {
+        const txt = await resp.text();
+        resetSubmitButton(submitBtn, spinner, icon);
+        alert('Failed to create transfer: ' + resp.status + '\n' + txt);
+      }
+    }).catch(err => {
+      console.error('AJAX create transfer error', err);
+      resetSubmitButton(submitBtn, spinner, icon);
+      alert('Error creating transfer');
+    });
+    });
+}
+
+function resetSubmitButton(submitBtn, spinner, icon) {
+    if (spinner) spinner.classList.add('d-none');
+    if (icon) icon.style.display = 'inline';
+    submitBtn.disabled = false;
+}
+
+// ========== INITIALIZATION ==========
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🏁 DOM loaded, initializing stock transfer system...');
+    
+    // Initialize form submission handler
+    setupFormSubmission();
+    
+    // Initialize any existing formset rows
+    document.querySelectorAll('.formset-row').forEach(row => {
+        initializeRowFeatures(row);
+    });
+
+  // Global event delegation for elements with data-action attribute
+  document.body.addEventListener('click', function(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.getAttribute('data-action');
+    if (!action) return;
+
+    try {
+      switch (action) {
+        case 'showApprovedRequestsModal':
+          showApprovedRequestsModal();
+          break;
+        case 'showDirectTransferModal':
+          showDirectTransferModal();
+          break;
+        case 'refreshTransfers':
+          refreshTransfers();
+          break;
+        case 'startTransfer':
+          startTransfer(el.dataset.transferId);
+          break;
+        case 'completeTransfer':
+          completeTransfer(el.dataset.transferId);
+          break;
+        case 'trackTransfer':
+          trackTransfer(el.dataset.transferId);
+          break;
+        case 'cancelTransfer':
+          cancelTransfer(el.dataset.transferId);
+          break;
+        case 'createBulkTransfers':
+          createBulkTransfers();
+          break;
+        case 'addFormsetRow':
+          addFormsetRow();
+          break;
+        default:
+          // no-op
+          break;
+      }
+    } catch (err) {
+      console.error('Error handling action', action, err);
+    }
+  });
+    
+    console.log('✅ Stock transfer system fully initialized');
+});
+
+// Feather icons refresh helper
+function refreshFeatherIcons() {
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+}
+
+
+document.addEventListener('click', function (e) {
+
+    // START TRANSFER
+    const startBtn = e.target.closest('.start-transfer-btn');
+    if (startBtn) {
+        const id = startBtn.dataset.id;
+        startTransfer(id);
+        return;
+    }
+
+    // COMPLETE TRANSFER
+    const completeBtn = e.target.closest('.complete-transfer-btn');
+    if (completeBtn) {
+        const id = completeBtn.dataset.id;
+        completeTransfer(id);
+        return;
+    }
+
+    // CREATE SINGLE TRANSFER FROM REQUEST
+    const createBtn = e.target.closest('.create-single-transfer-btn');
+    if (createBtn) {
+        const id = createBtn.dataset.id;
+        createSingleTransfer(id);
+        return;
+    }
+
+    // CANCEL (if you add later)
+    const cancelBtn = e.target.closest('.cancel-transfer-btn');
+    if (cancelBtn) {
+        const id = cancelBtn.dataset.id;
+        cancelTransfer(id);
+        return;
+    }
+});
+
 </script>
+
+
+
+
 
 <style>
 .transfer-route {
@@ -873,6 +1564,7 @@ function removeFormsetRow(button) {
 .action-table-data .btn {
   margin: 0 2px;
 }
+
 
 .feather-48 {
   width: 48px;
@@ -912,6 +1604,7 @@ function removeFormsetRow(button) {
   border-color: #dc3545;
 }
 
+
 @media (max-width: 768px) {
   .table-responsive {
     font-size: 0.875rem;
@@ -928,6 +1621,62 @@ function removeFormsetRow(button) {
   .modal-xl {
     max-width: 95%;
   }
+}
+
+/* Top bar list styling for actions */
+.table-top-head {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.table-top-head li { display: inline-block; }
+.table-top-head .btn { border-radius: 0.38rem; }
+.table-top-head .btn i.feather-16 { margin-right: 0.45rem; }
+
+/* Small-screen adjustments */
+@media (max-width: 576px) {
+  .table-top-head { flex-direction: column; gap: 0.4rem; align-items: stretch; }
+  .table-top-head .btn { width: 100%; justify-content: flex-start; }
+}
+
+/* Enhanced stock display styles */
+.available-stock.text-success {
+    font-weight: bold;
+}
+
+.available-stock.text-danger {
+    font-weight: bold;
+}
+
+.stock-warning {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+/* Loading animation for stock */
+.available-stock:empty::before {
+    content: 'Loading...';
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Real-time update indicators */
+.product-select:focus + .available-stock::after {
+    content: ' ⟳';
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 </style>
 {% endblock %}

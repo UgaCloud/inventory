@@ -23,6 +23,16 @@ from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
 from .views.reports import sales_report_views
 from app.views import stock_adjustments
+from .views.roles_views import (
+    roles_list_view, role_create_view, role_edit_view, role_detail_view,
+    role_delete_view, role_assign_to_user_view, role_unassign_from_user_view,
+    role_bulk_assign_view
+)
+from .views.user_views import (
+    users_list_view, user_create_view, user_edit_view, user_detail_view,
+    user_delete_view, user_assign_role_view, user_unassign_role_view
+)
+from .views.employee_role_views import employee_manage_roles_view
 
 
 urlpatterns = [
@@ -82,24 +92,39 @@ urlpatterns = [
     # Bulk upload / template for PurchaseOrderItem
     path('purchase_order/<int:order_id>/items/bulk-upload/', purchase_order_items_bulk_upload, name='purchase_order_items_bulk_upload'),
     path('purchase_order/items/bulk-template/', download_purchase_order_item_template, name='download_purchase_order_item_template'),
-
+    
     # Transfer Requests
     path('transfer_requests/', transfer_request_list, name='transfer_request_list'),
-    path('transfer_requests/add/', add_transfer_request, name='add_transfer_request'),
+    path('transfer_requests/create/', create_transfer_request, name='create_transfer_request'),  # NEW
     path('transfer_requests/<int:request_id>/', transfer_request_detail, name='transfer_request_detail'),
+    path('transfer_requests/<int:request_id>/json/', transfer_request_json, name='transfer_request_json'),
+    path('transfer_requests/<int:request_id>/edit/', edit_transfer_request, name='edit_transfer_request'),  # NEW
     path('transfer_requests/<int:request_id>/update/', update_transfer_request, name='update_transfer_request'),
     path('transfer_requests/<int:request_id>/approve/', approve_transfer_request, name='approve_transfer_request'),
+    path('transfer_requests/<int:request_id>/reject/', reject_transfer_request, name='reject_transfer_request'),  # NEW
     path('transfer_request_for_approval/', pending_transfer_requests_for_approval, name='transfer_request_for_approval'),
+
+
 
     # Stock Transfers
     path('stock_transfers/', stock_transfer_list, name='stock_transfer_list'),
     path('stock_transfers/create/', stock_transfer_create, name='stock_transfer_create'),
-    path('stock-transfer/direct/create/', direct_stock_transfer_create, name='direct_stock_transfer_create'),
-    path('stock_transfers/create/bulk/', stock_transfer_create_bulk, name='stock_transfer_create_bulk'),
+    path('stock-transfers/create/from-request/<int:request_id>/', create_transfer_from_request, name='create_transfer_from_request'),  # NEW
+    path('stock-transfers/direct/create/', direct_stock_transfer_create, name='direct_stock_transfer_create'),  # NEW
+    path('stock-transfers/bulk/create/', create_bulk_transfers, name='create_bulk_transfers'),  # NEW
     path('stock_transfers/<int:transfer_id>/', stock_transfer_detail, name='stock_transfer_detail'),
     path('stock_transfers/<int:transfer_id>/update/', stock_transfer_update, name='stock_transfer_update'),
-    path('stock_transfers/<int:transfer_id>/update_status/',update_transfer_status, name='update_transfer_status'),
+    path('stock_transfers/<int:transfer_id>/start/', start_stock_transfer, name='start_stock_transfer'),  # NEW
+    path('stock_transfers/<int:transfer_id>/complete/', complete_stock_transfer, name='complete_stock_transfer'),  # NEW
+    # path('stock_transfers/<int:transfer_id>/cancel/', cancel_stock_transfer, name='cancel_stock_transfer'),  # NEW
+    # path('stock_transfers/<int:transfer_id>/delete/', delete_stock_transfer, name='delete_stock_transfer'),  # NEW
+    path('stock_transfers/<int:transfer_id>/update_status/', update_transfer_status, name='update_transfer_status'),
+
+    # JSON API Endpoints
     path('approved_transfer_requests/', approved_transfer_requests_api, name='approved_transfer_requests'),
+    path('approved-transfer-requests/', approved_transfer_requests_json, name='approved_transfer_requests_json'),  # NEW
+    path('product-stock-info/', get_product_stock_info, name='get_product_stock_info'),  # NEW
+        
 
     # Stock Adjustments
     path('stock_adjustments/', stock_adjustment_list, name='stock_adjustment_list'),
@@ -204,6 +229,30 @@ urlpatterns = [
     path('reports/sales-item-unit/export/pdf/', sales_report_views.export_sales_item_unit_pdf, name='export_sales_item_unit_pdf'),
     path('adjust-stock/', stock_adjustments.adjust_stock_view, name='adjust_stock'),
     path('api/inventory/available/', stock_adjustments.api_inventory_available, name='api_inventory_available'),
+    
+    # Role Management URLs (RBAC 2.0)
+    path('roles/', roles_list_view, name='roles_list_page'),
+    path('roles/create/', role_create_view, name='role_create_page'),
+    path('roles/<int:role_id>/', role_detail_view, name='role_detail_page'),
+    path('roles/<int:role_id>/edit/', role_edit_view, name='role_edit_page'),
+    path('roles/<int:role_id>/delete/', role_delete_view, name='role_delete_page'),
+    path('roles/<int:role_id>/assign/<int:user_id>/', role_assign_to_user_view, name='role_assign_to_user_page'),
+    path('roles/<int:role_id>/unassign/<int:user_id>/', role_unassign_from_user_view, name='role_unassign_from_user_page'),
+    path('roles/<int:role_id>/bulk-assign/', role_bulk_assign_view, name='role_bulk_assign_page'),
+    
+    # User Management URLs (RBAC 2.0)
+    path('users/', users_list_view, name='users_list_page'),
+    path('users/create/', user_create_view, name='user_create_page'),
+    path('users/<int:user_id>/', user_detail_view, name='user_detail_page'),
+    path('users/<int:user_id>/edit/', user_edit_view, name='user_edit_page'),
+    path('users/<int:user_id>/delete/', user_delete_view, name='user_delete_page'),
+    path('users/<int:user_id>/assign-role/', user_assign_role_view, name='user_assign_role_page'),
+    path('users/<int:user_id>/unassign-role/', user_unassign_role_view, name='user_unassign_role_page'),
+    path('users/<int:user_id>/unassign-role/<int:role_id>/', user_unassign_role_view, name='user_unassign_role_page'),
+    
+    # Employee Role Management URLs (RBAC 2.0)
+    path('employees/<int:employee_id>/manage-roles/', employee_manage_roles_view, name='employee_manage_roles_page'),
+    
 ]
 
 if settings.DEBUG:

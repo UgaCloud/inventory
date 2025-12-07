@@ -496,10 +496,9 @@ def branch_comparison_report(request):
     branch_performance = StoreLocation.objects.filter(
         is_active=True
     ).annotate(
-        total_sales=Sum('sales__total_amount', filter=Q(sales__date__gte=date_from_obj, sales__date__lte=date_to_obj)),
-        total_transactions=Count('sales', filter=Q(sales__date__gte=date_from_obj, sales__date__lte=date_to_obj)),
-        total_items_sold=Sum('sales__items__quantity', filter=Q(sales__date__gte=date_from_obj, sales__date__lte=date_to_obj)),
-        average_transaction=Avg('sales__total_amount', filter=Q(sales__date__gte=date_from_obj, sales__date__lte=date_to_obj))
+        total_sales=Sum('sales__total_amount', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj)),
+        total_transactions=Count('sales', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj)),
+        average_transaction=Avg('sales__total_amount', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj))
     ).order_by('-total_sales')
     
     # Handle None values

@@ -82,12 +82,29 @@ def stock_transfer_list(request):
     paginator = Paginator(transfers, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
+    # Calculate total value of active (non-cancelled) transfers using item.total_value
+    total_value = 0
+    try:
+        from decimal import Decimal
+        total_value = Decimal('0.00')
+        active_qs = transfers.exclude(status='cancelled')
+        for t in active_qs:
+            for item in t.items.all():
+                try:
+                    iv = item.total_value
+                    if iv is not None:
+                        total_value += Decimal(str(iv))
+                except Exception:
+                    continue
+    except Exception:
+        total_value = 0
     
     context = {
         'transfers': page_obj,
         'status_counts': status_counts,
         'pending_approved_requests': pending_approved_requests,
-        # 'total_value': total_value,
+        'total_values': total_value,
         'current_status': status_filter,
         'search_query': search,
         'stock_form': stock_form,
@@ -382,14 +399,10 @@ def stock_transfer_create(request):
 @login_required
 def direct_stock_transfer_create(request):
     """Handle creation of direct stock transfers (without prior request)"""
-
-    print("In direct stock transfer create view")
     
     if request.method == 'POST':
         stock_form = StockTransferForm(request.POST)
         item_formset = StockTransferItemFormSet(request.POST)
-
-        print(f"Forms received: {stock_form.data}, items: {item_formset.data}")
 
         if stock_form.is_valid() and item_formset.is_valid():
             try:
@@ -405,10 +418,8 @@ def direct_stock_transfer_create(request):
                     validation_errors = []
 
                     for form in item_formset:
-                        print("Processing form:", form.data)
                         if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
 
-                            print('Processing item form:', form.cleaned_data)
                             # Get the product and quantity first
                             product = form.cleaned_data.get('product')
                             quantity = form.cleaned_data.get('quantity')
@@ -436,10 +447,9 @@ def direct_stock_transfer_create(request):
                             # Save the transfer item
                             try:
                                 transfer_item.save()
-                                print(f'Transfer item saved: {transfer_item.id}')
+                               
                                 items_created += 1
                             except Exception as e:
-                                print(f'Error saving transfer item: {str(e)}')
                                 validation_errors.append(f'Error saving item: {str(e)}')
             
                 if validation_errors:
@@ -671,17 +681,34 @@ def transfer_request_list(request):
     
     requests = requests.order_by('-request_date')
 
-    stores = Store.objects.filter(is_active=True)   
+    stores = Store.objects.filter(is_active=True)
+    
+    # Calculate status counts for summary cards
+    all_requests = TransferRequest.objects.all()
+    status_counts = {
+        'pending': all_requests.filter(status='pending').count(),
+        'approved': all_requests.filter(status='approved').count(),
+        'in_transit': all_requests.filter(status='approved').count(),  # Using approved as proxy for in_transit
+        'completed': all_requests.filter(status='fulfilled').count(),
+        'rejected': all_requests.filter(status='rejected').count(),
+    }
     
     # Pagination
     paginator = Paginator(requests, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Import necessary models
+    from app.models.human_resource import Department
+    from app.models.products import UnitOfMeasure
+    
     context = {
         'requests': page_obj,
         'current_status': status_filter,
         'stores': stores,
+        'status_counts': status_counts,
+        'departments': Department.objects.filter(is_active=True),
+        'units': UnitOfMeasure.objects.all(),
     }
     
     return render(request, 'transfers/transfer_request_list.html', context)
@@ -721,7 +748,7 @@ def get_product_info(request, product_id):
         
         if from_store_id:
             try:
-                from app.models.inventory import Inventory
+                from app.models.products import Inventory
                 inventory = Inventory.objects.get(
                     product=product,
                     store_id=from_store_id
@@ -778,7 +805,7 @@ def validate_transfer_items(request):
             
             try:
                 from app.models.products import Product
-                from app.models.inventory import Inventory
+                from app.models.products import Inventory
                 
                 product = Product.objects.get(id=product_id)
                 

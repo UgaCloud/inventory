@@ -185,25 +185,41 @@ def get_store_inventory_summary_optimized(store_id):
         )
     )
     
-    # Calculate total inventory value from batches
+    # FIXED: Use the correct field name 'remaining_quantity'
     total_value = InventoryBatch.objects.filter(
         store_id=store_id,
-        remaining_quantity__gt=0
+        remaining_quantity__gt=0  # CORRECT FIELD NAME
     ).aggregate(
-        total_value=Sum(F('remaining_quantity') * F('unit_cost'))
+        total_value=Sum(F('remaining_quantity') * F('unit_cost'))  # CORRECT FIELD NAME
     )['total_value'] or 0
     
     total_products = inventory_stats['total_products'] or 0
     products_in_stock = inventory_stats['products_in_stock'] or 0
+    stock_percentage = round((products_in_stock / total_products * 100) if total_products > 0 else 0, 2)
+    low_stock_count = inventory_stats['low_stock_count'] or 0
+    
+    # STATUS CALCULATION
+    if total_products == 0:
+        status = 'No Stock'
+    elif stock_percentage >= 95 and low_stock_count == 0:
+        status = 'Excellent'
+    elif stock_percentage >= 85:
+        status = 'Good'
+    elif stock_percentage >= 70:
+        status = 'Fair'
+    else:
+        status = 'Poor'
     
     return {
         'total_products': total_products,
         'products_in_stock': products_in_stock,
-        'low_stock_count': inventory_stats['low_stock_count'] or 0,
+        'low_stock_count': low_stock_count,
         'out_of_stock_count': inventory_stats['out_of_stock_count'] or 0,
         'total_inventory_value': total_value,
-        'stock_percentage': round((products_in_stock / total_products * 100) if total_products > 0 else 0, 2)
+        'stock_percentage': stock_percentage,
+        'status': status,
     }
+
 
 
 def get_product_inventory_value_by_store(store_id, product_id):
@@ -234,7 +250,7 @@ def get_product_inventory_value_by_store(store_id, product_id):
     batches = InventoryBatch.objects.filter(
         product_id=product_id,
         store_id=store_id,
-        remaining_quantity__gt=0
+        remaining_quantity__gt=0  # CORRECT FIELD NAME
     ).order_by('created_at')
     
     # Calculate totals
@@ -243,13 +259,13 @@ def get_product_inventory_value_by_store(store_id, product_id):
     total_quantity = 0
     
     for batch in batches:
-        batch_value = batch.remaining_quantity * batch.unit_cost
+        batch_value = batch.remaining_quantity * batch.unit_cost  # CORRECT FIELD NAME
         total_value += batch_value
-        total_quantity += batch.remaining_quantity
+        total_quantity += batch.remaining_quantity  # CORRECT FIELD NAME
         
         batch_data.append({
             'batch_id': batch.id,
-            'quantity': batch.remaining_quantity,
+            'quantity': batch.remaining_quantity,  # CORRECT FIELD NAME
             'unit_cost': batch.unit_cost,
             'batch_value': batch_value,
             'purchase_date': batch.created_at,
@@ -268,6 +284,7 @@ def get_product_inventory_value_by_store(store_id, product_id):
         'batch_count': len(batch_data),
         'batches': batch_data
     }
+
 
 
 def get_inventory_aging_report(store_id, days_threshold=90):
@@ -289,10 +306,12 @@ def get_inventory_aging_report(store_id, days_threshold=90):
     
     aging_batches = InventoryBatch.objects.filter(
         store_id=store_id,
-        remaining_quantity__gt=0,
+        remaining_quantity__gt=0,  # CORRECT FIELD NAME
         created_at__lt=cutoff_date
     ).select_related('product', 'store').order_by('created_at')
     
     return aging_batches
+
+
 
 

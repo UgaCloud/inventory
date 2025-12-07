@@ -666,7 +666,7 @@ function adjustPricing(productId = null) {
 }
 
 function transferStock(productId) {
-  window.location.href = `{% url 'add_transfer_request' %}?product=${productId}`;
+  window.location.href = `{% url 'create_transfer_request' %}?product=${productId}`;
 }
 
 function markObsolete(productId) {
@@ -729,7 +729,7 @@ function bulkTransfer() {
     return;
   }
   
-  window.location.href = `{% url 'add_transfer_request' %}?products=${selected.join(',')}`;
+  window.location.href = `{% url 'create_transfer_request' %}?products=${selected.join(',')}`;
 }
 
 function bulkAdjustPricing() {

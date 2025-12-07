@@ -82,6 +82,7 @@ TEMPLATES = [
                 'app.context_processors.organization_setting',  
                 'app.context_processors.app_menu',
                 'app.context_processors.transfer_notifications',
+                'app.context_processors.stock_transfer_forms',
             ],
         },
     },
@@ -146,12 +147,27 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Session Configuration for Login Timeout
-SESSION_COOKIE_AGE = 300  # 5 minutes in seconds 
+# Session length: 10 minutes (600 seconds)
+SESSION_COOKIE_AGE = 600  # 10 minutes in seconds
+# How long before expiry to show an on-page warning (in seconds)
+SESSION_WARNING_SECONDS = 300  # 5 minutes before expiry
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session expires when browser is closed
 SESSION_SAVE_EVERY_REQUEST = True  # Extend session on every request (keeps user active)
 SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_HOST_USER = 'your_email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your_password'
+# EMAIL_USE_TLS = True
+# EMAIL_USE_SSL = False
+
 
 
 
