@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('app', '0003_add_priority_required_date'),
+        ('app', '0062_add_priority_required_date'),
         ('app', '0061_transferrequest_department'),
     ]
 

@@ -10,9 +10,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='stockadjustmentitem',
-            name='unit_cost',
-            field=models.PositiveIntegerField(blank=True, null=True),
-        ),
+        # migrations.AlterField(
+        #     model_name='stockadjustmentitem',
+        #     name='unit_cost',
+        #     field=models.PositiveIntegerField(blank=True, null=True),
+        # ),
     ]

@@ -7,7 +7,7 @@
         </a>
     </div>
 
-    {% if not inventory_data %}
+    {% if not inventories %}
     <!-- Empty State -->
     <div class="card">
         <div class="card-body text-center py-5">
@@ -45,7 +45,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for data in inventory_data %}
+                {% for data in inventories %}
                 <tr>
                     <td>
                         <label class="checkboxs">

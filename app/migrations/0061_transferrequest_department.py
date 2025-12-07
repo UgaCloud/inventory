@@ -11,9 +11,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='transferrequest',
-            name='department',
-            field=models.ForeignKey(null=True, blank=True, on_delete=django.db.models.deletion.CASCADE, related_name='transfer_requests', to='app.department'),
-        ),
+        # migrations.AddField(
+        #     model_name='transferrequest',
+        #     name='department',
+        #     field=models.ForeignKey(null=True, blank=True, on_delete=django.db.models.deletion.CASCADE, related_name='transfer_requests', to='app.department'),
+        # ),
     ]

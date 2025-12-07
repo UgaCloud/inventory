@@ -399,14 +399,10 @@ def stock_transfer_create(request):
 @login_required
 def direct_stock_transfer_create(request):
     """Handle creation of direct stock transfers (without prior request)"""
-
-    print("In direct stock transfer create view")
     
     if request.method == 'POST':
         stock_form = StockTransferForm(request.POST)
         item_formset = StockTransferItemFormSet(request.POST)
-
-        print(f"Forms received: {stock_form.data}, items: {item_formset.data}")
 
         if stock_form.is_valid() and item_formset.is_valid():
             try:
@@ -422,10 +418,8 @@ def direct_stock_transfer_create(request):
                     validation_errors = []
 
                     for form in item_formset:
-                        print("Processing form:", form.data)
                         if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
 
-                            print('Processing item form:', form.cleaned_data)
                             # Get the product and quantity first
                             product = form.cleaned_data.get('product')
                             quantity = form.cleaned_data.get('quantity')
@@ -453,10 +447,9 @@ def direct_stock_transfer_create(request):
                             # Save the transfer item
                             try:
                                 transfer_item.save()
-                                print(f'Transfer item saved: {transfer_item.id}')
+                               
                                 items_created += 1
                             except Exception as e:
-                                print(f'Error saving transfer item: {str(e)}')
                                 validation_errors.append(f'Error saving item: {str(e)}')
             
                 if validation_errors:
