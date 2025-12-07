@@ -580,55 +580,12 @@ class StockAdjustment(models.Model):
         Locks inventory row to avoid race conditions.
         """
         from django.db import transaction
+        from django.utils import timezone
         from app.models.products import Inventory
-        from app.models.products import Product, UnitOfMeasure
         # import StockMovement here to avoid circular import at module load
         from app.models.transactions import StockMovement
 
-        if self.status == 'applied':
-            return False
-
-        with transaction.atomic():
-            for item in self.items.select_for_update():
-                item.apply_to_inventory()
-
-            self.status = 'applied'
-            
-            from django.utils import timezone
-            self.approved_at = timezone.now()
-            self.save(update_fields=['status'])
-        return True
-
-
-class StockAdjustmentItem(models.Model):
-    adjustment = models.ForeignKey(StockAdjustment, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
-    unit = models.ForeignKey('app.UnitOfMeasure', on_delete=models.SET_NULL, null=True, blank=True)
-    # positive -> add stock, negative -> reduce stock
-    quantity_change = models.IntegerField()
-    reason = models.CharField(max_length=255, blank=True, null=True)
-    unit_cost = models.PositiveIntegerField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = 'Stock Adjustment Item'
-        verbose_name_plural = 'Stock Adjustment Items'
-        unique_together = ('adjustment', 'product', 'unit')
-
-    def __str__(self):
-        return f"{self.product.name} {self.quantity_change} ({self.unit})"
-
-    def apply_to_inventory(self):
-        """
-        Apply this item to the inventory for the adjustment's store.
-        Creates a StockMovement record for auditing.
-        """
-        from django.db import transaction
-        from app.models.products import Inventory
-        from django.utils import timezone
-
-        store = self.adjustment.store
+        store = self.store
 
         with transaction.atomic():
             inv, created = Inventory.objects.select_for_update().get_or_create(
@@ -691,9 +648,6 @@ class StockAdjustmentItem(models.Model):
             for adj in qs:
                 adj.apply_to_inventory()
                 adj.status = 'applied'
-                # if applied_by:
-                #     adj.approved_by = applied_by
-                # adj.approved_at = timezone.now()
                 adj.save(update_fields=['status'])
         return True
 

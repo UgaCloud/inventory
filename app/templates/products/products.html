@@ -45,7 +45,6 @@
 
     <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-<<<<<<< HEAD
             <form method="get" action="{% url 'products_page' %}" class="d-flex gap-2 align-items-center flex-wrap flex-grow-1">
                 <div class="search-set">
                     <div class="search-input">
@@ -76,27 +75,6 @@
                 </a>
                 {% endif %}
             </form>
-=======
-            <div class="search-set">
-                <div class="search-input">
-                    <input type="text" placeholder="Search products..." class="form-control" id="search-input">
-                    <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
-                </div>
-            </div>
-            <div class="d-flex table-dropdown my-xl-auto right-content align-items-center flex-wrap row-gap-3">
-                <div class="dropdown me-2">
-                    <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-                        Category
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end p-3">
-                        <li><a href="?category=all" class="dropdown-item rounded-1">All Categories</a></li>
-                        {% for category in categories %}
-                        <li><a href="?category={{ category.id }}" class="dropdown-item rounded-1">{{ category.name }}</a></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
->>>>>>> inv_transfer
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -132,14 +110,7 @@
                                 <td>{{ product_data.product.sku }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
-<<<<<<< HEAD
-                                        {% comment %} <a href="javascript:void(0);" class="avatar avatar-md me-2">
-                                            <img src="assets/img/products/stock-img-01.png" alt="product">
-                                        </a> {% endcomment %}
-                                        <a href="{% url 'product_details_page' product.id %}">{{product.name}}</a>
-=======
                                         <a href="{% url 'product_details_page' product_data.product.id %}">{{ product_data.product.name }}</a>
->>>>>>> inv_transfer
                                     </div>												
                                 </td>							
                                 <td>
@@ -167,19 +138,6 @@
                                         </span>
                                     {% endif %}
                                 </td>
-<<<<<<< HEAD
-                                
-                                <td class="action-table-data">
-                                    {% if user.is_superuser or is_admin %}
-                                    <div class="edit-delete-action">
-                                        <a class="me-2 edit-icon p-2" href="{% url 'product_details_page' product.id %}" title="View Details">
-                                            <i data-feather="eye" class="feather-eye"></i>
-                                        </a>
-                                        <a class="me-2 edit-icon p-2" href="{% url 'edit_product_page' product.id %}" title="Edit Product">
-                                            <i data-feather="edit" class="feather-edit"></i>
-                                        </a>
-                                    </div>
-=======
                                 <td class="action-table-data">
                                     {% if is_admin or is_superuser %}
                                         <div class="edit-delete-action">
@@ -197,7 +155,6 @@
                                                 <i data-feather="trash-2" class="feather-trash-2"></i>
                                             </a>
                                         </div>
->>>>>>> inv_transfer
                                     {% endif %}
                                 </td>
                             </tr>
@@ -223,8 +180,6 @@
         </div>
     </div>
 
-<<<<<<< HEAD
-=======
     <!-- Delete Modal -->
     <div class="modal fade" id="delete-modal">
         <div class="modal-dialog modal-dialog-centered">
@@ -246,7 +201,6 @@
             </div>
         </div>
     </div>
->>>>>>> inv_transfer
 
     <!-- Add Product Modal -->
     <div class="modal fade" id="add-product">
@@ -262,17 +216,6 @@
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-<<<<<<< HEAD
-                        <div class="modal-body">
-                            <form method="post" action="{% url 'add_products_page'%}">
-                                {% csrf_token %}
-                                {{form|crispy}}
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
-                            <button type='submit' class="btn btn-primary fs-13 fw-medium p-2 px-3">Submit</button>
-                        </div>
-=======
                         <form method="post" action="{% url 'add_products_page' %}" id="add-product-form">
                             {% csrf_token %}
                             <div class="modal-body">
@@ -282,7 +225,6 @@
                                 <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-primary fs-13 fw-medium p-2 px-3">Add Product</button>
                             </div>
->>>>>>> inv_transfer
                         </form>
                     </div>
                 </div>
