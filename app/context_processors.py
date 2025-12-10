@@ -75,7 +75,7 @@ def app_menu(request):
             'icon': 'ti ti-brand-unity fs-16 me-2',
             'children': [
                 {'label': 'Branches', 'url_name': 'manage_branch_page'},
-                {'label': 'Stores', 'url_name': 'store_page'},
+                {'label': 'Stores', 'url_name': 'all_stores_inventory'},
                 {'label': 'Category', 'url_name': 'add_category_page'},
                 {'label': 'Units', 'url_name': 'unit_of_measure_page'},
                 {'label': 'Products', 'url_name': 'products_page'},

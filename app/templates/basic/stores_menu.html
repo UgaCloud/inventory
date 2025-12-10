@@ -35,14 +35,14 @@
         ><span>Stock</span> <span class="menu-arrow"></span
     ></a>
     <ul>
-        <li>
+        {% comment %} <li>
         <a href="{% url 'transfer_request_list' %}"
             ><span>Request Stock</span></a
         >
-        </li>
+        </li> {% endcomment %}
         <li>
         <a href="{% url 'stock_transfer_list' %}"
-            ><span>Stock Transfer</span></a
+            ><span>Stock Transfers</span></a
         >
         </li>
     </ul>
