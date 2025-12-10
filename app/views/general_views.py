@@ -38,13 +38,6 @@ def index_view(request):
     low_stock_products = get_low_stock_products()
     top_selling_products = get_top_selling_products()
     recent_sales = get_recent_sales(limit=5)
-    
-    # Stock adjustment data
-    recent_stock_adjustments = get_recent_stock_adjustments(limit=10)
-    pending_stock_adjustments = get_pending_stock_adjustments()
-    pending_stock_adjustments_count = get_pending_stock_adjustments_count()
-    todays_stock_adjustments_count = get_todays_stock_adjustments_count()
-    total_revenue = get_total_revenue()
 
 
     
@@ -64,19 +57,19 @@ def index_view(request):
             dashboard_templates = [info['template'] for info in dashboard_info]
             
             # Debug logging (remove in production if needed)
-            print(f"🔍 User: {request.user.username}")
-            print(f"🔍 Accessible modules: {accessible_modules}")
-            print(f"🔍 Assigned dashboards: {[info['name'] for info in dashboard_info]}")
+            print(f"User: {request.user.username}")
+            print(f"Accessible modules: {accessible_modules}")
+            print(f"Assigned dashboards: {[info['name'] for info in dashboard_info]}")
             
         except UserProfile.DoesNotExist:
             dashboard_templates = []
             dashboard_info = []
-            print("⚠️ UserProfile does not exist for user:", request.user.username)
+            print("UserProfile does not exist for user:", request.user.username)
         except AttributeError as e:
             # Fallback if profile doesn't have effective_modules
             dashboard_templates = []
             dashboard_info = []
-            print(f"⚠️ AttributeError accessing effective_modules: {e}")
+            print(f"AttributeError accessing effective_modules: {e}")
     
     # Superusers: Only give all dashboards if they have no specific module-based dashboards
     # This prevents showing all dashboards when superuser has specific module access
@@ -87,7 +80,7 @@ def index_view(request):
             {'name': name, 'template': template}
             for name, template in DASHBOARD_TEMPLATE_MAP.items()
         ]
-        print(f"🔍 Superuser with no module dashboards - showing all: {dashboard_templates}")
+        print(f"Superuser with no module dashboards - showing all: {dashboard_templates}")
 
     context = {
         'products': products,
@@ -111,11 +104,6 @@ def index_view(request):
         'todays_fully_paid_sales': get_todays_fully_paid_sales(),
         'todays_partially_paid_sales': get_todays_partially_paid_sales(),
         'todays_unpaid_sales': get_todays_unpaid_sales(),
-        'recent_stock_adjustments': recent_stock_adjustments,
-        'pending_stock_adjustments': pending_stock_adjustments,
-        'pending_stock_adjustments_count': pending_stock_adjustments_count,
-        'todays_stock_adjustments_count': todays_stock_adjustments_count,
-        'total_revenue': total_revenue,
         
         # ADD THIS LINE to hide sidebar on dashboard:
         'hide_sidebar': True,

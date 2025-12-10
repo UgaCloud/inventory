@@ -157,7 +157,7 @@ class Role(models.Model):
             if current_modules != all_modules:
                 # Use set_modules which will trigger update_all_users
                 self.set_modules(list(all_modules))
-                print(f"✅ Auto-assigned all modules (1-16) to superuser role: {self.name}")
+                print(f"Auto-assigned all modules (1-16) to superuser role: {self.name}")
 
     def _sync_permissions_to_group(self):
         """Sync Django permissions to the associated group if this role has superuser status"""
@@ -232,11 +232,9 @@ class Role(models.Model):
         Set modules for this role
         module_data: list of module IDs
         """
-        print(f"🔄 Setting {len(module_data)} modules for role {self.name}")
         
         # Clear existing modules
         deleted_count = self.modules.all().delete()[0]
-        print(f"🗑️ Deleted {deleted_count} old modules")
         
         # Add new modules
         for module_id in module_data:
@@ -246,7 +244,6 @@ class Role(models.Model):
                 module_id=module_id,
                 module_name=module_name
             )
-            print(f"✅ Added module {module_name} (ID: {module_id})")
         
         # Update all users with this role
         self.update_all_users()
@@ -254,7 +251,6 @@ class Role(models.Model):
     def update_all_users(self):
         """Update all users with this role to sync modules and permissions (RBAC 2.0)"""
         user_profiles = self.assigned_profiles.all()
-        print(f"🔄 Updating {user_profiles.count()} users with role {self.name}")
         
         updated_count = 0
         for user_profile in user_profiles:
@@ -275,13 +271,12 @@ class Role(models.Model):
                     user.is_superuser = has_superuser or user.is_superuser
                     user.save(update_fields=['is_staff', 'is_active', 'is_superuser'])
                     updated_count += 1
-                    print(f"✅ Updated permissions for {user.username}")
+                    print(f"Updated permissions for {user.username}")
                 except Exception as e:
-                    print(f"⚠️ Could not update permissions for {user_profile.user.username}: {e}")
+                    print(f"Could not update permissions for {user_profile.user.username}: {e}")
             except Exception as e:
-                print(f"❌ Error updating user {user_profile.user.username}: {e}")
+                print(f"Error updating user {user_profile.user.username}: {e}")
         
-        print(f"✅ Successfully updated {updated_count} users")
 
     def get_permissions_dict(self):
         """Return Django permissions as a dictionary"""
@@ -317,7 +312,6 @@ class Role(models.Model):
         if self.group:
             user.groups.add(self.group)
         
-        print(f"✅ Applied role {self.name} to user {user.username} (total roles: {profile.roles.count()})")
         return profile
 
     @property
@@ -528,9 +522,9 @@ class UserProfile(models.Model):
                 UserProfile.objects.filter(pk=self.pk).update(access_modules=effective)
                 # Update in-memory object
                 self.access_modules = effective
-                print(f"✅ Updated modules for {self.user.username}: {effective}")
+                print(f"Updated modules for {self.user.username}: {effective}")
             except Exception as e:
-                print(f"❌ Error updating modules for {self.user.username}: {e}")
+                print(f"Error updating modules for {self.user.username}: {e}")
 
     def update_modules_from_role(self):
         """Legacy method - redirects to update_modules_from_roles"""
@@ -653,9 +647,9 @@ def initialize_system_roles():
         if created:
             role.set_modules(role_data['modules'])
             created_count += 1
-            print(f"✅ Created system role: {role.name}")
+            print(f"Created system role: {role.name}")
     
-    print(f"🎉 System role initialization complete! Created {created_count} roles")
+    print(f"System role initialization complete! Created {created_count} roles")
     return created_count
 
 
