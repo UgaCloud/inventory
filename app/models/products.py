@@ -136,7 +136,7 @@ class Product(models.Model):
 
     def default_unit(self):
         unit = self.unit_prices.order_by('id').first()
-        return unit if unit else "Piece"
+        return unit.unit if unit else "Piece"
     
     @property
     def default_price(self):

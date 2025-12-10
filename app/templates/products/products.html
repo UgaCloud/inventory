@@ -46,12 +46,6 @@
     <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
             <form method="get" action="{% url 'products_page' %}" class="d-flex gap-2 align-items-center flex-wrap flex-grow-1">
-                <div class="search-set">
-                    <div class="search-input">
-                        <input type="text" name="search" class="form-control" placeholder="Search products..." value="{{ search_query|default:'' }}">
-                        <button type="submit" class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></button>
-                    </div>
-                </div>
                     <select name="category" class="form-select" style="min-width: 150px;" onchange="this.form.submit()">
                         <option value="">All Categories</option>
                         {% for category in categories %}
@@ -78,7 +72,7 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table" id="productsTable">
+                <table class="table datatable" id="productsTable">
                     <thead class="thead-light">
                         <tr>
                             <th class="no-sort">
@@ -92,7 +86,7 @@
                             <th>Category</th>
                             <th>Brand</th>
                             <th>Qty</th>
-                            <th>Base Price</th>
+                            <th>Base Price (Unit)</th>
                             <th>Status</th>
                             <th class="no-sort">Action</th>
                         </tr>
@@ -124,7 +118,7 @@
                                 <td>{{ product_data.total_available_stock }}</td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <a href="javascript:void(0);">{{ product_data.product.default_price|intcomma }}/-</a>
+                                        <a href="javascript:void(0);">{{ product_data.product.default_price|intcomma }}/- ({{ product_data.product.default_unit }})</a>
                                     </div>
                                 </td>
                                 <td>
