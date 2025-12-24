@@ -667,4 +667,21 @@ class StockMovement(models.Model):
         return f"{self.product.name} | {self.store.name} | {self.transaction_type} | {self.quantity} | {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
 
+class StockAdjustmentItem(models.Model):
+    stock_adjustment = models.ForeignKey('StockAdjustment', on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
+    unit = models.ForeignKey('app.UnitOfMeasure', on_delete=models.SET_NULL, null=True, blank=True)
+    quantity_change = models.IntegerField()
+    unit_cost = models.PositiveIntegerField(null=True, blank=True)
+    reason = models.TextField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ('stock_adjustment', 'product', 'unit')
+        verbose_name = 'Stock Adjustment Item'
+        verbose_name_plural = 'Stock Adjustment Items'
+
+    def __str__(self):
+        return f"{self.product.name} {self.quantity_change} ({self.unit}) for Adjustment {self.stock_adjustment.reference or self.stock_adjustment.id}"
+
+
 

@@ -2,10 +2,7 @@ from django import forms
 from django.forms import ModelForm, inlineformset_factory
 from django.utils import timezone
 import app
-from app.models.transactions import (
-    PurchaseOrder, Sales, StockTransfer, PurchaseOrderItem, SalesItem,
-    TransferRequest, StockTransferItem, TransferRequestItem, StockAdjustment,
-)
+from app.models.transactions import *
 from app.models.finance import PaymentMethod
 from app.models.products import Product, ProductUnitPrice, StoreLocation
 from decimal import Decimal
@@ -516,7 +513,7 @@ SalesItemFormSet = inlineformset_factory(
     Sales, SalesItem, form=SalesItemForm, extra=0, can_delete=True
 )
 
-# StockAdjustmentItemFormSet = inlineformset_factory(
-#     StockAdjustment, StockAdjustmentItem, form=StockAdjustmentItemForm, extra=1, can_delete=True
-# )
+StockAdjustmentItemFormSet = inlineformset_factory(
+    StockAdjustment, StockAdjustmentItem, fields='__all__', extra=1, can_delete=True
+)
 

@@ -33,6 +33,7 @@ from .views.user_views import (
     user_delete_view, user_assign_role_view, user_unassign_role_view
 )
 from .views.employee_role_views import employee_manage_roles_view
+from app.views.dashboard_api import order_stats_api, recent_sales_api
 
 
 urlpatterns = [
@@ -252,7 +253,8 @@ urlpatterns = [
     
     # Employee Role Management URLs (RBAC 2.0)
     path('employees/<int:employee_id>/manage-roles/', employee_manage_roles_view, name='employee_manage_roles_page'),
-    
+    path('dashboard/order-stats/', order_stats_api, name='order_stats_api'),
+    path('dashboard/recent-sales/', recent_sales_api, name='recent_sales_api'),
 ]
 
 if settings.DEBUG:
