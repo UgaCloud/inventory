@@ -199,7 +199,6 @@ class StoreLocation(models.Model):
     def total_stock_items(self):
         return sum(inv.quantity_in_stock for inv in self.inventory_set.all())
 
-    
 
 
 class Inventory(models.Model):

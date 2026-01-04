@@ -1,3 +1,18 @@
+from django.db.models import Sum
+from app.models.transactions import SalesItem
+
+def get_top_categories_by_sales(limit=3):
+    """
+    Returns a queryset of top categories by total sales quantity, descending.
+    Each result includes: category, total_sales (quantity).
+    """
+    from app.models.products import Category, Product
+    return (
+        Category.objects.annotate(
+            total_sales=Sum('products__salesitem__quantity')
+        )
+        .order_by('-total_sales')[:limit]
+    )
 from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice, Inventory, StoreLocation
 from django.db import models
 from app.models.transactions import InventoryBatch

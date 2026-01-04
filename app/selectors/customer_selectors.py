@@ -1,3 +1,18 @@
+from django.db.models import Sum
+from app.models.transactions import Sales
+
+def get_top_customers(limit=5):
+    """
+    Returns a queryset of top customers by total sales amount, descending.
+    Each result includes: customer, total_sales, total_orders, and country (if available).
+    """
+    return (
+        Customer.objects.annotate(
+            total_sales=Sum('sales__total_amount'),
+            total_orders=Sum('sales__id')
+        )
+        .order_by('-total_sales')[:limit]
+    )
 from app.models.customers import Customer, CustomerLedger
 
 def get_all_customers():

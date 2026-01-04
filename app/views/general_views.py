@@ -11,110 +11,123 @@ import time
 from app.selectors.organization_selectors import *
 from app.selectors.product_selectors import *
 from app.selectors.transaction_selectors import *
+from app.selectors.expense_selectors import get_total_expenses, get_all_expenses
 from app.selectors.customer_selectors import *
+from app.selectors.product_selectors import get_top_categories_by_sales
 from app.selectors.supplier_selectors import *
+
 from app.models.human_resource import UserProfile
+from app.models.expense import Expense
+from django.db.models import Sum
+
+
+
 
 
 
 
 @login_required
 def index_view(request):
-    products = get_all_products()
-    organization_details = get_organization_settings()
-    stores = get_stores()
-    total_purchases = get_total_purchases()
-    total_sales = get_total_sales()
-    todays_number_sales = get_todays_number_of_sales()
-    total_expenses = get_total_expenses()
-    net_profit = get_net_profit()
-    total_suppliers = get_number_of_suppliers()
-    total_customers = get_number_of_customers()
-    total_sale_orders = get_number_of_sales()
-    total_payments_received = get_total_payments_received()
-    total_outstanding_balances = get_total_outstanding_balances()
-    todays_outstanding_balances = get_todays_outstanding_balances()
-    todays_collection_rate = get_todays_collection_rate()
-    low_stock_products = get_low_stock_products()
-    top_selling_products = get_top_selling_products()
-    recent_sales = get_recent_sales(limit=5)
+        from app.selectors.transaction_selectors import get_order_statistics
 
+        user = request.user
 
-    
-    # Determine which dashboards to show based on RBAC module access
-    # Uses the flexible dashboard assignment system
-    dashboard_templates = []
-    dashboard_info = []
-    if request.user.is_authenticated:
+        context = {
+            "organization_details": get_organization_settings(),
+            "stores": get_stores(),
+
+            # Financials
+            "total_sales": get_total_sales(user),
+            "total_purchases": get_total_purchases(),
+            "total_expenses": get_total_expenses(),
+            "net_profit": (get_total_sales(user) or 0) - (get_total_expenses() or 0),
+            "total_revenue": get_total_revenue(),
+            "total_payments_received": get_total_payments_received(user),
+
+            # Counts
+            "total_customers": get_number_of_customers(),
+            "total_suppliers": get_number_of_suppliers(),
+            "total_sale_orders": get_all_sales(user).count(),
+
+            # Today's sales metrics
+            "todays_number_sales": get_todays_number_of_sales(user),
+            "todays_collection_rate": get_todays_collection_rate(user),
+            "todays_fully_paid_sales": get_todays_fully_paid_sales(user),
+            "todays_partially_paid_sales": get_todays_partially_paid_sales(user),
+            # "todays_unpaid_sales": get_todays_unpaid_sales(user),
+
+            # Products
+            "recent_sales": get_recent_sales(user, limit=5),
+            "low_stock_products": get_low_stock_products(),
+            "top_selling_products": get_top_selling_products(),
+
+            # Stock Adjustments
+            "todays_stock_adjustments_count": get_todays_stock_adjustments().count(),
+            "pending_stock_adjustments_count": get_pending_stock_adjustments_count(),
+            "recent_stock_adjustments": get_recent_stock_adjustments(10),
+
+            # Top Customers (by total sales amount)
+            "top_customers": get_top_customers(limit=5),
+
+            # Top Categories (by sales)
+            "top_categories": get_top_categories_by_sales(limit=3),
+            "total_categories": get_all_categories().count(),
+            "total_products": get_all_products().count(),
+
+            "hide_sidebar": True,
+            # Order statistics for last 7 days
+            "order_stats": get_order_statistics(days=7, user=user),
+        }
+
+        # Recent Transactions (dynamic for dashboard tabs)
+        recent_sales_transactions = get_recent_sales(user, limit=5)
+        recent_purchase_orders = get_all_orders().order_by('-purchase_date')[:5]
+        recent_expenses = get_all_expenses().order_by('-date')[:5]
+        # For quotations and invoices, use Sales with status or a dedicated model if available
+        recent_quotations = get_all_sales(user).filter(status='quotation').order_by('-sale_date')[:5]
+        recent_invoices = get_all_sales(user).filter(status='invoice').order_by('-sale_date')[:5]
+
+        context.update({
+            "recent_sales_transactions": recent_sales_transactions,
+            "recent_purchase_orders": recent_purchase_orders,
+            "recent_expenses": recent_expenses,
+            "recent_quotations": recent_quotations,
+            "recent_invoices": recent_invoices,
+        })
+        dashboard_templates = []
+        dashboard_info = []
+
         try:
             from app.utils.dashboard_assignment import (
                 get_dashboard_templates_for_modules,
-                get_dashboard_info_for_modules
+                get_dashboard_info_for_modules,
             )
-            accessible_modules = request.user.profile.effective_modules
-            # Get dashboard info (name and template) automatically based on module access
-            dashboard_info = get_dashboard_info_for_modules(accessible_modules)
-            dashboard_templates = [info['template'] for info in dashboard_info]
-            
-            # Debug logging (remove in production if needed)
-            print(f"User: {request.user.username}")
-            print(f"Accessible modules: {accessible_modules}")
-            print(f"Assigned dashboards: {[info['name'] for info in dashboard_info]}")
-            
-        except UserProfile.DoesNotExist:
-            dashboard_templates = []
-            dashboard_info = []
-            print("UserProfile does not exist for user:", request.user.username)
-        except AttributeError as e:
-            # Fallback if profile doesn't have effective_modules
-            dashboard_templates = []
-            dashboard_info = []
-            print(f"AttributeError accessing effective_modules: {e}")
-    
-    # Superusers: Only give all dashboards if they have no specific module-based dashboards
-    # This prevents showing all dashboards when superuser has specific module access
-    if request.user.is_superuser and not dashboard_templates:
-        from app.utils.dashboard_assignment import DASHBOARD_TEMPLATE_MAP, DASHBOARD_MODULE_MAP
-        dashboard_templates = list(DASHBOARD_TEMPLATE_MAP.values())
-        dashboard_info = [
-            {'name': name, 'template': template}
-            for name, template in DASHBOARD_TEMPLATE_MAP.items()
-        ]
-        print(f"Superuser with no module dashboards - showing all: {dashboard_templates}")
+            modules = user.profile.effective_modules
+            dashboard_info = get_dashboard_info_for_modules(modules)
+            dashboard_templates = [item["template"] for item in dashboard_info]
+        except (UserProfile.DoesNotExist, AttributeError):
+            pass
 
-    context = {
-        'products': products,
-        'organization_details': organization_details,
-        'stores': stores,
-        'total_purchases': total_purchases,
-        'total_sales': total_sales,
-        'total_expenses': total_expenses,
-        'net_profit': net_profit,
-        'total_suppliers': total_suppliers,
-        'total_customers': total_customers,
-        'total_sale_orders': total_sale_orders,
-        'low_stock_products': low_stock_products,
-        'top_selling_products': top_selling_products,
-        'recent_sales': recent_sales,
-        'total_payments_received': total_payments_received,
-        'total_outstanding_balances': total_outstanding_balances,
-        'todays_number_sales': todays_number_sales,
-        'todays_credit_sales': todays_outstanding_balances,
-        'todays_collection_rate': todays_collection_rate,
-        'todays_fully_paid_sales': get_todays_fully_paid_sales(),
-        'todays_partially_paid_sales': get_todays_partially_paid_sales(),
-        'todays_unpaid_sales': get_todays_unpaid_sales(),
-        
-        # ADD THIS LINE to hide sidebar on dashboard:
-        'hide_sidebar': True,
-        'dashboard_templates': dashboard_templates,
-        'dashboard_info': dashboard_info,  # List of dicts with 'name' and 'template'
-    }
-    print(context['todays_fully_paid_sales'])
-    
-    return render(request, 'basic/index.html', context)
+        # Superuser fallback
+        if user.is_superuser and not dashboard_templates:
+            from app.utils.dashboard_assignment import DASHBOARD_TEMPLATE_MAP
+            dashboard_templates = list(DASHBOARD_TEMPLATE_MAP.values())
+            dashboard_info = [
+                {"name": name, "template": template}
+                for name, template in DASHBOARD_TEMPLATE_MAP.items()
+            ]
+
+        context.update({
+            "dashboard_templates": dashboard_templates,
+            "dashboard_info": dashboard_info,
+        })
+
+        return render(request, "basic/index.html", context)
 
 
+
+
+# Restore login_view as a standalone function
 def login_view(request):
     # Check if user was redirected due to session timeout
     timeout_message = None
@@ -148,9 +161,11 @@ def sign_up_view(request):
         form = UserCreationForm(request.POST)
 
         if form.is_valid():
-            form.save()
-            message = 'Data has been succeefully stored in the database'
-            return redirect(login_view)
+            user = form.save(commit=False)
+            user.set_password('user1234')
+            user.save()
+            message = 'Data has been succeefully stored in the database. Default password is user1234.'
+            return redirect('login')
     else:
         form = UserCreationForm()
 

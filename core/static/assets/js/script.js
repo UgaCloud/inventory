@@ -114,30 +114,7 @@ $(document).ready(function(){
 		});
 	}, 1000);
 
-	// Datatable
-	if($('.datatable').length > 0) {
-		$('.datatable').DataTable({
-			"bFilter": true,
-			"sDom": 'fBtlpi',  
-			"ordering": true,
-			"language": {
-				search: ' ',
-				sLengthMenu: '_MENU_',
-				searchPlaceholder: "Search",
-				sLengthMenu: 'Row Per Page _MENU_ Entries',
-				info: "_START_ - _END_ of _TOTAL_ items",
-				paginate: {
-					next: ' <i class=" fa fa-angle-right"></i>',
-					previous: '<i class="fa fa-angle-left"></i> '
-				},
-			 },
-			initComplete: (settings, json)=>{
-				$('.dataTables_filter').appendTo('#tableSearch');
-				$('.dataTables_filter').appendTo('.search-input');
-
-			},	
-		});
-	}
+// Removed global DataTable initialization for .datatable to avoid double initialization issues.
 
 	// image file upload image
 	function readURL(input) {

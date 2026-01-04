@@ -60,6 +60,7 @@ admin.site.register(CustomerLedger, get_admin_for_model(CustomerLedger))
 admin.site.register(Payment, get_admin_for_model(Payment))
 admin.site.register(InventoryBatch, get_admin_for_model(InventoryBatch))
 admin.site.register(Employee, EmployeeAdmin)
+admin.site.register(StockAdjustmentItem, get_admin_for_model(StockAdjustmentItem))
 
 
 

@@ -144,12 +144,25 @@ def app_menu(request):
                 {'label': 'Roles & Permissions', 'url_name': 'roles_list_page'},
             ],
         },
-        {
+       {
             'label': 'Reports',
             'icon': 'ti ti-chart-bar fs-16 me-2',
             'children': [
                 {'label': 'Branch Sales Report', 'url_name': 'branch_sales_report'},
                 {'label': 'Sales Item Report', 'url_name': 'sales_item_unit_report'},
+                
+                # Inventory Reports
+                {'label': 'Stock Summary', 'url_name': 'stock_summary_report'},
+                {'label': 'Low Stock Alert', 'url_name': 'low_stock_report'},
+                {'label': 'Store Performance', 'url_name': 'store_performance_report'},
+                {'label': 'Category Analysis', 'url_name': 'category_analysis_report'},
+                {'label': 'Product Movement', 'url_name': 'product_movement_report'},
+                {'label': 'ABC Analysis', 'url_name': 'abc_analysis_report'},
+                
+                # Operational Reports
+                {'label': 'Inventory Valuation', 'url_name': 'inventory_valuation_report'},
+                {'label': 'Stock Transfer Status', 'url_name': 'stock_transfer_report'},
+                {'label': 'Product Availability', 'url_name': 'product_availability_report'},
             ],
         },
         {

@@ -6,12 +6,7 @@ from django.contrib.auth.decorators import login_required
 from app.models.transactions import *
 from app.forms.transaction_forms import *
 from app.models.products import *
-from app.selectors.transaction_selectors import (
-    get_all_stock_movements, get_stock_movements_by_branch,
-    get_all_stock_transfers, get_stock_transfer_by_id, get_stock_transfers_by_branch,
-    get_all_orders, get_order_by_id, get_orders_by_branch,
-    get_items_by_order
-)
+from app.selectors.transaction_selectors import *
 from app.models.products import Product, UnitOfMeasure
 # from app.forms.transaction_forms import StockAdjustmentItemFormSet
 

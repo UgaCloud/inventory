@@ -282,15 +282,29 @@ def edit_unit_of_measure_view(request, unit_id):
 
 @login_required
 def product_details_view(request, _product_id):
-    item = get_product_by_id(product_id=_product_id)
 
+    item = get_product_by_id(product_id=_product_id)
     product_form = ProductForm(instance=item)
     product_unit_price_form = ProductUnitPriceForm(initial={'product':item})
     inventory_form = InventoryForm(initial={'product': item})
-
     product_unit_prices = item.unit_prices.all()
     inventories = item.inventories.all()
-    stock_movements = item.stock_movements.all()
+
+    # Store filter
+    from app.models.products import StoreLocation
+    stores = StoreLocation.objects.filter(is_active=True)
+    selected_store_id = request.GET.get('store')
+    selected_store = None
+    if selected_store_id:
+        try:
+            selected_store = StoreLocation.objects.get(id=selected_store_id)
+        except StoreLocation.DoesNotExist:
+            selected_store = None
+
+    if selected_store:
+        stock_movements = item.stock_movements.filter(store=selected_store)
+    else:
+        stock_movements = item.stock_movements.all()
 
     units = get_all_units_of_measurement()
     
@@ -329,14 +343,15 @@ def product_details_view(request, _product_id):
         'product': item,
         'unit_prices': product_unit_prices,
         'inventories': inventory_data,  # Updated to include real-time data
-        'stock_movements': stock_movements,   
-        'units': units, 
+        'stock_movements': stock_movements,
+        'units': units,
         'stock_adjustment_form': stock_adjustment_form,
         'units': units,
-        # NEW: Overall product stock summary
         'total_physical_stock': sum(inv.quantity_in_stock for inv in inventories),
         'total_committed_stock': sum(data['committed_stock'] for data in inventory_data),
         'total_available_stock': sum(data['available_stock'] for data in inventory_data),
+        'stores': stores,
+        'selected_store': selected_store,
     }
     return render(request, 'products/product_details.html', context)
 
@@ -357,17 +372,33 @@ def add_product_unit_price_view(request):
 
 def update_product_unit_price_view(request, pup_id):
     pup = get_object_or_404(ProductUnitPrice, id=pup_id)
+    
     if request.method == 'POST':
-        form = ProductUnitPriceForm(request.POST, instance=pup)
+        # Create a mutable copy of POST data
+        post_data = request.POST.copy()
+        
+        # Make sure the product field is set to pup.product.id
+        # This ensures it's always in the POST data even if hidden field wasn't submitted
+        post_data['product'] = str(pup.product.id)
+        
+        form = ProductUnitPriceForm(post_data, instance=pup)
+        
         if form.is_valid():
             form.save()
             messages.success(request, 'Product unit price updated successfully.')
-            return redirect(product_details_view, request.POST.get('product'))
+            return redirect(product_details_view, pup.product.id)
         else:
-            messages.error(request, form.errors)
-            return redirect(product_details_view, request.POST.get('product'))
+            # Format errors for display
+            error_messages = []
+            for field, errors in form.errors.items():
+                for error in errors:
+                    error_messages.append(f"{field}: {error}")
+            messages.error(request, ' | '.join(error_messages))
+            return redirect(product_details_view, pup.product.id)
     else:
-        pass
+        # Handle GET requests - redirect to product details page
+        # Or render an edit form if you have one
+        return redirect(product_details_view, pup.product.id)
 
 @login_required
 def add_inventory_view(request):
