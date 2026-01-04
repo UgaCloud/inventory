@@ -372,17 +372,33 @@ def add_product_unit_price_view(request):
 
 def update_product_unit_price_view(request, pup_id):
     pup = get_object_or_404(ProductUnitPrice, id=pup_id)
+    
     if request.method == 'POST':
-        form = ProductUnitPriceForm(request.POST, instance=pup)
+        # Create a mutable copy of POST data
+        post_data = request.POST.copy()
+        
+        # Make sure the product field is set to pup.product.id
+        # This ensures it's always in the POST data even if hidden field wasn't submitted
+        post_data['product'] = str(pup.product.id)
+        
+        form = ProductUnitPriceForm(post_data, instance=pup)
+        
         if form.is_valid():
             form.save()
             messages.success(request, 'Product unit price updated successfully.')
-            return redirect(product_details_view, request.POST.get('product'))
+            return redirect(product_details_view, pup.product.id)
         else:
-            messages.error(request, form.errors)
-            return redirect(product_details_view, request.POST.get('product'))
+            # Format errors for display
+            error_messages = []
+            for field, errors in form.errors.items():
+                for error in errors:
+                    error_messages.append(f"{field}: {error}")
+            messages.error(request, ' | '.join(error_messages))
+            return redirect(product_details_view, pup.product.id)
     else:
-        pass
+        # Handle GET requests - redirect to product details page
+        # Or render an edit form if you have one
+        return redirect(product_details_view, pup.product.id)
 
 @login_required
 def add_inventory_view(request):
