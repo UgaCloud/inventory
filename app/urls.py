@@ -21,7 +21,7 @@ from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
 from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
-from .views.reports import sales_report_views
+from .views.reports import sales_report_views, inventory_reports
 from app.views import stock_adjustments
 from .views.roles_views import (
     roles_list_view, role_create_view, role_edit_view, role_detail_view,
@@ -230,6 +230,24 @@ urlpatterns = [
     path('reports/sales-item-unit/export/pdf/', sales_report_views.export_sales_item_unit_pdf, name='export_sales_item_unit_pdf'),
     path('adjust-stock/', stock_adjustments.adjust_stock_view, name='adjust_stock'),
     path('api/inventory/available/', stock_adjustments.api_inventory_available, name='api_inventory_available'),
+    
+    # Inventory Reports
+      path('reports/', inventory_reports.reports_dashboard, name='reports_dashboard'),
+    path('reports/stock-summary/', inventory_reports.reports_view, {'report_type': 'stock_summary'}, name='stock_summary_report'),
+    path('reports/low-stock/', inventory_reports.reports_view, {'report_type': 'low_stock'}, name='low_stock_report'),
+    path('reports/store-performance/', inventory_reports.reports_view, {'report_type': 'store_performance'}, name='store_performance_report'),
+    path('reports/category-analysis/', inventory_reports.reports_view, {'report_type': 'category_analysis'}, name='category_analysis_report'),
+    path('reports/product-movement/', inventory_reports.reports_view, {'report_type': 'product_movement'}, name='product_movement_report'),
+    path('reports/abc-analysis/', inventory_reports.reports_view, {'report_type': 'abc_analysis'}, name='abc_analysis_report'),
+    path('reports/inventory-valuation/', inventory_reports.reports_view, {'report_type': 'inventory_valuation'}, name='inventory_valuation_report'),
+    path('reports/stock-transfer/', inventory_reports.reports_view, {'report_type': 'stock_transfer'}, name='stock_transfer_report'),
+    path('reports/product-availability/', inventory_reports.reports_view, {'report_type': 'product_availability'}, name='product_availability_report'),
+    
+    # Export functionality
+    path('reports/export/<str:report_type>/', inventory_reports.export_report, name='export_report'),
+    
+    
+    
     
     # Role Management URLs (RBAC 2.0)
     path('roles/', roles_list_view, name='roles_list_page'),
