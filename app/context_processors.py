@@ -148,21 +148,30 @@ def app_menu(request):
             'label': 'Reports',
             'icon': 'ti ti-chart-bar fs-16 me-2',
             'children': [
-                {'label': 'Branch Sales Report', 'url_name': 'branch_sales_report'},
-                {'label': 'Sales Item Report', 'url_name': 'sales_item_unit_report'},
                 
-                # Inventory Reports
-                {'label': 'Stock Summary', 'url_name': 'stock_summary_report'},
-                {'label': 'Low Stock Alert', 'url_name': 'low_stock_report'},
-                {'label': 'Store Performance', 'url_name': 'store_performance_report'},
-                {'label': 'Category Analysis', 'url_name': 'category_analysis_report'},
-                {'label': 'Product Movement', 'url_name': 'product_movement_report'},
-                {'label': 'ABC Analysis', 'url_name': 'abc_analysis_report'},
+                # {'label': 'Report Dashboard', 'url_name': 'reports_dashboard'}, 
+                # {'label': 'Report details', 'url_name': 'reports_details'},
+                {'label': 'Sales Report', 'url_name': 'sales_details'},
+                {'label': 'Purchase Report', 'url_name': 'purchase_details'},
+                {'label': 'Inventory Report', 'url_name': 'inventory_details'},
+                {'label': 'Transfer Report', 'url_name': 'transfer_details'},
+                {'label': 'Stock Adjustment Report', 'url_name': 'stock_adjustment_details'},
+                # {'label': 'Financial Report', 'url_name': 'financial_details'},
+                # {'label': 'Product Master Report', 'url_name': 'productmaster_details'},
+                # {'label': 'Stock Location Report', 'url_name': 'stocklocation_details'},
+                # {'label': 'reorder Level Report', 'url_name': 'reorder_details'},
+                # {'label': 'Product Pricing Report', 'url_name': 'productpricing_details'},
+                # {'label': 'Performance Report', 'url_name': 'performace_details'},
+                # {'label': 'Lifecycle Report', 'url_name': 'lifecycle_details'},
+                # {'label': 'Operational Report', 'url_name': 'operational_details'},
+                # {'label': 'Audit & Compliance Report', 'url_name': 'auditcompliance_details'},
+                # {'label': 'Correlation Report', 'url_name': 'correlation_details'},
                 
-                # Operational Reports
-                {'label': 'Inventory Valuation', 'url_name': 'inventory_valuation_report'},
-                {'label': 'Stock Transfer Status', 'url_name': 'stock_transfer_report'},
-                {'label': 'Product Availability', 'url_name': 'product_availability_report'},
+                
+                
+                # {'label': 'Branch Sales Report', 'url_name': 'branch_sales_report'},
+                # {'label': 'Sales Item Report', 'url_name': 'sales_item_unit_report'},
+                
             ],
         },
         {

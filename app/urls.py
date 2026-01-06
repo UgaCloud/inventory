@@ -23,23 +23,18 @@ from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
 from .views.reports import sales_report_views, inventory_reports
 from app.views import stock_adjustments
-from .views.roles_views import (
-    roles_list_view, role_create_view, role_edit_view, role_detail_view,
-    role_delete_view, role_assign_to_user_view, role_unassign_from_user_view,
-    role_bulk_assign_view
-)
-from .views.user_views import (
-    users_list_view, user_create_view, user_edit_view, user_detail_view,
-    user_delete_view, user_assign_role_view, user_unassign_role_view
-)
+from .views.roles_views import *
+from .views.user_views import *
 from .views.employee_role_views import employee_manage_roles_view
 from app.views.dashboard_api import order_stats_api, recent_sales_api
+from app.views import profile_views
 
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     path('', index_view, name = 'index_page'),
     path('login/', login_view, name = 'login_page'),
+    path('reset-password/', reset_password_view, name='reset_password'),
     path('sign_up/', sign_up_view, name = 'sign_up_page'),
     path('extend-session/', extend_session_view, name = 'extend_session'),
     path('logout/', logout_view, name = 'logout'),
@@ -232,7 +227,46 @@ urlpatterns = [
     path('api/inventory/available/', stock_adjustments.api_inventory_available, name='api_inventory_available'),
     
     # Inventory Reports
-      path('reports/', inventory_reports.reports_dashboard, name='reports_dashboard'),
+    path('reports/', inventory_reports.reports_dashboard, name='reports_dashboard'),   
+    path('reports-details/', inventory_reports.reports_details, name='reports_details'),
+    
+    path('purchase-details/', inventory_reports.purchase_details, name='purchase_details'), 
+    # path('sales-details/', inventory_reports.sales_details, name='sales_details'),
+    path('inventory-details/', inventory_reports.inventory_details, name='inventory_details'),
+    path('transfer-details/', inventory_reports.transfer_details, name='transfer_details'),
+    path('stock-adjustment-details/', inventory_reports.stockadj_details, name='stock_adjustment_details'),
+    path('finance/reports/', inventory_reports.financial_details, name='financial_details'),
+    path('productmaster-details/', inventory_reports.productmaster_details, name='productmaster_details'),
+    path('stocklocation-details/', inventory_reports.stocklocation_details, name='stocklocation_details'),
+    path('reorder-details/', inventory_reports.reorder_details, name='reorder_details'), 
+    path('productpricing-details/', inventory_reports.productpricing_details, name='productpricing_details'),
+    path('performace-details/', inventory_reports.performace_details, name='performace_details'),
+    path('lifecycle-details/', inventory_reports.lifecycle_details, name='lifecycle_details'),
+    path('operational-details/', inventory_reports.operational_details, name='operational_details'),
+    path('auditcompliance-details/', inventory_reports.auditcompliance_details, name='auditcompliance_details'),
+    path('correlation-details/', inventory_reports.correlation_details, name='correlation_details'),
+    path('profile-details/', profile_views.profile_view, name='profile_details'),
+   
+   
+     # Sales details report
+    path('sales-details/', inventory_reports.sales_details, name='sales_details'),
+    path('sales-details/export/csv/', inventory_reports.export_sales_csv, name='export_sales_csv'),
+    path('sales-details/export/pdf/', inventory_reports.export_sales_pdf, name='export_sales_pdf'),
+    path('sales-details/export/excel/', inventory_reports.export_sales_excel, name='export_sales_excel'),
+   
+    path('reports/purchase/<str:report_type>/', inventory_reports.purchase_details, name='purchase_report_type'),
+    path('reports/purchase/<str:report_type>/<str:period>/',inventory_reports.purchase_details, name='purchase_report_period'),
+    path('reports/purchase/export/csv/', inventory_reports.export_purchase_csv, name='export_purchase_csv'),
+    path('reports/purchase/export/pdf/', inventory_reports.export_purchase_pdf, name='export_purchase_pdf'),
+    path('reports/purchase/export/excel/', inventory_reports.export_purchase_excel, name='export_purchase_excel'),
+
+
+    path('api/adjustments/<int:adjustment_id>/details/', inventory_reports.adjustment_details_api, name='adjustment_details_api'),
+    path('api/adjustments/batch/<str:batch_reference>/', inventory_reports.batch_details_api, name='batch_details_api'),
+  
+    
+    
+    
     path('reports/stock-summary/', inventory_reports.reports_view, {'report_type': 'stock_summary'}, name='stock_summary_report'),
     path('reports/low-stock/', inventory_reports.reports_view, {'report_type': 'low_stock'}, name='low_stock_report'),
     path('reports/store-performance/', inventory_reports.reports_view, {'report_type': 'store_performance'}, name='store_performance_report'),

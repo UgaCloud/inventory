@@ -23,7 +23,7 @@ def record_sales_view(request):
         form = SalesForm(request.POST)
         formset = SalesItemFormSet(request.POST, queryset=SalesItem.objects.none())
 
-        total_amount = int(request.POST['total_amount'])
+        total_amount = int(float(request.POST['total_amount']))
         
         if form.is_valid() and formset.is_valid():
             sale_data = form.save(commit=False)

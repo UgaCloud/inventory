@@ -1,0 +1,1868 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Store Location Reports{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+<style>
+    /* Custom styles for store reports */
+    .store-card {
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        border: 1px solid #dee2e6;
+    }
+    
+    .store-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .store-header {
+        border-radius: 12px 12px 0 0;
+        padding: 1rem;
+        color: white;
+        font-weight: 600;
+    }
+    
+    .store-kampala { background: linear-gradient(135deg, #4A90E2, #357ABD); }
+    .store-entebbe { background: linear-gradient(135deg, #36B9CC, #2A9CA5); }
+    .store-jinja { background: linear-gradient(135deg, #1CC88A, #17A673); }
+    .store-gulu { background: linear-gradient(135deg, #F6C23E, #F4B619); }
+    .store-mbarara { background: linear-gradient(135deg, #E74A3B, #E02D1B); }
+    
+    .capacity-meter {
+        height: 8px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    
+    .capacity-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 1s ease;
+    }
+    
+    .capacity-low { background-color: #1CC88A; }
+    .capacity-medium { background-color: #F6C23E; }
+    .capacity-high { background-color: #E74A3B; }
+    
+    .store-metrics {
+        display: flex;
+        justify-content: space-between;
+        margin: 15px 0;
+    }
+    
+    .metric-item {
+        text-align: center;
+        flex: 1;
+        padding: 0 5px;
+    }
+    
+    .metric-value {
+        font-size: 1.2rem;
+        font-weight: 600;
+        display: block;
+    }
+    
+    .metric-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+    
+    .activity-timeline {
+        border-left: 2px solid #dee2e6;
+        padding-left: 20px;
+        margin-left: 10px;
+    }
+    
+    .activity-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+    
+    .activity-item::before {
+        content: '';
+        position: absolute;
+        left: -25px;
+        top: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: white;
+        border: 3px solid;
+    }
+    
+    .activity-high { border-color: #1CC88A; }
+    .activity-medium { border-color: #F6C23E; }
+    .activity-low { border-color: #E74A3B; }
+    
+    .comparison-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+    }
+    
+    .comparison-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+    }
+    
+    .comparison-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .comparison-stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    .stat-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+    
+    .store-map {
+        height: 200px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+        margin: 20px 0;
+    }
+    
+    .map-marker {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background-color: white;
+        border: 2px solid;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    
+    .map-marker:hover {
+        transform: scale(1.5);
+    }
+    
+    .marker-kampala { border-color: #4A90E2; top: 30%; left: 40%; }
+    .marker-entebbe { border-color: #36B9CC; top: 35%; left: 35%; }
+    .marker-jinja { border-color: #1CC88A; top: 40%; left: 45%; }
+    .marker-gulu { border-color: #F6C23E; top: 25%; left: 30%; }
+    .marker-mbarara { border-color: #E74A3B; top: 50%; left: 35%; }
+    
+    .performance-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .performance-excellent { background-color: rgba(28, 200, 138, 0.1); color: #1CC88A; }
+    .performance-good { background-color: rgba(246, 194, 62, 0.1); color: #F6C23E; }
+    .performance-fair { background-color: rgba(231, 74, 59, 0.1); color: #E74A3B; }
+    
+    .trend-indicator {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.8rem;
+        margin-left: 5px;
+    }
+    
+    .trend-up { color: #1CC88A; }
+    .trend-down { color: #E74A3B; }
+    .trend-neutral { color: #6c757d; }
+    
+    .default-store-indicator {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background-color: #4A90E2;
+        color: white;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+    }
+    
+    .store-score {
+        font-size: 2rem;
+        font-weight: 700;
+        text-align: center;
+        margin: 10px 0;
+    }
+    
+    .score-excellent { color: #1CC88A; }
+    .score-good { color: #F6C23E; }
+    .score-fair { color: #E74A3B; }
+    
+    .store-chart-container {
+        height: 200px;
+        position: relative;
+        margin: 20px 0;
+    }
+    
+    /* Filter controls */
+    .date-range-picker {
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.5rem;
+        cursor: pointer;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .store-metrics {
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .metric-item {
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .comparison-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .comparison-stats {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .store-header h5 {
+            font-size: 1rem;
+        }
+        
+        .activity-timeline {
+            padding-left: 15px;
+            margin-left: 5px;
+        }
+        
+        .activity-item::before {
+            left: -20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="add-item d-flex">
+                <div class="page-title">
+                    <h4>Store Location Reports</h4>
+                    <h6>Store performance, capacity, and activity analysis</h6>
+                </div>
+            </div>
+            <ul class="table-top-head">
+                <li>
+                    <div class="date-range-picker" id="dateRangePicker">
+                        <i data-feather="calendar" class="feather-16 me-2"></i>
+                        <span>Jan 1, 2024 - Jan 31, 2024</span>
+                    </div>
+                </li>
+                <li>
+                    <button class="btn btn-outline-primary" onclick="refreshStoreReports()">
+                        <i data-feather="refresh-cw" class="feather-16 me-1"></i>
+                        Refresh
+                    </button>
+                </li>
+                <li>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i data-feather="download" class="feather-16 me-1"></i>
+                            Export
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="exportStoreReport('csv')">
+                                <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportStoreReport('pdf')">
+                                <i data-feather="file" class="feather-14 me-2"></i>Export PDF
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportStoreReport('excel')">
+                                <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
+                            </a></li>
+                        </ul>
+                    </div>
+                </li>
+                <li>
+                    <button class="btn btn-primary" onclick="goBack()">
+                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
+                        Back to Dashboard
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Report Header Info -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card" style="border-left: 4px solid #4A90E2;">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="card-title mb-3">
+                                    <i data-feather="map-pin" class="feather-16 me-2"></i>
+                                    Store Network Overview
+                                </h5>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Total Stores:</strong> 5 locations</p>
+                                        <p class="mb-1"><strong>Default Store:</strong> Kampala Main</p>
+                                        <p class="mb-1"><strong>Reporting Period:</strong> January 2024</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Best Performing:</strong> Kampala Main</p>
+                                        <p class="mb-1"><strong>Total Sales:</strong> UGX 185,250,000</p>
+                                        <p class="mb-1"><strong>Growth Rate:</strong> <span class="trend-up">+12.5%</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="store-map">
+                                    <div class="map-marker marker-kampala" data-bs-toggle="tooltip" data-bs-placement="top" title="Kampala Main"></div>
+                                    <div class="map-marker marker-entebbe" data-bs-toggle="tooltip" data-bs-placement="top" title="Entebbe Branch"></div>
+                                    <div class="map-marker marker-jinja" data-bs-toggle="tooltip" data-bs-placement="top" title="Jinja Branch"></div>
+                                    <div class="map-marker marker-gulu" data-bs-toggle="tooltip" data-bs-placement="top" title="Gulu Branch"></div>
+                                    <div class="map-marker marker-mbarara" data-bs-toggle="tooltip" data-bs-placement="top" title="Mbarara Branch"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabbed Interface -->
+        <div class="row">
+            <!-- Side Tabs -->
+            <div class="col-lg-3 col-md-4">
+                <div class="card side-tabs-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="bar-chart-2" class="feather-16 me-2"></i>
+                            Store Analysis Sections
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="side-tabs-container">
+                            <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
+                                <button class="nav-link side-tab active" id="capacity-tab" data-bs-toggle="pill" data-bs-target="#capacity" type="button" role="tab" aria-controls="capacity" aria-selected="true">
+                                    <i data-feather="package" class="feather-16 me-2"></i>
+                                    Store Capacity/Utilization
+                                </button>
+                                <button class="nav-link side-tab" id="activity-tab" data-bs-toggle="pill" data-bs-target="#activity" type="button" role="tab" aria-controls="activity" aria-selected="false">
+                                    <i data-feather="activity" class="feather-16 me-2"></i>
+                                    Store Activity Analysis
+                                </button>
+                                <button class="nav-link side-tab" id="comparison-tab" data-bs-toggle="pill" data-bs-target="#comparison" type="button" role="tab" aria-controls="comparison" aria-selected="false">
+                                    <i data-feather="git-merge" class="feather-16 me-2"></i>
+                                    Branch-wise Comparison
+                                </button>
+                                <button class="nav-link side-tab" id="default-tab" data-bs-toggle="pill" data-bs-target="#default" type="button" role="tab" aria-controls="default" aria-selected="false">
+                                    <i data-feather="star" class="feather-16 me-2"></i>
+                                    Default Store Analysis
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">
+                            <i data-feather="info" class="feather-12 me-1"></i>
+                            Click store markers on map for details
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="col-lg-9 col-md-8">
+                <div class="tab-content" id="sideTabContent">
+                    <!-- Store Capacity/Utilization Tab -->
+                    <div class="tab-pane fade show active" id="capacity" role="tabpanel" aria-labelledby="capacity-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="package" class="feather-16 me-2"></i>
+                                    Store Capacity & Utilization
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterCapacity('all')">All Stores</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterCapacity('high')">High Utilization</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterCapacity('low')">Low Utilization</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="store-chart-container">
+                                            <canvas id="capacityChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row" id="capacityGrid">
+                                    <!-- Kampala Main -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card store-card">
+                                            <div class="store-header store-kampala">
+                                                <h5 class="mb-0">Kampala Main</h5>
+                                                <small>Flagship Store</small>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="store-metrics">
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">85%</span>
+                                                        <span class="metric-label">Utilization</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">1,850</span>
+                                                        <span class="metric-label">SKUs</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">2,500</span>
+                                                        <span class="metric-label">Capacity</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <small>Storage Utilization</small>
+                                                        <small><strong>85%</strong></small>
+                                                    </div>
+                                                    <div class="capacity-meter">
+                                                        <div class="capacity-fill capacity-high" style="width: 85%"></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Floor Space</small>
+                                                        <p class="mb-0"><strong>5,000 sq.ft.</strong></p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Last Audit</small>
+                                                        <p class="mb-0"><strong>2024-01-25</strong></p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <span class="performance-badge performance-excellent">
+                                                        <i data-feather="trending-up" class="feather-12 me-1"></i>
+                                                        Optimal Utilization
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Entebbe Branch -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card store-card">
+                                            <div class="store-header store-entebbe">
+                                                <h5 class="mb-0">Entebbe Branch</h5>
+                                                <small>Airport Location</small>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="store-metrics">
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">62%</span>
+                                                        <span class="metric-label">Utilization</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">850</span>
+                                                        <span class="metric-label">SKUs</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">1,200</span>
+                                                        <span class="metric-label">Capacity</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <small>Storage Utilization</small>
+                                                        <small><strong>62%</strong></small>
+                                                    </div>
+                                                    <div class="capacity-meter">
+                                                        <div class="capacity-fill capacity-medium" style="width: 62%"></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Floor Space</small>
+                                                        <p class="mb-0"><strong>2,500 sq.ft.</strong></p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Last Audit</small>
+                                                        <p class="mb-0"><strong>2024-01-20</strong></p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <span class="performance-badge performance-good">
+                                                        <i data-feather="activity" class="feather-12 me-1"></i>
+                                                        Good Utilization
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Jinja Branch -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card store-card">
+                                            <div class="store-header store-jinja">
+                                                <h5 class="mb-0">Jinja Branch</h5>
+                                                <small>Industrial Area</small>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="store-metrics">
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">35%</span>
+                                                        <span class="metric-label">Utilization</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">420</span>
+                                                        <span class="metric-label">SKUs</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">800</span>
+                                                        <span class="metric-label">Capacity</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <small>Storage Utilization</small>
+                                                        <small><strong>35%</strong></small>
+                                                    </div>
+                                                    <div class="capacity-meter">
+                                                        <div class="capacity-fill capacity-low" style="width: 35%"></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Floor Space</small>
+                                                        <p class="mb-0"><strong>1,800 sq.ft.</strong></p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Last Audit</small>
+                                                        <p class="mb-0"><strong>2024-01-15</strong></p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <span class="performance-badge performance-fair">
+                                                        <i data-feather="alert-triangle" class="feather-12 me-1"></i>
+                                                        Low Utilization
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Gulu Branch -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card store-card">
+                                            <div class="store-header store-gulu">
+                                                <h5 class="mb-0">Gulu Branch</h5>
+                                                <small>Northern Region</small>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="store-metrics">
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">70%</span>
+                                                        <span class="metric-label">Utilization</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">280</span>
+                                                        <span class="metric-label">SKUs</span>
+                                                    </div>
+                                                    <div class="metric-item">
+                                                        <span class="metric-value">400</span>
+                                                        <span class="metric-label">Capacity</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <small>Storage Utilization</small>
+                                                        <small><strong>70%</strong></small>
+                                                    </div>
+                                                    <div class="capacity-meter">
+                                                        <div class="capacity-fill capacity-medium" style="width: 70%"></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Floor Space</small>
+                                                        <p class="mb-0"><strong>1,200 sq.ft.</strong></p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Last Audit</small>
+                                                        <p class="mb-0"><strong>2024-01-18</strong></p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <span class="performance-badge performance-good">
+                                                        <i data-feather="activity" class="feather-12 me-1"></i>
+                                                        Good Utilization
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Capacity Utilization Summary</h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Average Utilization:</strong> 62.4%</p>
+                                                        <p class="mb-1"><strong>Total Storage Capacity:</strong> 5,900 SKUs</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Highest Utilization:</strong> Kampala (85%)</p>
+                                                        <p class="mb-1"><strong>Lowest Utilization:</strong> Jinja (35%)</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Recommendation:</strong> Rebalance stock from Jinja to Mbarara</p>
+                                                        <p class="mb-1"><strong>Target Utilization:</strong> 70-80% optimal range</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Store Activity Analysis Tab -->
+                    <div class="tab-pane fade" id="activity" role="tabpanel" aria-labelledby="activity-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="activity" class="feather-16 me-2"></i>
+                                    Store Activity Analysis
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-success me-2">Real-time</span>
+                                    <small class="text-muted">Updated: <span id="activityTimestamp">Just now</span></small>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="store-chart-container">
+                                            <canvas id="activityChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="card-title mb-0">
+                                                    <i data-feather="shopping-cart" class="feather-16 me-2"></i>
+                                                    Recent Transactions
+                                                </h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="activity-timeline">
+                                                    <div class="activity-item activity-high">
+                                                        <div class="d-flex justify-content-between">
+                                                            <strong>Kampala Main</strong>
+                                                            <small class="text-muted">10:30 AM</small>
+                                                        </div>
+                                                        <p class="mb-1 small">Large corporate order - 25 units</p>
+                                                        <span class="badge bg-success">UGX 3,250,000</span>
+                                                    </div>
+                                                    
+                                                    <div class="activity-item activity-medium">
+                                                        <div class="d-flex justify-content-between">
+                                                            <strong>Entebbe Branch</strong>
+                                                            <small class="text-muted">10:15 AM</small>
+                                                        </div>
+                                                        <p class="mb-1 small">Retail customer - 3 items</p>
+                                                        <span class="badge bg-warning">UGX 450,000</span>
+                                                    </div>
+                                                    
+                                                    <div class="activity-item activity-high">
+                                                        <div class="d-flex justify-content-between">
+                                                            <strong>Kampala Main</strong>
+                                                            <small class="text-muted">9:45 AM</small>
+                                                        </div>
+                                                        <p class="mb-1 small">Online order pickup</p>
+                                                        <span class="badge bg-success">UGX 1,850,000</span>
+                                                    </div>
+                                                    
+                                                    <div class="activity-item activity-low">
+                                                        <div class="d-flex justify-content-between">
+                                                            <strong>Jinja Branch</strong>
+                                                            <small class="text-muted">9:30 AM</small>
+                                                        </div>
+                                                        <p class="mb-1 small">Walk-in customer</p>
+                                                        <span class="badge bg-info">UGX 120,000</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="card-title mb-0">
+                                                    <i data-feather="users" class="feather-16 me-2"></i>
+                                                    Staff Activity
+                                                </h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Store</th>
+                                                                <th>Staff On Duty</th>
+                                                                <th>Transactions</th>
+                                                                <th>Avg. Time</th>
+                                                                <th>Efficiency</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td><strong>Kampala</strong></td>
+                                                                <td>8</td>
+                                                                <td>45</td>
+                                                                <td>5.2 min</td>
+                                                                <td><span class="performance-badge performance-excellent">92%</span></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Entebbe</strong></td>
+                                                                <td>5</td>
+                                                                <td>22</td>
+                                                                <td>6.8 min</td>
+                                                                <td><span class="performance-badge performance-good">85%</span></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Jinja</strong></td>
+                                                                <td>3</td>
+                                                                <td>12</td>
+                                                                <td>8.5 min</td>
+                                                                <td><span class="performance-badge performance-fair">78%</span></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Gulu</strong></td>
+                                                                <td>4</td>
+                                                                <td>18</td>
+                                                                <td>7.2 min</td>
+                                                                <td><span class="performance-badge performance-good">82%</span></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Mbarara</strong></td>
+                                                                <td>3</td>
+                                                                <td>10</td>
+                                                                <td>9.1 min</td>
+                                                                <td><span class="performance-badge performance-fair">75%</span></td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Activity Insights & Recommendations</h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Peak Hours:</strong> 10:00 AM - 12:00 PM</p>
+                                                        <p class="mb-1"><strong>Busiest Store:</strong> Kampala Main</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Avg Transaction Value:</strong> UGX 850,000</p>
+                                                        <p class="mb-1"><strong>Customer Wait Time:</strong> 6.8 minutes</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Recommendation:</strong> Increase staffing at Jinja during peak</p>
+                                                        <p class="mb-1"><strong>Improvement Target:</strong> Reduce wait time to 5 minutes</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Branch-wise Store Comparison Tab -->
+                    <div class="tab-pane fade" id="comparison" role="tabpanel" aria-labelledby="comparison-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="git-merge" class="feather-16 me-2"></i>
+                                    Branch-wise Store Comparison
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="compareBy('performance')">Performance</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="compareBy('sales')">Sales</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="compareBy('efficiency')">Efficiency</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="store-chart-container">
+                                            <canvas id="comparisonChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="comparison-grid">
+                                    <!-- Kampala Main -->
+                                    <div class="comparison-card">
+                                        <div class="comparison-header">
+                                            <h6 class="mb-0 store-kampala" style="color: #4A90E2;">Kampala Main</h6>
+                                            <div class="store-score score-excellent">9.2</div>
+                                        </div>
+                                        <div class="comparison-stats">
+                                            <div class="stat-item">
+                                                <span class="stat-value">UGX 85.2M</span>
+                                                <span class="stat-label">Monthly Sales</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">1,245</span>
+                                                <span class="stat-label">Transactions</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">92%</span>
+                                                <span class="stat-label">Efficiency</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">4.8★</span>
+                                                <span class="stat-label">Rating</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <small class="text-muted">Strengths</small>
+                                            <p class="small mb-1">• High customer volume</p>
+                                            <p class="small mb-1">• Excellent staff efficiency</p>
+                                            <p class="small mb-0">• Premium product mix</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Entebbe Branch -->
+                                    <div class="comparison-card">
+                                        <div class="comparison-header">
+                                            <h6 class="mb-0 store-entebbe" style="color: #36B9CC;">Entebbe Branch</h6>
+                                            <div class="store-score score-good">7.8</div>
+                                        </div>
+                                        <div class="comparison-stats">
+                                            <div class="stat-item">
+                                                <span class="stat-value">UGX 42.5M</span>
+                                                <span class="stat-label">Monthly Sales</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">682</span>
+                                                <span class="stat-label">Transactions</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">85%</span>
+                                                <span class="stat-label">Efficiency</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">4.5★</span>
+                                                <span class="stat-label">Rating</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <small class="text-muted">Opportunities</small>
+                                            <p class="small mb-1">• Airport location advantage</p>
+                                            <p class="small mb-1">• Tourist customer base</p>
+                                            <p class="small mb-0">• Upsell potential</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Jinja Branch -->
+                                    <div class="comparison-card">
+                                        <div class="comparison-header">
+                                            <h6 class="mb-0 store-jinja" style="color: #1CC88A;">Jinja Branch</h6>
+                                            <div class="store-score score-fair">6.5</div>
+                                        </div>
+                                        <div class="comparison-stats">
+                                            <div class="stat-item">
+                                                <span class="stat-value">UGX 28.5M</span>
+                                                <span class="stat-label">Monthly Sales</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">425</span>
+                                                <span class="stat-label">Transactions</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">78%</span>
+                                                <span class="stat-label">Efficiency</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">4.2★</span>
+                                                <span class="stat-label">Rating</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <small class="text-muted">Improvements</small>
+                                            <p class="small mb-1">• Increase staff training</p>
+                                            <p class="small mb-1">• Optimize inventory mix</p>
+                                            <p class="small mb-0">• Local marketing needed</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Gulu Branch -->
+                                    <div class="comparison-card">
+                                        <div class="comparison-header">
+                                            <h6 class="mb-0 store-gulu" style="color: #F6C23E;">Gulu Branch</h6>
+                                            <div class="store-score score-good">7.2</div>
+                                        </div>
+                                        <div class="comparison-stats">
+                                            <div class="stat-item">
+                                                <span class="stat-value">UGX 18.7M</span>
+                                                <span class="stat-label">Monthly Sales</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">312</span>
+                                                <span class="stat-label">Transactions</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">82%</span>
+                                                <span class="stat-label">Efficiency</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">4.4★</span>
+                                                <span class="stat-label">Rating</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <small class="text-muted">Characteristics</small>
+                                            <p class="small mb-1">• Stable performance</p>
+                                            <p class="small mb-1">• Loyal customer base</p>
+                                            <p class="small mb-0">• Steady growth</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Mbarara Branch -->
+                                    <div class="comparison-card">
+                                        <div class="comparison-header">
+                                            <h6 class="mb-0 store-mbarara" style="color: #E74A3B;">Mbarara Branch</h6>
+                                            <div class="store-score score-fair">6.1</div>
+                                        </div>
+                                        <div class="comparison-stats">
+                                            <div class="stat-item">
+                                                <span class="stat-value">UGX 10.5M</span>
+                                                <span class="stat-label">Monthly Sales</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">185</span>
+                                                <span class="stat-label">Transactions</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">75%</span>
+                                                <span class="stat-label">Efficiency</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-value">4.0★</span>
+                                                <span class="stat-label">Rating</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <small class="text-muted">Challenges</small>
+                                            <p class="small mb-1">• New location</p>
+                                            <p class="small mb-1">• Low brand awareness</p>
+                                            <p class="small mb-0">• Need marketing push</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Comparative Analysis Summary</h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Top Performer:</strong> Kampala Main (Score: 9.2)</p>
+                                                        <p class="mb-1"><strong>Most Improved:</strong> Gulu Branch (+15%)</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Average Store Score:</strong> 7.36</p>
+                                                        <p class="mb-1"><strong>Sales Range:</strong> UGX 10.5M - 85.2M</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Recommendation:</strong> Implement best practices from Kampala to other stores</p>
+                                                        <p class="mb-1"><strong>Target:</strong> Bring all stores above 7.0 score</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Default Store Analysis Tab -->
+                    <div class="tab-pane fade" id="default" role="tabpanel" aria-labelledby="default-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="star" class="feather-16 me-2"></i>
+                                    Default Store Analysis
+                                    <span class="badge bg-primary ms-2">Kampala Main</span>
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="showDefaultMetrics('overview')">Overview</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showDefaultMetrics('performance')">Performance</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showDefaultMetrics('inventory')">Inventory</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-8">
+                                        <div class="store-chart-container">
+                                            <canvas id="defaultStoreChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card" style="position: relative;">
+                                            <div class="default-store-indicator" data-bs-toggle="tooltip" data-bs-placement="top" title="Default Store">
+                                                <i data-feather="star" class="feather-12"></i>
+                                            </div>
+                                            <div class="store-header store-kampala">
+                                                <h5 class="mb-0 text-center">Kampala Main</h5>
+                                                <small class="text-center d-block">Flagship Store</small>
+                                            </div>
+                                            <div class="card-body text-center">
+                                                <div class="store-score score-excellent mb-3">9.2</div>
+                                                <p class="small mb-3">Overall Store Rating</p>
+                                                
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Established</small>
+                                                        <p class="mb-0"><strong>2018</strong></p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Manager</small>
+                                                        <p class="mb-0"><strong>Sarah M.</strong></p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <span class="performance-badge performance-excellent">
+                                                        <i data-feather="award" class="feather-12 me-1"></i>
+                                                        Store of the Month
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="card-title mb-0">
+                                                    <i data-feather="trending-up" class="feather-16 me-2"></i>
+                                                    Key Metrics
+                                                </h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-3">
+                                                    <small class="text-muted">Monthly Sales Growth</small>
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span class="h5 mb-0 text-success">+12.5%</span>
+                                                        <i data-feather="trending-up" class="feather-16 text-success"></i>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <small class="text-muted">Customer Satisfaction</small>
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span class="h5 mb-0 text-primary">94%</span>
+                                                        <i data-feather="smile" class="feather-16 text-primary"></i>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <small class="text-muted">Inventory Accuracy</small>
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span class="h5 mb-0 text-info">98.2%</span>
+                                                        <i data-feather="check-circle" class="feather-16 text-info"></i>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <small class="text-muted">Staff Efficiency</small>
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span class="h5 mb-0 text-warning">92%</span>
+                                                        <i data-feather="users" class="feather-16 text-warning"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-8">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="card-title mb-0">
+                                                    <i data-feather="target" class="feather-16 me-2"></i>
+                                                    Strategic Role & Responsibilities
+                                                </h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row mb-3">
+                                                    <div class="col-md-6">
+                                                        <h6>Primary Functions</h6>
+                                                        <ul class="list-unstyled mb-0">
+                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Training center for new staff</li>
+                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Main inventory hub</li>
+                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Corporate sales headquarters</li>
+                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Product launch showcase</li>
+                                                        </ul>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <h6>Performance Targets</h6>
+                                                        <ul class="list-unstyled mb-0">
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Monthly sales: UGX 100M</li>
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Customer satisfaction: 95%+</li>
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Staff training: 20 hrs/month</li>
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Inventory accuracy: 99%</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <h6>Benchmark Comparison</h6>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Metric</th>
+                                                                    <th>Kampala (Default)</th>
+                                                                    <th>Average of Others</th>
+                                                                    <th>Difference</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td>Sales/Unit Area</td>
+                                                                    <td>UGX 17,040</td>
+                                                                    <td>UGX 9,850</td>
+                                                                    <td class="text-success">+73%</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td>Transaction Value</td>
+                                                                    <td>UGX 1,250,000</td>
+                                                                    <td>UGX 850,000</td>
+                                                                    <td class="text-success">+47%</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td>Customer Retention</td>
+                                                                    <td>88%</td>
+                                                                    <td>72%</td>
+                                                                    <td class="text-success">+22%</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td>Staff Productivity</td>
+                                                                    <td>5.6 units/hr</td>
+                                                                    <td>4.2 units/hr</td>
+                                                                    <td class="text-success">+33%</td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light-primary">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Default Store Leadership Role</h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Best Practices:</strong> 12 identified processes</p>
+                                                        <p class="mb-1"><strong>Training Programs:</strong> 4 active monthly</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Knowledge Sharing:</strong> Weekly sessions</p>
+                                                        <p class="mb-1"><strong>Cross-training:</strong> 8 staff/month</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Target Impact:</strong> Improve network average by 15%</p>
+                                                        <p class="mb-1"><strong>Review Cycle:</strong> Quarterly assessment</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let capacityChart;
+let activityChart;
+let comparisonChart;
+let defaultStoreChart;
+
+// Initialize charts and functionality
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCapacityChart();
+    initializeActivityChart();
+    initializeComparisonChart();
+    initializeDefaultStoreChart();
+    
+    // Initialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Initialize date range picker
+    initializeDateRangePicker();
+    
+    // Start activity updates
+    startActivityUpdates();
+});
+
+function initializeCapacityChart() {
+    const ctx = document.getElementById('capacityChart').getContext('2d');
+    
+    capacityChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Kampala', 'Entebbe', 'Jinja', 'Gulu', 'Mbarara'],
+            datasets: [{
+                label: 'Storage Utilization (%)',
+                data: [85, 62, 35, 70, 40],
+                backgroundColor: [
+                    '#4A90E2',
+                    '#36B9CC',
+                    '#1CC88A',
+                    '#F6C23E',
+                    '#E74A3B'
+                ],
+                borderColor: [
+                    '#357ABD',
+                    '#2A9CA5',
+                    '#17A673',
+                    '#F4B619',
+                    '#E02D1B'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Utilization: ${context.raw}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Utilization (%)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Store Locations'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initializeActivityChart() {
+    const ctx = document.getElementById('activityChart').getContext('2d');
+    
+    activityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+            datasets: [
+                {
+                    label: 'Kampala Main',
+                    data: [25, 45, 68, 85, 72, 58, 42, 35],
+                    borderColor: '#4A90E2',
+                    backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Entebbe Branch',
+                    data: [15, 28, 42, 55, 48, 38, 25, 18],
+                    borderColor: '#36B9CC',
+                    backgroundColor: 'rgba(54, 185, 204, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Jinja Branch',
+                    data: [8, 15, 22, 28, 25, 20, 15, 10],
+                    borderColor: '#1CC88A',
+                    backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Transactions per Hour'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Time of Day'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'nearest'
+            }
+        }
+    });
+}
+
+function initializeComparisonChart() {
+    const ctx = document.getElementById('comparisonChart').getContext('2d');
+    
+    comparisonChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Sales', 'Efficiency', 'Customer Sat', 'Inventory Acc', 'Staff Prod', 'Growth'],
+            datasets: [
+                {
+                    label: 'Kampala Main',
+                    data: [95, 92, 94, 98, 90, 88],
+                    backgroundColor: 'rgba(74, 144, 226, 0.2)',
+                    borderColor: '#4A90E2',
+                    pointBackgroundColor: '#4A90E2'
+                },
+                {
+                    label: 'Entebbe Branch',
+                    data: [75, 85, 88, 92, 80, 82],
+                    backgroundColor: 'rgba(54, 185, 204, 0.2)',
+                    borderColor: '#36B9CC',
+                    pointBackgroundColor: '#36B9CC'
+                },
+                {
+                    label: 'Jinja Branch',
+                    data: [60, 78, 82, 85, 75, 70],
+                    backgroundColor: 'rgba(28, 200, 138, 0.2)',
+                    borderColor: '#1CC88A',
+                    pointBackgroundColor: '#1CC88A'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        stepSize: 20
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initializeDefaultStoreChart() {
+    const ctx = document.getElementById('defaultStoreChart').getContext('2d');
+    
+    defaultStoreChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            datasets: [
+                {
+                    label: 'Sales (UGX M)',
+                    data: [68, 72, 75, 78, 82, 85, 80, 82, 85, 88, 85, 92],
+                    backgroundColor: 'rgba(74, 144, 226, 0.5)',
+                    borderColor: '#4A90E2',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Growth %',
+                    data: [8, 10, 12, 15, 18, 20, 18, 16, 14, 12, 10, 12],
+                    backgroundColor: 'rgba(28, 200, 138, 0.5)',
+                    borderColor: '#1CC88A',
+                    borderWidth: 1,
+                    type: 'line',
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Sales (UGX Millions)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Growth (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initializeDateRangePicker() {
+    const picker = $('#dateRangePicker');
+    picker.daterangepicker({
+        startDate: moment().startOf('month'),
+        endDate: moment().endOf('month'),
+        ranges: {
+           'Today': [moment(), moment()],
+           'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+           'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+           'This Month': [moment().startOf('month'), moment().endOf('month')],
+           'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+        }
+    }, function(start, end) {
+        $('#dateRangePicker span').html(start.format('MMM D, YYYY') + ' - ' + end.format('MMM D, YYYY'));
+        refreshStoreReports();
+    });
+}
+
+function startActivityUpdates() {
+    // Update activity timestamp every minute
+    setInterval(() => {
+        const now = new Date();
+        const formattedTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('activityTimestamp').textContent = formattedTime;
+    }, 60000); // Update every minute
+}
+
+function filterCapacity(type) {
+    const buttons = document.querySelectorAll('#capacity .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    const storeCards = document.querySelectorAll('.store-card');
+    storeCards.forEach(card => {
+        const utilization = parseInt(card.querySelector('.metric-value').textContent);
+        
+        if (type === 'all') {
+            card.style.display = 'block';
+        } else if (type === 'high' && utilization >= 70) {
+            card.style.display = 'block';
+        } else if (type === 'low' && utilization < 70) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function compareBy(metric) {
+    const buttons = document.querySelectorAll('#comparison .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // This would typically update the comparison chart based on metric
+    showToast(`Comparing stores by: ${metric}`, 'info');
+}
+
+function showDefaultMetrics(view) {
+    const buttons = document.querySelectorAll('#default .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // This would typically show different metrics based on view
+    showToast(`Showing default store: ${view}`, 'info');
+}
+
+function refreshStoreReports() {
+    showLoading();
+    
+    // Simulate API refresh
+    setTimeout(() => {
+        if (capacityChart) capacityChart.destroy();
+        if (activityChart) activityChart.destroy();
+        if (comparisonChart) comparisonChart.destroy();
+        if (defaultStoreChart) defaultStoreChart.destroy();
+        
+        initializeCapacityChart();
+        initializeActivityChart();
+        initializeComparisonChart();
+        initializeDefaultStoreChart();
+        feather.replace();
+        
+        // Hide loading
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.remove();
+        }
+        
+        // Show success message
+        showToast('Store reports refreshed successfully!', 'success');
+    }, 1000);
+}
+
+function exportStoreReport(format) {
+    let exportUrl;
+    let filename = `store-reports-${new Date().toISOString().split('T')[0]}`;
+    
+    if (format === 'csv') {
+        exportUrl = '/reports/store/export/csv/';
+        filename += '.csv';
+    } else if (format === 'pdf') {
+        exportUrl = '/reports/store/export/pdf/';
+        filename += '.pdf';
+    } else if (format === 'excel') {
+        exportUrl = '/reports/store/export/excel/';
+        filename += '.xlsx';
+    }
+    
+    // Create temporary link and download
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`${format.toUpperCase()} export started!`, 'info');
+}
+
+function goBack() {
+    window.history.back();
+    // Or redirect to dashboard:
+    // window.location.href = '/reports/dashboard/';
+}
+
+function showLoading() {
+    // Add loading overlay
+    const loadingHTML = `
+        <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
+             style="background: rgba(255,255,255,0.8); z-index: 9999;">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading store reports...</p>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', loadingHTML);
+}
+
+function showToast(message, type = 'info') {
+    // Create toast element
+    const toastHTML = `
+        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        const container = document.createElement('div');
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    
+    document.querySelector('.toast-container').insertAdjacentHTML('beforeend', toastHTML);
+    
+    // Initialize and show toast
+    const toastEl = document.querySelector('.toast-container .toast:last-child');
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+}
+
+// Add map marker click handlers
+document.querySelectorAll('.map-marker').forEach(marker => {
+    marker.addEventListener('click', function() {
+        const storeName = this.getAttribute('title');
+        showToast(`Viewing details for ${storeName}`, 'info');
+        // This would typically show store details
+    });
+});
+
+// Clean up intervals on page unload
+window.addEventListener('beforeunload', function() {
+    // Clean up any intervals
+});
+</script>
+
+<style>
+/* Additional styles for side tabs */
+.side-tabs-card {
+    height: fit-content;
+    min-height: 500px;
+}
+
+.side-tabs-container {
+    height: 400px;
+    overflow-y: auto;
+}
+
+.side-tabs {
+    border-right: 1px solid #dee2e6;
+}
+
+.side-tab {
+    padding: 1rem 1.25rem;
+    border: none;
+    border-left: 4px solid transparent;
+    border-radius: 0;
+    text-align: left;
+    color: #495057;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    background-color: transparent;
+    position: relative;
+    width: 100%;
+}
+
+.side-tab:hover {
+    background-color: rgba(74, 144, 226, 0.05);
+    color: #4A90E2;
+    border-left-color: rgba(74, 144, 226, 0.3);
+}
+
+.side-tab.active {
+    background-color: rgba(74, 144, 226, 0.1);
+    color: #4A90E2;
+    border-left-color: #4A90E2;
+    font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .side-tabs-card {
+        min-height: auto;
+        margin-bottom: 1rem;
+    }
+    
+    .side-tabs-container {
+        height: auto;
+        max-height: 300px;
+    }
+    
+    .side-tabs {
+        flex-direction: row !important;
+        overflow-x: auto;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .side-tab {
+        border-left: none;
+        border-bottom: 3px solid transparent;
+        white-space: nowrap;
+        padding: 0.75rem 1rem;
+    }
+    
+    .side-tab.active,
+    .side-tab:hover {
+        border-left-color: transparent;
+        border-bottom-color: #4A90E2;
+    }
+}
+
+@media (max-width: 768px) {
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .card-header .btn-group {
+        margin-top: 0.5rem;
+        align-self: flex-start;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .page-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .table-top-head {
+        justify-content: center;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+}
+
+/* Scrollbar styling */
+.side-tabs-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.side-tabs-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.side-tabs-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.side-tabs-container::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+{% endblock %}

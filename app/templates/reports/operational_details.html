@@ -1,0 +1,1991 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Operational Reports{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+<style>
+    /* Operational Report Specific Styles */
+    .operational-card {
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        border: 1px solid #dee2e6;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .operational-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+    
+    .operational-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .status-optimal {
+        background-color: rgba(28, 200, 138, 0.1);
+        color: #1CC88A;
+    }
+    
+    .status-warning {
+        background-color: rgba(246, 194, 62, 0.1);
+        color: #F6C23E;
+    }
+    
+    .status-critical {
+        background-color: rgba(231, 74, 59, 0.1);
+        color: #E74A3B;
+    }
+    
+    .status-excellent {
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0D6EFD;
+    }
+    
+    .operational-kpi-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        height: 100%;
+    }
+    
+    .operational-kpi-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #4A90E2;
+        margin: 10px 0;
+    }
+    
+    .operational-kpi-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .operational-kpi-change {
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+    }
+    
+    .operational-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+    }
+    
+    .activity-tag {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .activity-high {
+        background-color: rgba(28, 200, 138, 0.1);
+        color: #1CC88A;
+    }
+    
+    .activity-medium {
+        background-color: rgba(246, 194, 62, 0.1);
+        color: #F6C23E;
+    }
+    
+    .activity-low {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+    
+    .reorder-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .reorder-effective {
+        background-color: rgba(28, 200, 138, 0.1);
+        color: #1CC88A;
+    }
+    
+    .reorder-ineffective {
+        background-color: rgba(231, 74, 59, 0.1);
+        color: #E74A3B;
+    }
+    
+    .reorder-optimal {
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0D6EFD;
+    }
+    
+    .transfer-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .transfer-positive { background-color: rgba(28, 200, 138, 0.1); color: #1CC88A; }
+    .transfer-negative { background-color: rgba(231, 74, 59, 0.1); color: #E74A3B; }
+    .transfer-neutral { background-color: rgba(108, 117, 125, 0.1); color: #6c757d; }
+    
+    .operational-chart-container {
+        height: 300px;
+        position: relative;
+        margin: 20px 0;
+    }
+    
+    .operational-data-table {
+        font-size: 0.9rem;
+    }
+    
+    .operational-data-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    
+    .user-role-indicator {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-right: 8px;
+        background-color: #4A90E2;
+        color: white;
+    }
+    
+    .stockout-indicator {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-right: 8px;
+    }
+    
+    .stockout-high { background-color: #E74A3B; color: white; }
+    .stockout-medium { background-color: #F6C23E; color: white; }
+    .stockout-low { background-color: #1CC88A; color: white; }
+    
+    .reorder-timeline {
+        height: 8px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        position: relative;
+        margin: 15px 0;
+    }
+    
+    .timeline-point {
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        top: -4px;
+        transform: translateX(-50%);
+    }
+    
+    .point-reorder { background-color: #F6C23E; }
+    .point-delivery { background-color: #1CC88A; }
+    .point-stockout { background-color: #E74A3B; }
+    
+    .transfer-flow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    
+    .transfer-node {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+    }
+    
+    .transfer-arrow {
+        flex: 0 0 30px;
+        text-align: center;
+    }
+    
+    .operational-summary-card {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 20px 0;
+    }
+    
+    .operational-insight-card {
+        border-left: 4px solid #4A90E2;
+        background-color: rgba(74, 144, 226, 0.05);
+        padding: 15px;
+        margin: 15px 0;
+    }
+    
+    .efficiency-indicator {
+        display: inline-block;
+        margin-left: 5px;
+    }
+    
+    .efficiency-high { color: #1CC88A; }
+    .efficiency-medium { color: #F6C23E; }
+    .efficiency-low { color: #E74A3B; }
+    
+    .activity-pattern {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    /* Tab specific styles */
+    .side-tabs-card {
+        height: fit-content;
+        min-height: 500px;
+    }
+    
+    .side-tabs-container {
+        height: 400px;
+        overflow-y: auto;
+    }
+    
+    .side-tabs {
+        border-right: 1px solid #dee2e6;
+    }
+    
+    .side-tab {
+        padding: 1rem 1.25rem;
+        border: none;
+        border-left: 4px solid transparent;
+        border-radius: 0;
+        text-align: left;
+        color: #495057;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        background-color: transparent;
+        position: relative;
+        width: 100%;
+    }
+    
+    .side-tab:hover {
+        background-color: rgba(74, 144, 226, 0.05);
+        color: #4A90E2;
+        border-left-color: rgba(74, 144, 226, 0.3);
+    }
+    
+    .side-tab.active {
+        background-color: rgba(74, 144, 226, 0.1);
+        color: #4A90E2;
+        border-left-color: #4A90E2;
+        font-weight: 600;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .operational-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .operational-chart-container {
+            height: 250px;
+        }
+        
+        .side-tabs-card {
+            min-height: auto;
+            margin-bottom: 1rem;
+        }
+        
+        .side-tabs-container {
+            height: auto;
+            max-height: 300px;
+        }
+        
+        .side-tabs {
+            flex-direction: row !important;
+            overflow-x: auto;
+            border-right: none;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .side-tab {
+            border-left: none;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            padding: 0.75rem 1rem;
+        }
+        
+        .side-tab.active,
+        .side-tab:hover {
+            border-left-color: transparent;
+            border-bottom-color: #4A90E2;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .operational-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .operational-kpi-value {
+            font-size: 1.5rem;
+        }
+        
+        .transfer-flow {
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .transfer-arrow {
+            transform: rotate(90deg);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="add-item d-flex">
+                <div class="page-title">
+                    <h4>Operational Reports</h4>
+                    <h6>User activity, stock operations, reorder management, and transfer analysis</h6>
+                </div>
+            </div>
+            <ul class="table-top-head">
+                <li>
+                    <select class="form-select form-select-sm date-range-selector">
+                        <option value="week" selected>This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="quarter">This Quarter</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </li>
+                <li>
+                    <button class="btn btn-outline-primary" onclick="refreshOperationalReports()">
+                        <i data-feather="refresh-cw" class="feather-16 me-1"></i>
+                        Refresh
+                    </button>
+                </li>
+                <li>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i data-feather="download" class="feather-16 me-1"></i>
+                            Export
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="exportOperationalReport('csv')">
+                                <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportOperationalReport('pdf')">
+                                <i data-feather="file" class="feather-14 me-2"></i>Export PDF
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportOperationalReport('excel')">
+                                <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
+                            </a></li>
+                        </ul>
+                    </div>
+                </li>
+                <li>
+                    <button class="btn btn-primary" onclick="goBack()">
+                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
+                        Back to Dashboard
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Report Header Info -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card" style="border-left: 4px solid #1CC88A;">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="card-title mb-3">
+                                    <i data-feather="settings" class="feather-16 me-2"></i>
+                                    Operational Overview - Week 5, 2024
+                                </h5>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Report ID:</strong> OPS-REPORT-2024-W05</p>
+                                        <p class="mb-1"><strong>Period:</strong> Jan 29 - Feb 4, 2024</p>
+                                        <p class="mb-1"><strong>Active Users:</strong> 24 users</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Overall Efficiency:</strong> <span class="operational-status status-optimal">92.5%</span></p>
+                                        <p class="mb-1"><strong>Stockouts This Week:</strong> 3 incidents</p>
+                                        <p class="mb-1"><strong>Pending Transfers:</strong> 8 transfers</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="operational-grid">
+                                    <div class="operational-kpi-card">
+                                        <div class="operational-kpi-label">User Activity Rate</div>
+                                        <div class="operational-kpi-value">88%</div>
+                                        <div class="operational-kpi-change">
+                                            <span class="efficiency-high">
+                                                <i data-feather="trending-up" class="feather-12"></i>
+                                                +5%
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="operational-kpi-card">
+                                        <div class="operational-kpi-label">Stock Turnover</div>
+                                        <div class="operational-kpi-value">4.8x</div>
+                                        <div class="operational-kpi-change">
+                                            <span class="efficiency-high">
+                                                <i data-feather="trending-up" class="feather-12"></i>
+                                                +0.3x
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="operational-kpi-card">
+                                        <div class="operational-kpi-label">Reorder Accuracy</div>
+                                        <div class="operational-kpi-value">94%</div>
+                                        <div class="operational-kpi-change">
+                                            <span class="efficiency-medium">
+                                                <i data-feather="minus" class="feather-12"></i>
+                                                Stable
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="operational-kpi-card">
+                                        <div class="operational-kpi-label">Transfer Success</div>
+                                        <div class="operational-kpi-value">98%</div>
+                                        <div class="operational-kpi-change">
+                                            <span class="efficiency-high">
+                                                <i data-feather="trending-up" class="feather-12"></i>
+                                                +2%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabbed Interface -->
+        <div class="row">
+            <!-- Side Tabs -->
+            <div class="col-lg-3 col-md-4">
+                <div class="card side-tabs-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="bar-chart-2" class="feather-16 me-2"></i>
+                            Operational Reports
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="side-tabs-container">
+                            <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
+                                <button class="nav-link side-tab active" id="user-activity-tab" data-bs-toggle="pill" data-bs-target="#user-activity" type="button" role="tab" aria-controls="user-activity" aria-selected="true">
+                                    <i data-feather="users" class="feather-16 me-2"></i>
+                                    User Activity Report
+                                </button>
+                                <button class="nav-link side-tab" id="stock-turnover-tab" data-bs-toggle="pill" data-bs-target="#stock-turnover" type="button" role="tab" aria-controls="stock-turnover" aria-selected="false">
+                                    <i data-feather="repeat" class="feather-16 me-2"></i>
+                                    Stock Turnover Analysis
+                                </button>
+                                <button class="nav-link side-tab" id="reorder-point-tab" data-bs-toggle="pill" data-bs-target="#reorder-point" type="button" role="tab" aria-controls="reorder-point" aria-selected="false">
+                                    <i data-feather="shopping-cart" class="feather-16 me-2"></i>
+                                    Reorder Point Effectiveness
+                                </button>
+                                <button class="nav-link side-tab" id="transfer-impact-tab" data-bs-toggle="pill" data-bs-target="#transfer-impact" type="button" role="tab" aria-controls="transfer-impact" aria-selected="false">
+                                    <i data-feather="truck" class="feather-16 me-2"></i>
+                                    Transfer Impact Analysis
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">
+                            <i data-feather="info" class="feather-12 me-1"></i>
+                            Click to analyze different operational aspects
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="col-lg-9 col-md-8">
+                <div class="tab-content" id="sideTabContent">
+                    <!-- User Activity Report Tab -->
+                    <div class="tab-pane fade show active" id="user-activity" role="tabpanel" aria-labelledby="user-activity-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="users" class="feather-16 me-2"></i>
+                                    User Activity Analysis
+                                </h5>
+                                <div class="d-flex">
+                                    <div class="input-group input-group-sm" style="width: 200px;">
+                                        <input type="text" class="form-control" placeholder="Search users..." id="userSearch">
+                                        <button class="btn btn-outline-secondary" type="button">
+                                            <i data-feather="search" class="feather-12"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- User Activity Chart -->
+                                <div class="operational-chart-container mb-4">
+                                    <canvas id="userActivityChart"></canvas>
+                                </div>
+                                
+                                <!-- User Activity Summary -->
+                                <div class="operational-summary-card">
+                                    <h6 class="card-subtitle mb-3">User Activity Summary (Last 7 Days)</h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <p class="mb-2"><strong>Active Users:</strong> 24/28 (86%)</p>
+                                            <p class="mb-2"><strong>Avg. Session Duration:</strong> 2.8 hours</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p class="mb-2"><strong>Most Active Role:</strong> Store Manager</p>
+                                            <p class="mb-2"><strong>Peak Activity Time:</strong> 10:00 AM - 12:00 PM</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p class="mb-2"><strong>Transactions per User:</strong> 42.5 avg.</p>
+                                            <p class="mb-2"><strong>Error Rate:</strong> 0.8%</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- User Activity Table -->
+                                <div class="table-responsive mt-4">
+                                    <table class="table operational-data-table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>User ID</th>
+                                                <th>Name</th>
+                                                <th>Role</th>
+                                                <th>Last Login</th>
+                                                <th>Activity Level</th>
+                                                <th>Sessions (7d)</th>
+                                                <th>Transactions</th>
+                                                <th>Avg. Session</th>
+                                                <th>Error Rate</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>USR-001</strong></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="user-role-indicator">JM</span>
+                                                        John Mwangi
+                                                    </div>
+                                                </td>
+                                                <td>Store Manager</td>
+                                                <td>2024-02-04 09:15</td>
+                                                <td>
+                                                    <span class="activity-tag activity-high">High</span>
+                                                </td>
+                                                <td>28 sessions</td>
+                                                <td>156 transactions</td>
+                                                <td>3.2 hours</td>
+                                                <td>0.3%</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">Active</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>USR-005</strong></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="user-role-indicator">SA</span>
+                                                        Sarah Atieno
+                                                    </div>
+                                                </td>
+                                                <td>Inventory Clerk</td>
+                                                <td>2024-02-04 08:45</td>
+                                                <td>
+                                                    <span class="activity-tag activity-high">High</span>
+                                                </td>
+                                                <td>32 sessions</td>
+                                                <td>128 transactions</td>
+                                                <td>2.8 hours</td>
+                                                <td>0.5%</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">Active</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>USR-012</strong></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="user-role-indicator">PK</span>
+                                                        Peter Kamau
+                                                    </div>
+                                                </td>
+                                                <td>Sales Associate</td>
+                                                <td>2024-02-03 14:20</td>
+                                                <td>
+                                                    <span class="activity-tag activity-medium">Medium</span>
+                                                </td>
+                                                <td>18 sessions</td>
+                                                <td>85 transactions</td>
+                                                <td>2.1 hours</td>
+                                                <td>1.2%</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">Active</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>USR-018</strong></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="user-role-indicator">MN</span>
+                                                        Mary Njeri
+                                                    </div>
+                                                </td>
+                                                <td>Warehouse Staff</td>
+                                                <td>2024-02-02 11:10</td>
+                                                <td>
+                                                    <span class="activity-tag activity-low">Low</span>
+                                                </td>
+                                                <td>8 sessions</td>
+                                                <td>32 transactions</td>
+                                                <td>1.5 hours</td>
+                                                <td>2.8%</td>
+                                                <td>
+                                                    <span class="operational-status status-warning">Inactive</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- User Activity Insights -->
+                                <div class="operational-insight-card mt-4">
+                                    <h6><i data-feather="activity" class="feather-16 me-2"></i> User Activity Insights</h6>
+                                    <ul class="mb-0">
+                                        <li>Overall user activity increased by 5% compared to last week</li>
+                                        <li>Store managers show highest activity levels (avg. 3.2 hours/session)</li>
+                                        <li>Error rates decreased from 1.2% to 0.8% this week</li>
+                                        <li>3 users have been inactive for more than 3 days - follow up recommended</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stock Turnover Analysis Tab -->
+                    <div class="tab-pane fade" id="stock-turnover" role="tabpanel" aria-labelledby="stock-turnover-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="repeat" class="feather-16 me-2"></i>
+                                    Stock Turnover Analysis
+                                    <span class="badge bg-warning ms-2">12 Slow Movers</span>
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterTurnover('all')">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTurnover('fast')">Fast Movers</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTurnover('slow')">Slow Movers</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTurnover('dead')">Dead Stock</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Turnover Overview -->
+                                <div class="row mb-4">
+                                    <div class="col-md-4">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Avg. Turnover Rate</div>
+                                            <div class="operational-kpi-value">4.8x</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-high">
+                                                    <i data-feather="trending-up" class="feather-12"></i>
+                                                    +0.3x
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Industry avg: 3.5x</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Slow Movers</div>
+                                            <div class="operational-kpi-value">12</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-low">
+                                                    <i data-feather="trending-down" class="feather-12"></i>
+                                                    -3 items
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">7% of inventory</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Stockout Rate</div>
+                                            <div class="operational-kpi-value">2.5%</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-high">
+                                                    <i data-feather="trending-down" class="feather-12"></i>
+                                                    -0.8%
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Target: <3%</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Turnover Chart -->
+                                <div class="operational-chart-container mb-4">
+                                    <canvas id="turnoverAnalysisChart"></canvas>
+                                </div>
+                                
+                                <!-- Turnover Analysis Table -->
+                                <div class="table-responsive mt-4">
+                                    <table class="table operational-data-table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Turnover Rate</th>
+                                                <th>SKU</th>
+                                                <th>Product Name</th>
+                                                <th>Category</th>
+                                                <th>Current Stock</th>
+                                                <th>Avg. Daily Sales</th>
+                                                <th>Days of Stock</th>
+                                                <th>Stockout Risk</th>
+                                                <th>Overstock Risk</th>
+                                                <th>Action Required</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>
+                                                    <span class="operational-status status-excellent">8.2x</span>
+                                                </td>
+                                                <td><strong>SKU-128</strong></td>
+                                                <td>Screen Protector Pack</td>
+                                                <td>Accessories</td>
+                                                <td>200 units</td>
+                                                <td>15 units/day</td>
+                                                <td>
+                                                    <span class="stockout-indicator stockout-high">13</span>
+                                                    days
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-critical">HIGH</span>
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">LOW</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-warning" onclick="increaseStockLevel('SKU-128')">
+                                                        <i data-feather="plus" class="feather-12"></i>
+                                                        Increase Stock
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <span class="operational-status status-excellent">6.8x</span>
+                                                </td>
+                                                <td><strong>SKU-001</strong></td>
+                                                <td>Premium Smartphone X200</td>
+                                                <td>Electronics</td>
+                                                <td>25 units</td>
+                                                <td>3 units/day</td>
+                                                <td>
+                                                    <span class="stockout-indicator stockout-medium">8</span>
+                                                    days
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-warning">MEDIUM</span>
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">LOW</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-info" onclick="scheduleReorder('SKU-001')">
+                                                        <i data-feather="calendar" class="feather-12"></i>
+                                                        Schedule Reorder
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <span class="operational-status status-warning">1.2x</span>
+                                                </td>
+                                                <td><strong>SKU-045</strong></td>
+                                                <td>Old Model Charger</td>
+                                                <td>Accessories</td>
+                                                <td>85 units</td>
+                                                <td>0.3 units/day</td>
+                                                <td>
+                                                    <span class="stockout-indicator stockout-low">283</span>
+                                                    days
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">LOW</span>
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-critical">HIGH</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="markForClearance('SKU-045')">
+                                                        <i data-feather="percent" class="feather-12"></i>
+                                                        Clearance Sale
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <span class="operational-status status-optimal">4.5x</span>
+                                                </td>
+                                                <td><strong>SKU-015</strong></td>
+                                                <td>Standard Mouse</td>
+                                                <td>Accessories</td>
+                                                <td>120 units</td>
+                                                <td>5 units/day</td>
+                                                <td>
+                                                    <span class="stockout-indicator stockout-low">24</span>
+                                                    days
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">LOW</span>
+                                                </td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">LOW</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-success" onclick="maintainCurrent('SKU-015')">
+                                                        <i data-feather="check" class="feather-12"></i>
+                                                        Maintain
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Turnover Analysis -->
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Turnover Performance</h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> <strong>Excellent (>6x):</strong> 8 items (5%)</li>
+                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> <strong>Good (4-6x):</strong> 85 items (54%)</li>
+                                                    <li><i data-feather="alert-triangle" class="feather-12 text-warning me-2"></i> <strong>Average (2-4x):</strong> 51 items (33%)</li>
+                                                    <li><i data-feather="alert-circle" class="feather-12 text-danger me-2"></i> <strong>Poor (<2x):</strong> 12 items (8%)</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Quick Actions</h6>
+                                                <div class="d-grid gap-2">
+                                                    <button class="btn btn-outline-warning" onclick="reviewSlowMovers()">
+                                                        <i data-feather="alert-triangle" class="feather-12 me-2"></i>
+                                                        Review All Slow Movers
+                                                    </button>
+                                                    <button class="btn btn-outline-success" onclick="optimizeTurnover()">
+                                                        <i data-feather="target" class="feather-12 me-2"></i>
+                                                        Generate Optimization Plan
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reorder Point Effectiveness Tab -->
+                    <div class="tab-pane fade" id="reorder-point" role="tabpanel" aria-labelledby="reorder-point-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="shopping-cart" class="feather-16 me-2"></i>
+                                    Reorder Point Effectiveness
+                                    <span class="badge bg-danger ms-2">3 Stockouts</span>
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterReorder('all')">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterReorder('effective')">Effective</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterReorder('ineffective')">Ineffective</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterReorder('critical')">Critical</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Reorder Overview -->
+                                <div class="row mb-4">
+                                    <div class="col-md-4">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Reorder Accuracy</div>
+                                            <div class="operational-kpi-value">94%</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-medium">
+                                                    <i data-feather="minus" class="feather-12"></i>
+                                                    Stable
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Target: >95%</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Stockout Events</div>
+                                            <div class="operational-kpi-value">3</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-low">
+                                                    <i data-feather="trending-up" class="feather-12"></i>
+                                                    +1 event
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">This week</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Avg. Lead Time</div>
+                                            <div class="operational-kpi-value">5.2 days</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-high">
+                                                    <i data-feather="trending-down" class="feather-12"></i>
+                                                    -0.8 days
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Vendor performance</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Reorder Timeline Chart -->
+                                <div class="operational-chart-container mb-4">
+                                    <canvas id="reorderEffectivenessChart"></canvas>
+                                </div>
+                                
+                                <!-- Reorder Effectiveness Table -->
+                                <div class="table-responsive mt-4">
+                                    <table class="table operational-data-table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Effectiveness</th>
+                                                <th>SKU</th>
+                                                <th>Product Name</th>
+                                                <th>Current Stock</th>
+                                                <th>Reorder Point</th>
+                                                <th>Lead Time</th>
+                                                <th>Safety Stock</th>
+                                                <th>Stockout Events</th>
+                                                <th>Timeline</th>
+                                                <th>Adjustment Needed</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="table-danger">
+                                                <td>
+                                                    <span class="reorder-badge reorder-ineffective">Ineffective</span>
+                                                </td>
+                                                <td><strong>SKU-128</strong></td>
+                                                <td>Screen Protector Pack</td>
+                                                <td>50 units</td>
+                                                <td>100 units</td>
+                                                <td>3 days</td>
+                                                <td>20 units</td>
+                                                <td>
+                                                    <span class="operational-status status-critical">2 events</span>
+                                                </td>
+                                                <td>
+                                                    <div class="reorder-timeline">
+                                                        <div class="timeline-point point-reorder" style="left: 60%;"></div>
+                                                        <div class="timeline-point point-stockout" style="left: 75%;"></div>
+                                                        <div class="timeline-point point-delivery" style="left: 90%;"></div>
+                                                    </div>
+                                                    <small>Reorder too late</small>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="adjustReorderPoint('SKU-128')">
+                                                        <i data-feather="edit" class="feather-12"></i>
+                                                        Adjust Point
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="table-warning">
+                                                <td>
+                                                    <span class="reorder-badge reorder-ineffective">Ineffective</span>
+                                                </td>
+                                                <td><strong>SKU-001</strong></td>
+                                                <td>Premium Smartphone X200</td>
+                                                <td>8 units</td>
+                                                <td>15 units</td>
+                                                <td>7 days</td>
+                                                <td>5 units</td>
+                                                <td>
+                                                    <span class="operational-status status-warning">1 event</span>
+                                                </td>
+                                                <td>
+                                                    <div class="reorder-timeline">
+                                                        <div class="timeline-point point-reorder" style="left: 70%;"></div>
+                                                        <div class="timeline-point point-stockout" style="left: 85%;"></div>
+                                                        <div class="timeline-point point-delivery" style="left: 95%;"></div>
+                                                    </div>
+                                                    <small>Close to stockout</small>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-warning" onclick="increaseSafetyStock('SKU-001')">
+                                                        <i data-feather="shield" class="feather-12"></i>
+                                                        Increase Safety
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <span class="reorder-badge reorder-effective">Effective</span>
+                                                </td>
+                                                <td><strong>SKU-015</strong></td>
+                                                <td>Standard Mouse</td>
+                                                <td>85 units</td>
+                                                <td>50 units</td>
+                                                <td>5 days</td>
+                                                <td>25 units</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">0 events</span>
+                                                </td>
+                                                <td>
+                                                    <div class="reorder-timeline">
+                                                        <div class="timeline-point point-reorder" style="left: 40%;"></div>
+                                                        <div class="timeline-point point-delivery" style="left: 65%;"></div>
+                                                    </div>
+                                                    <small>Optimal timing</small>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-success" onclick="maintainSettings('SKU-015')">
+                                                        <i data-feather="check" class="feather-12"></i>
+                                                        Maintain
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <span class="reorder-badge reorder-optimal">Optimal</span>
+                                                </td>
+                                                <td><strong>SKU-002</strong></td>
+                                                <td>Wireless Headphones Pro</td>
+                                                <td>45 units</td>
+                                                <td>30 units</td>
+                                                <td>4 days</td>
+                                                <td>15 units</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">0 events</span>
+                                                </td>
+                                                <td>
+                                                    <div class="reorder-timeline">
+                                                        <div class="timeline-point point-reorder" style="left: 35%;"></div>
+                                                        <div class="timeline-point point-delivery" style="left: 55%;"></div>
+                                                    </div>
+                                                    <small>Perfect balance</small>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-info" onclick="analyzePattern('SKU-002')">
+                                                        <i data-feather="bar-chart-2" class="feather-12"></i>
+                                                        Analyze
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Reorder Insights -->
+                                <div class="operational-insight-card mt-4">
+                                    <h6><i data-feather="shopping-cart" class="feather-16 me-2"></i> Reorder Point Insights</h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p class="mb-2"><strong>Effectiveness Analysis:</strong></p>
+                                            <ul class="mb-2">
+                                                <li><strong>Optimal (95-100%):</strong> 68 items (43%)</li>
+                                                <li><strong>Effective (90-94%):</strong> 72 items (46%)</li>
+                                                <li><strong>Ineffective (80-89%):</strong> 12 items (8%)</li>
+                                                <li><strong>Critical (<80%):</strong> 4 items (3%)</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p class="mb-2"><strong>Common Issues:</strong></p>
+                                            <ul class="mb-0">
+                                                <li>Inaccurate demand forecasting (45% of cases)</li>
+                                                <li>Vendor lead time variability (30% of cases)</li>
+                                                <li>Seasonal demand spikes (15% of cases)</li>
+                                                <li>Safety stock miscalculation (10% of cases)</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transfer Impact Analysis Tab -->
+                    <div class="tab-pane fade" id="transfer-impact" role="tabpanel" aria-labelledby="transfer-impact-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="truck" class="feather-16 me-2"></i>
+                                    Transfer Impact Analysis
+                                    <span class="badge bg-warning ms-2">8 Pending</span>
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterTransfers('all')">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTransfers('pending')">Pending</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTransfers('completed')">Completed</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTransfers('delayed')">Delayed</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Transfer Overview -->
+                                <div class="row mb-4">
+                                    <div class="col-md-3">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Transfer Success Rate</div>
+                                            <div class="operational-kpi-value">98%</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-high">
+                                                    <i data-feather="trending-up" class="feather-12"></i>
+                                                    +2%
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Last 30 days</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Avg. Transfer Time</div>
+                                            <div class="operational-kpi-value">1.8 days</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-high">
+                                                    <i data-feather="trending-down" class="feather-12"></i>
+                                                    -0.5 days
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Target: <2 days</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Pending Transfers</div>
+                                            <div class="operational-kpi-value">8</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-low">
+                                                    <i data-feather="trending-up" class="feather-12"></i>
+                                                    +3 transfers
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Require attention</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="operational-kpi-card">
+                                            <div class="operational-kpi-label">Cost per Transfer</div>
+                                            <div class="operational-kpi-value">UGX 15,200</div>
+                                            <div class="operational-kpi-change">
+                                                <span class="efficiency-high">
+                                                    <i data-feather="trending-down" class="feather-12"></i>
+                                                    -8%
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">Operational cost</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Transfer Flow Chart -->
+                                <div class="operational-chart-container mb-4">
+                                    <canvas id="transferImpactChart"></canvas>
+                                </div>
+                                
+                                <!-- Transfer Impact Table -->
+                                <div class="table-responsive mt-4">
+                                    <table class="table operational-data-table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Transfer ID</th>
+                                                <th>From → To</th>
+                                                <th>Products</th>
+                                                <th>Quantity</th>
+                                                <th>Initiated</th>
+                                                <th>Status</th>
+                                                <th>Duration</th>
+                                                <th>Cost Impact</th>
+                                                <th>Stock Impact</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="table-warning">
+                                                <td><strong>TRF-2024-015</strong></td>
+                                                <td>
+                                                    <div class="transfer-flow">
+                                                        <div class="transfer-node">
+                                                            <small>Warehouse A</small>
+                                                            <strong>45 units</strong>
+                                                        </div>
+                                                        <div class="transfer-arrow">
+                                                            <i data-feather="arrow-right" class="feather-16 text-warning"></i>
+                                                        </div>
+                                                        <div class="transfer-node">
+                                                            <small>Store Central</small>
+                                                            <strong>45 units</strong>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>Screen Protector Pack</td>
+                                                <td>45 units</td>
+                                                <td>2024-02-03</td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-neutral">In Transit</span>
+                                                </td>
+                                                <td>1.5 days</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">UGX 12,500</span>
+                                                </td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-positive">+45 units</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-warning" onclick="trackTransfer('TRF-2024-015')">
+                                                        <i data-feather="map" class="feather-12"></i>
+                                                        Track
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>TRF-2024-014</strong></td>
+                                                <td>
+                                                    <div class="transfer-flow">
+                                                        <div class="transfer-node">
+                                                            <small>Store North</small>
+                                                            <strong>12 units</strong>
+                                                        </div>
+                                                        <div class="transfer-arrow">
+                                                            <i data-feather="arrow-right" class="feather-16 text-success"></i>
+                                                        </div>
+                                                        <div class="transfer-node">
+                                                            <small>Store South</small>
+                                                            <strong>12 units</strong>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>Premium Smartphone X200</td>
+                                                <td>12 units</td>
+                                                <td>2024-02-02</td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-positive">Completed</span>
+                                                </td>
+                                                <td>1.2 days</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">UGX 8,400</span>
+                                                </td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-positive">Balanced</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-success" onclick="viewTransferDetails('TRF-2024-014')">
+                                                        <i data-feather="eye" class="feather-12"></i>
+                                                        Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="table-danger">
+                                                <td><strong>TRF-2024-013</strong></td>
+                                                <td>
+                                                    <div class="transfer-flow">
+                                                        <div class="transfer-node">
+                                                            <small>Warehouse B</small>
+                                                            <strong>25 units</strong>
+                                                        </div>
+                                                        <div class="transfer-arrow">
+                                                            <i data-feather="arrow-right" class="feather-16 text-danger"></i>
+                                                        </div>
+                                                        <div class="transfer-node">
+                                                            <small>Store West</small>
+                                                            <strong>25 units</strong>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>Wireless Headphones Pro</td>
+                                                <td>25 units</td>
+                                                <td>2024-02-01</td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-negative">Delayed</span>
+                                                </td>
+                                                <td>3.5 days</td>
+                                                <td>
+                                                    <span class="operational-status status-critical">UGX 22,800</span>
+                                                </td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-negative">Stockout Risk</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="expediteTransfer('TRF-2024-013')">
+                                                        <i data-feather="zap" class="feather-12"></i>
+                                                        Expedite
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>TRF-2024-012</strong></td>
+                                                <td>
+                                                    <div class="transfer-flow">
+                                                        <div class="transfer-node">
+                                                            <small>Store Central</small>
+                                                            <strong>8 units</strong>
+                                                        </div>
+                                                        <div class="transfer-arrow">
+                                                            <i data-feather="arrow-right" class="feather-16 text-info"></i>
+                                                        </div>
+                                                        <div class="transfer-node">
+                                                            <small>Store East</small>
+                                                            <strong>8 units</strong>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>Standard Mouse</td>
+                                                <td>8 units</td>
+                                                <td>2024-01-31</td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-positive">Completed</span>
+                                                </td>
+                                                <td>0.8 days</td>
+                                                <td>
+                                                    <span class="operational-status status-optimal">UGX 5,600</span>
+                                                </td>
+                                                <td>
+                                                    <span class="transfer-tag transfer-positive">Optimized</span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-info" onclick="analyzeTransfer('TRF-2024-012')">
+                                                        <i data-feather="bar-chart-2" class="feather-12"></i>
+                                                        Analyze
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Transfer Impact Analysis -->
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Transfer Performance Metrics</h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> <strong>On-time Delivery:</strong> 94% (Target: 95%)</li>
+                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> <strong>Cost Efficiency:</strong> 92% (Improved +5%)</li>
+                                                    <li><i data-feather="alert-triangle" class="feather-12 text-warning me-2"></i> <strong>Transfer Errors:</strong> 2.1% (Target: <2%)</li>
+                                                    <li><i data-feather="alert-triangle" class="feather-12 text-warning me-2"></i> <strong>Pending Transfers:</strong> 8 (Increased +3)</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Transfer Optimization</h6>
+                                                <div class="d-grid gap-2">
+                                                    <button class="btn btn-outline-primary" onclick="optimizeTransferRoutes()">
+                                                        <i data-feather="navigation" class="feather-12 me-2"></i>
+                                                        Optimize Routes
+                                                    </button>
+                                                    <button class="btn btn-outline-success" onclick="consolidateTransfers()">
+                                                        <i data-feather="package" class="feather-12 me-2"></i>
+                                                        Consolidate Transfers
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let userActivityChart, turnoverAnalysisChart, reorderEffectivenessChart, transferImpactChart;
+
+// Initialize charts and functionality
+document.addEventListener('DOMContentLoaded', function() {
+    initializeUserActivityChart();
+    initializeTurnoverAnalysisChart();
+    initializeReorderEffectivenessChart();
+    initializeTransferImpactChart();
+    
+    // Initialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    // Initialize date range picker
+    setupDateRangeSelector();
+});
+
+function initializeUserActivityChart() {
+    const ctx = document.getElementById('userActivityChart').getContext('2d');
+    
+    userActivityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [
+                {
+                    label: 'Active Users',
+                    data: [18, 20, 22, 24, 23, 20, 18],
+                    borderColor: '#4A90E2',
+                    backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Transactions',
+                    data: [420, 480, 520, 580, 560, 500, 450],
+                    borderColor: '#1CC88A',
+                    backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Active Users'
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Transactions'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+}
+
+function initializeTurnoverAnalysisChart() {
+    const ctx = document.getElementById('turnoverAnalysisChart').getContext('2d');
+    
+    turnoverAnalysisChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Electronics', 'Accessories', 'Audio', 'Wearables', 'Other'],
+            datasets: [
+                {
+                    label: 'Current Turnover',
+                    data: [5.8, 5.2, 3.5, 2.8, 3.2],
+                    backgroundColor: '#4A90E2',
+                    borderColor: '#357ABD',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Target Turnover',
+                    data: [5.0, 4.5, 3.0, 2.5, 2.8],
+                    backgroundColor: '#6c757d',
+                    borderColor: '#495057',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Last Month',
+                    data: [5.5, 4.8, 3.2, 2.6, 3.0],
+                    backgroundColor: '#1CC88A',
+                    borderColor: '#17a673',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Turnover Rate (times/year)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initializeReorderEffectivenessChart() {
+    const ctx = document.getElementById('reorderEffectivenessChart').getContext('2d');
+    
+    reorderEffectivenessChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: 'Effective Reorders',
+                    data: [
+                        {x: 3, y: 85},
+                        {x: 4, y: 90},
+                        {x: 5, y: 88},
+                        {x: 6, y: 92},
+                        {x: 7, y: 87}
+                    ],
+                    backgroundColor: '#1CC88A',
+                    borderColor: '#17a673',
+                    borderWidth: 1,
+                    pointRadius: 8
+                },
+                {
+                    label: 'Ineffective Reorders',
+                    data: [
+                        {x: 2, y: 45},
+                        {x: 3, y: 38},
+                        {x: 8, y: 52},
+                        {x: 10, y: 40}
+                    ],
+                    backgroundColor: '#E74A3B',
+                    borderColor: '#E02D1B',
+                    borderWidth: 1,
+                    pointRadius: 8
+                },
+                {
+                    label: 'Stockout Events',
+                    data: [
+                        {x: 1, y: 15},
+                        {x: 2, y: 25},
+                        {x: 9, y: 30}
+                    ],
+                    backgroundColor: '#F6C23E',
+                    borderColor: '#f4b619',
+                    borderWidth: 1,
+                    pointRadius: 10
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    title: {
+                        display: true,
+                        text: 'Lead Time (days)'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Stock Level at Reorder (%)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initializeTransferImpactChart() {
+    const ctx = document.getElementById('transferImpactChart').getContext('2d');
+    
+    transferImpactChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            datasets: [
+                {
+                    label: 'Number of Transfers',
+                    data: [45, 48, 52, 55, 58, 62, 65, 68, 65, 60, 58, 55],
+                    borderColor: '#4A90E2',
+                    backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Transfer Cost (UGX 000)',
+                    data: [520, 540, 580, 620, 650, 680, 720, 750, 720, 680, 650, 620],
+                    borderColor: '#1CC88A',
+                    backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'Transfer Success Rate (%)',
+                    data: [92, 93, 94, 95, 96, 97, 97, 98, 97, 96, 95, 94],
+                    borderColor: '#F6C23E',
+                    backgroundColor: 'rgba(246, 194, 62, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y2'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Transfers'
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Transfer Cost (UGX 000)'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                },
+                y2: {
+                    beginAtZero: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Success Rate (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+}
+
+function setupDateRangeSelector() {
+    const selector = document.querySelector('.date-range-selector');
+    selector.addEventListener('change', function() {
+        const range = this.value;
+        if (range === 'custom') {
+            showDateRangePicker();
+        } else {
+            updateOperationalReportsForRange(range);
+        }
+    });
+}
+
+function updateOperationalReportsForRange(range) {
+    showLoading();
+    
+    // Simulate API call to update data
+    setTimeout(() => {
+        // Destroy and recreate charts with new data
+        if (userActivityChart) userActivityChart.destroy();
+        if (turnoverAnalysisChart) turnoverAnalysisChart.destroy();
+        if (reorderEffectivenessChart) reorderEffectivenessChart.destroy();
+        if (transferImpactChart) transferImpactChart.destroy();
+        
+        initializeUserActivityChart();
+        initializeTurnoverAnalysisChart();
+        initializeReorderEffectivenessChart();
+        initializeTransferImpactChart();
+        
+        // Update feather icons
+        feather.replace();
+        
+        // Hide loading
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.remove();
+        }
+        
+        showToast(`Operational reports updated for ${range}`, 'success');
+    }, 800);
+}
+
+function showDateRangePicker() {
+    // This would typically initialize a date range picker
+    showToast('Custom date range selection coming soon', 'info');
+}
+
+// Action functions for buttons
+function filterTurnover(type) {
+    const buttons = document.querySelectorAll('#stock-turnover .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    showToast(`Filtering: ${type} turnover items`, 'info');
+}
+
+function increaseStockLevel(sku) {
+    showToast(`Increasing stock level for ${sku}`, 'warning');
+}
+
+function scheduleReorder(sku) {
+    showToast(`Scheduling reorder for ${sku}`, 'info');
+}
+
+function markForClearance(sku) {
+    if (confirm(`Mark ${sku} for clearance sale?`)) {
+        showToast(`${sku} marked for clearance`, 'danger');
+    }
+}
+
+function maintainCurrent(sku) {
+    showToast(`Maintaining current settings for ${sku}`, 'success');
+}
+
+function reviewSlowMovers() {
+    showToast('Reviewing all slow moving items...', 'warning');
+}
+
+function optimizeTurnover() {
+    showToast('Generating turnover optimization plan...', 'success');
+}
+
+function filterReorder(type) {
+    const buttons = document.querySelectorAll('#reorder-point .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    showToast(`Filtering: ${type} reorder points`, 'info');
+}
+
+function adjustReorderPoint(sku) {
+    showToast(`Adjusting reorder point for ${sku}`, 'danger');
+}
+
+function increaseSafetyStock(sku) {
+    showToast(`Increasing safety stock for ${sku}`, 'warning');
+}
+
+function maintainSettings(sku) {
+    showToast(`Maintaining reorder settings for ${sku}`, 'success');
+}
+
+function analyzePattern(sku) {
+    showToast(`Analyzing reorder pattern for ${sku}`, 'info');
+}
+
+function filterTransfers(type) {
+    const buttons = document.querySelectorAll('#transfer-impact .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    showToast(`Filtering: ${type} transfers`, 'info');
+}
+
+function trackTransfer(transferId) {
+    showToast(`Tracking transfer ${transferId}`, 'warning');
+}
+
+function viewTransferDetails(transferId) {
+    showToast(`Viewing details for transfer ${transferId}`, 'success');
+}
+
+function expediteTransfer(transferId) {
+    if (confirm(`Expedite transfer ${transferId}? This may incur additional costs.`)) {
+        showToast(`Expediting transfer ${transferId}`, 'danger');
+    }
+}
+
+function analyzeTransfer(transferId) {
+    showToast(`Analyzing transfer ${transferId}`, 'info');
+}
+
+function optimizeTransferRoutes() {
+    showToast('Optimizing transfer routes...', 'primary');
+}
+
+function consolidateTransfers() {
+    showToast('Consolidating transfers for efficiency...', 'success');
+}
+
+function refreshOperationalReports() {
+    showLoading();
+    
+    // Simulate API refresh
+    setTimeout(() => {
+        // Destroy and recreate charts
+        if (userActivityChart) userActivityChart.destroy();
+        if (turnoverAnalysisChart) turnoverAnalysisChart.destroy();
+        if (reorderEffectivenessChart) reorderEffectivenessChart.destroy();
+        if (transferImpactChart) transferImpactChart.destroy();
+        
+        initializeUserActivityChart();
+        initializeTurnoverAnalysisChart();
+        initializeReorderEffectivenessChart();
+        initializeTransferImpactChart();
+        feather.replace();
+        
+        // Hide loading
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.remove();
+        }
+        
+        showToast('Operational reports refreshed successfully!', 'success');
+    }, 1000);
+}
+
+function exportOperationalReport(format) {
+    let exportUrl;
+    let filename = `operational-report-${new Date().toISOString().split('T')[0]}`;
+    
+    if (format === 'csv') {
+        exportUrl = '/reports/operational/export/csv/';
+        filename += '.csv';
+    } else if (format === 'pdf') {
+        exportUrl = '/reports/operational/export/pdf/';
+        filename += '.pdf';
+    } else if (format === 'excel') {
+        exportUrl = '/reports/operational/export/excel/';
+        filename += '.xlsx';
+    }
+    
+    // Create temporary link and download
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`${format.toUpperCase()} export started!`, 'info');
+}
+
+function goBack() {
+    window.history.back();
+}
+
+function showLoading() {
+    // Add loading overlay
+    const loadingHTML = `
+        <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
+             style="background: rgba(255,255,255,0.8); z-index: 9999;">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading operational reports...</p>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', loadingHTML);
+}
+
+function showToast(message, type = 'info') {
+    // Create toast element
+    const toastHTML = `
+        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        const container = document.createElement('div');
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    
+    document.querySelector('.toast-container').insertAdjacentHTML('beforeend', toastHTML);
+    
+    // Initialize and show toast
+    const toastEl = document.querySelector('.toast-container .toast:last-child');
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+}
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+{% endblock %}
