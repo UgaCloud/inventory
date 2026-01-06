@@ -3,7 +3,7 @@ from django.shortcuts import *
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from datetime import datetime, timedelta
+from datetime import date, timedelta
 import json
 import csv
 import random
@@ -26,7 +26,7 @@ import pandas as pd
 from reportlab.lib.styles import *
 import csv
 import json
-from datetime import datetime
+from datetime import date
 from django.http import HttpResponse
 from django.db.models import *
 from decimal import Decimal, DecimalTuple
@@ -102,9 +102,9 @@ except ImportError:
 class CustomJSONEncoder(DjangoJSONEncoder):
     """Custom JSON encoder to handle dates and decimals"""
     def default(self, obj):
-        if isinstance(obj, (datetime, timezone.datetime)):
+        if isinstance(obj, (date, timezone.date)):
             return obj.isoformat()
-        if isinstance(obj, datetime.date):
+        if isinstance(obj, date.date):
             return obj.isoformat()
         if isinstance(obj, decimal.Decimal):
             return float(obj)
@@ -150,11 +150,11 @@ def purchase_details(request, report_type='monthly', period=None):
         if not period:
             period = today.strftime('%Y-%m')
         year, month = map(int, period.split('-'))
-        start_date = datetime(year, month, 1).date()
+        start_date = date(year, month, 1)
         if month == 12:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
         else:
-            end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
         period_label = start_date.strftime('%B %Y')
         
     elif report_type == 'quarterly':
@@ -165,19 +165,19 @@ def purchase_details(request, report_type='monthly', period=None):
         year = int(year)
         quarter = int(quarter)
         start_month = (quarter - 1) * 3 + 1
-        start_date = datetime(year, start_month, 1).date()
+        start_date = date(year, start_month, 1)
         if start_month + 2 <= 12:
-            end_date = datetime(year, start_month + 3, 1).date() - timedelta(days=1)
+            end_date = date(year, start_month + 3, 1) - timedelta(days=1)
         else:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
         period_label = f"Q{quarter} {year}"
         
     elif report_type == 'yearly':
         if not period:
             period = str(today.year)
         year = int(period)
-        start_date = datetime(year, 1, 1).date()
-        end_date = datetime(year, 12, 31).date()
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
         period_label = str(year)
     else:
         start_date = today - timedelta(days=30)
@@ -360,12 +360,12 @@ def get_purchase_trend_data_corrected(report_type, start_date, end_date):
         # Get last 6 months including current
         for i in range(5, -1, -1):
             month_date = start_date - timedelta(days=30*i)
-            month_start = datetime(month_date.year, month_date.month, 1).date()
+            month_start = date(month_date.year, month_date.month, 1)
             
             if month_start.month == 12:
-                month_end = datetime(month_start.year + 1, 1, 1).date() - timedelta(days=1)
+                month_end = date(month_start.year + 1, 1, 1) - timedelta(days=1)
             else:
-                month_end = datetime(month_start.year, month_start.month + 1, 1).date() - timedelta(days=1)
+                month_end = date(month_start.year, month_start.month + 1, 1) - timedelta(days=1)
             
             if month_end > today:
                 month_end = today
@@ -652,11 +652,11 @@ def export_purchase_csv(request):
             year, month = map(int, period.split('-'))
         else:
             year, month = today.year, today.month
-        start_date = datetime(year, month, 1).date()
+        start_date = date(year, month, 1).date()
         if month == 12:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
         else:
-            end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+            end_date = date(year, month + 1, 1).date() - timedelta(days=1)
         period_label = start_date.strftime('%B %Y')
         
     elif report_type == 'quarterly':
@@ -668,11 +668,11 @@ def export_purchase_csv(request):
             year = today.year
             quarter = (today.month - 1) // 3 + 1
         start_month = (quarter - 1) * 3 + 1
-        start_date = datetime(year, start_month, 1).date()
+        start_date = date(year, start_month, 1).date()
         if start_month + 2 <= 12:
-            end_date = datetime(year, start_month + 3, 1).date() - timedelta(days=1)
+            end_date = date(year, start_month + 3, 1).date() - timedelta(days=1)
         else:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
         period_label = f"Q{quarter} {year}"
         
     else:  # yearly or custom
@@ -680,8 +680,8 @@ def export_purchase_csv(request):
             year = int(period)
         else:
             year = today.year
-        start_date = datetime(year, 1, 1).date()
-        end_date = datetime(year, 12, 31).date()
+        start_date = date(year, 1, 1).date()
+        end_date = date(year, 12, 31).date()
         period_label = str(year)
     
     # Write header information
@@ -762,11 +762,11 @@ def export_purchase_csv(request):
         # Get last 6 months including current
         for i in range(6, 0, -1):
             month_date = end_date - timedelta(days=30*i)
-            month_start = datetime(month_date.year, month_date.month, 1).date()
+            month_start = date(month_date.year, month_date.month, 1).date()
             if month_start.month == 12:
-                month_end = datetime(month_start.year + 1, 1, 1).date() - timedelta(days=1)
+                month_end = date(month_start.year + 1, 1, 1).date() - timedelta(days=1)
             else:
-                month_end = datetime(month_start.year, month_start.month + 1, 1).date() - timedelta(days=1)
+                month_end = date(month_start.year, month_start.month + 1, 1).date() - timedelta(days=1)
             
             month_orders = PurchaseOrder.objects.filter(
                 purchase_date__range=[month_start, month_end]
@@ -982,11 +982,11 @@ def export_purchase_pdf(request):
             year, month = map(int, period.split('-'))
         else:
             year, month = today.year, today.month
-        start_date = datetime(year, month, 1).date()
+        start_date = date(year, month, 1).date()
         if month == 12:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
         else:
-            end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+            end_date = date(year, month + 1, 1).date() - timedelta(days=1)
         period_label = start_date.strftime('%B %Y')
         
     elif report_type == 'quarterly':
@@ -998,11 +998,11 @@ def export_purchase_pdf(request):
             year = today.year
             quarter = (today.month - 1) // 3 + 1
         start_month = (quarter - 1) * 3 + 1
-        start_date = datetime(year, start_month, 1).date()
+        start_date = date(year, start_month, 1).date()
         if start_month + 2 <= 12:
-            end_date = datetime(year, start_month + 3, 1).date() - timedelta(days=1)
+            end_date = date(year, start_month + 3, 1).date() - timedelta(days=1)
         else:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
         period_label = f"Q{quarter} {year}"
         
     else:  # yearly or custom
@@ -1010,8 +1010,8 @@ def export_purchase_pdf(request):
             year = int(period)
         else:
             year = today.year
-        start_date = datetime(year, 1, 1).date()
-        end_date = datetime(year, 12, 31).date()
+        start_date = date(year, 1, 1).date()
+        end_date = date(year, 12, 31).date()
         period_label = str(year)
     
     # Create PDF document
@@ -1327,11 +1327,11 @@ def export_purchase_excel(request):
             year, month = map(int, period.split('-'))
         else:
             year, month = today.year, today.month
-        start_date = datetime(year, month, 1).date()
+        start_date = date(year, month, 1).date()
         if month == 12:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
         else:
-            end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+            end_date = date(year, month + 1, 1).date() - timedelta(days=1)
         period_label = start_date.strftime('%B %Y')
         
     elif report_type == 'quarterly':
@@ -1343,11 +1343,11 @@ def export_purchase_excel(request):
             year = today.year
             quarter = (today.month - 1) // 3 + 1
         start_month = (quarter - 1) * 3 + 1
-        start_date = datetime(year, start_month, 1).date()
+        start_date = date(year, start_month, 1).date()
         if start_month + 2 <= 12:
-            end_date = datetime(year, start_month + 3, 1).date() - timedelta(days=1)
+            end_date = date(year, start_month + 3, 1).date() - timedelta(days=1)
         else:
-            end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
         period_label = f"Q{quarter} {year}"
         
     else:  # yearly or custom
@@ -1355,8 +1355,8 @@ def export_purchase_excel(request):
             year = int(period)
         else:
             year = today.year
-        start_date = datetime(year, 1, 1).date()
-        end_date = datetime(year, 12, 31).date()
+        start_date = date(year, 1, 1).date()
+        end_date = date(year, 12, 31).date()
         period_label = str(year)
     
     # Create Excel workbook
@@ -1833,13 +1833,13 @@ def sales_details(request, period=None):
         # Parse period (e.g., "January 2024")
         try:
             month_year = period.split()
-            month = datetime.strptime(month_year[0], "%B").month
+            month = date.strptime(month_year[0], "%B").month
             year = int(month_year[1])
-            start_date = timezone.make_aware(datetime(year, month, 1))
+            start_date = timezone.make_aware(date(year, month, 1))
             if month == 12:
-                end_date = timezone.make_aware(datetime(year, month, 31))
+                end_date = timezone.make_aware(date(year, month, 31))
             else:
-                end_date = timezone.make_aware(datetime(year, month+1, 1)) - timedelta(days=1)
+                end_date = timezone.make_aware(date(year, month+1, 1)) - timedelta(days=1)
         except:
             start_date = today.replace(day=1)
             end_date = today
@@ -2129,8 +2129,8 @@ def export_sales_csv(request):
     today = timezone.now()
     if date_from and date_to:
         try:
-            start_date = timezone.make_aware(datetime.strptime(date_from, '%Y-%m-%d'))
-            end_date = timezone.make_aware(datetime.strptime(date_to, '%Y-%m-%d'))
+            start_date = timezone.make_aware(date.strptime(date_from, '%Y-%m-%d'))
+            end_date = timezone.make_aware(date.strptime(date_to, '%Y-%m-%d'))
         except:
             start_date = today.replace(day=1)
             end_date = today
@@ -2351,8 +2351,8 @@ def export_sales_pdf(request):
     today = timezone.now()
     if date_from and date_to:
         try:
-            start_date = timezone.make_aware(datetime.strptime(date_from, '%Y-%m-%d'))
-            end_date = timezone.make_aware(datetime.strptime(date_to, '%Y-%m-%d'))
+            start_date = timezone.make_aware(date.strptime(date_from, '%Y-%m-%d'))
+            end_date = timezone.make_aware(date.strptime(date_to, '%Y-%m-%d'))
         except:
             start_date = today.replace(day=1)
             end_date = today
@@ -2515,8 +2515,8 @@ def export_sales_excel(request):
     today = timezone.now()
     if date_from and date_to:
         try:
-            start_date = timezone.make_aware(datetime.strptime(date_from, '%Y-%m-%d'))
-            end_date = timezone.make_aware(datetime.strptime(date_to, '%Y-%m-%d'))
+            start_date = timezone.make_aware(date.strptime(date_from, '%Y-%m-%d'))
+            end_date = timezone.make_aware(date.strptime(date_to, '%Y-%m-%d'))
         except:
             start_date = today.replace(day=1)
             end_date = today
@@ -3264,8 +3264,8 @@ def transfer_details(request):
     if date_range:
         try:
             start_date_str, end_date_str = date_range.split(' - ')
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            start_date = date.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = date.strptime(end_date_str, '%Y-%m-%d').date()
         except:
             # Default to current month
             start_date = timezone.now().replace(day=1).date()
@@ -3407,8 +3407,8 @@ def stockadj_details(request):
             # Format: "YYYY-MM-DD - YYYY-MM-DD"
             dates = date_range_param.split(' - ')
             if len(dates) == 2:
-                start_date = datetime.strptime(dates[0].strip(), '%Y-%m-%d').date()
-                end_date = datetime.strptime(dates[1].strip(), '%Y-%m-%d').date()
+                start_date = date.strptime(dates[0].strip(), '%Y-%m-%d').date()
+                end_date = date.strptime(dates[1].strip(), '%Y-%m-%d').date()
         except (ValueError, AttributeError):
             pass
     
@@ -3416,8 +3416,8 @@ def stockadj_details(request):
     if not start_date or not end_date:
         if start_date_param and end_date_param:
             try:
-                start_date = datetime.strptime(start_date_param, '%Y-%m-%d').date()
-                end_date = datetime.strptime(end_date_param, '%Y-%m-%d').date()
+                start_date = date.strptime(start_date_param, '%Y-%m-%d').date()
+                end_date = date.strptime(end_date_param, '%Y-%m-%d').date()
             except (ValueError, AttributeError):
                 pass
     
@@ -3715,8 +3715,8 @@ def financial_details(request):
     if date_range:
         try:
             start_str, end_str = date_range.split(' - ')
-            start_date = datetime.strptime(start_str, '%Y-%m-%d')
-            end_date = datetime.strptime(end_str, '%Y-%m-%d')
+            start_date = date.strptime(start_str, '%Y-%m-%d')
+            end_date = date.strptime(end_str, '%Y-%m-%d')
         except:
             pass
     
@@ -3973,14 +3973,14 @@ def calculate_monthly_trends(start_date, end_date, store_filter):
     monthly_data = {}
     
     # Generate all months in the range
-    # Convert start_date and end_date to datetime objects if they aren't already
-    if isinstance(start_date, datetime.datetime):
-        current = datetime.datetime(start_date.year, start_date.month, 1)
-        end = datetime.datetime(end_date.year, end_date.month, 1)
+    # Convert start_date and end_date to date objects if they aren't already
+    if isinstance(start_date, date.date):
+        current = date.date(start_date.year, start_date.month, 1)
+        end = date.date(end_date.year, end_date.month, 1)
     else:
         # If start_date is already a date object
-        current = datetime.datetime(start_date.year, start_date.month, 1)
-        end = datetime.datetime(end_date.year, end_date.month, 1)
+        current = date.date(start_date.year, start_date.month, 1)
+        end = date.date(end_date.year, end_date.month, 1)
     
     while current <= end:
         month_key = current.strftime('%Y-%m')
@@ -4030,9 +4030,9 @@ def calculate_monthly_trends(start_date, end_date, store_filter):
         
         # Move to next month
         if current.month == 12:
-            current = datetime.datetime(current.year + 1, 1, 1)
+            current = date.date(current.year + 1, 1, 1)
         else:
-            current = datetime.datetime(current.year, current.month + 1, 1)
+            current = date.date(current.year, current.month + 1, 1)
     
     return monthly_data
 
