@@ -6,7 +6,6 @@
 
 {% block extra_css %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 <style>
     /* Custom styles for pricing reports */
     .price-card {
@@ -49,6 +48,62 @@
     }
     
     .price-stable {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+    
+    /* KPI Cards Styling */
+    .kpi-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        border-color: #4A90E2;
+    }
+    
+    .kpi-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin: 10px 0;
+    }
+    
+    .kpi-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+    }
+    
+    .kpi-trend {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        margin-top: 5px;
+    }
+    
+    .kpi-trend-up {
+        background-color: rgba(28, 200, 138, 0.1);
+        color: #1CC88A;
+    }
+    
+    .kpi-trend-down {
+        background-color: rgba(231, 74, 59, 0.1);
+        color: #E74A3B;
+    }
+    
+    .kpi-trend-neutral {
         background-color: rgba(108, 117, 125, 0.1);
         color: #6c757d;
     }
@@ -188,23 +243,6 @@
         font-size: 0.75rem;
     }
     
-    .price-history {
-        height: 60px;
-        width: 100%;
-        position: relative;
-        margin: 10px 0;
-    }
-    
-    .price-line {
-        fill: none;
-        stroke-width: 2;
-        stroke-linecap: round;
-    }
-    
-    .price-increase { stroke: #1CC88A; }
-    .price-decrease { stroke: #E74A3B; }
-    .price-steady { stroke: #6c757d; }
-    
     .margin-badge {
         display: inline-flex;
         align-items: center;
@@ -253,19 +291,6 @@
         margin: 20px 0;
     }
     
-    /* Status indicators */
-    .status-indicator {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 5px;
-    }
-    
-    .status-active { background-color: #1CC88A; }
-    .status-inactive { background-color: #F6C23E; }
-    .status-disabled { background-color: #E74A3B; }
-    
     /* Responsive adjustments */
     @media (max-width: 768px) {
         .price-matrix {
@@ -288,6 +313,10 @@
             width: 100%;
             margin-bottom: 10px;
         }
+        
+        .kpi-value {
+            font-size: 1.5rem;
+        }
     }
     
     @media (max-width: 576px) {
@@ -297,6 +326,10 @@
         
         .price-tag {
             font-size: 1.5rem;
+        }
+        
+        .kpi-value {
+            font-size: 1.2rem;
         }
     }
 </style>
@@ -315,7 +348,7 @@
             </div>
             <ul class="table-top-head">
                 <li>
-                    <select class="form-select form-select-sm currency-selector">
+                    <select class="form-select form-select-sm currency-selector" id="currencySelector">
                         <option value="UGX" selected>UGX</option>
                         <option value="USD">USD</option>
                         <option value="EUR">EUR</option>
@@ -326,12 +359,6 @@
                     <button class="btn btn-outline-primary" onclick="refreshPricingReports()">
                         <i data-feather="refresh-cw" class="feather-16 me-1"></i>
                         Refresh
-                    </button>
-                </li>
-                <li>
-                    <button class="btn btn-outline-success" onclick="updateAllPrices()">
-                        <i data-feather="dollar-sign" class="feather-16 me-1"></i>
-                        Update Prices
                     </button>
                 </li>
                 <li>
@@ -353,13 +380,54 @@
                         </ul>
                     </div>
                 </li>
-                <li>
-                    <button class="btn btn-primary" onclick="goBack()">
-                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
-                        Back to Dashboard
-                    </button>
-                </li>
             </ul>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="kpi-card">
+                    <div class="kpi-label">Average Selling Price</div>
+                    <div class="kpi-value">{{ currency }} {{ avg_selling_price|floatformat:0|intcomma }}</div>
+                    <div class="kpi-trend kpi-trend-up">
+                        <i data-feather="trending-up" class="feather-12 me-1"></i>
+                        +2.5% from last month
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="kpi-card">
+                    <div class="kpi-label">Average Cost Price</div>
+                    <div class="kpi-value">{{ currency }} {{ avg_cost_price|floatformat:0|intcomma }}</div>
+                    <div class="kpi-trend kpi-trend-neutral">
+                        <i data-feather="minus" class="feather-12 me-1"></i>
+                        No change
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="kpi-card">
+                    <div class="kpi-label">Average Margin</div>
+                    <div class="kpi-value">{{ avg_margin|floatformat:1 }}%</div>
+                    <div class="kpi-trend kpi-trend-up">
+                        <i data-feather="trending-up" class="feather-12 me-1"></i>
+                        +1.2% from last month
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="kpi-card">
+                    <div class="kpi-label">Price Changes This Month</div>
+                    <div class="kpi-value">{{ price_changes_this_month|intcomma }}</div>
+                    <div class="kpi-trend kpi-trend-up">
+                        <i data-feather="trending-up" class="feather-12 me-1"></i>
+                        +5 from last month
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Report Header Info -->
@@ -371,38 +439,43 @@
                             <div class="col-md-6">
                                 <h5 class="card-title mb-3">
                                     <i data-feather="tag" class="feather-16 me-2"></i>
-                                    Pricing Overview - January 2024
+                                    Pricing Overview - {{ report_date }}
                                 </h5>
                                 <div class="row">
                                     <div class="col-6">
-                                        <p class="mb-1"><strong>Report ID:</strong> PRICE-REPORT-2024-001</p>
-                                        <p class="mb-1"><strong>Products Analyzed:</strong> 312 items</p>
-                                        <p class="mb-1"><strong>Currency:</strong> UGX</p>
+                                        <p class="mb-1"><strong>Report ID:</strong> {{ report_id }}</p>
+                                        <p class="mb-1"><strong>Products Analyzed:</strong> {{ products_analyzed|intcomma }} items</p>
+                                        <p class="mb-1"><strong>Currency:</strong> {{ currency }}</p>
                                     </div>
                                     <div class="col-6">
-                                        <p class="mb-1"><strong>Avg. Price Change:</strong> <span class="price-up">+2.5%</span></p>
-                                        <p class="mb-1"><strong>Last Updated:</strong> 2024-01-31 10:30</p>
-                                        <p class="mb-1"><strong>Missing Prices:</strong> <span class="text-danger">18 items</span></p>
+                                        <p class="mb-1"><strong>Missing Prices:</strong> 
+                                            {% if missing_prices_count > 0 %}
+                                            <span class="text-danger">{{ missing_prices_count|intcomma }} items</span>
+                                            {% else %}
+                                            <span class="text-success">None</span>
+                                            {% endif %}
+                                        </p>
+                                        <p class="mb-1"><strong>Last Updated:</strong> {% now "Y-m-d H:i" %}</p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="price-matrix">
                                     <div class="matrix-item">
-                                        <div class="matrix-label">Average Selling Price</div>
-                                        <div class="matrix-value">UGX 284,500</div>
+                                        <div class="matrix-label">Total Products</div>
+                                        <div class="matrix-value">{{ products_analyzed|intcomma }}</div>
                                     </div>
                                     <div class="matrix-item">
-                                        <div class="matrix-label">Average Cost Price</div>
-                                        <div class="matrix-value">UGX 188,500</div>
+                                        <div class="matrix-label">Total Value</div>
+                                        <div class="matrix-value">{{ currency }} {{ total_product_value|floatformat:0|intcomma }}</div>
                                     </div>
                                     <div class="matrix-item">
-                                        <div class="matrix-label">Average Margin</div>
-                                        <div class="matrix-value">48.5%</div>
+                                        <div class="matrix-label">High Margin Items</div>
+                                        <div class="matrix-value">{{ high_margin_count|intcomma }}</div>
                                     </div>
                                     <div class="matrix-item">
-                                        <div class="matrix-label">Price Changes This Month</div>
-                                        <div class="matrix-value">24</div>
+                                        <div class="matrix-label">Low Margin Items</div>
+                                        <div class="matrix-value">{{ low_margin_count|intcomma }}</div>
                                     </div>
                                 </div>
                             </div>
@@ -420,7 +493,7 @@
                     <div class="card-header">
                         <h5 class="card-title mb-0">
                             <i data-feather="percent" class="feather-16 me-2"></i>
-                            Pricing Analysis Sections
+                            Pricing Analysis
                         </h5>
                     </div>
                     <div class="card-body p-0">
@@ -428,19 +501,15 @@
                             <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
                                 <button class="nav-link side-tab active" id="pricing-list-tab" data-bs-toggle="pill" data-bs-target="#pricing-list" type="button" role="tab" aria-controls="pricing-list" aria-selected="true">
                                     <i data-feather="list" class="feather-16 me-2"></i>
-                                    Product Pricing List
+                                    Product Pricing
                                 </button>
-                                <button class="nav-link side-tab" id="unit-conversion-tab" data-bs-toggle="pill" data-bs-target="#unit-conversion" type="button" role="tab" aria-controls="unit-conversion" aria-selected="false">
-                                    <i data-feather="repeat" class="feather-16 me-2"></i>
-                                    Unit Conversion Report
-                                </button>
-                                <button class="nav-link side-tab" id="price-comparison-tab" data-bs-toggle="pill" data-bs-target="#price-comparison" type="button" role="tab" aria-controls="price-comparison" aria-selected="false">
-                                    <i data-feather="git-compare" class="feather-16 me-2"></i>
-                                    Price Comparison
-                                </button>
+                              
                                 <button class="nav-link side-tab" id="missing-pricing-tab" data-bs-toggle="pill" data-bs-target="#missing-pricing" type="button" role="tab" aria-controls="missing-pricing" aria-selected="false">
                                     <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-                                    Missing Pricing Report
+                                    Missing Pricing
+                                    {% if missing_prices_count > 0 %}
+                                    <span class="badge bg-danger ms-2">{{ missing_prices_count }}</span>
+                                    {% endif %}
                                 </button>
                             </div>
                         </div>
@@ -466,56 +535,61 @@
                                     Product Pricing List
                                 </h5>
                                 <div class="d-flex">
-                                    <div class="input-group input-group-sm" style="width: 250px;">
-                                        <input type="text" class="form-control" placeholder="Search products..." id="priceSearch">
-                                        <button class="btn btn-outline-secondary" type="button">
-                                            <i data-feather="search" class="feather-12"></i>
-                                        </button>
-                                    </div>
+                                    <form method="GET" class="d-flex" id="searchForm">
+                                        <div class="input-group input-group-sm" style="width: 250px;">
+                                            <input type="text" class="form-control" placeholder="Search products..." name="search" value="{{ search_query }}">
+                                            <button class="btn btn-outline-secondary" type="submit">
+                                                <i data-feather="search" class="feather-12"></i>
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
                             <div class="card-body">
-                                <div class="price-filter mb-4">
-                                    <div class="row g-3">
-                                        <div class="col-md-3">
-                                            <label class="form-label small">Category</label>
-                                            <select class="form-select form-select-sm" id="priceCategoryFilter">
-                                                <option value="">All Categories</option>
-                                                <option value="electronics">Electronics</option>
-                                                <option value="accessories">Accessories</option>
-                                                <option value="wearables">Wearables</option>
-                                                <option value="audio">Audio</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label small">Price Range</label>
-                                            <select class="form-select form-select-sm" id="priceRangeFilter">
-                                                <option value="">All Prices</option>
-                                                <option value="low">Under UGX 100,000</option>
-                                                <option value="medium">UGX 100,000 - 500,000</option>
-                                                <option value="high">Over UGX 500,000</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label small">Margin</label>
-                                            <select class="form-select form-select-sm" id="marginFilter">
-                                                <option value="">All Margins</option>
-                                                <option value="high">High (>50%)</option>
-                                                <option value="medium">Medium (30-50%)</option>
-                                                <option value="low">Low (<30%)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label small">Sort By</label>
-                                            <select class="form-select form-select-sm" id="sortFilter">
-                                                <option value="name">Product Name</option>
-                                                <option value="price_high">Price (High to Low)</option>
-                                                <option value="price_low">Price (Low to High)</option>
-                                                <option value="margin">Margin %</option>
-                                            </select>
+                                <form method="GET" id="filterForm">
+                                    <div class="price-filter mb-4">
+                                        <div class="row g-3">
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Category</label>
+                                                <select class="form-select form-select-sm" name="category" onchange="submitForm()">
+                                                    <option value="">All Categories</option>
+                                                    {% for cat in categories %}
+                                                    <option value="{{ cat.name }}" {% if selected_category == cat.name %}selected{% endif %}>
+                                                        {{ cat.name }}
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Price Range</label>
+                                                <select class="form-select form-select-sm" name="price_range" onchange="submitForm()">
+                                                    <option value="">All Prices</option>
+                                                    <option value="low" {% if selected_price_range == 'low' %}selected{% endif %}>Under {{ currency }} 100,000</option>
+                                                    <option value="medium" {% if selected_price_range == 'medium' %}selected{% endif %}>{{ currency }} 100,000 - 500,000</option>
+                                                    <option value="high" {% if selected_price_range == 'high' %}selected{% endif %}>Over {{ currency }} 500,000</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Margin</label>
+                                                <select class="form-select form-select-sm" name="margin" onchange="submitForm()">
+                                                    <option value="">All Margins</option>
+                                                    <option value="high" {% if selected_margin == 'high' %}selected{% endif %}>High (>50%)</option>
+                                                    <option value="medium" {% if selected_margin == 'medium' %}selected{% endif %}>Medium (30-50%)</option>
+                                                    <option value="low" {% if selected_margin == 'low' %}selected{% endif %}>Low (<30%)</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Sort By</label>
+                                                <select class="form-select form-select-sm" name="sort" onchange="submitForm()">
+                                                    <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>Product Name</option>
+                                                    <option value="price_high" {% if selected_sort == 'price_high' %}selected{% endif %}>Price (High to Low)</option>
+                                                    <option value="price_low" {% if selected_sort == 'price_low' %}selected{% endif %}>Price (Low to High)</option>
+                                                    <option value="margin" {% if selected_sort == 'margin' %}selected{% endif %}>Margin %</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                </form>
                                 
                                 <div class="table-responsive">
                                     <table class="table table-hover">
@@ -529,184 +603,49 @@
                                                 <th>Margin</th>
                                                 <th>Price Tier</th>
                                                 <th>Last Change</th>
-                                                <th>Price History</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="pricingTableBody">
+                                            {% for item in product_pricing_data %}
                                             <tr>
-                                                <td><strong>SKU-001</strong></td>
-                                                <td>Premium Smartphone X200</td>
-                                                <td>Electronics</td>
-                                                <td>UGX 850,000</td>
+                                                <td><strong>{{ item.sku }}</strong></td>
+                                                <td>{{ item.name }}</td>
+                                                <td>{{ item.category }}</td>
+                                                <td>{{ currency }} {{ item.cost_price|floatformat:0|intcomma }}</td>
                                                 <td>
-                                                    <div class="price-tag">UGX 1,250,000</div>
-                                                    <span class="price-change price-up">
-                                                        <i data-feather="trending-up" class="feather-12 me-1"></i>
-                                                        +8.7%
+                                                    <div class="price-tag">{{ currency }} {{ item.selling_price|floatformat:0|intcomma }}</div>
+                                                    <span class="price-change {{ item.price_change_class }}">
+                                                        <i data-feather="{{ item.price_change_icon }}" class="feather-12 me-1"></i>
+                                                        {{ item.change_text }}
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <span class="margin-badge margin-high">47%</span>
+                                                    <span class="margin-badge {{ item.margin_class }}">{{ item.margin|floatformat:1 }}%</span>
                                                 </td>
                                                 <td>
-                                                    <span class="pricing-tier tier-premium">Premium</span>
+                                                    <span class="pricing-tier {{ item.tier_class }}">{{ item.tier }}</span>
                                                 </td>
                                                 <td>
-                                                    <small>2024-01-25</small><br>
-                                                    <small class="text-muted">Market adjustment</small>
-                                                </td>
-                                                <td>
-                                                    <div class="price-history">
-                                                        <!-- Simplified price history visualization -->
-                                                        <svg width="100" height="40" viewBox="0 0 100 40">
-                                                            <path class="price-line price-increase" d="M10,30 L30,20 L50,25 L70,15 L90,10" />
-                                                        </svg>
-                                                    </div>
+                                                    <small>{{ item.last_change_date }}</small><br>
+                                                    <small class="text-muted">{{ item.last_change_reason }}</small>
                                                 </td>
                                                 <td>
                                                     <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-001')">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('{{ item.sku }}')">
                                                             <i data-feather="edit" class="feather-12"></i>
                                                         </button>
-                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-001')">
-                                                            <i data-feather="trending-up" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-001')">
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('{{ item.sku }}')">
                                                             <i data-feather="refresh-cw" class="feather-12"></i>
                                                         </button>
                                                     </div>
                                                 </td>
                                             </tr>
+                                            {% empty %}
                                             <tr>
-                                                <td><strong>SKU-002</strong></td>
-                                                <td>Wireless Headphones Pro</td>
-                                                <td>Audio</td>
-                                                <td>UGX 210,000</td>
-                                                <td>
-                                                    <div class="price-tag">UGX 320,000</div>
-                                                    <span class="price-change price-stable">
-                                                        <i data-feather="minus" class="feather-12 me-1"></i>
-                                                        Stable
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span class="margin-badge margin-high">52%</span>
-                                                </td>
-                                                <td>
-                                                    <span class="pricing-tier tier-standard">Standard</span>
-                                                </td>
-                                                <td>
-                                                    <small>2024-01-10</small><br>
-                                                    <small class="text-muted">Regular update</small>
-                                                </td>
-                                                <td>
-                                                    <div class="price-history">
-                                                        <svg width="100" height="40" viewBox="0 0 100 40">
-                                                            <path class="price-line price-steady" d="M10,25 L30,25 L50,26 L70,25 L90,25" />
-                                                        </svg>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-002')">
-                                                            <i data-feather="edit" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-002')">
-                                                            <i data-feather="trending-up" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-002')">
-                                                            <i data-feather="refresh-cw" class="feather-12"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                                <td colspan="9" class="text-center">No products found with current filters</td>
                                             </tr>
-                                            <tr>
-                                                <td><strong>SKU-005</strong></td>
-                                                <td>USB-C Fast Charger</td>
-                                                <td>Accessories</td>
-                                                <td>UGX 28,000</td>
-                                                <td>
-                                                    <div class="price-tag">UGX 45,000</div>
-                                                    <span class="price-change price-down">
-                                                        <i data-feather="trending-down" class="feather-12 me-1"></i>
-                                                        -5.3%
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span class="margin-badge margin-medium">38%</span>
-                                                </td>
-                                                <td>
-                                                    <span class="pricing-tier tier-economy">Economy</span>
-                                                </td>
-                                                <td>
-                                                    <small>2024-01-28</small><br>
-                                                    <small class="text-muted">Promotion</small>
-                                                </td>
-                                                <td>
-                                                    <div class="price-history">
-                                                        <svg width="100" height="40" viewBox="0 0 100 40">
-                                                            <path class="price-line price-decrease" d="M10,15 L30,20 L50,22 L70,25 L90,30" />
-                                                        </svg>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-005')">
-                                                            <i data-feather="edit" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-005')">
-                                                            <i data-feather="trending-up" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-005')">
-                                                            <i data-feather="refresh-cw" class="feather-12"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>SKU-128</strong></td>
-                                                <td>Screen Protector Pack (3)</td>
-                                                <td>Accessories</td>
-                                                <td>UGX 15,000</td>
-                                                <td>
-                                                    <div class="price-tag">UGX 25,000</div>
-                                                    <span class="price-change price-up">
-                                                        <i data-feather="trending-up" class="feather-12 me-1"></i>
-                                                        +12.5%
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span class="margin-badge margin-high">67%</span>
-                                                </td>
-                                                <td>
-                                                    <span class="pricing-tier tier-standard">Standard</span>
-                                                </td>
-                                                <td>
-                                                    <small>2024-01-30</small><br>
-                                                    <small class="text-muted">Cost increase</small>
-                                                </td>
-                                                <td>
-                                                    <div class="price-history">
-                                                        <svg width="100" height="40" viewBox="0 0 100 40">
-                                                            <path class="price-line price-increase" d="M10,30 L30,28 L50,25 L70,20 L90,15" />
-                                                        </svg>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-128')">
-                                                            <i data-feather="edit" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-128')">
-                                                            <i data-feather="trending-up" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-128')">
-                                                            <i data-feather="refresh-cw" class="feather-12"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                            {% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
@@ -718,16 +657,18 @@
                                                 <h6 class="card-subtitle mb-2 text-muted">Pricing Analysis Summary</h6>
                                                 <div class="row">
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Total Products:</strong> 312 with prices</p>
-                                                        <p class="mb-1"><strong>Avg. Margin:</strong> 48.5%</p>
+                                                        <p class="mb-1"><strong>Total Products:</strong> {{ products_analyzed|intcomma }} with prices</p>
+                                                        <p class="mb-1"><strong>Avg. Margin:</strong> {{ avg_margin|floatformat:1 }}%</p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Price Changes This Month:</strong> 24 items</p>
-                                                        <p class="mb-1"><strong>Avg. Price Increase:</strong> +2.5%</p>
+                                                        <p class="mb-1"><strong>Price Changes This Month:</strong> {{ price_changes_this_month|intcomma }} items</p>
+                                                        <p class="mb-1"><strong>Avg. Price Change:</strong> 
+                                                            {% if avg_price_change > 0 %}+{% endif %}{{ avg_price_change|floatformat:1 }}%
+                                                        </p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Highest Margin:</strong> Accessories (65%)</p>
-                                                        <p class="mb-1"><strong>Lowest Margin:</strong> Electronics (32%)</p>
+                                                        <p class="mb-1"><strong>Highest Margin Category:</strong> {{ highest_margin_category }} ({{ highest_margin_pct|floatformat:0 }}%)</p>
+                                                        <p class="mb-1"><strong>Lowest Margin Category:</strong> {{ lowest_margin_category }} ({{ lowest_margin_pct|floatformat:0 }}%)</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -738,383 +679,6 @@
                         </div>
                     </div>
 
-                    <!-- Unit Conversion Report Tab -->
-                    <div class="tab-pane fade" id="unit-conversion" role="tabpanel" aria-labelledby="unit-conversion-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="repeat" class="feather-16 me-2"></i>
-                                    Unit Conversion Report
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="showConversionType('all')">All</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showConversionType('weight')">Weight</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showConversionType('volume')">Volume</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showConversionType('count')">Count</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="card">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-3">Unit Conversion Calculator</h6>
-                                                <div class="row g-3">
-                                                    <div class="col-md-3">
-                                                        <label class="form-label">From Value</label>
-                                                        <input type="number" class="form-control" value="1" id="fromValue">
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <label class="form-label">From Unit</label>
-                                                        <select class="form-select" id="fromUnit">
-                                                            <option value="kg">Kilograms (kg)</option>
-                                                            <option value="g">Grams (g)</option>
-                                                            <option value="lb">Pounds (lb)</option>
-                                                            <option value="oz">Ounces (oz)</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <label class="form-label">To Unit</label>
-                                                        <select class="form-select" id="toUnit">
-                                                            <option value="g">Grams (g)</option>
-                                                            <option value="kg">Kilograms (kg)</option>
-                                                            <option value="lb">Pounds (lb)</option>
-                                                            <option value="oz">Ounces (oz)</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-3 d-flex align-items-end">
-                                                        <button class="btn btn-primary w-100" onclick="calculateConversion()">
-                                                            <i data-feather="refresh-cw" class="feather-16 me-2"></i>
-                                                            Convert
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div class="mt-3 text-center" id="conversionResult">
-                                                    <h4 class="text-primary">1 kg = 1000 g</h4>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="table-responsive">
-                                    <table class="table unit-conversion-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Product</th>
-                                                <th>SKU</th>
-                                                <th>Base Unit</th>
-                                                <th>Pack Unit</th>
-                                                <th>Conversion Factor</th>
-                                                <th>Base Price</th>
-                                                <th>Pack Price</th>
-                                                <th>Unit Price</th>
-                                                <th>Best Value</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>Premium Rice</td>
-                                                <td><strong>FOOD-001</strong></td>
-                                                <td>kg</td>
-                                                <td>50kg bag</td>
-                                                <td><span class="conversion-factor">1:50</span></td>
-                                                <td>UGX 4,500/kg</td>
-                                                <td>UGX 200,000</td>
-                                                <td>UGX 4,000/kg</td>
-                                                <td><span class="badge bg-success">Pack saves 11%</span></td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-001')">
-                                                        <i data-feather="edit" class="feather-12"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>Cooking Oil</td>
-                                                <td><strong>FOOD-002</strong></td>
-                                                <td>Liter</td>
-                                                <td>20L Jerrycan</td>
-                                                <td><span class="conversion-factor">1:20</span></td>
-                                                <td>UGX 8,500/L</td>
-                                                <td>UGX 150,000</td>
-                                                <td>UGX 7,500/L</td>
-                                                <td><span class="badge bg-success">Pack saves 12%</span></td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-002')">
-                                                        <i data-feather="edit" class="feather-12"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>Wheat Flour</td>
-                                                <td><strong>FOOD-003</strong></td>
-                                                <td>kg</td>
-                                                <td>25kg bag</td>
-                                                <td><span class="conversion-factor">1:25</span></td>
-                                                <td>UGX 3,200/kg</td>
-                                                <td>UGX 70,000</td>
-                                                <td>UGX 2,800/kg</td>
-                                                <td><span class="badge bg-success">Pack saves 13%</span></td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-003')">
-                                                        <i data-feather="edit" class="feather-12"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>Sugar</td>
-                                                <td><strong>FOOD-004</strong></td>
-                                                <td>kg</td>
-                                                <td>50kg bag</td>
-                                                <td><span class="conversion-factor">1:50</span></td>
-                                                <td>UGX 3,800/kg</td>
-                                                <td>UGX 175,000</td>
-                                                <td>UGX 3,500/kg</td>
-                                                <td><span class="badge bg-success">Pack saves 8%</span></td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-004')">
-                                                        <i data-feather="edit" class="feather-12"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>Beans</td>
-                                                <td><strong>FOOD-005</strong></td>
-                                                <td>kg</td>
-                                                <td>100kg sack</td>
-                                                <td><span class="conversion-factor">1:100</span></td>
-                                                <td>UGX 4,200/kg</td>
-                                                <td>UGX 380,000</td>
-                                                <td>UGX 3,800/kg</td>
-                                                <td><span class="badge bg-success">Pack saves 10%</span></td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-005')">
-                                                        <i data-feather="edit" class="feather-12"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                <div class="row mt-4">
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Conversion Standards</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    <li><i data-feather="scale" class="feather-12 text-primary me-2"></i> <strong>Weight:</strong> 1 kg = 1000 g = 2.20462 lb</li>
-                                                    <li><i data-feather="droplet" class="feather-12 text-info me-2"></i> <strong>Volume:</strong> 1 L = 1000 ml = 0.264172 gal</li>
-                                                    <li><i data-feather="package" class="feather-12 text-success me-2"></i> <strong>Count:</strong> 1 dozen = 12 units</li>
-                                                    <li><i data-feather="box" class="feather-12 text-warning me-2"></i> <strong>Bulk:</strong> 1 carton = 24 units (varies)</li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Best Practices</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Always display unit price alongside pack price</li>
-                                                    <li><i data-feather="alert-triangle" class="feather-12 text-warning me-2"></i> Update conversion factors when costs change</li>
-                                                    <li><i data-feather="percent" class="feather-12 text-info me-2"></i> Maintain consistent margin across all unit sizes</li>
-                                                    <li><i data-feather="refresh-cw" class="feather-12 text-primary me-2"></i> Review bulk pricing quarterly</li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Price Comparison Tab -->
-                    <div class="tab-pane fade" id="price-comparison" role="tabpanel" aria-labelledby="price-comparison-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="git-compare" class="feather-16 me-2"></i>
-                                    Price Comparison Analysis
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterComparison('all')">All</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterComparison('higher')">We're Higher</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterComparison('lower')">We're Lower</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterComparison('matched')">Price Matched</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="price-chart-container">
-                                            <canvas id="priceComparisonChart"></canvas>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="comparison-grid">
-                                    <!-- Comparison Item 1 -->
-                                    <div class="comparison-item">
-                                        <span class="competitor-tag">TechZone</span>
-                                        <h6>Premium Smartphone X200</h6>
-                                        <div class="d-flex justify-content-between align-items-center my-3">
-                                            <div>
-                                                <small class="text-muted">Our Price</small>
-                                                <div class="h5 mb-0">UGX 1,250,000</div>
-                                            </div>
-                                            <div class="text-center">
-                                                <i data-feather="arrow-right" class="feather-24 text-primary"></i>
-                                            </div>
-                                            <div>
-                                                <small class="text-muted">Competitor Price</small>
-                                                <div class="h5 mb-0">UGX 1,180,000</div>
-                                            </div>
-                                        </div>
-                                        <div class="price-difference difference-negative">
-                                            <i data-feather="trending-up" class="feather-16 me-1"></i>
-                                            We're 5.9% higher
-                                        </div>
-                                        <p class="small mb-3">Competitor is running a special promotion. Consider matching for key customers.</p>
-                                        <div class="pricing-actions">
-                                            <button class="btn btn-sm btn-outline-danger" onclick="priceMatch('SKU-001')">
-                                                <i data-feather="target" class="feather-12 me-1"></i>
-                                                Price Match
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-warning" onclick="analyzeImpact('SKU-001')">
-                                                <i data-feather="bar-chart-2" class="feather-12 me-1"></i>
-                                                Analyze
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Comparison Item 2 -->
-                                    <div class="comparison-item">
-                                        <span class="competitor-tag">AudioWorld</span>
-                                        <h6>Wireless Headphones Pro</h6>
-                                        <div class="d-flex justify-content-between align-items-center my-3">
-                                            <div>
-                                                <small class="text-muted">Our Price</small>
-                                                <div class="h5 mb-0">UGX 320,000</div>
-                                            </div>
-                                            <div class="text-center">
-                                                <i data-feather="arrow-left" class="feather-24 text-success"></i>
-                                            </div>
-                                            <div>
-                                                <small class="text-muted">Competitor Price</small>
-                                                <div class="h5 mb-0">UGX 350,000</div>
-                                            </div>
-                                        </div>
-                                        <div class="price-difference difference-positive">
-                                            <i data-feather="trending-down" class="feather-16 me-1"></i>
-                                            We're 8.6% lower
-                                        </div>
-                                        <p class="small mb-3">Our price is competitive. Consider highlighting this in marketing materials.</p>
-                                        <div class="pricing-actions">
-                                            <button class="btn btn-sm btn-outline-success" onclick="promotePrice('SKU-002')">
-                                                <i data-feather="megaphone" class="feather-12 me-1"></i>
-                                                Promote
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-primary" onclick="maintainPrice('SKU-002')">
-                                                <i data-feather="check" class="feather-12 me-1"></i>
-                                                Maintain
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Comparison Item 3 -->
-                                    <div class="comparison-item">
-                                        <div class="discount-badge">-15%</div>
-                                        <span class="competitor-tag">GadgetHub</span>
-                                        <h6>USB-C Fast Charger</h6>
-                                        <div class="d-flex justify-content-between align-items-center my-3">
-                                            <div>
-                                                <small class="text-muted">Our Price</small>
-                                                <div class="h5 mb-0">UGX 45,000</div>
-                                            </div>
-                                            <div class="text-center">
-                                                <i data-feather="check" class="feather-24 text-info"></i>
-                                            </div>
-                                            <div>
-                                                <small class="text-muted">Competitor Price</small>
-                                                <div class="h5 mb-0">UGX 45,000</div>
-                                            </div>
-                                        </div>
-                                        <div class="price-difference difference-neutral">
-                                            <i data-feather="minus" class="feather-16 me-1"></i>
-                                            Price Matched
-                                        </div>
-                                        <p class="small mb-3">Prices are identical. Monitor for any competitor changes.</p>
-                                        <div class="pricing-actions">
-                                            <button class="btn btn-sm btn-outline-info" onclick="monitorPrice('SKU-005')">
-                                                <i data-feather="eye" class="feather-12 me-1"></i>
-                                                Monitor
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Comparison Item 4 -->
-                                    <div class="comparison-item">
-                                        <span class="competitor-tag">MobileMall</span>
-                                        <h6>Screen Protector Pack</h6>
-                                        <div class="d-flex justify-content-between align-items-center my-3">
-                                            <div>
-                                                <small class="text-muted">Our Price</small>
-                                                <div class="h5 mb-0">UGX 25,000</div>
-                                            </div>
-                                            <div class="text-center">
-                                                <i data-feather="arrow-left" class="feather-24 text-success"></i>
-                                            </div>
-                                            <div>
-                                                <small class="text-muted">Competitor Price</small>
-                                                <div class="h5 mb-0">UGX 28,000</div>
-                                            </div>
-                                        </div>
-                                        <div class="price-difference difference-positive">
-                                            <i data-feather="trending-down" class="feather-16 me-1"></i>
-                                            We're 10.7% lower
-                                        </div>
-                                        <p class="small mb-3">Significant price advantage. Could increase margin slightly.</p>
-                                        <div class="pricing-actions">
-                                            <button class="btn btn-sm btn-outline-success" onclick="adjustMargin('SKU-128')">
-                                                <i data-feather="dollar-sign" class="feather-12 me-1"></i>
-                                                Adjust Margin
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-warning" onclick="analyzeImpact('SKU-128')">
-                                                <i data-feather="bar-chart-2" class="feather-12 me-1"></i>
-                                                Analyze
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Competitive Analysis Summary</h6>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Compared Products:</strong> 45 items</p>
-                                                        <p class="mb-1"><strong>We're Lower:</strong> 28 items (62%)</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>We're Higher:</strong> 12 items (27%)</p>
-                                                        <p class="mb-1"><strong>Price Matched:</strong> 5 items (11%)</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Avg. Price Difference:</strong> -3.8%</p>
-                                                        <p class="mb-1"><strong>Recommendation:</strong> Review 12 higher-priced items</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Missing Pricing Report Tab -->
                     <div class="tab-pane fade" id="missing-pricing" role="tabpanel" aria-labelledby="missing-pricing-tab">
@@ -1123,14 +687,19 @@
                                 <h5 class="card-title mb-0">
                                     <i data-feather="alert-triangle" class="feather-16 me-2"></i>
                                     Missing Pricing Report
-                                    <span class="badge bg-danger ms-2">18 Items</span>
+                                    {% if missing_prices_count > 0 %}
+                                    <span class="badge bg-danger ms-2">{{ missing_prices_count|intcomma }} Items</span>
+                                    {% endif %}
                                 </h5>
+                                {% if missing_prices_count > 0 %}
                                 <button class="btn btn-sm btn-success" onclick="autoPriceMissing()">
                                     <i data-feather="zap" class="feather-12 me-1"></i>
                                     Auto-price All
                                 </button>
+                                {% endif %}
                             </div>
                             <div class="card-body">
+                                {% if missing_prices_count > 0 %}
                                 <div class="row mb-4">
                                     <div class="col-md-12">
                                         <div class="card missing-price-alert">
@@ -1141,7 +710,7 @@
                                                             <i data-feather="alert-circle" class="feather-16 me-2"></i>
                                                             Immediate Action Required
                                                         </h6>
-                                                        <p class="mb-0">18 products are missing pricing information. This affects inventory management and sales operations.</p>
+                                                        <p class="mb-0">{{ missing_prices_count|intcomma }} products are missing pricing information. This affects inventory management and sales operations.</p>
                                                     </div>
                                                     <div class="col-md-4 text-end">
                                                         <button class="btn btn-danger" onclick="prioritizeMissingPricing()">
@@ -1172,127 +741,55 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr class="table-warning">
-                                                <td><strong>SKU-450</strong></td>
-                                                <td>New Model Smartphone Case</td>
-                                                <td>Accessories</td>
-                                                <td>2024-01-30</td>
-                                                <td><span class="badge bg-danger">2 days</span></td>
+                                            {% for item in missing_pricing_data %}
+                                            <tr class="table-{% if item.days_without_price > 7 %}danger{% else %}warning{% endif %}">
+                                                <td><strong>{{ item.sku }}</strong></td>
+                                                <td>{{ item.name }}</td>
+                                                <td>{{ item.category }}</td>
+                                                <td>{{ item.date_added }}</td>
                                                 <td>
-                                                    <small>Similar to SKU-007</small><br>
-                                                    <small>Avg. price: UGX 35,000</small>
+                                                    <span class="badge {% if item.days_without_price > 7 %}bg-danger{% else %}bg-warning{% endif %}">
+                                                        {{ item.days_without_price }} days
+                                                    </span>
                                                 </td>
                                                 <td>
-                                                    <input type="text" class="form-control form-control-sm" placeholder="UGX 35,000" style="width: 120px;">
+                                                    <small>Similar products: {{ item.similar_products_count }}</small><br>
+                                                    {% if item.similar_products_count > 0 %}
+                                                    <small>Avg. price: {{ currency }} {{ item.suggested_price|floatformat:0|intcomma }}</small>
+                                                    {% else %}
+                                                    <small>No similar products found</small>
+                                                    {% endif %}
                                                 </td>
-                                                <td>UGX 18,000</td>
                                                 <td>
-                                                    <span class="badge bg-warning">New Product</span>
+                                                    {% if item.similar_products_count > 0 %}
+                                                    <input type="text" class="form-control form-control-sm suggested-price" 
+                                                           placeholder="{{ currency }} {{ item.suggested_price|floatformat:0|intcomma }}" 
+                                                           style="width: 120px;" 
+                                                           data-sku="{{ item.sku }}"
+                                                           value="{{ currency }} {{ item.suggested_price|floatformat:0|intcomma }}">
+                                                    {% else %}
+                                                    <input type="text" class="form-control form-control-sm suggested-price" 
+                                                           placeholder="Enter price" 
+                                                           style="width: 120px;" 
+                                                           data-sku="{{ item.sku }}">
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ currency }} {{ item.cost_price|floatformat:0|intcomma }}</td>
+                                                <td>
+                                                    <span class="badge {{ item.status_class }}">{{ item.status }}</span>
                                                 </td>
                                                 <td>
                                                     <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-success" onclick="applySuggestedPrice('SKU-450')">
+                                                        <button class="btn btn-sm btn-success" onclick="applySuggestedPrice('{{ item.sku }}')">
                                                             <i data-feather="check" class="feather-12"></i>
                                                         </button>
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-450')">
-                                                            <i data-feather="calculator" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-secondary" onclick="skipProduct('SKU-450')">
+                                                        <button class="btn btn-sm btn-outline-secondary" onclick="skipProduct('{{ item.sku }}')">
                                                             <i data-feather="skip-forward" class="feather-12"></i>
                                                         </button>
                                                     </div>
                                                 </td>
                                             </tr>
-                                            <tr class="table-warning">
-                                                <td><strong>SKU-451</strong></td>
-                                                <td>Bluetooth Earbuds Pro</td>
-                                                <td>Audio</td>
-                                                <td>2024-01-29</td>
-                                                <td><span class="badge bg-danger">3 days</span></td>
-                                                <td>
-                                                    <small>Similar to SKU-002</small><br>
-                                                    <small>Avg. price: UGX 280,000</small>
-                                                </td>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm" placeholder="UGX 280,000" style="width: 120px;">
-                                                </td>
-                                                <td>UGX 185,000</td>
-                                                <td>
-                                                    <span class="badge bg-warning">New Product</span>
-                                                </td>
-                                                <td>
-                                                    <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-success" onclick="applySuggestedPrice('SKU-451')">
-                                                            <i data-feather="check" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-451')">
-                                                            <i data-feather="calculator" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-secondary" onclick="skipProduct('SKU-451')">
-                                                            <i data-feather="skip-forward" class="feather-12"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr class="table-danger">
-                                                <td><strong>SKU-320</strong></td>
-                                                <td>Laptop Cooling Stand</td>
-                                                <td>Accessories</td>
-                                                <td>2024-01-15</td>
-                                                <td><span class="badge bg-danger">16 days</span></td>
-                                                <td>
-                                                    <small>Unique product</small><br>
-                                                    <small>No similar items</small>
-                                                </td>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm" placeholder="Calculate..." style="width: 120px;">
-                                                </td>
-                                                <td>UGX 45,000</td>
-                                                <td>
-                                                    <span class="badge bg-danger">Overdue</span>
-                                                </td>
-                                                <td>
-                                                    <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-danger" onclick="flagUrgent('SKU-320')">
-                                                            <i data-feather="flag" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-320')">
-                                                            <i data-feather="calculator" class="feather-12"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr class="table-warning">
-                                                <td><strong>SKU-452</strong></td>
-                                                <td>Wireless Mouse V3</td>
-                                                <td>Accessories</td>
-                                                <td>2024-01-28</td>
-                                                <td><span class="badge bg-warning">4 days</span></td>
-                                                <td>
-                                                    <small>Similar to SKU-015</small><br>
-                                                    <small>Avg. price: UGX 85,000</small>
-                                                </td>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm" placeholder="UGX 85,000" style="width: 120px;">
-                                                </td>
-                                                <td>UGX 55,000</td>
-                                                <td>
-                                                    <span class="badge bg-warning">New Product</span>
-                                                </td>
-                                                <td>
-                                                    <div class="pricing-actions">
-                                                        <button class="btn btn-sm btn-success" onclick="applySuggestedPrice('SKU-452')">
-                                                            <i data-feather="check" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-452')">
-                                                            <i data-feather="calculator" class="feather-12"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-secondary" onclick="skipProduct('SKU-452')">
-                                                            <i data-feather="skip-forward" class="feather-12"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                            {% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1304,12 +801,12 @@
                                                 <h6 class="card-subtitle mb-2 text-muted">Missing Pricing Analysis</h6>
                                                 <div class="row">
                                                     <div class="col-6">
-                                                        <p class="mb-1"><strong>Total Missing:</strong> 18 items</p>
-                                                        <p class="mb-1"><strong>New Products:</strong> 15 items</p>
+                                                        <p class="mb-1"><strong>Total Missing:</strong> {{ missing_prices_count|intcomma }} items</p>
+                                                        <p class="mb-1"><strong>New Products:</strong> {{ new_products_count|intcomma }} items</p>
                                                     </div>
                                                     <div class="col-6">
-                                                        <p class="mb-1"><strong>Overdue (>7 days):</strong> 3 items</p>
-                                                        <p class="mb-1"><strong>Avg. Days Missing:</strong> 6.2 days</p>
+                                                        <p class="mb-1"><strong>Overdue (>7 days):</strong> {{ overdue_count|intcomma }} items</p>
+                                                        <p class="mb-1"><strong>Avg. Days Missing:</strong> {{ avg_days_missing|floatformat:1 }} days</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1322,17 +819,24 @@
                                                 <div class="d-grid gap-2">
                                                     <button class="btn btn-outline-primary" onclick="applyCostPlus()">
                                                         <i data-feather="percent" class="feather-12 me-2"></i>
-                                                        Apply Cost + 50% Margin
+                                                        Apply Cost + {{ default_margin }}% Margin
                                                     </button>
                                                     <button class="btn btn-outline-success" onclick="applyCompetitive()">
                                                         <i data-feather="git-compare" class="feather-12 me-2"></i>
-                                                        Match Competitive Prices
+                                                        Match Similar Products
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+                                {% else %}
+                                <div class="text-center py-5">
+                                    <i data-feather="check-circle" class="feather-48 text-success mb-3"></i>
+                                    <h4 class="text-success">All products have pricing information!</h4>
+                                    <p class="text-muted">Great job! All active products in the system have proper pricing configured.</p>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -1343,13 +847,8 @@
 </div>
 
 <script>
-let priceComparisonChart;
-
-// Initialize charts and functionality
+// Initialize feather icons
 document.addEventListener('DOMContentLoaded', function() {
-    initializePriceComparisonChart();
-    
-    // Initialize feather icons
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
@@ -1362,86 +861,52 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set up currency selector
     setupCurrencySelector();
+    
+    // Set up filter form submission
+    setupFilters();
 });
 
-function initializePriceComparisonChart() {
-    const ctx = document.getElementById('priceComparisonChart').getContext('2d');
-    
-    priceComparisonChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ['Electronics', 'Accessories', 'Wearables', 'Audio', 'Other'],
-            datasets: [
-                {
-                    label: 'Our Price (UGX)',
-                    data: [1250000, 45000, 320000, 85000, 25000],
-                    backgroundColor: '#4A90E2',
-                    borderColor: '#357ABD',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Competitor Avg (UGX)',
-                    data: [1180000, 48000, 350000, 90000, 28000],
-                    backgroundColor: '#E74A3B',
-                    borderColor: '#E02D1B',
-                    borderWidth: 1
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'UGX ' + (value / 1000).toFixed(0) + 'K';
-                        }
-                    }
-                }
-            }
-        }
-    });
+function setupCurrencySelector() {
+    const selector = document.getElementById('currencySelector');
+    if (selector) {
+        selector.addEventListener('change', function() {
+            const currency = this.value;
+            updateCurrencyDisplay(currency);
+            showToast(`Currency changed to ${currency}`, 'info');
+        });
+    }
 }
 
-function setupCurrencySelector() {
-    const selector = document.querySelector('.currency-selector');
-    selector.addEventListener('change', function() {
-        const currency = this.value;
-        updateCurrencyDisplay(currency);
-        showToast(`Currency changed to ${currency}`, 'info');
-    });
+function setupFilters() {
+    // Handle search form submission
+    const searchForm = document.getElementById('searchForm');
+    if (searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitFilterForm();
+        });
+    }
+}
+
+function submitFilterForm() {
+    document.getElementById('filterForm').submit();
 }
 
 function updateCurrencyDisplay(currency) {
-    // This would typically update all price displays to new currency
+    // Update all currency displays
+    const currencyDisplays = document.querySelectorAll('.currency-display');
+    currencyDisplays.forEach(display => {
+        display.textContent = currency;
+    });
+    
+    // Update price tags (this is a simplified version)
+    // In a real system, you'd make an AJAX call to convert prices
     const priceTags = document.querySelectorAll('.price-tag');
     priceTags.forEach(tag => {
         const currentText = tag.textContent;
         const amount = currentText.replace(/[^0-9.]/g, '');
-        if (currency === 'USD') {
-            tag.textContent = `$${(parseFloat(amount) / 3700).toFixed(2)}`;
-        } else if (currency === 'EUR') {
-            tag.textContent = `€${(parseFloat(amount) / 4000).toFixed(2)}`;
-        } else {
-            tag.textContent = `UGX ${parseFloat(amount).toLocaleString()}`;
-        }
+        tag.textContent = `${currency} ${parseFloat(amount).toLocaleString()}`;
     });
-}
-
-function showConversionType(type) {
-    const buttons = document.querySelectorAll('#unit-conversion .btn-group .btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    
-    // This would typically filter conversion data
-    showToast(`Showing ${type} conversions`, 'info');
 }
 
 function calculateConversion() {
@@ -1470,195 +935,88 @@ function calculateConversion() {
     }
 }
 
-function filterComparison(type) {
-    const buttons = document.querySelectorAll('#price-comparison .btn-group .btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    
-    // This would typically filter comparison items
-    showToast(`Filtering: ${type} prices`, 'info');
-}
-
 function editPrice(sku) {
-    showToast(`Editing price for ${sku}`, 'info');
-    // This would typically open price edit modal
-}
-
-function viewPriceHistory(sku) {
-    showToast(`Viewing price history for ${sku}`, 'info');
-    // This would typically show price history chart
+    showToast(`Opening price editor for ${sku}...`, 'info');
+    // In production: window.location.href = `/products/edit/${sku}/`;
 }
 
 function adjustPrice(sku) {
-    showToast(`Adjusting price for ${sku}`, 'warning');
-    // This would typically open price adjustment interface
-}
-
-function priceMatch(sku) {
-    if (confirm(`Price match ${sku} with competitor?`)) {
-        showToast(`Price matching ${sku}...`, 'success');
-        // This would typically update price
-    }
-}
-
-function analyzeImpact(sku) {
-    showToast(`Analyzing impact for ${sku}...`, 'info');
-    // This would typically show impact analysis
-}
-
-function promotePrice(sku) {
-    showToast(`Promoting price advantage for ${sku}`, 'info');
-    // This would typically update marketing materials
-}
-
-function maintainPrice(sku) {
-    showToast(`Maintaining current price for ${sku}`, 'info');
-    // This would typically confirm no changes needed
-}
-
-function monitorPrice(sku) {
-    showToast(`Adding ${sku} to price monitoring`, 'info');
-    // This would typically add to monitoring list
-}
-
-function adjustMargin(sku) {
-    showToast(`Adjusting margin for ${sku}`, 'warning');
-    // This would typically open margin adjustment
-}
-
-function editConversion(sku) {
-    showToast(`Editing conversion for ${sku}`, 'info');
-    // This would typically open conversion edit modal
+    showToast(`Adjusting price for ${sku}...`, 'warning');
+    // In production: window.location.href = `/products/adjust-price/${sku}/`;
 }
 
 function applySuggestedPrice(sku) {
-    showToast(`Applying suggested price for ${sku}`, 'success');
-    // This would typically apply the suggested price
-}
-
-function calculatePrice(sku) {
-    showToast(`Calculating optimal price for ${sku}...`, 'info');
-    // This would typically calculate optimal price
+    const input = document.querySelector(`.suggested-price[data-sku="${sku}"]`);
+    const price = input.value.replace(/[^0-9.]/g, '');
+    
+    if (price && confirm(`Apply price ${price} for ${sku}?`)) {
+        showToast(`Applying price for ${sku}...`, 'success');
+        // In production: Make AJAX call to update price
+        // fetch(`/api/products/${sku}/set-price/`, {
+        //     method: 'POST',
+        //     headers: {
+        //         'X-CSRFToken': getCsrfToken(),
+        //         'Content-Type': 'application/json',
+        //     },
+        //     body: JSON.stringify({ price: price })
+        // })
+    } else {
+        showToast('Please enter a valid price', 'warning');
+    }
 }
 
 function skipProduct(sku) {
     if (confirm(`Skip pricing ${sku} for now?`)) {
         showToast(`Skipped ${sku}`, 'warning');
-        // This would typically move to next item
+        // In production: Mark product as skipped
     }
-}
-
-function flagUrgent(sku) {
-    showToast(`Flagged ${sku} as urgent`, 'danger');
-    // This would typically flag as urgent priority
 }
 
 function autoPriceMissing() {
     if (confirm('Auto-price all missing items using default rules?')) {
         showToast('Auto-pricing in progress...', 'warning');
-        // This would typically auto-price all missing items
+        // In production: Make AJAX call to auto-price
     }
 }
 
 function prioritizeMissingPricing() {
     showToast('Prioritizing missing pricing resolution', 'info');
-    // This would typically escalate priority
+    // In production: Send notification or update priority flags
 }
 
 function applyCostPlus() {
-    if (confirm('Apply cost + 50% margin to all missing items?')) {
+    if (confirm('Apply cost + margin to all missing items?')) {
         showToast('Applying cost-plus pricing...', 'success');
-        // This would typically apply cost-plus pricing
+        // In production: Make AJAX call
     }
 }
 
 function applyCompetitive() {
-    if (confirm('Match competitive prices for all missing items?')) {
+    if (confirm('Match similar products prices for all missing items?')) {
         showToast('Applying competitive pricing...', 'success');
-        // This would typically apply competitive pricing
-    }
-}
-
-function updateAllPrices() {
-    if (confirm('Update all prices based on current market analysis?')) {
-        showToast('Updating all prices...', 'warning');
-        // This would typically batch update prices
+        // In production: Make AJAX call
     }
 }
 
 function refreshPricingReports() {
-    showLoading();
-    
-    // Simulate API refresh
-    setTimeout(() => {
-        if (priceComparisonChart) {
-            priceComparisonChart.destroy();
-        }
-        
-        initializePriceComparisonChart();
-        feather.replace();
-        
-        // Hide loading
-        const loadingOverlay = document.getElementById('loading-overlay');
-        if (loadingOverlay) {
-            loadingOverlay.remove();
-        }
-        
-        // Show success message
-        showToast('Pricing reports refreshed successfully!', 'success');
-    }, 1000);
+    location.reload();
 }
 
 function exportPricingReport(format) {
-    let exportUrl;
-    let filename = `pricing-report-${new Date().toISOString().split('T')[0]}`;
-    
-    if (format === 'csv') {
-        exportUrl = '/reports/pricing/export/csv/';
-        filename += '.csv';
-    } else if (format === 'pdf') {
-        exportUrl = '/reports/pricing/export/pdf/';
-        filename += '.pdf';
-    } else if (format === 'excel') {
-        exportUrl = '/reports/pricing/export/excel/';
-        filename += '.xlsx';
-    }
-    
-    // Create temporary link and download
-    const link = document.createElement('a');
-    link.href = exportUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    showToast(`${format.toUpperCase()} export started!`, 'info');
-}
-
-function goBack() {
-    window.history.back();
-    // Or redirect to dashboard:
-    // window.location.href = '/reports/dashboard/';
-}
-
-function showLoading() {
-    // Add loading overlay
-    const loadingHTML = `
-        <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
-             style="background: rgba(255,255,255,0.8); z-index: 9999;">
-            <div class="text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading pricing reports...</p>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', loadingHTML);
+    showToast(`Exporting to ${format.toUpperCase()}...`, 'info');
+    // In production: window.location.href = `/reports/export-pricing/${format}/`;
 }
 
 function showToast(message, type = 'info') {
-    // Create toast element
+    // Simple toast notification
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        const container = document.createElement('div');
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    
     const toastHTML = `
         <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
@@ -1669,14 +1027,6 @@ function showToast(message, type = 'info') {
             </div>
         </div>
     `;
-    
-    const toastContainer = document.querySelector('.toast-container');
-    if (!toastContainer) {
-        const container = document.createElement('div');
-        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        container.style.zIndex = '9999';
-        document.body.appendChild(container);
-    }
     
     document.querySelector('.toast-container').insertAdjacentHTML('beforeend', toastHTML);
     
@@ -1769,11 +1119,6 @@ function showToast(message, type = 'info') {
         align-items: flex-start !important;
     }
     
-    .card-header .btn-group {
-        margin-top: 0.5rem;
-        align-self: flex-start;
-    }
-    
     .table-responsive {
         font-size: 0.8rem;
     }
@@ -1812,9 +1157,8 @@ function showToast(message, type = 'info') {
 }
 </style>
 
-{% endblock %}
 
-{% block extra_js %}
+
 <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 {% endblock %}

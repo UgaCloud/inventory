@@ -148,11 +148,6 @@ def sum_list(value):
     
 
 
-
-
-
-
-
 @register.filter
 def get_store_color_hex(report):
     """Get store color hex code based on store name"""
@@ -389,8 +384,10 @@ def get_default_store_report(reports):
     return None
 
 
-
-
+@register.filter
+def get_item(dictionary, key):
+    """Template filter to get dictionary item by key"""
+    return dictionary.get(key)
 
 
 

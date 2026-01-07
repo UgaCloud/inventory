@@ -4405,8 +4405,240 @@ def get_product_statistics(request):
 
 @login_required
 def reorder_details(request):
-    """Reports dashboard view"""
-    context = {}
+    """Reorder & Low Stock Reports view"""
+    
+    # Get all active stores
+    stores = StoreLocation.objects.filter(is_active=True)
+    
+    # Get current date for calculations
+    today = timezone.now().date()
+    
+    # 1. BELOW REORDER LEVEL ITEMS
+    below_reorder_items = []
+    for inventory in Inventory.objects.filter(
+        quantity_in_stock__gt=0  # Only items with some stock
+    ).select_related('product', 'store'):
+        
+        # Calculate stock percentage relative to reorder level
+        if inventory.reorder_level > 0:
+            stock_percentage = (inventory.quantity_in_stock / inventory.reorder_level) * 100
+        else:
+            stock_percentage = 0
+            
+        # Determine priority
+        if inventory.quantity_in_stock == 0:
+            priority = 'critical'
+        elif stock_percentage <= 50:
+            priority = 'critical'
+        elif stock_percentage <= 75:
+            priority = 'high'
+        elif stock_percentage <= 90:
+            priority = 'medium'
+        else:
+            priority = 'low'
+        
+        # Calculate average daily sales (last 30 days)
+        thirty_days_ago = today - timedelta(days=30)
+        total_sales = SalesItem.objects.filter(
+            product=inventory.product,
+            order__sale_date__gte=thirty_days_ago,
+            order__store=inventory.store
+        ).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+        
+        avg_daily_sales = total_sales / 30 if total_sales > 0 else 0
+        
+        # Calculate days until stockout
+        days_until_stockout = inventory.quantity_in_stock / avg_daily_sales if avg_daily_sales > 0 else 999
+        
+        # Get days below reorder level (simplified - would need historical tracking)
+        days_below_reorder = 0  # You would need to track this historically
+        
+        if inventory.quantity_in_stock <= inventory.reorder_level:
+            below_reorder_items.append({
+                'inventory': inventory,
+                'stock_percentage': stock_percentage,
+                'priority': priority,
+                'avg_daily_sales': round(avg_daily_sales, 1),
+                'days_until_stockout': round(days_until_stockout, 1),
+                'days_below_reorder': days_below_reorder,
+                'stock_value': inventory.quantity_in_stock * inventory.product.default_price
+            })
+    
+    # Sort by priority (critical first)
+    below_reorder_items.sort(key=lambda x: {
+        'critical': 0, 'high': 1, 'medium': 2, 'low': 3
+    }[x['priority']])
+    
+    # 2. OUT OF STOCK ITEMS
+    out_of_stock_items = []
+    for inventory in Inventory.objects.filter(
+        quantity_in_stock=0
+    ).select_related('product', 'store'):
+        
+        # Get last sale date
+        last_sale = SalesItem.objects.filter(
+            product=inventory.product,
+            order__store=inventory.store
+        ).order_by('-order__sale_date').first()
+        
+        # Count backorders/requests (would need a backorder model)
+        backorders = 0
+        
+        # Get supplier info (from purchase orders)
+        last_purchase = PurchaseOrderItem.objects.filter(
+            product=inventory.product
+        ).order_by('-order__purchase_date').first()
+        
+        supplier = last_purchase.order.supplier if last_purchase else None
+        
+        # Calculate days out of stock
+        days_out = 0  # You would need to track when it went out of stock
+        
+        # Determine urgency based on sales velocity
+        thirty_days_ago = today - timedelta(days=30)
+        sales_last_month = SalesItem.objects.filter(
+            product=inventory.product,
+            order__sale_date__gte=thirty_days_ago,
+            order__store=inventory.store
+        ).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+        
+        if sales_last_month > 20:
+            urgency = 'critical'
+        elif sales_last_month > 10:
+            urgency = 'high'
+        elif sales_last_month > 0:
+            urgency = 'medium'
+        else:
+            urgency = 'low'
+        
+        out_of_stock_items.append({
+            'inventory': inventory,
+            'last_sale': last_sale.order.sale_date if last_sale else None,
+            'backorders': backorders,
+            'supplier': supplier,
+            'days_out': days_out,
+            'urgency': urgency,
+            'sales_last_month': sales_last_month
+        })
+    
+    # Sort by urgency
+    out_of_stock_items.sort(key=lambda x: {
+        'critical': 0, 'high': 1, 'medium': 2, 'low': 3
+    }[x['urgency']])
+    
+    # 3. STORE-SPECIFIC LOW STOCK
+    store_specific_data = {}
+    for store in stores:
+        low_stock_in_store = []
+        
+        for inventory in Inventory.objects.filter(
+            store=store,
+            quantity_in_stock__gt=0,  # Has some stock
+            quantity_in_stock__lte=F('reorder_level') * 2  # Below 2x reorder level
+        ).select_related('product'):
+            
+            # Get stock in other stores
+            other_store_stock = []
+            for other_store in stores.exclude(id=store.id):
+                try:
+                    other_inv = Inventory.objects.get(
+                        product=inventory.product,
+                        store=other_store
+                    )
+                    if other_inv.quantity_in_stock > inventory.reorder_level * 1.5:  # Has excess stock
+                        other_store_stock.append({
+                            'store': other_store,
+                            'quantity': other_inv.quantity_in_stock
+                        })
+                except Inventory.DoesNotExist:
+                    continue
+            
+            # Determine transfer recommendation
+            if other_store_stock:
+                # Can transfer from other stores
+                best_source = max(other_store_stock, key=lambda x: x['quantity'])
+                
+                # Get the reorder level for the source store
+                try:
+                    source_inventory = Inventory.objects.get(
+                        product=inventory.product,
+                        store=best_source['store']
+                    )
+                    source_reorder_level = source_inventory.reorder_level
+                except Inventory.DoesNotExist:
+                    source_reorder_level = 10  # Default
+                
+                # Calculate suggested units
+                suggested_units = min(
+                    inventory.reorder_level - inventory.quantity_in_stock,
+                    best_source['quantity'] - source_reorder_level
+                )
+                suggested_units = max(suggested_units, 1)  # At least 1 unit
+                
+                recommendation = {
+                    'type': 'transfer',
+                    'from_store': best_source['store'],
+                    'suggested_units': suggested_units,
+                    'lead_time': '1-2 days'
+                }
+            else:
+                # Need to reorder from supplier
+                recommendation = {
+                    'type': 'reorder',
+                    'lead_time': '4-5 days'
+                }
+            
+            low_stock_in_store.append({
+                'inventory': inventory,
+                'other_store_stock': other_store_stock,
+                'recommendation': recommendation
+            })
+        
+        store_specific_data[store] = low_stock_in_store
+    
+    # 4. SUMMARY STATISTICS
+    total_out_of_stock = Inventory.objects.filter(quantity_in_stock=0).count()
+    total_below_reorder = len(below_reorder_items)
+    
+    # Calculate total value at risk
+    total_value_at_risk = sum(
+        item['stock_value'] for item in below_reorder_items
+    ) + sum(
+        item['inventory'].reorder_level * item['inventory'].product.default_price
+        for item in below_reorder_items if item['inventory'].quantity_in_stock == 0
+    )
+    
+    # Store-wise counts
+    store_stats = {}
+    for store in stores:
+        store_stats[store.name] = {
+            'low_stock': Inventory.objects.filter(
+                store=store,
+                quantity_in_stock__gt=0,
+                quantity_in_stock__lte=F('reorder_level')
+            ).count(),
+            'out_of_stock': Inventory.objects.filter(
+                store=store,
+                quantity_in_stock=0
+            ).count()
+        }
+    
+    context = {
+        'below_reorder_items': below_reorder_items[:50],  # Limit to 50 items
+        'out_of_stock_items': out_of_stock_items[:50],
+        'store_specific_data': store_specific_data,
+        'stores': stores,
+        'total_out_of_stock': total_out_of_stock,
+        'total_below_reorder': total_below_reorder,
+        'total_value_at_risk': total_value_at_risk,
+        'store_stats': store_stats,
+        'report_id': f"STOCK-ALERT-{today.strftime('%Y%m%d')}-001",
+        'report_date': today,
+        'urgent_count': len([item for item in below_reorder_items if item['priority'] == 'critical']),
+        'warning_count': len([item for item in below_reorder_items if item['priority'] == 'high']),
+        'monitor_count': len([item for item in below_reorder_items if item['priority'] in ['medium', 'low']]),
+    }
+    
     return render(request, 'reports/reorder_details.html', context)
 
 
@@ -4931,11 +5163,322 @@ def get_dynamic_border_color(store_id):
 
 @login_required
 def productpricing_details(request):  
-    """Reports dashboard view"""
-    context = {}
+    """Pricing reports view with detailed analysis"""
+    
+    today = timezone.now()
+    currency = request.GET.get('currency', 'UGX')
+    
+    # Get filter parameters
+    category_filter = request.GET.get('category', '')
+    price_range_filter = request.GET.get('price_range', '')
+    margin_filter = request.GET.get('margin', '')
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset for products
+    products = Product.objects.filter(is_active=True).prefetch_related(
+        'unit_prices', 'category'
+    )
+    
+    # Apply filters
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(sku__icontains=search_query)
+        )
+    
+    if category_filter:
+        products = products.filter(category__name=category_filter)
+    
+    # Prepare product pricing data
+    product_pricing_data = []
+    total_selling_price = Decimal('0')
+    total_cost_price = Decimal('0')
+    products_count = 0
+    high_margin_count = 0
+    low_margin_count = 0
+    total_product_value = Decimal('0')
+    
+    for product in products:
+        default_unit_price = product.unit_prices.first()
+        
+        if default_unit_price:
+            selling_price = default_unit_price.price
+            
+            # Get cost from purchase history or use default
+            purchase_items = PurchaseOrderItem.objects.filter(product=product)
+            avg_cost = purchase_items.aggregate(avg=Avg('unit_cost'))['avg']
+            cost_price = avg_cost or (selling_price * Decimal('0.65'))
+            
+            # Calculate margin
+            if cost_price > 0:
+                margin = ((selling_price - cost_price) / cost_price) * 100
+            else:
+                margin = 0
+            
+            # Apply filters
+            if price_range_filter:
+                if price_range_filter == 'low' and selling_price >= 100000:
+                    continue
+                elif price_range_filter == 'medium' and (selling_price < 100000 or selling_price > 500000):
+                    continue
+                elif price_range_filter == 'high' and selling_price <= 500000:
+                    continue
+            
+            if margin_filter:
+                if margin_filter == 'low' and margin >= 30:
+                    continue
+                elif margin_filter == 'medium' and (margin < 30 or margin > 50):
+                    continue
+                elif margin_filter == 'high' and margin <= 50:
+                    continue
+            
+            # Determine price tier
+            if margin >= 50:
+                tier = 'Premium'
+                tier_class = 'tier-premium'
+                high_margin_count += 1
+            elif margin >= 30:
+                tier = 'Standard'
+                tier_class = 'tier-standard'
+            else:
+                tier = 'Economy'
+                tier_class = 'tier-economy'
+                low_margin_count += 1
+            
+            # Determine margin badge
+            if margin >= 50:
+                margin_class = 'margin-high'
+            elif margin >= 30:
+                margin_class = 'margin-medium'
+            else:
+                margin_class = 'margin-low'
+            
+            # Static price change for now
+            price_change = Decimal('0')
+            if price_change > 0:
+                price_change_class = 'price-up'
+                price_change_icon = 'trending-up'
+                change_text = f"+{price_change:.1f}%"
+            elif price_change < 0:
+                price_change_class = 'price-down'
+                price_change_icon = 'trending-down'
+                change_text = f"{price_change:.1f}%"
+            else:
+                price_change_class = 'price-stable'
+                price_change_icon = 'minus'
+                change_text = 'Stable'
+            
+            product_data = {
+                'sku': product.sku,
+                'name': product.name,
+                'category': product.category.name if product.category else 'Uncategorized',
+                'cost_price': cost_price,
+                'selling_price': selling_price,
+                'margin': margin,
+                'margin_class': margin_class,
+                'tier': tier,
+                'tier_class': tier_class,
+                'price_change': price_change,
+                'price_change_class': price_change_class,
+                'price_change_icon': price_change_icon,
+                'change_text': change_text,
+                'last_change_date': (today - timedelta(days=7)).strftime('%Y-%m-%d'),
+                'last_change_reason': 'Market adjustment',
+            }
+            
+            product_pricing_data.append(product_data)
+            total_selling_price += selling_price
+            total_cost_price += cost_price
+            total_product_value += selling_price
+            products_count += 1
+    
+    # Sort products
+    sort_by = request.GET.get('sort', 'name')
+    if sort_by == 'price_high':
+        product_pricing_data.sort(key=lambda x: x['selling_price'], reverse=True)
+    elif sort_by == 'price_low':
+        product_pricing_data.sort(key=lambda x: x['selling_price'])
+    elif sort_by == 'margin':
+        product_pricing_data.sort(key=lambda x: x['margin'], reverse=True)
+    else:
+        product_pricing_data.sort(key=lambda x: x['name'])
+    
+    # Calculate statistics
+    avg_selling_price = total_selling_price / products_count if products_count > 0 else 0
+    avg_cost_price = total_cost_price / products_count if products_count > 0 else 0
+    avg_margin = ((avg_selling_price - avg_cost_price) / avg_cost_price * 100) if avg_cost_price > 0 else 0
+    
+    # Get unit conversion data (products with multiple unit prices)
+    unit_conversion_data = []
+    for product in products:
+        unit_prices = product.unit_prices.all()
+        if len(unit_prices) >= 2:
+            # Sort by conversion factor (smallest to largest)
+            sorted_prices = sorted(unit_prices, key=lambda x: x.conversion_factor)
+            base_unit = sorted_prices[0]
+            pack_unit = sorted_prices[-1]
+            
+            if pack_unit.conversion_factor > base_unit.conversion_factor:
+                pack_price_per_base_unit = pack_unit.price / pack_unit.conversion_factor
+                base_price_per_unit = base_unit.price
+                savings_pct = ((base_price_per_unit - pack_price_per_base_unit) / base_price_per_unit * 100) if base_price_per_unit > 0 else 0
+                
+                unit_conversion_data.append({
+                    'product': product.name,
+                    'sku': product.sku,
+                    'base_unit': base_unit.unit.name,
+                    'pack_unit': f"{pack_unit.conversion_factor}{base_unit.unit.abbreviation}",
+                    'conversion_factor': f"1:{int(pack_unit.conversion_factor)}",
+                    'base_price': base_unit.price,
+                    'pack_price': pack_unit.price,
+                    'unit_price': pack_price_per_base_unit,
+                    'savings_pct': savings_pct,
+                })
+    
+    # Get missing pricing data
+    missing_pricing_products = Product.objects.filter(
+        is_active=True,
+        unit_prices__isnull=True
+    )
+    
+    missing_prices_count = missing_pricing_products.count()
+    missing_pricing_data = []
+    overdue_count = 0
+    new_products_count = 0
+    total_days_missing = 0
+    
+    for product in missing_pricing_products[:10]:  # Limit to 10 for display
+        days_without_price = (today - product.created_at).days
+        total_days_missing += days_without_price
+        
+        if days_without_price > 7:
+            overdue_count += 1
+            status = 'Overdue'
+            status_class = 'bg-danger'
+        else:
+            new_products_count += 1
+            status = 'New Product'
+            status_class = 'bg-warning'
+        
+        # Find similar products for price suggestion
+        similar_products = Product.objects.filter(
+            category=product.category,
+            unit_prices__isnull=False
+        )[:3]
+        
+        avg_similar_price = 0
+        if similar_products.exists():
+            avg_prices = []
+            for sim_product in similar_products:
+                price = sim_product.unit_prices.first()
+                if price:
+                    avg_prices.append(price.price)
+            if avg_prices:
+                avg_similar_price = sum(avg_prices) / len(avg_prices)
+        
+        # Get cost price from purchase history
+        purchase_items = PurchaseOrderItem.objects.filter(product=product)
+        avg_cost = purchase_items.aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+        
+        missing_pricing_data.append({
+            'sku': product.sku,
+            'name': product.name,
+            'category': product.category.name if product.category else 'Uncategorized',
+            'date_added': product.created_at.strftime('%Y-%m-%d'),
+            'days_without_price': days_without_price,
+            'similar_products_count': similar_products.count(),
+            'suggested_price': avg_similar_price,
+            'cost_price': avg_cost,
+            'status': status,
+            'status_class': status_class,
+        })
+    
+    # Calculate margin by category
+    categories = Category.objects.all()
+    category_margins = []
+    for category in categories:
+        category_products = products.filter(category=category)
+        if category_products.exists():
+            total_margin = 0
+            count = 0
+            for product in category_products:
+                unit_price = product.unit_prices.first()
+                if unit_price:
+                    purchase_items = PurchaseOrderItem.objects.filter(product=product)
+                    avg_cost = purchase_items.aggregate(avg=Avg('unit_cost'))['avg']
+                    cost_price = avg_cost or (unit_price.price * Decimal('0.65'))
+                    if cost_price > 0:
+                        margin = ((unit_price.price - cost_price) / cost_price) * 100
+                        total_margin += margin
+                        count += 1
+            if count > 0:
+                category_margins.append({
+                    'name': category.name,
+                    'avg_margin': total_margin / count
+                })
+    
+    # Find highest and lowest margin categories
+    if category_margins:
+        highest = max(category_margins, key=lambda x: x['avg_margin'])
+        lowest = min(category_margins, key=lambda x: x['avg_margin'])
+        highest_margin_category = highest['name']
+        highest_margin_pct = highest['avg_margin']
+        lowest_margin_category = lowest['name']
+        lowest_margin_pct = lowest['avg_margin']
+    else:
+        highest_margin_category = 'N/A'
+        highest_margin_pct = 0
+        lowest_margin_category = 'N/A'
+        lowest_margin_pct = 0
+    
+    # Prepare context
+    context = {
+        # Report metadata
+        'report_id': f"PRICE-{today.strftime('%Y%m%d')}-001",
+        'report_date': today.strftime('%B %Y'),
+        'currency': currency,
+        'products_analyzed': products_count,
+        'missing_prices_count': missing_prices_count,
+        
+        # Overall statistics
+        'avg_selling_price': avg_selling_price,
+        'avg_cost_price': avg_cost_price,
+        'avg_margin': avg_margin,
+        'avg_price_change': Decimal('2.5'),  # Static for now
+        'price_changes_this_month': 24,  # Static for now
+        
+        # Additional statistics
+        'total_product_value': total_product_value,
+        'high_margin_count': high_margin_count,
+        'low_margin_count': low_margin_count,
+        
+        # Margin analysis
+        'highest_margin_category': highest_margin_category,
+        'highest_margin_pct': highest_margin_pct,
+        'lowest_margin_category': lowest_margin_category,
+        'lowest_margin_pct': lowest_margin_pct,
+        
+        # Data for templates
+        'product_pricing_data': product_pricing_data,
+        'unit_conversion_data': unit_conversion_data,
+        'missing_pricing_data': missing_pricing_data,
+        
+        # Missing pricing statistics
+        'new_products_count': new_products_count,
+        'overdue_count': overdue_count,
+        'avg_days_missing': total_days_missing / missing_prices_count if missing_prices_count > 0 else 0,
+        'default_margin': 50,
+        
+        # Filter options
+        'categories': categories,
+        'selected_category': category_filter,
+        'selected_price_range': price_range_filter,
+        'selected_margin': margin_filter,
+        'selected_sort': sort_by,
+        'search_query': search_query,
+    }
+    
     return render(request, 'reports/productpricing_details.html', context)
-
-
 # ============================================================================
 # PERFORMANCE REPORTS VIEWS
 # ============================================================================
