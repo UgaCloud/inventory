@@ -383,52 +383,49 @@
             </ul>
         </div>
 
-        <!-- KPI Cards -->
-        <div class="row mb-4">
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="kpi-card">
-                    <div class="kpi-label">Average Selling Price</div>
-                    <div class="kpi-value">{{ currency }} {{ avg_selling_price|floatformat:0|intcomma }}</div>
-                    <div class="kpi-trend kpi-trend-up">
-                        <i data-feather="trending-up" class="feather-12 me-1"></i>
-                        +2.5% from last month
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="kpi-card">
-                    <div class="kpi-label">Average Cost Price</div>
-                    <div class="kpi-value">{{ currency }} {{ avg_cost_price|floatformat:0|intcomma }}</div>
-                    <div class="kpi-trend kpi-trend-neutral">
-                        <i data-feather="minus" class="feather-12 me-1"></i>
-                        No change
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="kpi-card">
-                    <div class="kpi-label">Average Margin</div>
-                    <div class="kpi-value">{{ avg_margin|floatformat:1 }}%</div>
-                    <div class="kpi-trend kpi-trend-up">
-                        <i data-feather="trending-up" class="feather-12 me-1"></i>
-                        +1.2% from last month
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="kpi-card">
-                    <div class="kpi-label">Price Changes This Month</div>
-                    <div class="kpi-value">{{ price_changes_this_month|intcomma }}</div>
-                    <div class="kpi-trend kpi-trend-up">
-                        <i data-feather="trending-up" class="feather-12 me-1"></i>
-                        +5 from last month
-                    </div>
-                </div>
-            </div>
-        </div>
+                                <div class="row">
+                                 
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Average Selling Price</h6>
+                                                <h4 class="card-title text-warning">{{ currency }} {{ avg_selling_price|floatformat:0|intcomma }}</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Average Cost Price</h6>
+                                                <h4 class="card-title text-warning">{{ currency }} {{ avg_cost_price|floatformat:0|intcomma }}</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Average Margin</h6>
+                                                <h4 class="card-title text-warning">{{ avg_margin|floatformat:1 }}%</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+
+
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Price Changes This Month</h6>
+                                                <h4 class="card-title text-warning">{{ price_changes_this_month|intcomma }}</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                               
+                     
+
+        
 
         <!-- Report Header Info -->
         <div class="row mb-4">
@@ -459,24 +456,58 @@
                                     </div>
                                 </div>
                             </div>
+
+
+                            <!-- KPI Cards -->
+        
+
+
+
                             <div class="col-md-6">
-                                <div class="price-matrix">
-                                    <div class="matrix-item">
-                                        <div class="matrix-label">Total Products</div>
-                                        <div class="matrix-value">{{ products_analyzed|intcomma }}</div>
+                                <div class="row">
+
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Total Products</h6>
+                                                <h4 class="card-title text-warning">{{ products_analyzed|intcomma }}</h4>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="matrix-item">
-                                        <div class="matrix-label">Total Value</div>
-                                        <div class="matrix-value">{{ currency }} {{ total_product_value|floatformat:0|intcomma }}</div>
+
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Total Value</h6>
+                                                <h4 class="card-title text-warning">{{ currency }} {{ total_product_value|floatformat:0|intcomma }}</h4>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="matrix-item">
-                                        <div class="matrix-label">High Margin Items</div>
-                                        <div class="matrix-value">{{ high_margin_count|intcomma }}</div>
+
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">High Margin Items</h6>
+                                                <h4 class="card-title text-warning">{{ high_margin_count|intcomma }}</h4>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="matrix-item">
-                                        <div class="matrix-label">Low Margin Items</div>
-                                        <div class="matrix-value">{{ low_margin_count|intcomma }}</div>
+
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Low Margin Items</h6>
+                                                <h4 class="card-title text-warning">{{ low_margin_count|intcomma }}</h4>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                </div>
+
+                                
+
+
+                                  
                                 </div>
                             </div>
                         </div>

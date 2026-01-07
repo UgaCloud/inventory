@@ -240,11 +240,6 @@ urlpatterns = [
     path('stocklocation-details/', inventory_reports.stocklocation_details, name='stocklocation_details'),
     path('reorder-details/', inventory_reports.reorder_details, name='reorder_details'), 
     path('productpricing-details/', inventory_reports.productpricing_details, name='productpricing_details'),
-    path('performace-details/', inventory_reports.performace_details, name='performace_details'),
-    path('lifecycle-details/', inventory_reports.lifecycle_details, name='lifecycle_details'),
-    path('operational-details/', inventory_reports.operational_details, name='operational_details'),
-    path('auditcompliance-details/', inventory_reports.auditcompliance_details, name='auditcompliance_details'),
-    path('correlation-details/', inventory_reports.correlation_details, name='correlation_details'),
     path('profile-details/', profile_views.profile_view, name='profile_details'),
    
    
@@ -271,24 +266,6 @@ urlpatterns = [
     path('product-statistics/', inventory_reports.get_product_statistics, name='product_statistics'),
 
   
-    
-    
-    
-    path('reports/stock-summary/', inventory_reports.reports_view, {'report_type': 'stock_summary'}, name='stock_summary_report'),
-    path('reports/low-stock/', inventory_reports.reports_view, {'report_type': 'low_stock'}, name='low_stock_report'),
-    path('reports/store-performance/', inventory_reports.reports_view, {'report_type': 'store_performance'}, name='store_performance_report'),
-    path('reports/category-analysis/', inventory_reports.reports_view, {'report_type': 'category_analysis'}, name='category_analysis_report'),
-    path('reports/product-movement/', inventory_reports.reports_view, {'report_type': 'product_movement'}, name='product_movement_report'),
-    path('reports/abc-analysis/', inventory_reports.reports_view, {'report_type': 'abc_analysis'}, name='abc_analysis_report'),
-    path('reports/inventory-valuation/', inventory_reports.reports_view, {'report_type': 'inventory_valuation'}, name='inventory_valuation_report'),
-    path('reports/stock-transfer/', inventory_reports.reports_view, {'report_type': 'stock_transfer'}, name='stock_transfer_report'),
-    path('reports/product-availability/', inventory_reports.reports_view, {'report_type': 'product_availability'}, name='product_availability_report'),
-    
-    # Export functionality
-    path('reports/export/<str:report_type>/', inventory_reports.export_report, name='export_report'),
-    
-    
-    
     
     # Role Management URLs (RBAC 2.0)
     path('roles/', roles_list_view, name='roles_list_page'),

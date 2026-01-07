@@ -161,11 +161,7 @@ def app_menu(request):
                 {'label': 'Stock Location Report', 'url_name': 'stocklocation_details'},
                 {'label': 'reorder Level Report', 'url_name': 'reorder_details'},
                 {'label': 'Product Pricing Report', 'url_name': 'productpricing_details'},
-                # {'label': 'Performance Report', 'url_name': 'performace_details'},
-                # {'label': 'Lifecycle Report', 'url_name': 'lifecycle_details'},
-                # {'label': 'Operational Report', 'url_name': 'operational_details'},
-                # {'label': 'Audit & Compliance Report', 'url_name': 'auditcompliance_details'},
-                # {'label': 'Correlation Report', 'url_name': 'correlation_details'},
+                
                 
                 
                 
