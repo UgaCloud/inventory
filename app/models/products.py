@@ -104,6 +104,7 @@ class Product(models.Model):
                 low_stock.append(store_data)
         return low_stock
 
+
     @property
     def out_of_stock_stores(self):
         """Stores where this product is out of stock"""

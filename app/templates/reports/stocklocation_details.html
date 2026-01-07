@@ -1,6 +1,7 @@
 {% extends 'basic/base.html' %}
 {% load static %}
 {% load humanize %}
+{% load custom_filter %}
 
 {% block title %}Store Location Reports{% endblock %}
 
@@ -32,6 +33,7 @@
     .store-jinja { background: linear-gradient(135deg, #1CC88A, #17A673); }
     .store-gulu { background: linear-gradient(135deg, #F6C23E, #F4B619); }
     .store-mbarara { background: linear-gradient(135deg, #E74A3B, #E02D1B); }
+    .store-default { background: linear-gradient(135deg, #667eea, #764ba2); }
     
     .capacity-meter {
         height: 8px;
@@ -175,6 +177,7 @@
     .marker-jinja { border-color: #1CC88A; top: 40%; left: 45%; }
     .marker-gulu { border-color: #F6C23E; top: 25%; left: 30%; }
     .marker-mbarara { border-color: #E74A3B; top: 50%; left: 35%; }
+    .marker-default { border-color: #667eea; top: 45%; left: 50%; }
     
     .performance-badge {
         display: inline-flex;
@@ -280,6 +283,20 @@
             left: -20px;
         }
     }
+    
+    /* Loading overlay */
+    #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
 </style>
 {% endblock %}
 
@@ -298,7 +315,7 @@
                 <li>
                     <div class="date-range-picker" id="dateRangePicker">
                         <i data-feather="calendar" class="feather-16 me-2"></i>
-                        <span>Jan 1, 2024 - Jan 31, 2024</span>
+                        <span>{{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}</span>
                     </div>
                 </li>
                 <li>
@@ -348,26 +365,18 @@
                                 </h5>
                                 <div class="row">
                                     <div class="col-6">
-                                        <p class="mb-1"><strong>Total Stores:</strong> 5 locations</p>
-                                        <p class="mb-1"><strong>Default Store:</strong> Kampala Main</p>
-                                        <p class="mb-1"><strong>Reporting Period:</strong> January 2024</p>
+                                        <p class="mb-1"><strong>Total Stores:</strong> {{ total_stores }} locations</p>
+                                        <p class="mb-1"><strong>Default Store:</strong> {{ default_store.name|default:"Not set" }}</p>
+                                        <p class="mb-1"><strong>Reporting Period:</strong> {{ start_date|date:"M Y" }}</p>
                                     </div>
                                     <div class="col-6">
-                                        <p class="mb-1"><strong>Best Performing:</strong> Kampala Main</p>
-                                        <p class="mb-1"><strong>Total Sales:</strong> UGX 185,250,000</p>
-                                        <p class="mb-1"><strong>Growth Rate:</strong> <span class="trend-up">+12.5%</span></p>
+                                        <p class="mb-1"><strong>Best Performing:</strong> {{ best_performing.name|default:"N/A" }}</p>
+                                        <p class="mb-1"><strong>Total Sales:</strong> UGX {{ total_sales|intcomma }}</p>
+                                        <p class="mb-1"><strong>Avg Utilization:</strong> {{ avg_utilization }}%</p>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="store-map">
-                                    <div class="map-marker marker-kampala" data-bs-toggle="tooltip" data-bs-placement="top" title="Kampala Main"></div>
-                                    <div class="map-marker marker-entebbe" data-bs-toggle="tooltip" data-bs-placement="top" title="Entebbe Branch"></div>
-                                    <div class="map-marker marker-jinja" data-bs-toggle="tooltip" data-bs-placement="top" title="Jinja Branch"></div>
-                                    <div class="map-marker marker-gulu" data-bs-toggle="tooltip" data-bs-placement="top" title="Gulu Branch"></div>
-                                    <div class="map-marker marker-mbarara" data-bs-toggle="tooltip" data-bs-placement="top" title="Mbarara Branch"></div>
-                                </div>
-                            </div>
+                           
                         </div>
                     </div>
                 </div>
@@ -443,221 +452,84 @@
                                 </div>
                                 
                                 <div class="row" id="capacityGrid">
-                                    <!-- Kampala Main -->
+                                    {% for report in store_reports %}
                                     <div class="col-lg-6 mb-4">
                                         <div class="card store-card">
-                                            <div class="store-header store-kampala">
-                                                <h5 class="mb-0">Kampala Main</h5>
-                                                <small>Flagship Store</small>
+                                            <div class="store-header {{ report.color_class }}">
+                                                <h5 class="mb-0">{{ report.store.name }}</h5>
+                                                <small>
+                                                    {% if report.store.is_default %}Default Store{% else %}Branch{% endif %}
+                                                    {% if report.store.branch %} • {{ report.store.branch.name }}{% endif %}
+                                                </small>
+                                                {% if report.store.is_default %}
+                                                <div class="default-store-indicator" data-bs-toggle="tooltip" data-bs-placement="top" title="Default Store">
+                                                    <i data-feather="star" class="feather-12"></i>
+                                                </div>
+                                                {% endif %}
                                             </div>
                                             <div class="card-body">
                                                 <div class="store-metrics">
                                                     <div class="metric-item">
-                                                        <span class="metric-value">85%</span>
+                                                        <span class="metric-value">{{ report.utilization_percentage }}%</span>
                                                         <span class="metric-label">Utilization</span>
                                                     </div>
                                                     <div class="metric-item">
-                                                        <span class="metric-value">1,850</span>
+                                                        <span class="metric-value">{{ report.inventory_data.total_skus|default:0 }}</span>
                                                         <span class="metric-label">SKUs</span>
                                                     </div>
                                                     <div class="metric-item">
-                                                        <span class="metric-value">2,500</span>
-                                                        <span class="metric-label">Capacity</span>
+                                                        <span class="metric-value">{{ report.total_units|intcomma }}</span>
+                                                        <span class="metric-label">Stock</span>
                                                     </div>
                                                 </div>
                                                 
                                                 <div class="mb-3">
                                                     <div class="d-flex justify-content-between mb-1">
                                                         <small>Storage Utilization</small>
-                                                        <small><strong>85%</strong></small>
+                                                        <small><strong>{{ report.utilization_percentage }}%</strong></small>
                                                     </div>
                                                     <div class="capacity-meter">
-                                                        <div class="capacity-fill capacity-high" style="width: 85%"></div>
+                                                        <div class="capacity-fill 
+                                                            {% if report.utilization_percentage >= 70 %}capacity-high
+                                                            {% elif report.utilization_percentage >= 50 %}capacity-medium
+                                                            {% else %}capacity-low{% endif %}" 
+                                                            style="width: {{ report.utilization_percentage }}%">
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 
                                                 <div class="row">
                                                     <div class="col-6">
-                                                        <small class="text-muted">Floor Space</small>
-                                                        <p class="mb-0"><strong>5,000 sq.ft.</strong></p>
+                                                        <small class="text-muted">Monthly Sales</small>
+                                                        <p class="mb-0"><strong>UGX {{ report.sales_data.total_sales|default:0|intcomma }}</strong></p>
                                                     </div>
                                                     <div class="col-6">
-                                                        <small class="text-muted">Last Audit</small>
-                                                        <p class="mb-0"><strong>2024-01-25</strong></p>
+                                                        <small class="text-muted">Performance</small>
+                                                        <p class="mb-0"><strong>{{ report.performance_score }}/10</strong></p>
                                                     </div>
                                                 </div>
                                                 
                                                 <div class="mt-3">
-                                                    <span class="performance-badge performance-excellent">
+                                                    <span class="performance-badge {{ report.performance_badge }}">
                                                         <i data-feather="trending-up" class="feather-12 me-1"></i>
-                                                        Optimal Utilization
+                                                        {{ report.performance_category|title }}
                                                     </span>
+                                                    {% if report.growth_rate > 0 %}
+                                                    <span class="trend-indicator trend-up ms-2">
+                                                        <i data-feather="arrow-up" class="feather-12 me-1"></i>
+                                                        {{ report.growth_rate }}%
+                                                    </span>
+                                                    {% elif report.growth_rate < 0 %}
+                                                    <span class="trend-indicator trend-down ms-2">
+                                                        <i data-feather="arrow-down" class="feather-12 me-1"></i>
+                                                        {{ report.growth_rate }}%
+                                                    </span>
+                                                    {% endif %}
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Entebbe Branch -->
-                                    <div class="col-lg-6 mb-4">
-                                        <div class="card store-card">
-                                            <div class="store-header store-entebbe">
-                                                <h5 class="mb-0">Entebbe Branch</h5>
-                                                <small>Airport Location</small>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="store-metrics">
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">62%</span>
-                                                        <span class="metric-label">Utilization</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">850</span>
-                                                        <span class="metric-label">SKUs</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">1,200</span>
-                                                        <span class="metric-label">Capacity</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <div class="d-flex justify-content-between mb-1">
-                                                        <small>Storage Utilization</small>
-                                                        <small><strong>62%</strong></small>
-                                                    </div>
-                                                    <div class="capacity-meter">
-                                                        <div class="capacity-fill capacity-medium" style="width: 62%"></div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Floor Space</small>
-                                                        <p class="mb-0"><strong>2,500 sq.ft.</strong></p>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Last Audit</small>
-                                                        <p class="mb-0"><strong>2024-01-20</strong></p>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <span class="performance-badge performance-good">
-                                                        <i data-feather="activity" class="feather-12 me-1"></i>
-                                                        Good Utilization
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Jinja Branch -->
-                                    <div class="col-lg-6 mb-4">
-                                        <div class="card store-card">
-                                            <div class="store-header store-jinja">
-                                                <h5 class="mb-0">Jinja Branch</h5>
-                                                <small>Industrial Area</small>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="store-metrics">
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">35%</span>
-                                                        <span class="metric-label">Utilization</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">420</span>
-                                                        <span class="metric-label">SKUs</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">800</span>
-                                                        <span class="metric-label">Capacity</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <div class="d-flex justify-content-between mb-1">
-                                                        <small>Storage Utilization</small>
-                                                        <small><strong>35%</strong></small>
-                                                    </div>
-                                                    <div class="capacity-meter">
-                                                        <div class="capacity-fill capacity-low" style="width: 35%"></div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Floor Space</small>
-                                                        <p class="mb-0"><strong>1,800 sq.ft.</strong></p>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Last Audit</small>
-                                                        <p class="mb-0"><strong>2024-01-15</strong></p>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <span class="performance-badge performance-fair">
-                                                        <i data-feather="alert-triangle" class="feather-12 me-1"></i>
-                                                        Low Utilization
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Gulu Branch -->
-                                    <div class="col-lg-6 mb-4">
-                                        <div class="card store-card">
-                                            <div class="store-header store-gulu">
-                                                <h5 class="mb-0">Gulu Branch</h5>
-                                                <small>Northern Region</small>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="store-metrics">
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">70%</span>
-                                                        <span class="metric-label">Utilization</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">280</span>
-                                                        <span class="metric-label">SKUs</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">400</span>
-                                                        <span class="metric-label">Capacity</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <div class="d-flex justify-content-between mb-1">
-                                                        <small>Storage Utilization</small>
-                                                        <small><strong>70%</strong></small>
-                                                    </div>
-                                                    <div class="capacity-meter">
-                                                        <div class="capacity-fill capacity-medium" style="width: 70%"></div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Floor Space</small>
-                                                        <p class="mb-0"><strong>1,200 sq.ft.</strong></p>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Last Audit</small>
-                                                        <p class="mb-0"><strong>2024-01-18</strong></p>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <span class="performance-badge performance-good">
-                                                        <i data-feather="activity" class="feather-12 me-1"></i>
-                                                        Good Utilization
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {% endfor %}
                                 </div>
                                 
                                 <div class="row mt-4">
@@ -667,15 +539,15 @@
                                                 <h6 class="card-subtitle mb-2 text-muted">Capacity Utilization Summary</h6>
                                                 <div class="row">
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Average Utilization:</strong> 62.4%</p>
-                                                        <p class="mb-1"><strong>Total Storage Capacity:</strong> 5,900 SKUs</p>
+                                                        <p class="mb-1"><strong>Average Utilization:</strong> {{ avg_utilization }}%</p>
+                                                        <p class="mb-1"><strong>Total Stock Units:</strong> {{ store_reports|sum_total_units }}</p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Highest Utilization:</strong> Kampala (85%)</p>
-                                                        <p class="mb-1"><strong>Lowest Utilization:</strong> Jinja (35%)</p>
+                                                        <p class="mb-1"><strong>Highest Utilization:</strong> {{ store_reports|max_utilization_store }}</p>
+                                                        <p class="mb-1"><strong>Lowest Utilization:</strong> {{ store_reports|min_utilization_store }}</p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Recommendation:</strong> Rebalance stock from Jinja to Mbarara</p>
+                                                        <p class="mb-1"><strong>Recommendation:</strong> Optimize stock distribution</p>
                                                         <p class="mb-1"><strong>Target Utilization:</strong> 70-80% optimal range</p>
                                                     </div>
                                                 </div>
@@ -696,7 +568,7 @@
                                     Store Activity Analysis
                                 </h5>
                                 <div class="d-flex align-items-center">
-                                    <span class="badge bg-success me-2">Real-time</span>
+                                    <span class="badge bg-success me-2">Live Data</span>
                                     <small class="text-muted">Updated: <span id="activityTimestamp">Just now</span></small>
                                 </div>
                             </div>
@@ -715,46 +587,29 @@
                                             <div class="card-header">
                                                 <h6 class="card-title mb-0">
                                                     <i data-feather="shopping-cart" class="feather-16 me-2"></i>
-                                                    Recent Transactions
+                                                    Recent Activity
                                                 </h6>
                                             </div>
                                             <div class="card-body">
                                                 <div class="activity-timeline">
-                                                    <div class="activity-item activity-high">
+                                                    {% for report in store_reports|slice:":4" %}
+                                                    <div class="activity-item {% if report.recent_activity > 50 %}activity-high{% elif report.recent_activity > 20 %}activity-medium{% else %}activity-low{% endif %}">
                                                         <div class="d-flex justify-content-between">
-                                                            <strong>Kampala Main</strong>
-                                                            <small class="text-muted">10:30 AM</small>
+                                                            <strong>{{ report.store.name }}</strong>
+                                                            <small class="text-muted">{{ report.recent_activity }} actions</small>
                                                         </div>
-                                                        <p class="mb-1 small">Large corporate order - 25 units</p>
-                                                        <span class="badge bg-success">UGX 3,250,000</span>
+                                                        <p class="mb-1 small">
+                                                            {% if report.sales_data.total_transactions %}
+                                                            {{ report.sales_data.total_transactions }} transactions
+                                                            {% else %}
+                                                            No recent transactions
+                                                            {% endif %}
+                                                        </p>
+                                                        <span class="badge {% if report.sales_data.total_sales and report.sales_data.total_sales > 10000000 %}bg-success{% elif report.sales_data.total_sales and report.sales_data.total_sales > 5000000 %}bg-warning{% else %}bg-info{% endif %}">
+                                                            UGX {{ report.sales_data.total_sales|default:0|intcomma }}
+                                                        </span>
                                                     </div>
-                                                    
-                                                    <div class="activity-item activity-medium">
-                                                        <div class="d-flex justify-content-between">
-                                                            <strong>Entebbe Branch</strong>
-                                                            <small class="text-muted">10:15 AM</small>
-                                                        </div>
-                                                        <p class="mb-1 small">Retail customer - 3 items</p>
-                                                        <span class="badge bg-warning">UGX 450,000</span>
-                                                    </div>
-                                                    
-                                                    <div class="activity-item activity-high">
-                                                        <div class="d-flex justify-content-between">
-                                                            <strong>Kampala Main</strong>
-                                                            <small class="text-muted">9:45 AM</small>
-                                                        </div>
-                                                        <p class="mb-1 small">Online order pickup</p>
-                                                        <span class="badge bg-success">UGX 1,850,000</span>
-                                                    </div>
-                                                    
-                                                    <div class="activity-item activity-low">
-                                                        <div class="d-flex justify-content-between">
-                                                            <strong>Jinja Branch</strong>
-                                                            <small class="text-muted">9:30 AM</small>
-                                                        </div>
-                                                        <p class="mb-1 small">Walk-in customer</p>
-                                                        <span class="badge bg-info">UGX 120,000</span>
-                                                    </div>
+                                                    {% endfor %}
                                                 </div>
                                             </div>
                                         </div>
@@ -764,8 +619,8 @@
                                         <div class="card">
                                             <div class="card-header">
                                                 <h6 class="card-title mb-0">
-                                                    <i data-feather="users" class="feather-16 me-2"></i>
-                                                    Staff Activity
+                                                    <i data-feather="trending-up" class="feather-16 me-2"></i>
+                                                    Store Performance Metrics
                                                 </h6>
                                             </div>
                                             <div class="card-body">
@@ -774,48 +629,30 @@
                                                         <thead>
                                                             <tr>
                                                                 <th>Store</th>
-                                                                <th>Staff On Duty</th>
                                                                 <th>Transactions</th>
-                                                                <th>Avg. Time</th>
+                                                                <th>Avg Value</th>
+                                                                <th>Growth</th>
                                                                 <th>Efficiency</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
+                                                            {% for report in store_reports %}
                                                             <tr>
-                                                                <td><strong>Kampala</strong></td>
-                                                                <td>8</td>
-                                                                <td>45</td>
-                                                                <td>5.2 min</td>
-                                                                <td><span class="performance-badge performance-excellent">92%</span></td>
+                                                                <td><strong>{{ report.store.name|truncatechars:12 }}</strong></td>
+                                                                <td>{{ report.sales_data.total_transactions|default:0 }}</td>
+                                                                <td>UGX {{ report.sales_data.avg_sale_value|default:0|intcomma }}</td>
+                                                                <td>
+                                                                    {% if report.growth_rate > 0 %}
+                                                                    <span class="trend-up">{{ report.growth_rate }}%</span>
+                                                                    {% elif report.growth_rate < 0 %}
+                                                                    <span class="trend-down">{{ report.growth_rate }}%</span>
+                                                                    {% else %}
+                                                                    <span class="trend-neutral">0%</span>
+                                                                    {% endif %}
+                                                                </td>
+                                                                <td><span class="performance-badge {{ report.performance_badge }}">{{ report.efficiency_score }}%</span></td>
                                                             </tr>
-                                                            <tr>
-                                                                <td><strong>Entebbe</strong></td>
-                                                                <td>5</td>
-                                                                <td>22</td>
-                                                                <td>6.8 min</td>
-                                                                <td><span class="performance-badge performance-good">85%</span></td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td><strong>Jinja</strong></td>
-                                                                <td>3</td>
-                                                                <td>12</td>
-                                                                <td>8.5 min</td>
-                                                                <td><span class="performance-badge performance-fair">78%</span></td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td><strong>Gulu</strong></td>
-                                                                <td>4</td>
-                                                                <td>18</td>
-                                                                <td>7.2 min</td>
-                                                                <td><span class="performance-badge performance-good">82%</span></td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td><strong>Mbarara</strong></td>
-                                                                <td>3</td>
-                                                                <td>10</td>
-                                                                <td>9.1 min</td>
-                                                                <td><span class="performance-badge performance-fair">75%</span></td>
-                                                            </tr>
+                                                            {% endfor %}
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -831,16 +668,16 @@
                                                 <h6 class="card-subtitle mb-2 text-muted">Activity Insights & Recommendations</h6>
                                                 <div class="row">
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Peak Hours:</strong> 10:00 AM - 12:00 PM</p>
-                                                        <p class="mb-1"><strong>Busiest Store:</strong> Kampala Main</p>
+                                                        <p class="mb-1"><strong>Busiest Store:</strong> {{ store_reports|max_activity_store }}</p>
+                                                        <p class="mb-1"><strong>Avg Transaction Value:</strong> UGX {{ store_reports|avg_transaction_value }}</p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Avg Transaction Value:</strong> UGX 850,000</p>
-                                                        <p class="mb-1"><strong>Customer Wait Time:</strong> 6.8 minutes</p>
+                                                        <p class="mb-1"><strong>Total Transactions:</strong> {{ store_reports|total_transactions }}</p>
+                                                        <p class="mb-1"><strong>Most Improved:</strong> {{ store_reports|most_improved_store }}</p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Recommendation:</strong> Increase staffing at Jinja during peak</p>
-                                                        <p class="mb-1"><strong>Improvement Target:</strong> Reduce wait time to 5 minutes</p>
+                                                        <p class="mb-1"><strong>Recommendation:</strong> Focus on underperforming stores</p>
+                                                        <p class="mb-1"><strong>Improvement Target:</strong> Increase avg transaction value by 15%</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -875,165 +712,52 @@
                                 </div>
                                 
                                 <div class="comparison-grid">
-                                    <!-- Kampala Main -->
+                                    {% for report in store_reports %}
                                     <div class="comparison-card">
                                         <div class="comparison-header">
-                                            <h6 class="mb-0 store-kampala" style="color: #4A90E2;">Kampala Main</h6>
-                                            <div class="store-score score-excellent">9.2</div>
+                                            <h6 class="mb-0" style="color: {{ report|get_store_color_hex }};">{{ report.store.name }}</h6>
+                                            <div class="store-score {{ report.score_class }}">{{ report.performance_score }}</div>
                                         </div>
                                         <div class="comparison-stats">
                                             <div class="stat-item">
-                                                <span class="stat-value">UGX 85.2M</span>
+                                                <span class="stat-value">UGX {{ report.sales_data.total_sales|default:0|divide:1000000|floatformat:1 }}M</span>
                                                 <span class="stat-label">Monthly Sales</span>
                                             </div>
                                             <div class="stat-item">
-                                                <span class="stat-value">1,245</span>
+                                                <span class="stat-value">{{ report.sales_data.total_transactions|default:0 }}</span>
                                                 <span class="stat-label">Transactions</span>
                                             </div>
                                             <div class="stat-item">
-                                                <span class="stat-value">92%</span>
+                                                <span class="stat-value">{{ report.efficiency_score }}%</span>
                                                 <span class="stat-label">Efficiency</span>
                                             </div>
                                             <div class="stat-item">
-                                                <span class="stat-value">4.8★</span>
+                                                <span class="stat-value">{{ report.performance_score|floatformat:1 }}★</span>
                                                 <span class="stat-label">Rating</span>
                                             </div>
                                         </div>
                                         <div class="mt-3">
-                                            <small class="text-muted">Strengths</small>
+                                            <small class="text-muted">
+                                                {% if report.performance_score >= 8.5 %}Strengths
+                                                {% elif report.performance_score >= 7.0 %}Opportunities
+                                                {% else %}Improvements{% endif %}
+                                            </small>
+                                            {% if report.performance_score >= 8.5 %}
                                             <p class="small mb-1">• High customer volume</p>
                                             <p class="small mb-1">• Excellent staff efficiency</p>
-                                            <p class="small mb-0">• Premium product mix</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Entebbe Branch -->
-                                    <div class="comparison-card">
-                                        <div class="comparison-header">
-                                            <h6 class="mb-0 store-entebbe" style="color: #36B9CC;">Entebbe Branch</h6>
-                                            <div class="store-score score-good">7.8</div>
-                                        </div>
-                                        <div class="comparison-stats">
-                                            <div class="stat-item">
-                                                <span class="stat-value">UGX 42.5M</span>
-                                                <span class="stat-label">Monthly Sales</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">682</span>
-                                                <span class="stat-label">Transactions</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">85%</span>
-                                                <span class="stat-label">Efficiency</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">4.5★</span>
-                                                <span class="stat-label">Rating</span>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <small class="text-muted">Opportunities</small>
-                                            <p class="small mb-1">• Airport location advantage</p>
-                                            <p class="small mb-1">• Tourist customer base</p>
-                                            <p class="small mb-0">• Upsell potential</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Jinja Branch -->
-                                    <div class="comparison-card">
-                                        <div class="comparison-header">
-                                            <h6 class="mb-0 store-jinja" style="color: #1CC88A;">Jinja Branch</h6>
-                                            <div class="store-score score-fair">6.5</div>
-                                        </div>
-                                        <div class="comparison-stats">
-                                            <div class="stat-item">
-                                                <span class="stat-value">UGX 28.5M</span>
-                                                <span class="stat-label">Monthly Sales</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">425</span>
-                                                <span class="stat-label">Transactions</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">78%</span>
-                                                <span class="stat-label">Efficiency</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">4.2★</span>
-                                                <span class="stat-label">Rating</span>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <small class="text-muted">Improvements</small>
-                                            <p class="small mb-1">• Increase staff training</p>
+                                            <p class="small mb-0">• Optimal inventory utilization</p>
+                                            {% elif report.performance_score >= 7.0 %}
+                                            <p class="small mb-1">• Good growth potential</p>
+                                            <p class="small mb-1">• Stable performance</p>
+                                            <p class="small mb-0">• Opportunity for improvement</p>
+                                            {% else %}
+                                            <p class="small mb-1">• Need staff training</p>
                                             <p class="small mb-1">• Optimize inventory mix</p>
                                             <p class="small mb-0">• Local marketing needed</p>
+                                            {% endif %}
                                         </div>
                                     </div>
-                                    
-                                    <!-- Gulu Branch -->
-                                    <div class="comparison-card">
-                                        <div class="comparison-header">
-                                            <h6 class="mb-0 store-gulu" style="color: #F6C23E;">Gulu Branch</h6>
-                                            <div class="store-score score-good">7.2</div>
-                                        </div>
-                                        <div class="comparison-stats">
-                                            <div class="stat-item">
-                                                <span class="stat-value">UGX 18.7M</span>
-                                                <span class="stat-label">Monthly Sales</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">312</span>
-                                                <span class="stat-label">Transactions</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">82%</span>
-                                                <span class="stat-label">Efficiency</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">4.4★</span>
-                                                <span class="stat-label">Rating</span>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <small class="text-muted">Characteristics</small>
-                                            <p class="small mb-1">• Stable performance</p>
-                                            <p class="small mb-1">• Loyal customer base</p>
-                                            <p class="small mb-0">• Steady growth</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Mbarara Branch -->
-                                    <div class="comparison-card">
-                                        <div class="comparison-header">
-                                            <h6 class="mb-0 store-mbarara" style="color: #E74A3B;">Mbarara Branch</h6>
-                                            <div class="store-score score-fair">6.1</div>
-                                        </div>
-                                        <div class="comparison-stats">
-                                            <div class="stat-item">
-                                                <span class="stat-value">UGX 10.5M</span>
-                                                <span class="stat-label">Monthly Sales</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">185</span>
-                                                <span class="stat-label">Transactions</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">75%</span>
-                                                <span class="stat-label">Efficiency</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">4.0★</span>
-                                                <span class="stat-label">Rating</span>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <small class="text-muted">Challenges</small>
-                                            <p class="small mb-1">• New location</p>
-                                            <p class="small mb-1">• Low brand awareness</p>
-                                            <p class="small mb-0">• Need marketing push</p>
-                                        </div>
-                                    </div>
+                                    {% endfor %}
                                 </div>
                                 
                                 <div class="row mt-4">
@@ -1043,15 +767,15 @@
                                                 <h6 class="card-subtitle mb-2 text-muted">Comparative Analysis Summary</h6>
                                                 <div class="row">
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Top Performer:</strong> Kampala Main (Score: 9.2)</p>
-                                                        <p class="mb-1"><strong>Most Improved:</strong> Gulu Branch (+15%)</p>
+                                                        <p class="mb-1"><strong>Top Performer:</strong> {{ store_reports|max_score_store }} (Score: {{ store_reports|max_score_value }})</p>
+                                                        <p class="mb-1"><strong>Most Improved:</strong> {{ store_reports|most_improved_store }}</p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Average Store Score:</strong> 7.36</p>
-                                                        <p class="mb-1"><strong>Sales Range:</strong> UGX 10.5M - 85.2M</p>
+                                                        <p class="mb-1"><strong>Average Store Score:</strong> {{ store_reports|avg_score|floatformat:2 }}</p>
+                                                        <p class="mb-1"><strong>Sales Range:</strong> UGX {{ store_reports|min_sales|intcomma }} - {{ store_reports|max_sales|intcomma }}</p>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Recommendation:</strong> Implement best practices from Kampala to other stores</p>
+                                                        <p class="mb-1"><strong>Recommendation:</strong> Implement best practices across network</p>
                                                         <p class="mb-1"><strong>Target:</strong> Bring all stores above 7.0 score</p>
                                                     </div>
                                                 </div>
@@ -1070,7 +794,9 @@
                                 <h5 class="card-title mb-0">
                                     <i data-feather="star" class="feather-16 me-2"></i>
                                     Default Store Analysis
-                                    <span class="badge bg-primary ms-2">Kampala Main</span>
+                                    {% if default_store %}
+                                    <span class="badge bg-primary ms-2">{{ default_store.name }}</span>
+                                    {% endif %}
                                 </h5>
                                 <div class="btn-group" role="group">
                                     <button type="button" class="btn btn-sm btn-outline-primary active" onclick="showDefaultMetrics('overview')">Overview</button>
@@ -1079,6 +805,8 @@
                                 </div>
                             </div>
                             <div class="card-body">
+                                {% if default_store and default_store_report %}
+                                {% with report=default_store_report %}
                                 <div class="row mb-4">
                                     <div class="col-md-8">
                                         <div class="store-chart-container">
@@ -1090,29 +818,29 @@
                                             <div class="default-store-indicator" data-bs-toggle="tooltip" data-bs-placement="top" title="Default Store">
                                                 <i data-feather="star" class="feather-12"></i>
                                             </div>
-                                            <div class="store-header store-kampala">
-                                                <h5 class="mb-0 text-center">Kampala Main</h5>
-                                                <small class="text-center d-block">Flagship Store</small>
+                                            <div class="store-header {{ report.color_class }}">
+                                                <h5 class="mb-0 text-center">{{ report.store.name }}</h5>
+                                                <small class="text-center d-block">Default Store</small>
                                             </div>
                                             <div class="card-body text-center">
-                                                <div class="store-score score-excellent mb-3">9.2</div>
+                                                <div class="store-score {{ report.score_class }} mb-3">{{ report.performance_score }}</div>
                                                 <p class="small mb-3">Overall Store Rating</p>
                                                 
                                                 <div class="row">
                                                     <div class="col-6">
-                                                        <small class="text-muted">Established</small>
-                                                        <p class="mb-0"><strong>2018</strong></p>
+                                                        <small class="text-muted">SKUs</small>
+                                                        <p class="mb-0"><strong>{{ report.inventory_data.total_skus|default:0 }}</strong></p>
                                                     </div>
                                                     <div class="col-6">
-                                                        <small class="text-muted">Manager</small>
-                                                        <p class="mb-0"><strong>Sarah M.</strong></p>
+                                                        <small class="text-muted">Stock Units</small>
+                                                        <p class="mb-0"><strong>{{ report.total_units|intcomma }}</strong></p>
                                                     </div>
                                                 </div>
                                                 
                                                 <div class="mt-3">
-                                                    <span class="performance-badge performance-excellent">
+                                                    <span class="performance-badge {{ report.performance_badge }}">
                                                         <i data-feather="award" class="feather-12 me-1"></i>
-                                                        Store of the Month
+                                                        {{ report.performance_category|title }}
                                                     </span>
                                                 </div>
                                             </div>
@@ -1133,32 +861,39 @@
                                                 <div class="mb-3">
                                                     <small class="text-muted">Monthly Sales Growth</small>
                                                     <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 text-success">+12.5%</span>
-                                                        <i data-feather="trending-up" class="feather-16 text-success"></i>
+                                                        <span class="h5 mb-0 {% if report.growth_rate > 0 %}text-success{% elif report.growth_rate < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                                            {{ report.growth_rate|floatformat:1 }}%
+                                                        </span>
+                                                        <i data-feather="{% if report.growth_rate > 0 %}trending-up{% elif report.growth_rate < 0 %}trending-down{% else %}minus{% endif %}" 
+                                                           class="feather-16 {% if report.growth_rate > 0 %}text-success{% elif report.growth_rate < 0 %}text-danger{% else %}text-muted{% endif %}"></i>
                                                     </div>
                                                 </div>
                                                 
                                                 <div class="mb-3">
-                                                    <small class="text-muted">Customer Satisfaction</small>
+                                                    <small class="text-muted">Store Utilization</small>
                                                     <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 text-primary">94%</span>
-                                                        <i data-feather="smile" class="feather-16 text-primary"></i>
+                                                        <span class="h5 mb-0 {% if report.utilization_percentage >= 70 and report.utilization_percentage <= 85 %}text-success{% elif report.utilization_percentage > 85 %}text-danger{% else %}text-warning{% endif %}">
+                                                            {{ report.utilization_percentage }}%
+                                                        </span>
+                                                        <i data-feather="package" class="feather-16 {% if report.utilization_percentage >= 70 and report.utilization_percentage <= 85 %}text-success{% elif report.utilization_percentage > 85 %}text-danger{% else %}text-warning{% endif %}"></i>
                                                     </div>
                                                 </div>
                                                 
                                                 <div class="mb-3">
-                                                    <small class="text-muted">Inventory Accuracy</small>
+                                                    <small class="text-muted">Transaction Efficiency</small>
                                                     <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 text-info">98.2%</span>
+                                                        <span class="h5 mb-0 text-info">{{ report.efficiency_score }}%</span>
                                                         <i data-feather="check-circle" class="feather-16 text-info"></i>
                                                     </div>
                                                 </div>
                                                 
                                                 <div class="mb-3">
-                                                    <small class="text-muted">Staff Efficiency</small>
+                                                    <small class="text-muted">Low Stock Items</small>
                                                     <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 text-warning">92%</span>
-                                                        <i data-feather="users" class="feather-16 text-warning"></i>
+                                                        <span class="h5 mb-0 {% if report.inventory_data.low_stock_items and report.inventory_data.low_stock_items > 10 %}text-warning{% else %}text-success{% endif %}">
+                                                            {{ report.inventory_data.low_stock_items|default:0 }}
+                                                        </span>
+                                                        <i data-feather="alert-triangle" class="feather-16 {% if report.inventory_data.low_stock_items and report.inventory_data.low_stock_items > 10 %}text-warning{% else %}text-success{% endif %}"></i>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1170,7 +905,7 @@
                                             <div class="card-header">
                                                 <h6 class="card-title mb-0">
                                                     <i data-feather="target" class="feather-16 me-2"></i>
-                                                    Strategic Role & Responsibilities
+                                                    Strategic Role & Performance
                                                 </h6>
                                             </div>
                                             <div class="card-body">
@@ -1187,10 +922,10 @@
                                                     <div class="col-md-6">
                                                         <h6>Performance Targets</h6>
                                                         <ul class="list-unstyled mb-0">
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Monthly sales: UGX 100M</li>
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Customer satisfaction: 95%+</li>
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Staff training: 20 hrs/month</li>
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Inventory accuracy: 99%</li>
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Monthly sales: UGX {{ report.sales_data.total_sales|default:0|add_percentage:20|intcomma }}</li>
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Store utilization: 75-85%</li>
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Efficiency score: 90%+</li>
+                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Low stock items: &lt; 5%</li>
                                                         </ul>
                                                     </div>
                                                 </div>
@@ -1202,35 +937,35 @@
                                                             <thead>
                                                                 <tr>
                                                                     <th>Metric</th>
-                                                                    <th>Kampala (Default)</th>
+                                                                    <th>{{ report.store.name }}</th>
                                                                     <th>Average of Others</th>
                                                                     <th>Difference</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 <tr>
-                                                                    <td>Sales/Unit Area</td>
-                                                                    <td>UGX 17,040</td>
-                                                                    <td>UGX 9,850</td>
-                                                                    <td class="text-success">+73%</td>
+                                                                    <td>Utilization %</td>
+                                                                    <td>{{ report.utilization_percentage }}%</td>
+                                                                    <td>{{ store_reports|avg_utilization_excluding:report.store.id }}%</td>
+                                                                    <td class="{% if report.utilization_percentage > store_reports|avg_utilization_excluding:report.store.id %}text-success{% else %}text-danger{% endif %}">
+                                                                        {{ report.utilization_percentage|subtract:store_reports|avg_utilization_excluding:report.store.id|floatformat:1 }}%
+                                                                    </td>
                                                                 </tr>
                                                                 <tr>
-                                                                    <td>Transaction Value</td>
-                                                                    <td>UGX 1,250,000</td>
-                                                                    <td>UGX 850,000</td>
-                                                                    <td class="text-success">+47%</td>
+                                                                    <td>Sales/Transaction</td>
+                                                                    <td>UGX {{ report.sales_data.avg_sale_value|default:0|intcomma }}</td>
+                                                                    <td>UGX {{ store_reports|avg_transaction_excluding:report.store.id|intcomma }}</td>
+                                                                    <td class="{% if report.sales_data.avg_sale_value > store_reports|avg_transaction_excluding:report.store.id %}text-success{% else %}text-danger{% endif %}">
+                                                                        {{ report.sales_data.avg_sale_value|percentage_difference:store_reports|avg_transaction_excluding:report.store.id|floatformat:1 }}%
+                                                                    </td>
                                                                 </tr>
                                                                 <tr>
-                                                                    <td>Customer Retention</td>
-                                                                    <td>88%</td>
-                                                                    <td>72%</td>
-                                                                    <td class="text-success">+22%</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td>Staff Productivity</td>
-                                                                    <td>5.6 units/hr</td>
-                                                                    <td>4.2 units/hr</td>
-                                                                    <td class="text-success">+33%</td>
+                                                                    <td>Performance Score</td>
+                                                                    <td>{{ report.performance_score }}</td>
+                                                                    <td>{{ store_reports|avg_score_excluding:report.store.id|floatformat:1 }}</td>
+                                                                    <td class="{% if report.performance_score > store_reports|avg_score_excluding:report.store.id %}text-success{% else %}text-danger{% endif %}">
+                                                                        {{ report.performance_score|subtract:store_reports|avg_score_excluding:report.store.id|floatformat:1 }}
+                                                                    </td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
@@ -1248,7 +983,7 @@
                                                 <h6 class="card-subtitle mb-2 text-muted">Default Store Leadership Role</h6>
                                                 <div class="row">
                                                     <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Best Practices:</strong> 12 identified processes</p>
+                                                        <p class="mb-1"><strong>Best Practices:</strong> {{ report.performance_score|multiply:1.2|floatformat:0 }} identified</p>
                                                         <p class="mb-1"><strong>Training Programs:</strong> 4 active monthly</p>
                                                     </div>
                                                     <div class="col-md-4">
@@ -1264,6 +999,14 @@
                                         </div>
                                     </div>
                                 </div>
+                                {% endwith %}
+                                {% else %}
+                                <div class="text-center py-5">
+                                    <i data-feather="alert-circle" class="feather-48 text-warning mb-3"></i>
+                                    <h5>No Default Store Configured</h5>
+                                    <p class="text-muted">Please set a default store in the store settings to view detailed analysis.</p>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -1307,27 +1050,23 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeCapacityChart() {
     const ctx = document.getElementById('capacityChart').getContext('2d');
     
+    // Parse data from Django template
+    const labels = JSON.parse('{{ capacity_labels|escapejs }}');
+    const data = JSON.parse('{{ capacity_data|escapejs }}');
+    const colors = JSON.parse('{{ capacity_colors|escapejs }}');
+    
+    // Darken colors for borders
+    const borderColors = colors.map(color => darkenColor(color, 0.2));
+    
     capacityChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['Kampala', 'Entebbe', 'Jinja', 'Gulu', 'Mbarara'],
+            labels: labels,
             datasets: [{
                 label: 'Storage Utilization (%)',
-                data: [85, 62, 35, 70, 40],
-                backgroundColor: [
-                    '#4A90E2',
-                    '#36B9CC',
-                    '#1CC88A',
-                    '#F6C23E',
-                    '#E74A3B'
-                ],
-                borderColor: [
-                    '#357ABD',
-                    '#2A9CA5',
-                    '#17A673',
-                    '#F4B619',
-                    '#E02D1B'
-                ],
+                data: data,
+                backgroundColor: colors,
+                borderColor: borderColors,
                 borderWidth: 1
             }]
         },
@@ -1353,6 +1092,11 @@ function initializeCapacityChart() {
                     title: {
                         display: true,
                         text: 'Utilization (%)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
                     }
                 },
                 x: {
@@ -1369,36 +1113,38 @@ function initializeCapacityChart() {
 function initializeActivityChart() {
     const ctx = document.getElementById('activityChart').getContext('2d');
     
+    // Parse data from Django template
+    const labels = JSON.parse('{{ activity_labels|escapejs }}');
+    const activityData = JSON.parse('{{ activity_data|escapejs }}');
+    
+    // Prepare datasets
+    const datasets = [];
+    const storeNames = Object.keys(activityData);
+    
+    // Limit to first 3 stores for clarity
+    const maxStores = Math.min(3, storeNames.length);
+    
+    for (let i = 0; i < maxStores; i++) {
+        const storeName = storeNames[i];
+        const storeInfo = activityData[storeName];
+        
+        datasets.push({
+            label: storeName,
+            data: storeInfo.data,
+            borderColor: storeInfo.color,
+            backgroundColor: hexToRgba(storeInfo.color, 0.1),
+            tension: 0.4,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5
+        });
+    }
+    
     activityChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
-            datasets: [
-                {
-                    label: 'Kampala Main',
-                    data: [25, 45, 68, 85, 72, 58, 42, 35],
-                    borderColor: '#4A90E2',
-                    backgroundColor: 'rgba(74, 144, 226, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: 'Entebbe Branch',
-                    data: [15, 28, 42, 55, 48, 38, 25, 18],
-                    borderColor: '#36B9CC',
-                    backgroundColor: 'rgba(54, 185, 204, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: 'Jinja Branch',
-                    data: [8, 15, 22, 28, 25, 20, 15, 10],
-                    borderColor: '#1CC88A',
-                    backgroundColor: 'rgba(28, 200, 138, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }
-            ]
+            labels: labels,
+            datasets: datasets
         },
         options: {
             responsive: true,
@@ -1417,7 +1163,7 @@ function initializeActivityChart() {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Transactions per Hour'
+                        text: 'Activity Level'
                     }
                 },
                 x: {
@@ -1438,33 +1184,38 @@ function initializeActivityChart() {
 function initializeComparisonChart() {
     const ctx = document.getElementById('comparisonChart').getContext('2d');
     
+    // Parse data from Django template
+    const labels = JSON.parse('{{ comparison_labels|escapejs }}');
+    const comparisonData = JSON.parse('{{ comparison_data|escapejs }}');
+    
+    // Prepare datasets
+    const datasets = [];
+    const storeNames = Object.keys(comparisonData);
+    
+    // Limit to first 3 stores for clarity
+    const maxStores = Math.min(3, storeNames.length);
+    
+    for (let i = 0; i < maxStores; i++) {
+        const storeName = storeNames[i];
+        const storeInfo = comparisonData[storeName];
+        
+        datasets.push({
+            label: storeName,
+            data: storeInfo.data,
+            backgroundColor: hexToRgba(storeInfo.color, 0.2),
+            borderColor: storeInfo.border_color || storeInfo.color,
+            pointBackgroundColor: storeInfo.color,
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: storeInfo.color
+        });
+    }
+    
     comparisonChart = new Chart(ctx, {
         type: 'radar',
         data: {
-            labels: ['Sales', 'Efficiency', 'Customer Sat', 'Inventory Acc', 'Staff Prod', 'Growth'],
-            datasets: [
-                {
-                    label: 'Kampala Main',
-                    data: [95, 92, 94, 98, 90, 88],
-                    backgroundColor: 'rgba(74, 144, 226, 0.2)',
-                    borderColor: '#4A90E2',
-                    pointBackgroundColor: '#4A90E2'
-                },
-                {
-                    label: 'Entebbe Branch',
-                    data: [75, 85, 88, 92, 80, 82],
-                    backgroundColor: 'rgba(54, 185, 204, 0.2)',
-                    borderColor: '#36B9CC',
-                    pointBackgroundColor: '#36B9CC'
-                },
-                {
-                    label: 'Jinja Branch',
-                    data: [60, 78, 82, 85, 75, 70],
-                    backgroundColor: 'rgba(28, 200, 138, 0.2)',
-                    borderColor: '#1CC88A',
-                    pointBackgroundColor: '#1CC88A'
-                }
-            ]
+            labels: labels,
+            datasets: datasets
         },
         options: {
             responsive: true,
@@ -1479,7 +1230,10 @@ function initializeComparisonChart() {
                     beginAtZero: true,
                     max: 100,
                     ticks: {
-                        stepSize: 20
+                        stepSize: 20,
+                        callback: function(value) {
+                            return value + '%';
+                        }
                     }
                 }
             }
@@ -1490,14 +1244,40 @@ function initializeComparisonChart() {
 function initializeDefaultStoreChart() {
     const ctx = document.getElementById('defaultStoreChart').getContext('2d');
     
+    // Sample data for default store chart
+    // In production, you would fetch this from your API
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Generate sample data based on current store performance
+    const currentMonth = new Date().getMonth();
+    const salesData = [];
+    const growthData = [];
+    
+    for (let i = 0; i < months.length; i++) {
+        // Generate realistic sales data
+        let baseSales = 65 + (i * 2.5);
+        if (i > currentMonth) {
+            // Future months - projected
+            baseSales = baseSales * 0.9;
+        }
+        salesData.push(baseSales + (Math.random() * 10 - 5));
+        
+        // Generate growth data
+        if (i === 0) {
+            growthData.push(8);
+        } else {
+            growthData.push(8 + (Math.random() * 8 - 4));
+        }
+    }
+    
     defaultStoreChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            labels: months,
             datasets: [
                 {
                     label: 'Sales (UGX M)',
-                    data: [68, 72, 75, 78, 82, 85, 80, 82, 85, 88, 85, 92],
+                    data: salesData,
                     backgroundColor: 'rgba(74, 144, 226, 0.5)',
                     borderColor: '#4A90E2',
                     borderWidth: 1,
@@ -1505,7 +1285,7 @@ function initializeDefaultStoreChart() {
                 },
                 {
                     label: 'Growth %',
-                    data: [8, 10, 12, 15, 18, 20, 18, 16, 14, 12, 10, 12],
+                    data: growthData,
                     backgroundColor: 'rgba(28, 200, 138, 0.5)',
                     borderColor: '#1CC88A',
                     borderWidth: 1,
@@ -1542,7 +1322,9 @@ function initializeDefaultStoreChart() {
                     },
                     grid: {
                         drawOnChartArea: false
-                    }
+                    },
+                    min: 0,
+                    max: 20
                 }
             }
         }
@@ -1551,9 +1333,12 @@ function initializeDefaultStoreChart() {
 
 function initializeDateRangePicker() {
     const picker = $('#dateRangePicker');
+    const startDate = moment('{{ start_date|date:"Y-m-d" }}');
+    const endDate = moment('{{ end_date|date:"Y-m-d" }}');
+    
     picker.daterangepicker({
-        startDate: moment().startOf('month'),
-        endDate: moment().endOf('month'),
+        startDate: startDate,
+        endDate: endDate,
         ranges: {
            'Today': [moment(), moment()],
            'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
@@ -1564,7 +1349,11 @@ function initializeDateRangePicker() {
         }
     }, function(start, end) {
         $('#dateRangePicker span').html(start.format('MMM D, YYYY') + ' - ' + end.format('MMM D, YYYY'));
-        refreshStoreReports();
+        // Redirect with date parameters
+        const url = new URL(window.location.href);
+        url.searchParams.set('start_date', start.format('YYYY-MM-DD'));
+        url.searchParams.set('end_date', end.format('YYYY-MM-DD'));
+        window.location.href = url.toString();
     });
 }
 
@@ -1584,7 +1373,8 @@ function filterCapacity(type) {
     
     const storeCards = document.querySelectorAll('.store-card');
     storeCards.forEach(card => {
-        const utilization = parseInt(card.querySelector('.metric-value').textContent);
+        const utilizationText = card.querySelector('.metric-value').textContent;
+        const utilization = parseFloat(utilizationText.replace('%', ''));
         
         if (type === 'all') {
             card.style.display = 'block';
@@ -1605,6 +1395,9 @@ function compareBy(metric) {
     
     // This would typically update the comparison chart based on metric
     showToast(`Comparing stores by: ${metric}`, 'info');
+    
+    // In production, you would fetch new data and update the chart
+    // For now, we'll just show a toast
 }
 
 function showDefaultMetrics(view) {
@@ -1614,6 +1407,8 @@ function showDefaultMetrics(view) {
     
     // This would typically show different metrics based on view
     showToast(`Showing default store: ${view}`, 'info');
+    
+    // In production, you would update the content based on the view
 }
 
 function refreshStoreReports() {
@@ -1621,16 +1416,22 @@ function refreshStoreReports() {
     
     // Simulate API refresh
     setTimeout(() => {
+        // Destroy old charts
         if (capacityChart) capacityChart.destroy();
         if (activityChart) activityChart.destroy();
         if (comparisonChart) comparisonChart.destroy();
         if (defaultStoreChart) defaultStoreChart.destroy();
         
+        // Reinitialize charts
         initializeCapacityChart();
         initializeActivityChart();
         initializeComparisonChart();
         initializeDefaultStoreChart();
-        feather.replace();
+        
+        // Refresh feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
         
         // Hide loading
         const loadingOverlay = document.getElementById('loading-overlay');
@@ -1645,16 +1446,16 @@ function refreshStoreReports() {
 
 function exportStoreReport(format) {
     let exportUrl;
-    let filename = `store-reports-${new Date().toISOString().split('T')[0]}`;
+    let filename = `store-reports-{{ start_date|date:"Y-m-d" }}-to-{{ end_date|date:"Y-m-d" }}`;
     
     if (format === 'csv') {
-        exportUrl = '/reports/store/export/csv/';
+        exportUrl = '/reports/store/export/csv/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}';
         filename += '.csv';
     } else if (format === 'pdf') {
-        exportUrl = '/reports/store/export/pdf/';
+        exportUrl = '/reports/store/export/pdf/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}';
         filename += '.pdf';
     } else if (format === 'excel') {
-        exportUrl = '/reports/store/export/excel/';
+        exportUrl = '/reports/store/export/excel/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}';
         filename += '.xlsx';
     }
     
@@ -1679,7 +1480,7 @@ function showLoading() {
     // Add loading overlay
     const loadingHTML = `
         <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
-             style="background: rgba(255,255,255,0.8); z-index: 9999;">
+             style="background: rgba(255,255,255,0.9); z-index: 9999;">
             <div class="text-center">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
@@ -1725,13 +1526,71 @@ document.querySelectorAll('.map-marker').forEach(marker => {
     marker.addEventListener('click', function() {
         const storeName = this.getAttribute('title');
         showToast(`Viewing details for ${storeName}`, 'info');
-        // This would typically show store details
+        
+        // Scroll to the corresponding store card
+        const storeCards = document.querySelectorAll('.store-card');
+        storeCards.forEach(card => {
+            if (card.querySelector('h5').textContent === storeName) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add highlight effect
+                card.style.boxShadow = '0 0 0 3px rgba(74, 144, 226, 0.5)';
+                setTimeout(() => {
+                    card.style.boxShadow = '';
+                }, 2000);
+            }
+        });
     });
 });
+
+// Helper functions
+function showStoreDetails(storeId) {
+    showToast(`Fetching details for store ID: ${storeId}`, 'info');
+    // In production, you would fetch store details via AJAX
+}
+
+function darkenColor(color, amount) {
+    // Simple color darkening for borders
+    if (color.startsWith('#')) {
+        const num = parseInt(color.slice(1), 16);
+        const amt = Math.round(2.55 * amount * 100);
+        const R = (num >> 16) - amt;
+        const G = (num >> 8 & 0x00FF) - amt;
+        const B = (num & 0x0000FF) - amt;
+        return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+            (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+            (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+    }
+    return color;
+}
+
+function hexToRgba(hex, alpha) {
+    // Convert hex to rgba
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 // Clean up intervals on page unload
 window.addEventListener('beforeunload', function() {
     // Clean up any intervals
+    if (activityUpdateInterval) {
+        clearInterval(activityUpdateInterval);
+    }
+});
+
+// Add event listener for tab changes to resize charts
+document.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', function() {
+        // Resize charts when tab becomes active
+        setTimeout(() => {
+            if (capacityChart) capacityChart.resize();
+            if (activityChart) activityChart.resize();
+            if (comparisonChart) comparisonChart.resize();
+            if (defaultStoreChart) defaultStoreChart.resize();
+        }, 100);
+    });
 });
 </script>
 
@@ -1857,6 +1716,46 @@ window.addEventListener('beforeunload', function() {
 
 .side-tabs-container::-webkit-scrollbar-thumb:hover {
     background: #a1a1a1;
+}
+
+/* Store card hover effects */
+.store-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.store-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+/* Map marker animation */
+.map-marker {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(74, 144, 226, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(74, 144, 226, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(74, 144, 226, 0);
+    }
+}
+
+/* Chart container responsive */
+.store-chart-container {
+    position: relative;
+    height: 200px;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .store-chart-container {
+        height: 150px;
+    }
 }
 </style>
 

@@ -3,7 +3,7 @@ from django.shortcuts import *
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from datetime import date, timedelta
+from datetime import date, timedelta, time
 import json
 import csv
 import random
@@ -12,7 +12,6 @@ import xlsxwriter
 import io
 import calendar
 from .reports import InventoryReports
-from django.db.models import *
 from django.utils import timezone
 from app.models.transactions import *
 from app.models.products import *
@@ -4059,7 +4058,6 @@ def financial_details(request):
     
     return render(request, 'reports/financial_details.html', context)
 
-
 def calculate_accounts_receivable(store_filter):
     """Calculate accounts receivable"""
     # Get sales with balance > 0 (using balance field from your Sales model)
@@ -4146,9 +4144,256 @@ def export_financial_report(request, format):
 
 @login_required
 def productmaster_details(request):
-    """Reports dashboard view"""
-    context = {}
+    """Product Master Reports - REAL production view using EXISTING models"""
+    
+    # Get all data using your existing models
+    all_products = Product.objects.select_related('category').prefetch_related('inventories').all()
+    
+    # 1. Basic Statistics
+    total_products = all_products.count()
+    active_products = all_products.filter(is_active=True).count()
+    inactive_products = total_products - active_products
+    
+    categories = Category.objects.annotate(product_count=Count('products')).order_by('-product_count')
+    categories_count = categories.count()
+    
+    # Calculate products with SKU
+    total_skus = all_products.filter(sku__isnull=False).exclude(sku='').count()
+    
+    # 2. Stock analysis
+    products_with_stock = sum(1 for p in all_products if p.total_stock > 0)
+    out_of_stock_products = total_products - products_with_stock
+    total_stock = sum(p.total_stock for p in all_products)
+    
+    # 3. Percentages
+    if total_products > 0:
+        active_percentage = (active_products / total_products) * 100
+        inactive_percentage = (inactive_products / total_products) * 100
+        with_stock_percentage = (products_with_stock / total_products) * 100
+        out_of_stock_percentage = (out_of_stock_products / total_products) * 100
+    else:
+        active_percentage = inactive_percentage = with_stock_percentage = out_of_stock_percentage = 0
+    
+    # 4. Category analysis
+    largest_category = categories.first() if categories else None
+    smallest_category = categories.last() if categories else None
+    empty_categories = categories.filter(product_count=0).count()
+    
+    # Calculate low stock categories - FIXED SYNTAX
+    low_stock_categories = 0
+    for category in categories:
+        category_products = category.products.all()
+        low_stock_count = 0
+        for p in category_products:
+            if p.inventories.exists():
+                inventory = p.inventories.first()
+                if p.total_stock <= inventory.reorder_level:
+                    low_stock_count += 1
+            else:
+                # If no inventory record, consider it out of stock
+                low_stock_count += 1
+        
+        if low_stock_count > 0:
+            low_stock_categories += 1
+    
+    # Average products per category
+    avg_products_per_category = categories.aggregate(avg=Avg('product_count'))['avg'] or 0
+    
+    # 5. Paginate products for catalog tab
+    page = request.GET.get('page', 1)
+    paginator = Paginator(all_products.order_by('name'), 12)  # 12 products per page
+    products_page = paginator.get_page(page)
+    
+    # 6. Products for status tab
+    status_page = request.GET.get('status_page', 1)
+    status_paginator = Paginator(all_products.order_by('-is_active', 'name'), 20)
+    status_products = status_paginator.get_page(status_page)
+    
+    # 7. Recent products (for timeline)
+    recent_products = all_products.order_by('-created_at')[:10]
+    
+    # 8. SKU/Barcode data
+    sku_products = all_products.filter(sku__isnull=False).exclude(sku='')[:50]
+    sku_count = all_products.filter(sku__isnull=False).exclude(sku='').count()
+    no_sku_count = total_products - sku_count
+    barcode_count = all_products.filter(barcode__isnull=False).exclude(barcode='').count()
+    no_barcode_count = total_products - barcode_count
+    
+    # 9. Creation statistics
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    week_start = today - timedelta(days=today.weekday())
+    
+    products_today = all_products.filter(created_at__date=today).count()
+    products_this_week = all_products.filter(created_at__date__gte=week_start).count()
+    products_this_month = all_products.filter(created_at__date__gte=month_start).count()
+    
+    # Calculate creation trend
+    last_month_start = (month_start - timedelta(days=1)).replace(day=1)
+    products_last_month = all_products.filter(
+        created_at__date__gte=last_month_start,
+        created_at__date__lt=month_start
+    ).count()
+    
+    if products_last_month > 0:
+        creation_trend = ((products_this_month - products_last_month) / products_last_month) * 100
+    else:
+        creation_trend = 0 if products_this_month == 0 else 100
+    
+    # Most active category (by product count)
+    most_active_category = categories.first()
+    
+    # Average creation rate per month
+    if all_products.exists():
+        first_product_date = all_products.order_by('created_at').first().created_at.date()
+        months_diff = (today.year - first_product_date.year) * 12 + (today.month - first_product_date.month) + 1
+        avg_creation_rate = total_products / max(months_diff, 1)
+    else:
+        avg_creation_rate = 0
+    
+    # Most active month
+    from django.db.models.functions import TruncMonth
+    month_counts = all_products.annotate(
+        month=TruncMonth('created_at')
+    ).values('month').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    most_active_month = month_counts.first()['month'].strftime('%B %Y') if month_counts else 'N/A'
+    
+    context = {
+        'current_date': timezone.now(),
+        
+        # Statistics
+        'total_products': total_products,
+        'active_products': active_products,
+        'inactive_products': inactive_products,
+        'categories_count': categories_count,
+        'total_skus': total_skus,
+        'total_stock': total_stock,
+        
+        # Stock analysis
+        'products_with_stock': products_with_stock,
+        'out_of_stock_products': out_of_stock_products,
+        
+        # Percentages
+        'active_percentage': active_percentage,
+        'inactive_percentage': inactive_percentage,
+        'with_stock_percentage': with_stock_percentage,
+        'out_of_stock_percentage': out_of_stock_percentage,
+        
+        # Category data
+        'categories': categories,
+        'largest_category': largest_category,
+        'smallest_category': smallest_category,
+        'empty_categories': empty_categories,
+        'low_stock_categories': low_stock_categories,
+        'avg_products_per_category': avg_products_per_category,
+        'most_active_category': most_active_category,
+        
+        # Paginated data
+        'products': products_page,
+        'status_products': status_products,
+        'recent_products': recent_products,
+        'sku_products': sku_products,
+        
+        # SKU/Barcode stats
+        'sku_count': sku_count,
+        'no_sku_count': no_sku_count,
+        'barcode_count': barcode_count,
+        'no_barcode_count': no_barcode_count,
+        
+        # Creation stats
+        'products_today': products_today,
+        'products_this_week': products_this_week,
+        'products_this_month': products_this_month,
+        'creation_trend': creation_trend,
+        'avg_creation_rate': avg_creation_rate,
+        'most_active_month': most_active_month,
+    }
+    
     return render(request, 'reports/productmaster_details.html', context)
+
+
+@login_required
+def export_product_report(request, format):
+    """Export product reports in various formats"""
+    from django.http import HttpResponse
+    import csv
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    import io
+    
+    if format == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="product_report.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow(['Product Name', 'SKU', 'Category', 'Status', 'Stock', 'Price'])
+        
+        for product in Product.objects.all():
+            writer.writerow([
+                product.name,
+                product.sku,
+                product.category.name if product.category else '',
+                'Active' if product.is_active else 'Inactive',
+                product.total_stock,
+                product.default_price or 0
+            ])
+        
+        return response
+    
+    elif format == 'pdf':
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="product_report.pdf"'
+        
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        p.drawString(100, 750, "Product Master Report")
+        p.drawString(100, 730, f"Generated: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+        p.drawString(100, 710, f"Total Products: {Product.objects.count()}")
+        p.showPage()
+        p.save()
+        
+        pdf = buffer.getvalue()
+        buffer.close()
+        response.write(pdf)
+        
+        return response
+    
+    return HttpResponse('Invalid format', status=400)
+
+
+@login_required
+def get_product_catalog_data(request):
+    """API endpoint for product catalog data (for AJAX)"""
+    import json
+    from django.core import serializers
+    
+    products = Product.objects.all()
+    data = serializers.serialize('json', products)
+    return HttpResponse(data, content_type='application/json')
+
+
+@login_required
+def get_product_statistics(request):
+    """API endpoint for product statistics"""
+    from django.http import JsonResponse
+    
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    
+    stats = {
+        'total_products': Product.objects.count(),
+        'active_products': Product.objects.filter(is_active=True).count(),
+        'new_this_month': Product.objects.filter(created_at__gte=month_start).count(),
+        'out_of_stock': Product.objects.filter(inventories__quantity_in_stock=0).distinct().count(),
+        'low_stock': Product.objects.filter(
+            inventories__quantity_in_stock__lte=F('inventories__reorder_level')
+        ).distinct().count(),
+    }
+    
+    return JsonResponse(stats)
 
 
 # ============================================================================
@@ -4172,11 +4417,509 @@ def reorder_details(request):
 # Default Store Analysis
 # ============================================================================
 
+def decimal_to_float(obj):
+    """Convert Decimal objects to float for JSON serialization"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
 @login_required
 def stocklocation_details(request):
-    """Reports dashboard view"""
-    context = {}
+    """Store Location Reports dashboard view - Fully Dynamic"""
+    
+    # Get all active stores
+    stores = StoreLocation.objects.filter(is_active=True)
+    
+    # Date range - default to current month
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    
+    if start_date_str and end_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = date.today().replace(day=1)
+            end_date = date.today()
+    else:
+        start_date = date.today().replace(day=1)
+        end_date = date.today()
+    
+    # Get actual sales status from model
+    actual_sales_statuses = Sales.objects.values_list('status', flat=True).distinct()
+    
+    # Determine which status to use for "completed" sales
+    possible_statuses = ['FULFILLED', 'Fulfilled', 'COMPLETED', 'Completed']
+    sales_status = None
+    
+    for status in possible_statuses:
+        if status in actual_sales_statuses:
+            sales_status = status
+            break
+    
+    # If no matching status found, use the first available status
+    if not sales_status and actual_sales_statuses:
+        sales_status = actual_sales_statuses[0]
+    
+    # Calculate store metrics
+    store_reports = []
+    
+    # Get all store sales for calculating averages
+    all_store_sales = {}
+    for store in stores:
+        sales_data = Sales.objects.filter(
+            store=store,
+            sale_date__range=[start_date, end_date],
+            status=sales_status
+        ).aggregate(
+            total_sales=Sum('total_amount'),
+            total_transactions=Count('id'),
+            avg_sale_value=Avg('total_amount')
+        )
+        all_store_sales[store.id] = sales_data['total_sales'] or 0
+    
+    # Calculate average sales across all stores
+    total_sales_all_stores = sum(all_store_sales.values())
+    avg_sales_all_stores = float(total_sales_all_stores) / len(stores) if stores else 0 
+    
+    for store in stores:
+        # Sales metrics for the period
+        sales_data = Sales.objects.filter(
+            store=store,
+            sale_date__range=[start_date, end_date],
+            status=sales_status
+        ).aggregate(
+            total_sales=Sum('total_amount'),
+            total_transactions=Count('id'),
+            avg_sale_value=Avg('total_amount')
+        )
+        
+        # Convert Decimal to float for calculations
+        total_sales_val = float(sales_data['total_sales'] or 0)
+        avg_sale_val = float(sales_data['avg_sale_value'] or 0)
+        
+        # Inventory metrics
+        inventory_data = Inventory.objects.filter(store=store).aggregate(
+            total_skus=Count('product', distinct=True),
+            total_items=Sum('quantity_in_stock'),
+            low_stock_items=Count('id', filter=Q(quantity_in_stock__lte=F('reorder_level'))),
+            zero_stock_items=Count('id', filter=Q(quantity_in_stock=0))
+        )
+        
+        # Get purchase order status from model
+        purchase_statuses = PurchaseOrder.objects.values_list('status', flat=True).distinct()
+        purchase_status = 'received' if 'received' in purchase_statuses else purchase_statuses[0] if purchase_statuses else None
+        
+        # Purchase metrics
+        purchase_data = {}
+        if purchase_status:
+            purchase_data = PurchaseOrder.objects.filter(
+                store=store,
+                purchase_date__range=[start_date, end_date],
+                status=purchase_status
+            ).aggregate(
+                total_purchases=Sum('total_cost'),
+                purchase_orders=Count('id')
+            )
+            # Convert Decimal to float
+            if purchase_data['total_purchases']:
+                purchase_data['total_purchases'] = float(purchase_data['total_purchases'])
+        else:
+            purchase_data = {'total_purchases': 0, 'purchase_orders': 0}
+        
+        # Get stock transfer status from model
+        transfer_statuses = StockTransfer.objects.values_list('status', flat=True).distinct()
+        completed_status = 'completed' if 'completed' in transfer_statuses else transfer_statuses[0] if transfer_statuses else None
+        
+        # Transfer metrics
+        transfers_out = {'total_items': 0}
+        transfers_out_value = 0
+        
+        if completed_status:
+            transfers_out = StockTransfer.objects.filter(
+                from_store=store,
+                transfer_date__range=[start_date, end_date],
+                status=completed_status
+            ).aggregate(
+                total_items=Sum('items__quantity')
+            )
+            
+            completed_transfers = StockTransfer.objects.filter(
+                from_store=store,
+                transfer_date__range=[start_date, end_date],
+                status=completed_status
+            )
+            for transfer in completed_transfers:
+                transfers_out_value += float(transfer.total_value or 0)
+        
+        transfers_in = {'total_items': 0}
+        if completed_status:
+            transfers_in = StockTransfer.objects.filter(
+                to_store=store,
+                transfer_date__range=[start_date, end_date],
+                status=completed_status
+            ).aggregate(
+                total_items=Sum('items__quantity')
+            )
+        
+        # Stock movement activity (last 7 days)
+        week_ago = end_date - timedelta(days=7)
+        recent_activity = StockMovement.objects.filter(
+            store=store,
+            timestamp__date__gte=week_ago
+        ).count()
+        
+        # Capacity/utilization calculation
+        total_batches = InventoryBatch.objects.filter(store=store, remaining_quantity__gt=0)
+        total_units = total_batches.aggregate(total=Sum('remaining_quantity'))['total'] or 0
+        
+        max_quantity_ever = InventoryBatch.objects.filter(store=store).aggregate(
+            max_quantity=Sum('quantity')
+        )['max_quantity'] or 0
+        
+        if max_quantity_ever > 0:
+            utilization_percentage = min(100, round((total_units / max_quantity_ever) * 100, 1))
+        else:
+            utilization_percentage = 0
+        
+        # Determine performance score (0-10)
+        performance_score = 6.0
+        
+        # Adjust based on sales performance (0-2 points)
+        store_sales = total_sales_val
+        if avg_sales_all_stores > 0:
+            sales_ratio = store_sales / avg_sales_all_stores
+            if sales_ratio >= 1.5:
+                performance_score += 2.0
+            elif sales_ratio >= 1.2:
+                performance_score += 1.5
+            elif sales_ratio >= 0.8:
+                performance_score += 1.0
+            elif sales_ratio >= 0.5:
+                performance_score += 0.5
+        
+        # Adjust based on inventory utilization (0-1.5 points)
+        if 70 <= utilization_percentage <= 85:
+            performance_score += 1.5
+        elif 60 <= utilization_percentage < 70 or 85 < utilization_percentage <= 90:
+            performance_score += 1.0
+        elif 50 <= utilization_percentage < 60 or 90 < utilization_percentage <= 95:
+            performance_score += 0.5
+        elif utilization_percentage > 95:
+            performance_score -= 0.5
+        
+        # Adjust based on stock availability (0-1 point)
+        total_skus = inventory_data['total_skus'] or 0
+        low_stock_items = inventory_data['low_stock_items'] or 0
+        if total_skus > 0:
+            low_stock_ratio = low_stock_items / total_skus
+            if low_stock_ratio <= 0.1:
+                performance_score += 1.0
+            elif low_stock_ratio <= 0.2:
+                performance_score += 0.5
+            elif low_stock_ratio > 0.3:
+                performance_score -= 0.5
+        
+        # Adjust based on activity (0-0.5 points)
+        if recent_activity > 20:
+            performance_score += 0.5
+        elif recent_activity > 10:
+            performance_score += 0.25
+        
+        # Cap score between 0 and 10
+        performance_score = max(0, min(10, round(performance_score, 1)))
+        
+        # Determine performance category
+        if performance_score >= 8.5:
+            performance_category = 'excellent'
+            performance_badge = 'performance-excellent'
+            score_class = 'score-excellent'
+        elif performance_score >= 7.0:
+            performance_category = 'good'
+            performance_badge = 'performance-good'
+            score_class = 'score-good'
+        else:
+            performance_category = 'fair'
+            performance_badge = 'performance-fair'
+            score_class = 'score-fair'
+        
+        # Calculate efficiency score based on multiple factors
+        efficiency_score = 70
+        
+        # Add based on utilization (max 10 points)
+        if 70 <= utilization_percentage <= 85:
+            efficiency_score += 10
+        elif 60 <= utilization_percentage < 70 or 85 < utilization_percentage <= 90:
+            efficiency_score += 5
+        
+        # Add based on sales performance (max 10 points)
+        if store_sales > 0 and avg_sales_all_stores > 0:
+            sales_eff = min(store_sales / avg_sales_all_stores * 10, 10)
+            efficiency_score += sales_eff
+        
+        # Add based on low stock management (max 5 points)
+        if total_skus > 0:
+            low_stock_ratio = low_stock_items / total_skus
+            if low_stock_ratio <= 0.1:
+                efficiency_score += 5
+            elif low_stock_ratio <= 0.2:
+                efficiency_score += 3
+        
+        # Cap efficiency score at 100%
+        efficiency_score = min(100, efficiency_score)
+        
+        # Calculate growth rate
+        previous_month_start = (start_date - timedelta(days=30)).replace(day=1)
+        previous_month_end = start_date - timedelta(days=1)
+        
+        previous_sales = Sales.objects.filter(
+            store=store,
+            sale_date__range=[previous_month_start, previous_month_end],
+            status=sales_status
+        ).aggregate(total_sales=Sum('total_amount'))['total_sales'] or 0
+        previous_sales = float(previous_sales)
+
+        current_sales = store_sales
+        if previous_sales > 0:
+            growth_rate = ((current_sales - previous_sales) / previous_sales) * 100
+            # Cap unrealistic growth percentages
+            if growth_rate > 500:
+                growth_rate = 500
+        elif current_sales > 0:
+            growth_rate = 100  # First time sales
+        else:
+            growth_rate = 0
+            
+        
+        # Generate dynamic color based on store ID
+        color_index = store.id % 6
+        color_classes = ['store-primary', 'store-secondary', 'store-success', 
+                        'store-warning', 'store-danger', 'store-info']
+        store_color_class = color_classes[color_index]
+        
+        # Build store report with float values for JSON serialization
+        store_report = {
+            'store': store,
+            'color_class': store_color_class,
+            'sales_data': {
+                'total_sales': total_sales_val,
+                'total_transactions': sales_data['total_transactions'] or 0,
+                'avg_sale_value': avg_sale_val,
+            },
+            'inventory_data': {
+                'total_skus': inventory_data['total_skus'] or 0,
+                'total_items': inventory_data['total_items'] or 0,
+                'low_stock_items': inventory_data['low_stock_items'] or 0,
+                'zero_stock_items': inventory_data['zero_stock_items'] or 0,
+            },
+            'purchase_data': purchase_data,
+            'transfers_out': {
+                'total_items': transfers_out['total_items'] or 0,
+                'total_value': transfers_out_value
+            },
+            'transfers_in': transfers_in,
+            'recent_activity': recent_activity,
+            'utilization_percentage': utilization_percentage,
+            'performance_score': performance_score,
+            'performance_category': performance_category,
+            'performance_badge': performance_badge,
+            'score_class': score_class,
+            'efficiency_score': round(efficiency_score),
+            'growth_rate': round(growth_rate, 1),
+            'total_units': total_units,
+            'max_capacity': max_quantity_ever,
+            'is_default': store.is_default,
+        }
+        
+        store_reports.append(store_report)
+    
+    # Get default store
+    default_store = stores.filter(is_default=True).first()
+    
+    # Get default store report
+    default_store_report = None
+    if default_store:
+        for report in store_reports:
+            if report['store'].id == default_store.id:
+                default_store_report = report
+                break
+    
+    # Generate chart data
+    # Sales trend chart data
+    sales_trend_labels = []
+    sales_trend_data = {}
+    
+    # Generate labels for the last 7 days
+    for i in range(6, -1, -1):
+        day = end_date - timedelta(days=i)
+        sales_trend_labels.append(day.strftime('%b %d'))
+    
+    # Get sales data for each store for the last 7 days
+    for store_report in store_reports:
+        store = store_report['store']
+        store_data = []
+        
+        for i in range(6, -1, -1):
+            day = end_date - timedelta(days=i)
+            daily_sales = Sales.objects.filter(
+                store=store,
+                sale_date=day,
+                status=sales_status
+            ).aggregate(total=Sum('total_amount'))['total'] or 0
+            store_data.append(float(daily_sales) / 1000000)  # Convert to millions
+            
+        sales_trend_data[store.name] = {
+            'data': store_data,
+            'color': get_dynamic_chart_color(store.id)
+        }
+    
+    # Capacity utilization chart data
+    capacity_labels = [report['store'].name for report in store_reports]
+    capacity_data = [report['utilization_percentage'] for report in store_reports]
+    capacity_colors = [get_dynamic_chart_color(report['store'].id) for report in store_reports]
+    
+    # Activity chart data (transactions per day for last 7 days - not hourly)
+    activity_labels = []
+    activity_data = {}
+    
+    # Generate labels for the last 7 days
+    for i in range(6, -1, -1):
+        day = end_date - timedelta(days=i)
+        activity_labels.append(day.strftime('%a %d'))
+    
+    # Generate activity data based on recent transactions
+    for store_report in store_reports[:3]:  # Show only first 3 stores for clarity
+        store = store_report['store']
+        
+        daily_data = []
+        
+        for i in range(6, -1, -1):
+            day = end_date - timedelta(days=i)
+            
+            # Count transactions for this day
+            daily_transactions = Sales.objects.filter(
+                store=store,
+                sale_date=day,
+                status=sales_status
+            ).count()
+            
+            daily_data.append(daily_transactions)
+        
+        activity_data[store.name] = {
+            'data': daily_data,
+            'color': get_dynamic_chart_color(store.id)
+        }
+    
+    # Comparison radar chart data
+    comparison_labels = ['Sales', 'Efficiency', 'Growth', 'Activity', 'Utilization', 'Stock Health']
+    comparison_data = {}
+    
+    for store_report in store_reports[:3]:  # Show only first 3 stores
+        store = store_report['store']
+        
+        # Calculate radar scores (0-100)
+        sales_score = min(100, (store_report['sales_data']['total_sales'] or 0) / 1000000 * 20)
+        efficiency_score = store_report['efficiency_score']
+        growth_score = min(100, max(0, 50 + store_report['growth_rate']))
+        
+        # Activity score based on recent activity
+        activity_score = min(100, store_report['recent_activity'] * 5)
+        
+        # Utilization score
+        utilization_score = store_report['utilization_percentage']
+        
+        # Stock health score (higher is better - less low stock items)
+        total_skus = store_report['inventory_data']['total_skus'] or 1
+        low_stock_items = store_report['inventory_data']['low_stock_items'] or 0
+        stock_health_score = max(0, 100 - (low_stock_items / total_skus * 100))
+        
+        radar_data = [
+            sales_score,
+            efficiency_score,
+            growth_score,
+            activity_score,
+            utilization_score,
+            stock_health_score
+        ]
+        
+        comparison_data[store.name] = {
+            'data': radar_data,
+            'color': get_dynamic_chart_color(store.id),
+            'border_color': get_dynamic_border_color(store.id)
+        }
+    
+    # Calculate best performing store
+    best_performing = None
+    if store_reports:
+        best_performing_report = max(store_reports, key=lambda x: x['performance_score'])
+        best_performing = best_performing_report['store']
+    
+    # Calculate total sales across all stores
+    total_sales = sum((report['sales_data']['total_sales'] or 0) for report in store_reports)
+    
+    # Calculate average utilization
+    avg_utilization = 0
+    if store_reports:
+        avg_utilization = round(sum(report['utilization_percentage'] for report in store_reports) / len(store_reports), 1)
+    
+    # Prepare context - using custom JSON encoder for Decimal objects
+    context = {
+        'stores': stores,
+        'store_reports': store_reports,
+        'default_store': default_store,
+        'default_store_report': default_store_report,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_stores': stores.count(),
+        'total_sales': total_sales,
+        'avg_utilization': avg_utilization,
+        'best_performing': best_performing,
+        'sales_status': sales_status,
+        # Chart data as JSON - using custom encoder
+        'sales_trend_labels': json.dumps(sales_trend_labels),
+        'sales_trend_data': json.dumps(sales_trend_data, default=decimal_to_float),
+        'capacity_labels': json.dumps(capacity_labels),
+        'capacity_data': json.dumps(capacity_data, default=decimal_to_float),
+        'capacity_colors': json.dumps(capacity_colors),
+        'activity_labels': json.dumps(activity_labels),
+        'activity_data': json.dumps(activity_data, default=decimal_to_float),
+        'comparison_labels': json.dumps(comparison_labels),
+        'comparison_data': json.dumps(comparison_data, default=decimal_to_float),
+    }
+    
     return render(request, 'reports/stocklocation_details.html', context)
+
+# Dynamic color helper functions
+def get_dynamic_chart_color(store_id):
+    """Generate a consistent chart color based on store ID"""
+    colors = [
+        '#4A90E2',  # Blue
+        '#36B9CC',  # Cyan
+        '#1CC88A',  # Green
+        '#F6C23E',  # Yellow
+        '#E74A3B',  # Red
+        '#6C757D',  # Gray
+        '#4E73DF',  # Indigo
+        '#1CC88A',  # Teal
+        '#F6C23E',  # Orange
+    ]
+    return colors[store_id % len(colors)]
+
+
+def get_dynamic_border_color(store_id):
+    """Generate a consistent border color based on store ID"""
+    colors = [
+        '#357ABD',  # Darker Blue
+        '#2A9CA5',  # Darker Cyan
+        '#17A673',  # Darker Green
+        '#F4B619',  # Darker Yellow
+        '#E02D1B',  # Darker Red
+        '#495057',  # Darker Gray
+        '#2E59D9',  # Darker Indigo
+        '#17A673',  # Darker Teal
+        '#F4B619',  # Darker Orange
+    ]
+    return colors[store_id % len(colors)]
 
 
 # ============================================================================

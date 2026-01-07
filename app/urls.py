@@ -264,6 +264,13 @@ urlpatterns = [
     path('api/adjustments/<int:adjustment_id>/details/', inventory_reports.adjustment_details_api, name='adjustment_details_api'),
     path('api/adjustments/batch/<str:batch_reference>/', inventory_reports.batch_details_api, name='batch_details_api'),
   
+     
+    # Add these new endpoints
+    path('productmaster-export/<str:format>/', inventory_reports.export_product_report, name='productmaster_export'),
+    path('product-catalog-data/', inventory_reports.get_product_catalog_data, name='product_catalog_data'),
+    path('product-statistics/', inventory_reports.get_product_statistics, name='product_statistics'),
+
+  
     
     
     
