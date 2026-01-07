@@ -139,6 +139,15 @@ urlpatterns = [
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('product_autocomplete/', product_autocomplete, name='product_autocomplete'),
 
+    # API endpoints
+    path('api/products/autocomplete/', product_autocomplete, name='product_autocomplete'),
+    path('api/products/<int:product_id>/stock-info/', get_product_stock_info, name='product_stock_info'),
+    path('api/products/list/', get_products_list, name='get_products_list'),
+    path('api/units/list/', get_units_list, name='get_units_list'),
+    path('api/sales/validate-stock/', validate_sale_stock, name='validate_sale_stock'),
+    path('api/products/<int:product_id>/details/', get_product_details, name='get_product_details'),    
+
+
     #human resource
     path('employee_profile/<int:employee_id>', employee_profile_view, name = 'employee_profile_page'),
     path('employee_profile/', employee_profile_view, name = 'employee_profile_page'),
@@ -225,6 +234,8 @@ urlpatterns = [
     path('reports/sales-item-unit/export/pdf/', sales_report_views.export_sales_item_unit_pdf, name='export_sales_item_unit_pdf'),
     path('adjust-stock/', stock_adjustments.adjust_stock_view, name='adjust_stock'),
     path('api/inventory/available/', stock_adjustments.api_inventory_available, name='api_inventory_available'),
+    
+    
     
     # Inventory Reports
     path('reports/', inventory_reports.reports_dashboard, name='reports_dashboard'),   

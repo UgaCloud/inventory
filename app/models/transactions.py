@@ -103,19 +103,19 @@ class InventoryBatch(models.Model):
 
 
 class Sales(models.Model):
-    receipt_no = models.CharField(max_length=50, unique=True, blank=True)  # Allow blank for auto-generation
+    receipt_no = models.CharField(max_length=50, unique=True, blank=True)
     customer = models.ForeignKey("app.Customer", on_delete=models.SET_NULL, null=True, blank=True)
     sale_date = models.DateField(auto_now_add=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=SALE_ORDER_OPTIONS)
     recorded_by = models.ForeignKey("auth.User", on_delete=models.DO_NOTHING)
-    amount_paid = models.DecimalField(max_digits=12, decimal_places=0, default=0)
-    balance = models.DecimalField(max_digits=12, decimal_places=0, default=0)
-    amount_received = models.DecimalField(max_digits=12, decimal_places=0, default=0)
-    change = models.DecimalField(max_digits=12, decimal_places=0, default=0)
-    note = models.TextField(blank=True, null=True)  
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)  
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)     
+    amount_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)  
+    change = models.DecimalField(max_digits=12, decimal_places=2, default=0)       
+    note = models.TextField(blank=True, null=True)
     payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT, null=True, blank=True)
-    total_amount = models.DecimalField(max_digits=16, decimal_places=0, default=0)
+    total_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0) 
 
     def save(self, *args, **kwargs):
         # Auto-generate receipt number if not provided
