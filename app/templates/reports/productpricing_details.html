@@ -1,0 +1,1820 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Pricing Reports{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+<style>
+    /* Custom styles for pricing reports */
+    .price-card {
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        border: 1px solid #dee2e6;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .price-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+    
+    .price-tag {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #4A90E2;
+        margin: 10px 0;
+    }
+    
+    .price-change {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .price-up {
+        background-color: rgba(28, 200, 138, 0.1);
+        color: #1CC88A;
+    }
+    
+    .price-down {
+        background-color: rgba(231, 74, 59, 0.1);
+        color: #E74A3B;
+    }
+    
+    .price-stable {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+    
+    .price-matrix {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+    }
+    
+    .matrix-item {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+    }
+    
+    .matrix-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 5px;
+    }
+    
+    .matrix-value {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .unit-conversion-table {
+        font-size: 0.9rem;
+    }
+    
+    .unit-conversion-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    
+    .conversion-factor {
+        background-color: #e8f4fd;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+    }
+    
+    .comparison-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+    }
+    
+    .comparison-item {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        position: relative;
+    }
+    
+    .competitor-tag {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #f8f9fa;
+        padding: 0.2rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        border: 1px solid #dee2e6;
+    }
+    
+    .price-difference {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 10px 0;
+    }
+    
+    .difference-positive {
+        color: #1CC88A;
+    }
+    
+    .difference-negative {
+        color: #E74A3B;
+    }
+    
+    .difference-neutral {
+        color: #6c757d;
+    }
+    
+    .missing-price-alert {
+        border-left: 4px solid #E74A3B;
+        animation: pulseWarning 2s infinite;
+        background-color: rgba(231, 74, 59, 0.05);
+    }
+    
+    @keyframes pulseWarning {
+        0% { box-shadow: 0 0 0 0 rgba(231, 74, 59, 0.2); }
+        70% { box-shadow: 0 0 0 5px rgba(231, 74, 59, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(231, 74, 59, 0); }
+    }
+    
+    .pricing-tier {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .tier-premium {
+        background-color: rgba(74, 144, 226, 0.1);
+        color: #4A90E2;
+    }
+    
+    .tier-standard {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+    
+    .tier-economy {
+        background-color: rgba(28, 200, 138, 0.1);
+        color: #1CC88A;
+    }
+    
+    .pricing-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    
+    .pricing-actions .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .price-history {
+        height: 60px;
+        width: 100%;
+        position: relative;
+        margin: 10px 0;
+    }
+    
+    .price-line {
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+    }
+    
+    .price-increase { stroke: #1CC88A; }
+    .price-decrease { stroke: #E74A3B; }
+    .price-steady { stroke: #6c757d; }
+    
+    .margin-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .margin-high { background-color: rgba(28, 200, 138, 0.1); color: #1CC88A; }
+    .margin-medium { background-color: rgba(246, 194, 62, 0.1); color: #F6C23E; }
+    .margin-low { background-color: rgba(231, 74, 59, 0.1); color: #E74A3B; }
+    
+    .discount-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background-color: #E74A3B;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+    
+    .currency-selector {
+        width: 100px;
+        font-size: 0.9rem;
+    }
+    
+    .price-filter {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    /* Chart containers */
+    .price-chart-container {
+        height: 250px;
+        position: relative;
+        margin: 20px 0;
+    }
+    
+    /* Status indicators */
+    .status-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 5px;
+    }
+    
+    .status-active { background-color: #1CC88A; }
+    .status-inactive { background-color: #F6C23E; }
+    .status-disabled { background-color: #E74A3B; }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .price-matrix {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .comparison-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .pricing-actions {
+            flex-direction: column;
+        }
+        
+        .pricing-actions .btn {
+            width: 100%;
+        }
+        
+        .currency-selector {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .price-matrix {
+            grid-template-columns: 1fr;
+        }
+        
+        .price-tag {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="add-item d-flex">
+                <div class="page-title">
+                    <h4>Pricing Reports</h4>
+                    <h6>Product pricing, comparisons, and analysis</h6>
+                </div>
+            </div>
+            <ul class="table-top-head">
+                <li>
+                    <select class="form-select form-select-sm currency-selector">
+                        <option value="UGX" selected>UGX</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                    </select>
+                </li>
+                <li>
+                    <button class="btn btn-outline-primary" onclick="refreshPricingReports()">
+                        <i data-feather="refresh-cw" class="feather-16 me-1"></i>
+                        Refresh
+                    </button>
+                </li>
+                <li>
+                    <button class="btn btn-outline-success" onclick="updateAllPrices()">
+                        <i data-feather="dollar-sign" class="feather-16 me-1"></i>
+                        Update Prices
+                    </button>
+                </li>
+                <li>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i data-feather="download" class="feather-16 me-1"></i>
+                            Export
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="exportPricingReport('csv')">
+                                <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportPricingReport('pdf')">
+                                <i data-feather="file" class="feather-14 me-2"></i>Export PDF
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportPricingReport('excel')">
+                                <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
+                            </a></li>
+                        </ul>
+                    </div>
+                </li>
+                <li>
+                    <button class="btn btn-primary" onclick="goBack()">
+                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
+                        Back to Dashboard
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Report Header Info -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card" style="border-left: 4px solid #4A90E2;">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="card-title mb-3">
+                                    <i data-feather="tag" class="feather-16 me-2"></i>
+                                    Pricing Overview - January 2024
+                                </h5>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Report ID:</strong> PRICE-REPORT-2024-001</p>
+                                        <p class="mb-1"><strong>Products Analyzed:</strong> 312 items</p>
+                                        <p class="mb-1"><strong>Currency:</strong> UGX</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Avg. Price Change:</strong> <span class="price-up">+2.5%</span></p>
+                                        <p class="mb-1"><strong>Last Updated:</strong> 2024-01-31 10:30</p>
+                                        <p class="mb-1"><strong>Missing Prices:</strong> <span class="text-danger">18 items</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="price-matrix">
+                                    <div class="matrix-item">
+                                        <div class="matrix-label">Average Selling Price</div>
+                                        <div class="matrix-value">UGX 284,500</div>
+                                    </div>
+                                    <div class="matrix-item">
+                                        <div class="matrix-label">Average Cost Price</div>
+                                        <div class="matrix-value">UGX 188,500</div>
+                                    </div>
+                                    <div class="matrix-item">
+                                        <div class="matrix-label">Average Margin</div>
+                                        <div class="matrix-value">48.5%</div>
+                                    </div>
+                                    <div class="matrix-item">
+                                        <div class="matrix-label">Price Changes This Month</div>
+                                        <div class="matrix-value">24</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabbed Interface -->
+        <div class="row">
+            <!-- Side Tabs -->
+            <div class="col-lg-3 col-md-4">
+                <div class="card side-tabs-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="percent" class="feather-16 me-2"></i>
+                            Pricing Analysis Sections
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="side-tabs-container">
+                            <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
+                                <button class="nav-link side-tab active" id="pricing-list-tab" data-bs-toggle="pill" data-bs-target="#pricing-list" type="button" role="tab" aria-controls="pricing-list" aria-selected="true">
+                                    <i data-feather="list" class="feather-16 me-2"></i>
+                                    Product Pricing List
+                                </button>
+                                <button class="nav-link side-tab" id="unit-conversion-tab" data-bs-toggle="pill" data-bs-target="#unit-conversion" type="button" role="tab" aria-controls="unit-conversion" aria-selected="false">
+                                    <i data-feather="repeat" class="feather-16 me-2"></i>
+                                    Unit Conversion Report
+                                </button>
+                                <button class="nav-link side-tab" id="price-comparison-tab" data-bs-toggle="pill" data-bs-target="#price-comparison" type="button" role="tab" aria-controls="price-comparison" aria-selected="false">
+                                    <i data-feather="git-compare" class="feather-16 me-2"></i>
+                                    Price Comparison
+                                </button>
+                                <button class="nav-link side-tab" id="missing-pricing-tab" data-bs-toggle="pill" data-bs-target="#missing-pricing" type="button" role="tab" aria-controls="missing-pricing" aria-selected="false">
+                                    <i data-feather="alert-triangle" class="feather-16 me-2"></i>
+                                    Missing Pricing Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">
+                            <i data-feather="info" class="feather-12 me-1"></i>
+                            Click to analyze different pricing aspects
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="col-lg-9 col-md-8">
+                <div class="tab-content" id="sideTabContent">
+                    <!-- Product Pricing List Tab -->
+                    <div class="tab-pane fade show active" id="pricing-list" role="tabpanel" aria-labelledby="pricing-list-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="list" class="feather-16 me-2"></i>
+                                    Product Pricing List
+                                </h5>
+                                <div class="d-flex">
+                                    <div class="input-group input-group-sm" style="width: 250px;">
+                                        <input type="text" class="form-control" placeholder="Search products..." id="priceSearch">
+                                        <button class="btn btn-outline-secondary" type="button">
+                                            <i data-feather="search" class="feather-12"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="price-filter mb-4">
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Category</label>
+                                            <select class="form-select form-select-sm" id="priceCategoryFilter">
+                                                <option value="">All Categories</option>
+                                                <option value="electronics">Electronics</option>
+                                                <option value="accessories">Accessories</option>
+                                                <option value="wearables">Wearables</option>
+                                                <option value="audio">Audio</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Price Range</label>
+                                            <select class="form-select form-select-sm" id="priceRangeFilter">
+                                                <option value="">All Prices</option>
+                                                <option value="low">Under UGX 100,000</option>
+                                                <option value="medium">UGX 100,000 - 500,000</option>
+                                                <option value="high">Over UGX 500,000</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Margin</label>
+                                            <select class="form-select form-select-sm" id="marginFilter">
+                                                <option value="">All Margins</option>
+                                                <option value="high">High (>50%)</option>
+                                                <option value="medium">Medium (30-50%)</option>
+                                                <option value="low">Low (<30%)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Sort By</label>
+                                            <select class="form-select form-select-sm" id="sortFilter">
+                                                <option value="name">Product Name</option>
+                                                <option value="price_high">Price (High to Low)</option>
+                                                <option value="price_low">Price (Low to High)</option>
+                                                <option value="margin">Margin %</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>SKU</th>
+                                                <th>Product Name</th>
+                                                <th>Category</th>
+                                                <th>Cost Price</th>
+                                                <th>Selling Price</th>
+                                                <th>Margin</th>
+                                                <th>Price Tier</th>
+                                                <th>Last Change</th>
+                                                <th>Price History</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pricingTableBody">
+                                            <tr>
+                                                <td><strong>SKU-001</strong></td>
+                                                <td>Premium Smartphone X200</td>
+                                                <td>Electronics</td>
+                                                <td>UGX 850,000</td>
+                                                <td>
+                                                    <div class="price-tag">UGX 1,250,000</div>
+                                                    <span class="price-change price-up">
+                                                        <i data-feather="trending-up" class="feather-12 me-1"></i>
+                                                        +8.7%
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="margin-badge margin-high">47%</span>
+                                                </td>
+                                                <td>
+                                                    <span class="pricing-tier tier-premium">Premium</span>
+                                                </td>
+                                                <td>
+                                                    <small>2024-01-25</small><br>
+                                                    <small class="text-muted">Market adjustment</small>
+                                                </td>
+                                                <td>
+                                                    <div class="price-history">
+                                                        <!-- Simplified price history visualization -->
+                                                        <svg width="100" height="40" viewBox="0 0 100 40">
+                                                            <path class="price-line price-increase" d="M10,30 L30,20 L50,25 L70,15 L90,10" />
+                                                        </svg>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-001')">
+                                                            <i data-feather="edit" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-001')">
+                                                            <i data-feather="trending-up" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-001')">
+                                                            <i data-feather="refresh-cw" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>SKU-002</strong></td>
+                                                <td>Wireless Headphones Pro</td>
+                                                <td>Audio</td>
+                                                <td>UGX 210,000</td>
+                                                <td>
+                                                    <div class="price-tag">UGX 320,000</div>
+                                                    <span class="price-change price-stable">
+                                                        <i data-feather="minus" class="feather-12 me-1"></i>
+                                                        Stable
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="margin-badge margin-high">52%</span>
+                                                </td>
+                                                <td>
+                                                    <span class="pricing-tier tier-standard">Standard</span>
+                                                </td>
+                                                <td>
+                                                    <small>2024-01-10</small><br>
+                                                    <small class="text-muted">Regular update</small>
+                                                </td>
+                                                <td>
+                                                    <div class="price-history">
+                                                        <svg width="100" height="40" viewBox="0 0 100 40">
+                                                            <path class="price-line price-steady" d="M10,25 L30,25 L50,26 L70,25 L90,25" />
+                                                        </svg>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-002')">
+                                                            <i data-feather="edit" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-002')">
+                                                            <i data-feather="trending-up" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-002')">
+                                                            <i data-feather="refresh-cw" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>SKU-005</strong></td>
+                                                <td>USB-C Fast Charger</td>
+                                                <td>Accessories</td>
+                                                <td>UGX 28,000</td>
+                                                <td>
+                                                    <div class="price-tag">UGX 45,000</div>
+                                                    <span class="price-change price-down">
+                                                        <i data-feather="trending-down" class="feather-12 me-1"></i>
+                                                        -5.3%
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="margin-badge margin-medium">38%</span>
+                                                </td>
+                                                <td>
+                                                    <span class="pricing-tier tier-economy">Economy</span>
+                                                </td>
+                                                <td>
+                                                    <small>2024-01-28</small><br>
+                                                    <small class="text-muted">Promotion</small>
+                                                </td>
+                                                <td>
+                                                    <div class="price-history">
+                                                        <svg width="100" height="40" viewBox="0 0 100 40">
+                                                            <path class="price-line price-decrease" d="M10,15 L30,20 L50,22 L70,25 L90,30" />
+                                                        </svg>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-005')">
+                                                            <i data-feather="edit" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-005')">
+                                                            <i data-feather="trending-up" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-005')">
+                                                            <i data-feather="refresh-cw" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>SKU-128</strong></td>
+                                                <td>Screen Protector Pack (3)</td>
+                                                <td>Accessories</td>
+                                                <td>UGX 15,000</td>
+                                                <td>
+                                                    <div class="price-tag">UGX 25,000</div>
+                                                    <span class="price-change price-up">
+                                                        <i data-feather="trending-up" class="feather-12 me-1"></i>
+                                                        +12.5%
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="margin-badge margin-high">67%</span>
+                                                </td>
+                                                <td>
+                                                    <span class="pricing-tier tier-standard">Standard</span>
+                                                </td>
+                                                <td>
+                                                    <small>2024-01-30</small><br>
+                                                    <small class="text-muted">Cost increase</small>
+                                                </td>
+                                                <td>
+                                                    <div class="price-history">
+                                                        <svg width="100" height="40" viewBox="0 0 100 40">
+                                                            <path class="price-line price-increase" d="M10,30 L30,28 L50,25 L70,20 L90,15" />
+                                                        </svg>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="editPrice('SKU-128')">
+                                                            <i data-feather="edit" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-info" onclick="viewPriceHistory('SKU-128')">
+                                                            <i data-feather="trending-up" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="adjustPrice('SKU-128')">
+                                                            <i data-feather="refresh-cw" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Pricing Analysis Summary</h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Total Products:</strong> 312 with prices</p>
+                                                        <p class="mb-1"><strong>Avg. Margin:</strong> 48.5%</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Price Changes This Month:</strong> 24 items</p>
+                                                        <p class="mb-1"><strong>Avg. Price Increase:</strong> +2.5%</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Highest Margin:</strong> Accessories (65%)</p>
+                                                        <p class="mb-1"><strong>Lowest Margin:</strong> Electronics (32%)</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Unit Conversion Report Tab -->
+                    <div class="tab-pane fade" id="unit-conversion" role="tabpanel" aria-labelledby="unit-conversion-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="repeat" class="feather-16 me-2"></i>
+                                    Unit Conversion Report
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="showConversionType('all')">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showConversionType('weight')">Weight</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showConversionType('volume')">Volume</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showConversionType('count')">Count</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-3">Unit Conversion Calculator</h6>
+                                                <div class="row g-3">
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">From Value</label>
+                                                        <input type="number" class="form-control" value="1" id="fromValue">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">From Unit</label>
+                                                        <select class="form-select" id="fromUnit">
+                                                            <option value="kg">Kilograms (kg)</option>
+                                                            <option value="g">Grams (g)</option>
+                                                            <option value="lb">Pounds (lb)</option>
+                                                            <option value="oz">Ounces (oz)</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">To Unit</label>
+                                                        <select class="form-select" id="toUnit">
+                                                            <option value="g">Grams (g)</option>
+                                                            <option value="kg">Kilograms (kg)</option>
+                                                            <option value="lb">Pounds (lb)</option>
+                                                            <option value="oz">Ounces (oz)</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-3 d-flex align-items-end">
+                                                        <button class="btn btn-primary w-100" onclick="calculateConversion()">
+                                                            <i data-feather="refresh-cw" class="feather-16 me-2"></i>
+                                                            Convert
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-3 text-center" id="conversionResult">
+                                                    <h4 class="text-primary">1 kg = 1000 g</h4>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table unit-conversion-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th>SKU</th>
+                                                <th>Base Unit</th>
+                                                <th>Pack Unit</th>
+                                                <th>Conversion Factor</th>
+                                                <th>Base Price</th>
+                                                <th>Pack Price</th>
+                                                <th>Unit Price</th>
+                                                <th>Best Value</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Premium Rice</td>
+                                                <td><strong>FOOD-001</strong></td>
+                                                <td>kg</td>
+                                                <td>50kg bag</td>
+                                                <td><span class="conversion-factor">1:50</span></td>
+                                                <td>UGX 4,500/kg</td>
+                                                <td>UGX 200,000</td>
+                                                <td>UGX 4,000/kg</td>
+                                                <td><span class="badge bg-success">Pack saves 11%</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-001')">
+                                                        <i data-feather="edit" class="feather-12"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Cooking Oil</td>
+                                                <td><strong>FOOD-002</strong></td>
+                                                <td>Liter</td>
+                                                <td>20L Jerrycan</td>
+                                                <td><span class="conversion-factor">1:20</span></td>
+                                                <td>UGX 8,500/L</td>
+                                                <td>UGX 150,000</td>
+                                                <td>UGX 7,500/L</td>
+                                                <td><span class="badge bg-success">Pack saves 12%</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-002')">
+                                                        <i data-feather="edit" class="feather-12"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Wheat Flour</td>
+                                                <td><strong>FOOD-003</strong></td>
+                                                <td>kg</td>
+                                                <td>25kg bag</td>
+                                                <td><span class="conversion-factor">1:25</span></td>
+                                                <td>UGX 3,200/kg</td>
+                                                <td>UGX 70,000</td>
+                                                <td>UGX 2,800/kg</td>
+                                                <td><span class="badge bg-success">Pack saves 13%</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-003')">
+                                                        <i data-feather="edit" class="feather-12"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Sugar</td>
+                                                <td><strong>FOOD-004</strong></td>
+                                                <td>kg</td>
+                                                <td>50kg bag</td>
+                                                <td><span class="conversion-factor">1:50</span></td>
+                                                <td>UGX 3,800/kg</td>
+                                                <td>UGX 175,000</td>
+                                                <td>UGX 3,500/kg</td>
+                                                <td><span class="badge bg-success">Pack saves 8%</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-004')">
+                                                        <i data-feather="edit" class="feather-12"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Beans</td>
+                                                <td><strong>FOOD-005</strong></td>
+                                                <td>kg</td>
+                                                <td>100kg sack</td>
+                                                <td><span class="conversion-factor">1:100</span></td>
+                                                <td>UGX 4,200/kg</td>
+                                                <td>UGX 380,000</td>
+                                                <td>UGX 3,800/kg</td>
+                                                <td><span class="badge bg-success">Pack saves 10%</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="editConversion('FOOD-005')">
+                                                        <i data-feather="edit" class="feather-12"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Conversion Standards</h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li><i data-feather="scale" class="feather-12 text-primary me-2"></i> <strong>Weight:</strong> 1 kg = 1000 g = 2.20462 lb</li>
+                                                    <li><i data-feather="droplet" class="feather-12 text-info me-2"></i> <strong>Volume:</strong> 1 L = 1000 ml = 0.264172 gal</li>
+                                                    <li><i data-feather="package" class="feather-12 text-success me-2"></i> <strong>Count:</strong> 1 dozen = 12 units</li>
+                                                    <li><i data-feather="box" class="feather-12 text-warning me-2"></i> <strong>Bulk:</strong> 1 carton = 24 units (varies)</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Best Practices</h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Always display unit price alongside pack price</li>
+                                                    <li><i data-feather="alert-triangle" class="feather-12 text-warning me-2"></i> Update conversion factors when costs change</li>
+                                                    <li><i data-feather="percent" class="feather-12 text-info me-2"></i> Maintain consistent margin across all unit sizes</li>
+                                                    <li><i data-feather="refresh-cw" class="feather-12 text-primary me-2"></i> Review bulk pricing quarterly</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Price Comparison Tab -->
+                    <div class="tab-pane fade" id="price-comparison" role="tabpanel" aria-labelledby="price-comparison-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="git-compare" class="feather-16 me-2"></i>
+                                    Price Comparison Analysis
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterComparison('all')">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterComparison('higher')">We're Higher</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterComparison('lower')">We're Lower</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterComparison('matched')">Price Matched</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="price-chart-container">
+                                            <canvas id="priceComparisonChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="comparison-grid">
+                                    <!-- Comparison Item 1 -->
+                                    <div class="comparison-item">
+                                        <span class="competitor-tag">TechZone</span>
+                                        <h6>Premium Smartphone X200</h6>
+                                        <div class="d-flex justify-content-between align-items-center my-3">
+                                            <div>
+                                                <small class="text-muted">Our Price</small>
+                                                <div class="h5 mb-0">UGX 1,250,000</div>
+                                            </div>
+                                            <div class="text-center">
+                                                <i data-feather="arrow-right" class="feather-24 text-primary"></i>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted">Competitor Price</small>
+                                                <div class="h5 mb-0">UGX 1,180,000</div>
+                                            </div>
+                                        </div>
+                                        <div class="price-difference difference-negative">
+                                            <i data-feather="trending-up" class="feather-16 me-1"></i>
+                                            We're 5.9% higher
+                                        </div>
+                                        <p class="small mb-3">Competitor is running a special promotion. Consider matching for key customers.</p>
+                                        <div class="pricing-actions">
+                                            <button class="btn btn-sm btn-outline-danger" onclick="priceMatch('SKU-001')">
+                                                <i data-feather="target" class="feather-12 me-1"></i>
+                                                Price Match
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-warning" onclick="analyzeImpact('SKU-001')">
+                                                <i data-feather="bar-chart-2" class="feather-12 me-1"></i>
+                                                Analyze
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Comparison Item 2 -->
+                                    <div class="comparison-item">
+                                        <span class="competitor-tag">AudioWorld</span>
+                                        <h6>Wireless Headphones Pro</h6>
+                                        <div class="d-flex justify-content-between align-items-center my-3">
+                                            <div>
+                                                <small class="text-muted">Our Price</small>
+                                                <div class="h5 mb-0">UGX 320,000</div>
+                                            </div>
+                                            <div class="text-center">
+                                                <i data-feather="arrow-left" class="feather-24 text-success"></i>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted">Competitor Price</small>
+                                                <div class="h5 mb-0">UGX 350,000</div>
+                                            </div>
+                                        </div>
+                                        <div class="price-difference difference-positive">
+                                            <i data-feather="trending-down" class="feather-16 me-1"></i>
+                                            We're 8.6% lower
+                                        </div>
+                                        <p class="small mb-3">Our price is competitive. Consider highlighting this in marketing materials.</p>
+                                        <div class="pricing-actions">
+                                            <button class="btn btn-sm btn-outline-success" onclick="promotePrice('SKU-002')">
+                                                <i data-feather="megaphone" class="feather-12 me-1"></i>
+                                                Promote
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="maintainPrice('SKU-002')">
+                                                <i data-feather="check" class="feather-12 me-1"></i>
+                                                Maintain
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Comparison Item 3 -->
+                                    <div class="comparison-item">
+                                        <div class="discount-badge">-15%</div>
+                                        <span class="competitor-tag">GadgetHub</span>
+                                        <h6>USB-C Fast Charger</h6>
+                                        <div class="d-flex justify-content-between align-items-center my-3">
+                                            <div>
+                                                <small class="text-muted">Our Price</small>
+                                                <div class="h5 mb-0">UGX 45,000</div>
+                                            </div>
+                                            <div class="text-center">
+                                                <i data-feather="check" class="feather-24 text-info"></i>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted">Competitor Price</small>
+                                                <div class="h5 mb-0">UGX 45,000</div>
+                                            </div>
+                                        </div>
+                                        <div class="price-difference difference-neutral">
+                                            <i data-feather="minus" class="feather-16 me-1"></i>
+                                            Price Matched
+                                        </div>
+                                        <p class="small mb-3">Prices are identical. Monitor for any competitor changes.</p>
+                                        <div class="pricing-actions">
+                                            <button class="btn btn-sm btn-outline-info" onclick="monitorPrice('SKU-005')">
+                                                <i data-feather="eye" class="feather-12 me-1"></i>
+                                                Monitor
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Comparison Item 4 -->
+                                    <div class="comparison-item">
+                                        <span class="competitor-tag">MobileMall</span>
+                                        <h6>Screen Protector Pack</h6>
+                                        <div class="d-flex justify-content-between align-items-center my-3">
+                                            <div>
+                                                <small class="text-muted">Our Price</small>
+                                                <div class="h5 mb-0">UGX 25,000</div>
+                                            </div>
+                                            <div class="text-center">
+                                                <i data-feather="arrow-left" class="feather-24 text-success"></i>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted">Competitor Price</small>
+                                                <div class="h5 mb-0">UGX 28,000</div>
+                                            </div>
+                                        </div>
+                                        <div class="price-difference difference-positive">
+                                            <i data-feather="trending-down" class="feather-16 me-1"></i>
+                                            We're 10.7% lower
+                                        </div>
+                                        <p class="small mb-3">Significant price advantage. Could increase margin slightly.</p>
+                                        <div class="pricing-actions">
+                                            <button class="btn btn-sm btn-outline-success" onclick="adjustMargin('SKU-128')">
+                                                <i data-feather="dollar-sign" class="feather-12 me-1"></i>
+                                                Adjust Margin
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-warning" onclick="analyzeImpact('SKU-128')">
+                                                <i data-feather="bar-chart-2" class="feather-12 me-1"></i>
+                                                Analyze
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Competitive Analysis Summary</h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Compared Products:</strong> 45 items</p>
+                                                        <p class="mb-1"><strong>We're Lower:</strong> 28 items (62%)</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>We're Higher:</strong> 12 items (27%)</p>
+                                                        <p class="mb-1"><strong>Price Matched:</strong> 5 items (11%)</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Avg. Price Difference:</strong> -3.8%</p>
+                                                        <p class="mb-1"><strong>Recommendation:</strong> Review 12 higher-priced items</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Missing Pricing Report Tab -->
+                    <div class="tab-pane fade" id="missing-pricing" role="tabpanel" aria-labelledby="missing-pricing-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="alert-triangle" class="feather-16 me-2"></i>
+                                    Missing Pricing Report
+                                    <span class="badge bg-danger ms-2">18 Items</span>
+                                </h5>
+                                <button class="btn btn-sm btn-success" onclick="autoPriceMissing()">
+                                    <i data-feather="zap" class="feather-12 me-1"></i>
+                                    Auto-price All
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="card missing-price-alert">
+                                            <div class="card-body">
+                                                <div class="row align-items-center">
+                                                    <div class="col-md-8">
+                                                        <h6 class="card-subtitle mb-2 text-danger">
+                                                            <i data-feather="alert-circle" class="feather-16 me-2"></i>
+                                                            Immediate Action Required
+                                                        </h6>
+                                                        <p class="mb-0">18 products are missing pricing information. This affects inventory management and sales operations.</p>
+                                                    </div>
+                                                    <div class="col-md-4 text-end">
+                                                        <button class="btn btn-danger" onclick="prioritizeMissingPricing()">
+                                                            <i data-feather="alert-triangle" class="feather-16 me-2"></i>
+                                                            Prioritize Resolution
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>SKU</th>
+                                                <th>Product Name</th>
+                                                <th>Category</th>
+                                                <th>Date Added</th>
+                                                <th>Days Without Price</th>
+                                                <th>Similar Products</th>
+                                                <th>Suggested Price</th>
+                                                <th>Cost Price</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="table-warning">
+                                                <td><strong>SKU-450</strong></td>
+                                                <td>New Model Smartphone Case</td>
+                                                <td>Accessories</td>
+                                                <td>2024-01-30</td>
+                                                <td><span class="badge bg-danger">2 days</span></td>
+                                                <td>
+                                                    <small>Similar to SKU-007</small><br>
+                                                    <small>Avg. price: UGX 35,000</small>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" placeholder="UGX 35,000" style="width: 120px;">
+                                                </td>
+                                                <td>UGX 18,000</td>
+                                                <td>
+                                                    <span class="badge bg-warning">New Product</span>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-success" onclick="applySuggestedPrice('SKU-450')">
+                                                            <i data-feather="check" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-450')">
+                                                            <i data-feather="calculator" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-secondary" onclick="skipProduct('SKU-450')">
+                                                            <i data-feather="skip-forward" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr class="table-warning">
+                                                <td><strong>SKU-451</strong></td>
+                                                <td>Bluetooth Earbuds Pro</td>
+                                                <td>Audio</td>
+                                                <td>2024-01-29</td>
+                                                <td><span class="badge bg-danger">3 days</span></td>
+                                                <td>
+                                                    <small>Similar to SKU-002</small><br>
+                                                    <small>Avg. price: UGX 280,000</small>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" placeholder="UGX 280,000" style="width: 120px;">
+                                                </td>
+                                                <td>UGX 185,000</td>
+                                                <td>
+                                                    <span class="badge bg-warning">New Product</span>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-success" onclick="applySuggestedPrice('SKU-451')">
+                                                            <i data-feather="check" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-451')">
+                                                            <i data-feather="calculator" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-secondary" onclick="skipProduct('SKU-451')">
+                                                            <i data-feather="skip-forward" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr class="table-danger">
+                                                <td><strong>SKU-320</strong></td>
+                                                <td>Laptop Cooling Stand</td>
+                                                <td>Accessories</td>
+                                                <td>2024-01-15</td>
+                                                <td><span class="badge bg-danger">16 days</span></td>
+                                                <td>
+                                                    <small>Unique product</small><br>
+                                                    <small>No similar items</small>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" placeholder="Calculate..." style="width: 120px;">
+                                                </td>
+                                                <td>UGX 45,000</td>
+                                                <td>
+                                                    <span class="badge bg-danger">Overdue</span>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-danger" onclick="flagUrgent('SKU-320')">
+                                                            <i data-feather="flag" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-320')">
+                                                            <i data-feather="calculator" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr class="table-warning">
+                                                <td><strong>SKU-452</strong></td>
+                                                <td>Wireless Mouse V3</td>
+                                                <td>Accessories</td>
+                                                <td>2024-01-28</td>
+                                                <td><span class="badge bg-warning">4 days</span></td>
+                                                <td>
+                                                    <small>Similar to SKU-015</small><br>
+                                                    <small>Avg. price: UGX 85,000</small>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" placeholder="UGX 85,000" style="width: 120px;">
+                                                </td>
+                                                <td>UGX 55,000</td>
+                                                <td>
+                                                    <span class="badge bg-warning">New Product</span>
+                                                </td>
+                                                <td>
+                                                    <div class="pricing-actions">
+                                                        <button class="btn btn-sm btn-success" onclick="applySuggestedPrice('SKU-452')">
+                                                            <i data-feather="check" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="calculatePrice('SKU-452')">
+                                                            <i data-feather="calculator" class="feather-12"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-secondary" onclick="skipProduct('SKU-452')">
+                                                            <i data-feather="skip-forward" class="feather-12"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Missing Pricing Analysis</h6>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <p class="mb-1"><strong>Total Missing:</strong> 18 items</p>
+                                                        <p class="mb-1"><strong>New Products:</strong> 15 items</p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <p class="mb-1"><strong>Overdue (>7 days):</strong> 3 items</p>
+                                                        <p class="mb-1"><strong>Avg. Days Missing:</strong> 6.2 days</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Auto-pricing Rules</h6>
+                                                <div class="d-grid gap-2">
+                                                    <button class="btn btn-outline-primary" onclick="applyCostPlus()">
+                                                        <i data-feather="percent" class="feather-12 me-2"></i>
+                                                        Apply Cost + 50% Margin
+                                                    </button>
+                                                    <button class="btn btn-outline-success" onclick="applyCompetitive()">
+                                                        <i data-feather="git-compare" class="feather-12 me-2"></i>
+                                                        Match Competitive Prices
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let priceComparisonChart;
+
+// Initialize charts and functionality
+document.addEventListener('DOMContentLoaded', function() {
+    initializePriceComparisonChart();
+    
+    // Initialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Set up currency selector
+    setupCurrencySelector();
+});
+
+function initializePriceComparisonChart() {
+    const ctx = document.getElementById('priceComparisonChart').getContext('2d');
+    
+    priceComparisonChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Electronics', 'Accessories', 'Wearables', 'Audio', 'Other'],
+            datasets: [
+                {
+                    label: 'Our Price (UGX)',
+                    data: [1250000, 45000, 320000, 85000, 25000],
+                    backgroundColor: '#4A90E2',
+                    borderColor: '#357ABD',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Competitor Avg (UGX)',
+                    data: [1180000, 48000, 350000, 90000, 28000],
+                    backgroundColor: '#E74A3B',
+                    borderColor: '#E02D1B',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'UGX ' + (value / 1000).toFixed(0) + 'K';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function setupCurrencySelector() {
+    const selector = document.querySelector('.currency-selector');
+    selector.addEventListener('change', function() {
+        const currency = this.value;
+        updateCurrencyDisplay(currency);
+        showToast(`Currency changed to ${currency}`, 'info');
+    });
+}
+
+function updateCurrencyDisplay(currency) {
+    // This would typically update all price displays to new currency
+    const priceTags = document.querySelectorAll('.price-tag');
+    priceTags.forEach(tag => {
+        const currentText = tag.textContent;
+        const amount = currentText.replace(/[^0-9.]/g, '');
+        if (currency === 'USD') {
+            tag.textContent = `$${(parseFloat(amount) / 3700).toFixed(2)}`;
+        } else if (currency === 'EUR') {
+            tag.textContent = `€${(parseFloat(amount) / 4000).toFixed(2)}`;
+        } else {
+            tag.textContent = `UGX ${parseFloat(amount).toLocaleString()}`;
+        }
+    });
+}
+
+function showConversionType(type) {
+    const buttons = document.querySelectorAll('#unit-conversion .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // This would typically filter conversion data
+    showToast(`Showing ${type} conversions`, 'info');
+}
+
+function calculateConversion() {
+    const fromValue = parseFloat(document.getElementById('fromValue').value);
+    const fromUnit = document.getElementById('fromUnit').value;
+    const toUnit = document.getElementById('toUnit').value;
+    
+    // Simple conversion factors
+    const conversionFactors = {
+        'kg': { 'g': 1000, 'lb': 2.20462, 'oz': 35.274 },
+        'g': { 'kg': 0.001, 'lb': 0.00220462, 'oz': 0.035274 },
+        'lb': { 'kg': 0.453592, 'g': 453.592, 'oz': 16 },
+        'oz': { 'kg': 0.0283495, 'g': 28.3495, 'lb': 0.0625 }
+    };
+    
+    if (fromUnit === toUnit) {
+        document.getElementById('conversionResult').innerHTML = 
+            `<h4 class="text-primary">${fromValue} ${fromUnit} = ${fromValue} ${toUnit}</h4>`;
+    } else if (conversionFactors[fromUnit] && conversionFactors[fromUnit][toUnit]) {
+        const factor = conversionFactors[fromUnit][toUnit];
+        const result = fromValue * factor;
+        document.getElementById('conversionResult').innerHTML = 
+            `<h4 class="text-primary">${fromValue} ${fromUnit} = ${result.toFixed(4)} ${toUnit}</h4>`;
+    } else {
+        showToast('Conversion not available for selected units', 'warning');
+    }
+}
+
+function filterComparison(type) {
+    const buttons = document.querySelectorAll('#price-comparison .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // This would typically filter comparison items
+    showToast(`Filtering: ${type} prices`, 'info');
+}
+
+function editPrice(sku) {
+    showToast(`Editing price for ${sku}`, 'info');
+    // This would typically open price edit modal
+}
+
+function viewPriceHistory(sku) {
+    showToast(`Viewing price history for ${sku}`, 'info');
+    // This would typically show price history chart
+}
+
+function adjustPrice(sku) {
+    showToast(`Adjusting price for ${sku}`, 'warning');
+    // This would typically open price adjustment interface
+}
+
+function priceMatch(sku) {
+    if (confirm(`Price match ${sku} with competitor?`)) {
+        showToast(`Price matching ${sku}...`, 'success');
+        // This would typically update price
+    }
+}
+
+function analyzeImpact(sku) {
+    showToast(`Analyzing impact for ${sku}...`, 'info');
+    // This would typically show impact analysis
+}
+
+function promotePrice(sku) {
+    showToast(`Promoting price advantage for ${sku}`, 'info');
+    // This would typically update marketing materials
+}
+
+function maintainPrice(sku) {
+    showToast(`Maintaining current price for ${sku}`, 'info');
+    // This would typically confirm no changes needed
+}
+
+function monitorPrice(sku) {
+    showToast(`Adding ${sku} to price monitoring`, 'info');
+    // This would typically add to monitoring list
+}
+
+function adjustMargin(sku) {
+    showToast(`Adjusting margin for ${sku}`, 'warning');
+    // This would typically open margin adjustment
+}
+
+function editConversion(sku) {
+    showToast(`Editing conversion for ${sku}`, 'info');
+    // This would typically open conversion edit modal
+}
+
+function applySuggestedPrice(sku) {
+    showToast(`Applying suggested price for ${sku}`, 'success');
+    // This would typically apply the suggested price
+}
+
+function calculatePrice(sku) {
+    showToast(`Calculating optimal price for ${sku}...`, 'info');
+    // This would typically calculate optimal price
+}
+
+function skipProduct(sku) {
+    if (confirm(`Skip pricing ${sku} for now?`)) {
+        showToast(`Skipped ${sku}`, 'warning');
+        // This would typically move to next item
+    }
+}
+
+function flagUrgent(sku) {
+    showToast(`Flagged ${sku} as urgent`, 'danger');
+    // This would typically flag as urgent priority
+}
+
+function autoPriceMissing() {
+    if (confirm('Auto-price all missing items using default rules?')) {
+        showToast('Auto-pricing in progress...', 'warning');
+        // This would typically auto-price all missing items
+    }
+}
+
+function prioritizeMissingPricing() {
+    showToast('Prioritizing missing pricing resolution', 'info');
+    // This would typically escalate priority
+}
+
+function applyCostPlus() {
+    if (confirm('Apply cost + 50% margin to all missing items?')) {
+        showToast('Applying cost-plus pricing...', 'success');
+        // This would typically apply cost-plus pricing
+    }
+}
+
+function applyCompetitive() {
+    if (confirm('Match competitive prices for all missing items?')) {
+        showToast('Applying competitive pricing...', 'success');
+        // This would typically apply competitive pricing
+    }
+}
+
+function updateAllPrices() {
+    if (confirm('Update all prices based on current market analysis?')) {
+        showToast('Updating all prices...', 'warning');
+        // This would typically batch update prices
+    }
+}
+
+function refreshPricingReports() {
+    showLoading();
+    
+    // Simulate API refresh
+    setTimeout(() => {
+        if (priceComparisonChart) {
+            priceComparisonChart.destroy();
+        }
+        
+        initializePriceComparisonChart();
+        feather.replace();
+        
+        // Hide loading
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.remove();
+        }
+        
+        // Show success message
+        showToast('Pricing reports refreshed successfully!', 'success');
+    }, 1000);
+}
+
+function exportPricingReport(format) {
+    let exportUrl;
+    let filename = `pricing-report-${new Date().toISOString().split('T')[0]}`;
+    
+    if (format === 'csv') {
+        exportUrl = '/reports/pricing/export/csv/';
+        filename += '.csv';
+    } else if (format === 'pdf') {
+        exportUrl = '/reports/pricing/export/pdf/';
+        filename += '.pdf';
+    } else if (format === 'excel') {
+        exportUrl = '/reports/pricing/export/excel/';
+        filename += '.xlsx';
+    }
+    
+    // Create temporary link and download
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`${format.toUpperCase()} export started!`, 'info');
+}
+
+function goBack() {
+    window.history.back();
+    // Or redirect to dashboard:
+    // window.location.href = '/reports/dashboard/';
+}
+
+function showLoading() {
+    // Add loading overlay
+    const loadingHTML = `
+        <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
+             style="background: rgba(255,255,255,0.8); z-index: 9999;">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading pricing reports...</p>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', loadingHTML);
+}
+
+function showToast(message, type = 'info') {
+    // Create toast element
+    const toastHTML = `
+        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        const container = document.createElement('div');
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    
+    document.querySelector('.toast-container').insertAdjacentHTML('beforeend', toastHTML);
+    
+    // Initialize and show toast
+    const toastEl = document.querySelector('.toast-container .toast:last-child');
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+}
+</script>
+
+<style>
+/* Additional styles for side tabs */
+.side-tabs-card {
+    height: fit-content;
+    min-height: 500px;
+}
+
+.side-tabs-container {
+    height: 400px;
+    overflow-y: auto;
+}
+
+.side-tabs {
+    border-right: 1px solid #dee2e6;
+}
+
+.side-tab {
+    padding: 1rem 1.25rem;
+    border: none;
+    border-left: 4px solid transparent;
+    border-radius: 0;
+    text-align: left;
+    color: #495057;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    background-color: transparent;
+    position: relative;
+    width: 100%;
+}
+
+.side-tab:hover {
+    background-color: rgba(74, 144, 226, 0.05);
+    color: #4A90E2;
+    border-left-color: rgba(74, 144, 226, 0.3);
+}
+
+.side-tab.active {
+    background-color: rgba(74, 144, 226, 0.1);
+    color: #4A90E2;
+    border-left-color: #4A90E2;
+    font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .side-tabs-card {
+        min-height: auto;
+        margin-bottom: 1rem;
+    }
+    
+    .side-tabs-container {
+        height: auto;
+        max-height: 300px;
+    }
+    
+    .side-tabs {
+        flex-direction: row !important;
+        overflow-x: auto;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .side-tab {
+        border-left: none;
+        border-bottom: 3px solid transparent;
+        white-space: nowrap;
+        padding: 0.75rem 1rem;
+    }
+    
+    .side-tab.active,
+    .side-tab:hover {
+        border-left-color: transparent;
+        border-bottom-color: #4A90E2;
+    }
+}
+
+@media (max-width: 768px) {
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .card-header .btn-group {
+        margin-top: 0.5rem;
+        align-self: flex-start;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .page-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .table-top-head {
+        justify-content: center;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+}
+
+/* Scrollbar styling */
+.side-tabs-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.side-tabs-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.side-tabs-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.side-tabs-container::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+{% endblock %}

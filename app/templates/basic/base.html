@@ -555,12 +555,12 @@
                 </div>
                 <a
                   class="dropdown-item"
-                  href="{% url 'under_maintenance_page' %}"
+                  href="{% url 'profile_details' %}"
                   ><i class="ti ti-user-circle me-2"></i>MyProfile</a
                 >
                 <a
                   class="dropdown-item"
-                  href="{% url 'under_maintenance_page' %}"
+                  href="{% url 'reports_dashboard' %}"
                   ><i class="ti ti-file-text me-2"></i>Reports</a
                 >
                 <a
@@ -583,12 +583,15 @@
             <a
               href="javascript:void(0);"
               class="nav-link dropdown-toggle"
-              data-bs-toggle="dropdown"
+              data-bs-toggle="dropdown"(
+    users_list_view, user_create_view, user_edit_view, user_detail_view,
+    user_delete_view, user_assign_role_view, user_unassign_role_view
+)
               aria-expanded="false"
               ><i class="fa fa-ellipsis-v"></i
             ></a>
             <div class="dropdown-menu dropdown-menu-right">
-              <a class="dropdown-item" href="#">My Profile</a>
+              <a class="dropdown-item" href="{% url 'profile_details' %}">My Profile</a>
               <a class="dropdown-item" href="general-settings.html">Settings</a>
               <a class="dropdown-item" href="signin.html">Logout</a>
             </div>

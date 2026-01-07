@@ -20,7 +20,9 @@ from app.models.human_resource import UserProfile
 from app.models.expense import Expense
 from django.db.models import Sum
 
-
+# In your views.py
+from django.contrib import messages
+from django.contrib.auth.models import User
 
 
 
@@ -126,33 +128,92 @@ def index_view(request):
 
 
 
-
-# Restore login_view as a standalone function
 def login_view(request):
     # Check if user was redirected due to session timeout
     timeout_message = None
     if request.GET.get('timeout'):
         timeout_message = "Your session has expired due to inactivity. Please log in again."
-
+    
+    # Check for messages from password reset
+    default_password_notification = None
+    username_for_reset = None
+    
+    # Check session for reset success
+    if request.session.get('password_reset_success'):
+        default_password_notification = request.session.get('password_reset_message')
+        username_for_reset = request.session.get('reset_username')
+        # Clear session data
+        request.session.pop('password_reset_success', None)
+        request.session.pop('password_reset_message', None)
+        request.session.pop('reset_username', None)
+    
     if request.method == "POST":
+        # Only handle login POST requests
         form = AuthenticationForm(request, data=request.POST)
-
+        
         if form.is_valid():
             user = form.get_user()
             login(request, user)
             # Clear any timeout warnings from session
             request.session.pop('timeout_warning', None)
             return redirect(index_view)
-
+    
     else:
+        # GET request - show empty form
         form = AuthenticationForm()
-
+    
     context = {
         'form': form,
-        'timeout_message': timeout_message
+        'timeout_message': timeout_message,
+        'default_password_notification': default_password_notification,
+        'username': username_for_reset
     }
-
+    
     return render(request, 'registration/login.html', context)
+
+
+
+def reset_password_view(request):
+    """Handle password reset AJAX requests"""
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        
+        if not username:
+            return JsonResponse({
+                'success': False,
+                'error': 'Please enter a username'
+            })
+        
+        try:
+            user = User.objects.get(username=username)
+            # Set default password
+            DEFAULT_PASSWORD = 'user_1234'
+            user.set_password(DEFAULT_PASSWORD)
+            user.save()
+            
+            # Store success in session for login page
+            request.session['password_reset_success'] = True
+            request.session['password_reset_message'] = f'Password has been reset for {username}. Default password: {DEFAULT_PASSWORD}'
+            request.session['reset_username'] = username
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Password has been reset for {username}',
+                'username': username,
+                'default_password': DEFAULT_PASSWORD
+            })
+            
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'User "{username}" not found. Please check the username.'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request method'
+    })
+
 
 @login_required
 def sign_up_view(request):
@@ -203,4 +264,9 @@ def logout_view(request):
     request.session.flush()
     logout(request)
     return redirect('login')
+
+
+
+
+
 

@@ -1,0 +1,1551 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Product Master Reports{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+<style>
+    /* Custom styles for product reports */
+    .product-image-small {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .status-badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .category-tag {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        background-color: #e9ecef;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        margin: 0.1rem;
+    }
+    
+    .product-stat-card {
+        border-left: 4px solid #4A90E2;
+    }
+    
+    .chart-container-small {
+        height: 250px;
+        position: relative;
+    }
+    
+    .barcode-display {
+        font-family: 'Libre Barcode 39', monospace;
+        font-size: 2rem;
+        letter-spacing: 2px;
+        text-align: center;
+        background: white;
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+    
+    .sku-badge {
+        font-family: 'Courier New', monospace;
+        background-color: #f8f9fa;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        font-size: 0.85rem;
+    }
+    
+    .creation-timeline {
+        position: relative;
+        padding-left: 20px;
+    }
+    
+    .creation-timeline::before {
+        content: '';
+        position: absolute;
+        left: 7px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #dee2e6;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -20px;
+        top: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #4A90E2;
+        border: 2px solid white;
+    }
+    
+    .product-card-hover {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .product-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .filter-buttons .btn {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.75rem;
+    }
+    
+    /* Color coding for product status */
+    .active-product-row {
+        background-color: rgba(40, 167, 69, 0.05);
+    }
+    
+    .inactive-product-row {
+        background-color: rgba(108, 117, 125, 0.05);
+    }
+    
+    .discontinued-product-row {
+        background-color: rgba(220, 53, 69, 0.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="add-item d-flex">
+                <div class="page-title">
+                    <h4>Product Master Reports</h4>
+                    <h6>Comprehensive product data and analysis</h6>
+                </div>
+            </div>
+            <ul class="table-top-head">
+                <li>
+                    <button class="btn btn-outline-primary" onclick="refreshProductReports()">
+                        <i data-feather="refresh-cw" class="feather-16 me-1"></i>
+                        Refresh
+                    </button>
+                </li>
+                <li>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i data-feather="download" class="feather-16 me-1"></i>
+                            Export
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="exportProductReport('csv')">
+                                <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportProductReport('pdf')">
+                                <i data-feather="file" class="feather-14 me-2"></i>Export PDF
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportProductReport('excel')">
+                                <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
+                            </a></li>
+                        </ul>
+                    </div>
+                </li>
+                <li>
+                    <button class="btn btn-primary" onclick="goBack()">
+                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
+                        Back to Dashboard
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Report Header Info -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card product-stat-card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="card-title mb-3">Product Master Report - January 2024</h5>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Report ID:</strong> PROD-MASTER-2024-001</p>
+                                        <p class="mb-1"><strong>Scope:</strong> All Products</p>
+                                        <p class="mb-1"><strong>Generated By:</strong> Product Manager</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p class="mb-1"><strong>Date Range:</strong> All Time</p>
+                                        <p class="mb-1"><strong>Status:</strong> <span class="badge bg-success">Live</span></p>
+                                        <p class="mb-1"><strong>Last Updated:</strong> 2024-01-31 14:30</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Total Products</h6>
+                                                <h4 class="card-title text-primary">312</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Active Products</h6>
+                                                <h4 class="card-title text-success">256</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Categories</h6>
+                                                <h4 class="card-title text-info">18</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">SKUs</h6>
+                                                <h4 class="card-title text-warning">420</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabbed Interface -->
+        <div class="row">
+            <!-- Side Tabs -->
+            <div class="col-lg-3 col-md-4">
+                <div class="card side-tabs-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="package" class="feather-16 me-2"></i>
+                            Product Report Sections
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="side-tabs-container">
+                            <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
+                                <button class="nav-link side-tab active" id="product-catalog-tab" data-bs-toggle="pill" data-bs-target="#product-catalog" type="button" role="tab" aria-controls="product-catalog" aria-selected="true">
+                                    <i data-feather="grid" class="feather-16 me-2"></i>
+                                    Product Catalog
+                                </button>
+                                <button class="nav-link side-tab" id="category-analysis-tab" data-bs-toggle="pill" data-bs-target="#category-analysis" type="button" role="tab" aria-controls="category-analysis" aria-selected="false">
+                                    <i data-feather="folder" class="feather-16 me-2"></i>
+                                    Category Analysis
+                                </button>
+                                <button class="nav-link side-tab" id="active-inactive-tab" data-bs-toggle="pill" data-bs-target="#active-inactive" type="button" role="tab" aria-controls="active-inactive" aria-selected="false">
+                                    <i data-feather="toggle-left" class="feather-16 me-2"></i>
+                                    Active/Inactive Products
+                                </button>
+                                <button class="nav-link side-tab" id="sku-barcode-tab" data-bs-toggle="pill" data-bs-target="#sku-barcode" type="button" role="tab" aria-controls="sku-barcode" aria-selected="false">
+                                    <i data-feather="hash" class="feather-16 me-2"></i>
+                                    SKU/Barcode Listing
+                                </button>
+                                <button class="nav-link side-tab" id="creation-history-tab" data-bs-toggle="pill" data-bs-target="#creation-history" type="button" role="tab" aria-controls="creation-history" aria-selected="false">
+                                    <i data-feather="clock" class="feather-16 me-2"></i>
+                                    Product Creation History
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">
+                            <i data-feather="info" class="feather-12 me-1"></i>
+                            Click on any section to view details
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="col-lg-9 col-md-8">
+                <div class="tab-content" id="sideTabContent">
+                    <!-- Product Catalog Tab -->
+                    <div class="tab-pane fade show active" id="product-catalog" role="tabpanel" aria-labelledby="product-catalog-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="grid" class="feather-16 me-2"></i>
+                                    Product Catalog
+                                </h5>
+                                <div class="d-flex">
+                                    <div class="input-group input-group-sm" style="width: 250px;">
+                                        <input type="text" class="form-control" placeholder="Search products..." id="productSearch">
+                                        <button class="btn btn-outline-secondary" type="button">
+                                            <i data-feather="search" class="feather-12"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4 filter-buttons">
+                                    <div class="col-12">
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-outline-primary active" onclick="filterProducts('all')">All Products</button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="filterProducts('electronics')">Electronics</button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="filterProducts('accessories')">Accessories</button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="filterProducts('wearables')">Wearables</button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="filterProducts('audio')">Audio</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row" id="productCatalogGrid">
+                                    <!-- Product Cards will be loaded here -->
+                                    <div class="col-lg-4 col-md-6 mb-4">
+                                        <div class="card product-card-hover h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-start mb-3">
+                                                    <img src="https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=P1" alt="Product" class="product-image-small me-3">
+                                                    <div class="flex-grow-1">
+                                                        <h6 class="card-title mb-1">Premium Smartphone X200</h6>
+                                                        <div class="d-flex align-items-center">
+                                                            <span class="sku-badge me-2">SKU-001</span>
+                                                            <span class="badge bg-success status-badge">Active</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <p class="card-text text-muted small mb-2">Latest flagship smartphone with advanced features and premium design.</p>
+                                                <div class="mb-3">
+                                                    <span class="category-tag">Electronics</span>
+                                                    <span class="category-tag">Mobile</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-primary">UGX 1,250,000</strong>
+                                                        <small class="text-muted d-block">Cost: UGX 850,000</small>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-primary">View Details</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-lg-4 col-md-6 mb-4">
+                                        <div class="card product-card-hover h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-start mb-3">
+                                                    <img src="https://via.placeholder.com/60x60/36B9CC/FFFFFF?text=P2" alt="Product" class="product-image-small me-3">
+                                                    <div class="flex-grow-1">
+                                                        <h6 class="card-title mb-1">Wireless Headphones Pro</h6>
+                                                        <div class="d-flex align-items-center">
+                                                            <span class="sku-badge me-2">SKU-002</span>
+                                                            <span class="badge bg-success status-badge">Active</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <p class="card-text text-muted small mb-2">Noise-cancelling wireless headphones with premium sound quality.</p>
+                                                <div class="mb-3">
+                                                    <span class="category-tag">Audio</span>
+                                                    <span class="category-tag">Accessories</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-primary">UGX 320,000</strong>
+                                                        <small class="text-muted d-block">Cost: UGX 210,000</small>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-primary">View Details</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-lg-4 col-md-6 mb-4">
+                                        <div class="card product-card-hover h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-start mb-3">
+                                                    <img src="https://via.placeholder.com/60x60/1CC88A/FFFFFF?text=P3" alt="Product" class="product-image-small me-3">
+                                                    <div class="flex-grow-1">
+                                                        <h6 class="card-title mb-1">Smart Watch Series 5</h6>
+                                                        <div class="d-flex align-items-center">
+                                                            <span class="sku-badge me-2">SKU-003</span>
+                                                            <span class="badge bg-success status-badge">Active</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <p class="card-text text-muted small mb-2">Advanced smartwatch with health monitoring and fitness tracking.</p>
+                                                <div class="mb-3">
+                                                    <span class="category-tag">Wearables</span>
+                                                    <span class="category-tag">Electronics</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-primary">UGX 450,000</strong>
+                                                        <small class="text-muted d-block">Cost: UGX 300,000</small>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-primary">View Details</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- More product cards can be added here -->
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-12">
+                                        <nav aria-label="Product catalog pagination">
+                                            <ul class="pagination justify-content-center">
+                                                <li class="page-item disabled">
+                                                    <a class="page-link" href="#" tabindex="-1">Previous</a>
+                                                </li>
+                                                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                                                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                                                <li class="page-item">
+                                                    <a class="page-link" href="#">Next</a>
+                                                </li>
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Analysis Tab -->
+                    <div class="tab-pane fade" id="category-analysis" role="tabpanel" aria-labelledby="category-analysis-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="folder" class="feather-16 me-2"></i>
+                                    Category Analysis
+                                </h5>
+                                <span class="badge bg-primary">18 Categories</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="chart-container-small">
+                                            <canvas id="categoryDistributionChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="chart-container-small">
+                                            <canvas id="categoryRevenueChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Products</th>
+                                                <th>SKUs</th>
+                                                <th>Avg. Price (UGX)</th>
+                                                <th>Total Revenue (UGX)</th>
+                                                <th>Profit Margin</th>
+                                                <th>Growth Rate</th>
+                                                <th>Market Share</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Electronics</strong></td>
+                                                <td>45</td>
+                                                <td>68</td>
+                                                <td>850,000</td>
+                                                <td>68,250,000</td>
+                                                <td><span class="badge bg-success">42%</span></td>
+                                                <td><span class="badge bg-success">+15%</span></td>
+                                                <td>35%</td>
+                                                <td><span class="badge bg-success">Growing</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Mobile Accessories</strong></td>
+                                                <td>85</td>
+                                                <td>125</td>
+                                                <td>25,000</td>
+                                                <td>42,500,000</td>
+                                                <td><span class="badge bg-success">65%</span></td>
+                                                <td><span class="badge bg-warning">+5%</span></td>
+                                                <td>22%</td>
+                                                <td><span class="badge bg-warning">Stable</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Wearables</strong></td>
+                                                <td>25</td>
+                                                <td>38</td>
+                                                <td>320,000</td>
+                                                <td>28,500,000</td>
+                                                <td><span class="badge bg-success">48%</span></td>
+                                                <td><span class="badge bg-success">+22%</span></td>
+                                                <td>15%</td>
+                                                <td><span class="badge bg-success">Rapid Growth</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Audio Equipment</strong></td>
+                                                <td>42</td>
+                                                <td>65</td>
+                                                <td>180,000</td>
+                                                <td>35,250,000</td>
+                                                <td><span class="badge bg-success">52%</span></td>
+                                                <td><span class="badge bg-success">+12%</span></td>
+                                                <td>18%</td>
+                                                <td><span class="badge bg-success">Growing</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Computer Accessories</strong></td>
+                                                <td>35</td>
+                                                <td>52</td>
+                                                <td>45,000</td>
+                                                <td>18,750,000</td>
+                                                <td><span class="badge bg-warning">38%</span></td>
+                                                <td><span class="badge bg-danger">-3%</span></td>
+                                                <td>10%</td>
+                                                <td><span class="badge bg-danger">Declining</span></td>
+                                            </tr>
+                                            <tr class="table-primary">
+                                                <td><strong>Total</strong></td>
+                                                <td><strong>312</strong></td>
+                                                <td><strong>420</strong></td>
+                                                <td><strong>284,000</strong></td>
+                                                <td><strong>193,250,000</strong></td>
+                                                <td><strong>49%</strong></td>
+                                                <td><strong>+10%</strong></td>
+                                                <td><strong>100%</strong></td>
+                                                <td><strong>-</strong></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Category Performance Insights</h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li><i data-feather="trending-up" class="feather-12 text-success me-2"></i> <strong>Wearables</strong> show highest growth rate at +22%</li>
+                                                    <li><i data-feather="dollar-sign" class="feather-12 text-primary me-2"></i> <strong>Mobile Accessories</strong> have highest profit margin at 65%</li>
+                                                    <li><i data-feather="alert-triangle" class="feather-12 text-danger me-2"></i> <strong>Computer Accessories</strong> require attention (-3% growth)</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Recommendations</h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li><i data-feather="plus-circle" class="feather-12 text-success me-2"></i> Expand Wearables category with new products</li>
+                                                    <li><i data-feather="refresh-cw" class="feather-12 text-warning me-2"></i> Review and refresh Computer Accessories line</li>
+                                                    <li><i data-feather="bar-chart-2" class="feather-12 text-info me-2"></i> Increase marketing for high-margin accessories</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active/Inactive Products Tab -->
+                    <div class="tab-pane fade" id="active-inactive" role="tabpanel" aria-labelledby="active-inactive-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="toggle-left" class="feather-16 me-2"></i>
+                                    Active/Inactive Products
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterStatus('all')">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterStatus('active')">Active</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterStatus('inactive')">Inactive</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterStatus('discontinued')">Discontinued</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-3">
+                                        <div class="card bg-light-success">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-1 text-muted">Active Products</h6>
+                                                <h4 class="card-title text-success">256</h4>
+                                                <small class="text-muted">82% of total</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-light-warning">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-1 text-muted">Inactive Products</h6>
+                                                <h4 class="card-title text-warning">35</h4>
+                                                <small class="text-muted">11% of total</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-light-danger">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-1 text-muted">Discontinued</h6>
+                                                <h4 class="card-title text-danger">18</h4>
+                                                <small class="text-muted">6% of total</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-light-info">
+                                            <div class="card-body p-3 text-center">
+                                                <h6 class="card-subtitle mb-1 text-muted">New Last Month</h6>
+                                                <h4 class="card-title text-info">24</h4>
+                                                <small class="text-muted">7.7% growth</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Product Name</th>
+                                                <th>SKU</th>
+                                                <th>Category</th>
+                                                <th>Status</th>
+                                                <th>Last Sale</th>
+                                                <th>Stock Level</th>
+                                                <th>Days Inactive</th>
+                                                <th>Reason</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="statusTableBody">
+                                            <tr class="active-product-row">
+                                                <td>Premium Smartphone X200</td>
+                                                <td><span class="sku-badge">SKU-001</span></td>
+                                                <td>Electronics</td>
+                                                <td><span class="badge bg-success">Active</span></td>
+                                                <td>2024-01-30</td>
+                                                <td>15 units</td>
+                                                <td>-</td>
+                                                <td>-</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-secondary">Edit</button>
+                                                </td>
+                                            </tr>
+                                            <tr class="inactive-product-row">
+                                                <td>Old Model Tablet</td>
+                                                <td><span class="sku-badge">SKU-045</span></td>
+                                                <td>Electronics</td>
+                                                <td><span class="badge bg-warning">Inactive</span></td>
+                                                <td>2023-11-15</td>
+                                                <td>8 units</td>
+                                                <td>47 days</td>
+                                                <td>Low sales</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-warning">Reactivate</button>
+                                                </td>
+                                            </tr>
+                                            <tr class="discontinued-product-row">
+                                                <td>Feature Phone Basic</td>
+                                                <td><span class="sku-badge">SKU-128</span></td>
+                                                <td>Electronics</td>
+                                                <td><span class="badge bg-danger">Discontinued</span></td>
+                                                <td>2023-08-20</td>
+                                                <td>0 units</td>
+                                                <td>134 days</td>
+                                                <td>Obsolete</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-secondary">Archive</button>
+                                                </td>
+                                            </tr>
+                                            <tr class="active-product-row">
+                                                <td>Wireless Headphones Pro</td>
+                                                <td><span class="sku-badge">SKU-002</span></td>
+                                                <td>Audio</td>
+                                                <td><span class="badge bg-success">Active</span></td>
+                                                <td>2024-01-31</td>
+                                                <td>8 units</td>
+                                                <td>-</td>
+                                                <td>-</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-secondary">Edit</button>
+                                                </td>
+                                            </tr>
+                                            <tr class="inactive-product-row">
+                                                <td>Bluetooth Speaker V2</td>
+                                                <td><span class="sku-badge">SKU-067</span></td>
+                                                <td>Audio</td>
+                                                <td><span class="badge bg-warning">Inactive</span></td>
+                                                <td>2023-12-10</td>
+                                                <td>12 units</td>
+                                                <td>52 days</td>
+                                                <td>New version available</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-warning">Reactivate</button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Product Status Management</h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Active Products:</strong> 256 (82%)</p>
+                                                        <p class="mb-1"><strong>Average Active Duration:</strong> 18 months</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Inactive Products:</strong> 35 (11%)</p>
+                                                        <p class="mb-1"><strong>Average Inactive Duration:</strong> 3.2 months</p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p class="mb-1"><strong>Discontinued Products:</strong> 18 (6%)</p>
+                                                        <p class="mb-1"><strong>Common Reasons:</strong> Obsolete (45%), Low Sales (35%)</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SKU/Barcode Listing Tab -->
+                    <div class="tab-pane fade" id="sku-barcode" role="tabpanel" aria-labelledby="sku-barcode-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="hash" class="feather-16 me-2"></i>
+                                    SKU/Barcode Listing
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="printBarcodes()">
+                                        <i data-feather="printer" class="feather-12 me-1"></i>
+                                        Print Barcodes
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="generateNewBarcodes()">
+                                        <i data-feather="plus" class="feather-12 me-1"></i>
+                                        Generate Barcodes
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i data-feather="search" class="feather-16"></i>
+                                            </span>
+                                            <input type="text" class="form-control" placeholder="Search by SKU, barcode, or product name..." id="skuSearch">
+                                            <button class="btn btn-outline-primary" type="button" onclick="searchSKU()">
+                                                Search
+                                            </button>
+                                            <button class="btn btn-outline-secondary" type="button" onclick="clearSKUSearch()">
+                                                Clear
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>SKU</th>
+                                                <th>Product Name</th>
+                                                <th>Barcode</th>
+                                                <th>Barcode Type</th>
+                                                <th>Barcode Preview</th>
+                                                <th>Category</th>
+                                                <th>UPC/EAN</th>
+                                                <th>Last Scanned</th>
+                                                <th>Scan Count</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>SKU-001</strong></td>
+                                                <td>Premium Smartphone X200</td>
+                                                <td>5901234567890</td>
+                                                <td><span class="badge bg-primary">EAN-13</span></td>
+                                                <td>
+                                                    <div class="barcode-display">*5901234567890*</div>
+                                                </td>
+                                                <td>Electronics</td>
+                                                <td>123456789012</td>
+                                                <td>2024-01-31 14:30</td>
+                                                <td>1,245</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary me-1">Print</button>
+                                                    <button class="btn btn-sm btn-outline-secondary">Regenerate</button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>SKU-002</strong></td>
+                                                <td>Wireless Headphones Pro</td>
+                                                <td>5901234567891</td>
+                                                <td><span class="badge bg-primary">EAN-13</span></td>
+                                                <td>
+                                                    <div class="barcode-display">*5901234567891*</div>
+                                                </td>
+                                                <td>Audio</td>
+                                                <td>123456789013</td>
+                                                <td>2024-01-31 13:45</td>
+                                                <td>892</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary me-1">Print</button>
+                                                    <button class="btn btn-sm btn-outline-secondary">Regenerate</button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>SKU-003</strong></td>
+                                                <td>Smart Watch Series 5</td>
+                                                <td>5901234567892</td>
+                                                <td><span class="badge bg-primary">EAN-13</span></td>
+                                                <td>
+                                                    <div class="barcode-display">*5901234567892*</div>
+                                                </td>
+                                                <td>Wearables</td>
+                                                <td>123456789014</td>
+                                                <td>2024-01-31 12:15</td>
+                                                <td>756</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary me-1">Print</button>
+                                                    <button class="btn btn-sm btn-outline-secondary">Regenerate</button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>SKU-004</strong></td>
+                                                <td>Laptop Stand Premium</td>
+                                                <td>5901234567893</td>
+                                                <td><span class="badge bg-primary">EAN-13</span></td>
+                                                <td>
+                                                    <div class="barcode-display">*5901234567893*</div>
+                                                </td>
+                                                <td>Accessories</td>
+                                                <td>123456789015</td>
+                                                <td>2024-01-30 16:20</td>
+                                                <td>432</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary me-1">Print</button>
+                                                    <button class="btn btn-sm btn-outline-secondary">Regenerate</button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>SKU-005</strong></td>
+                                                <td>USB-C Fast Charger</td>
+                                                <td>5901234567894</td>
+                                                <td><span class="badge bg-primary">EAN-13</span></td>
+                                                <td>
+                                                    <div class="barcode-display">*5901234567894*</div>
+                                                </td>
+                                                <td>Accessories</td>
+                                                <td>123456789016</td>
+                                                <td>2024-01-30 11:10</td>
+                                                <td>1,089</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary me-1">Print</button>
+                                                    <button class="btn btn-sm btn-outline-secondary">Regenerate</button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Barcode Statistics</h6>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <p class="mb-1"><strong>Total SKUs:</strong> 420</p>
+                                                        <p class="mb-1"><strong>EAN-13:</strong> 380 (90%)</p>
+                                                        <p class="mb-1"><strong>UPC-A:</strong> 25 (6%)</p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <p class="mb-1"><strong>Scanned Today:</strong> 245</p>
+                                                        <p class="mb-1"><strong>Missing Barcodes:</strong> 8</p>
+                                                        <p class="mb-1"><strong>Code 128:</strong> 15 (4%)</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Barcode Management</h6>
+                                                <div class="d-grid gap-2">
+                                                    <button class="btn btn-outline-primary" onclick="bulkPrintBarcodes()">
+                                                        <i data-feather="printer" class="feather-12 me-1"></i>
+                                                        Bulk Print Barcodes
+                                                    </button>
+                                                    <button class="btn btn-outline-success" onclick="verifyBarcodeSystem()">
+                                                        <i data-feather="check" class="feather-12 me-1"></i>
+                                                        Verify Barcode System
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Creation History Tab -->
+                    <div class="tab-pane fade" id="creation-history" role="tabpanel" aria-labelledby="creation-history-tab">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i data-feather="clock" class="feather-16 me-2"></i>
+                                    Product Creation History
+                                </h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterTimeline('all')">All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTimeline('today')">Today</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTimeline('week')">This Week</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterTimeline('month')">This Month</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <div class="creation-timeline">
+                                            <div class="timeline-item">
+                                                <div class="card mb-3">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <div>
+                                                                <h6 class="card-title mb-1">Premium Smartphone X200 Created</h6>
+                                                                <p class="text-muted small mb-0">New flagship smartphone added to catalog</p>
+                                                            </div>
+                                                            <small class="text-muted">2024-01-31 14:30</small>
+                                                        </div>
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <span class="sku-badge me-2">SKU-001</span>
+                                                            <span class="badge bg-primary me-2">Electronics</span>
+                                                            <span class="badge bg-success">Active</span>
+                                                        </div>
+                                                        <p class="small mb-0">Created by: <strong>John Doe</strong> | Category: <strong>Mobile Phones</strong> | Initial Stock: <strong>50 units</strong></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="timeline-item">
+                                                <div class="card mb-3">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <div>
+                                                                <h6 class="card-title mb-1">Wireless Headphones Pro Updated</h6>
+                                                                <p class="text-muted small mb-0">Price updated and new variants added</p>
+                                                            </div>
+                                                            <small class="text-muted">2024-01-30 11:15</small>
+                                                        </div>
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <span class="sku-badge me-2">SKU-002</span>
+                                                            <span class="badge bg-primary me-2">Audio</span>
+                                                            <span class="badge bg-success">Active</span>
+                                                        </div>
+                                                        <p class="small mb-0">Updated by: <strong>Jane Smith</strong> | Changes: <strong>Price: UGX 300,000 → UGX 320,000</strong> | New Variants: <strong>3 colors</strong></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="timeline-item">
+                                                <div class="card mb-3">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <div>
+                                                                <h6 class="card-title mb-1">Smart Watch Series 5 Created</h6>
+                                                                <p class="text-muted small mb-0">New wearable product line launched</p>
+                                                            </div>
+                                                            <small class="text-muted">2024-01-28 09:45</small>
+                                                        </div>
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <span class="sku-badge me-2">SKU-003</span>
+                                                            <span class="badge bg-primary me-2">Wearables</span>
+                                                            <span class="badge bg-success">Active</span>
+                                                        </div>
+                                                        <p class="small mb-0">Created by: <strong>Mike Johnson</strong> | Category: <strong>Smart Watches</strong> | Initial Stock: <strong>100 units</strong></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="timeline-item">
+                                                <div class="card mb-3">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <div>
+                                                                <h6 class="card-title mb-1">Feature Phone Basic Discontinued</h6>
+                                                                <p class="text-muted small mb-0">Product marked as discontinued due to obsolescence</p>
+                                                            </div>
+                                                            <small class="text-muted">2024-01-25 16:20</small>
+                                                        </div>
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <span class="sku-badge me-2">SKU-128</span>
+                                                            <span class="badge bg-primary me-2">Electronics</span>
+                                                            <span class="badge bg-danger">Discontinued</span>
+                                                        </div>
+                                                        <p class="small mb-0">Updated by: <strong>Sarah Wilson</strong> | Reason: <strong>Obsolete Technology</strong> | Remaining Stock: <strong>0 units</strong></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="timeline-item">
+                                                <div class="card mb-3">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <div>
+                                                                <h6 class="card-title mb-1">USB-C Fast Charger Variants Added</h6>
+                                                                <p class="text-muted small mb-0">New power ratings added to existing product</p>
+                                                            </div>
+                                                            <small class="text-muted">2024-01-22 14:10</small>
+                                                        </div>
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <span class="sku-badge me-2">SKU-005</span>
+                                                            <span class="badge bg-primary me-2">Accessories</span>
+                                                            <span class="badge bg-success">Active</span>
+                                                        </div>
+                                                        <p class="small mb-0">Updated by: <strong>David Brown</strong> | New Variants: <strong>30W, 45W, 65W</strong> | New SKUs: <strong>3</strong></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-subtitle mb-2 text-muted">Creation Statistics</h6>
+                                                <div class="row">
+                                                    <div class="col-md-3">
+                                                        <p class="mb-1"><strong>Total Products Created:</strong> 312</p>
+                                                        <p class="mb-1"><strong>This Month:</strong> 24</p>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <p class="mb-1"><strong>Last Week:</strong> 8</p>
+                                                        <p class="mb-1"><strong>Yesterday:</strong> 3</p>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <p class="mb-1"><strong>Most Active Creator:</strong> John Doe (42)</p>
+                                                        <p class="mb-1"><strong>Avg. Creation Rate:</strong> 12/month</p>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <p class="mb-1"><strong>Most Active Category:</strong> Accessories (85)</p>
+                                                        <p class="mb-1"><strong>Recent Trend:</strong> +15% growth</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let categoryDistributionChart;
+let categoryRevenueChart;
+
+// Initialize charts and icons
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCategoryCharts();
+    
+    // Initialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Load initial data
+    loadProductCatalog();
+});
+
+function initializeCategoryCharts() {
+    // Category Distribution Chart
+    const distributionCtx = document.getElementById('categoryDistributionChart').getContext('2d');
+    categoryDistributionChart = new Chart(distributionCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Electronics', 'Mobile Accessories', 'Wearables', 'Audio Equipment', 'Computer Accessories', 'Other'],
+            datasets: [{
+                data: [45, 85, 25, 42, 35, 80],
+                backgroundColor: [
+                    '#4A90E2',
+                    '#36B9CC',
+                    '#1CC88A',
+                    '#F6C23E',
+                    '#E74A3B',
+                    '#6F42C1'
+                ],
+                borderColor: [
+                    '#357ABD',
+                    '#2A9CA5',
+                    '#17A673',
+                    '#F4B619',
+                    '#E02D1B',
+                    '#5A3696'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} products (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Category Revenue Chart
+    const revenueCtx = document.getElementById('categoryRevenueChart').getContext('2d');
+    categoryRevenueChart = new Chart(revenueCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Electronics', 'Mobile Accessories', 'Wearables', 'Audio', 'Computer Acc'],
+            datasets: [{
+                label: 'Revenue (UGX)',
+                data: [68250000, 42500000, 28500000, 35250000, 18750000],
+                backgroundColor: [
+                    '#4A90E2',
+                    '#36B9CC',
+                    '#1CC88A',
+                    '#F6C23E',
+                    '#E74A3B'
+                ],
+                borderColor: [
+                    '#357ABD',
+                    '#2A9CA5',
+                    '#17A673',
+                    '#F4B619',
+                    '#E02D1B'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.raw || 0;
+                            return `Revenue: UGX ${(value / 1000000).toFixed(1)}M`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'UGX ' + (value / 1000000).toFixed(0) + 'M';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function loadProductCatalog() {
+    // This would typically load product data from an API
+    // For now, we'll just ensure the existing cards are displayed
+    console.log('Loading product catalog...');
+}
+
+function filterProducts(category) {
+    const buttons = document.querySelectorAll('#product-catalog .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // This would typically filter products based on category
+    showToast(`Filtering products by: ${category}`, 'info');
+}
+
+function filterStatus(status) {
+    const buttons = document.querySelectorAll('#active-inactive .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Filter table rows based on status
+    const tableRows = document.querySelectorAll('#statusTableBody tr');
+    tableRows.forEach(row => {
+        if (status === 'all') {
+            row.style.display = '';
+        } else {
+            const rowStatus = row.querySelector('td:nth-child(4) .badge').textContent.toLowerCase();
+            if (rowStatus === status) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+    });
+    
+    showToast(`Showing ${status} products`, 'info');
+}
+
+function filterTimeline(range) {
+    const buttons = document.querySelectorAll('#creation-history .btn-group .btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // This would typically filter timeline based on date range
+    showToast(`Showing timeline for: ${range}`, 'info');
+}
+
+function searchSKU() {
+    const searchTerm = document.getElementById('skuSearch').value.toLowerCase();
+    const tableRows = document.querySelectorAll('#sku-barcode table tbody tr');
+    
+    tableRows.forEach(row => {
+        const rowText = row.textContent.toLowerCase();
+        if (rowText.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    if (searchTerm) {
+        showToast(`Search results for: ${searchTerm}`, 'info');
+    }
+}
+
+function clearSKUSearch() {
+    document.getElementById('skuSearch').value = '';
+    const tableRows = document.querySelectorAll('#sku-barcode table tbody tr');
+    tableRows.forEach(row => {
+        row.style.display = '';
+    });
+    showToast('Search cleared', 'info');
+}
+
+function printBarcodes() {
+    showToast('Opening barcode print dialog...', 'info');
+    // This would typically open a print dialog for barcodes
+}
+
+function generateNewBarcodes() {
+    showToast('Generating new barcodes...', 'info');
+    // This would typically generate new barcodes for products
+}
+
+function bulkPrintBarcodes() {
+    showToast('Preparing bulk barcode print...', 'info');
+    // This would typically handle bulk barcode printing
+}
+
+function verifyBarcodeSystem() {
+    showToast('Verifying barcode system integrity...', 'info');
+    // This would typically verify barcode system
+}
+
+function refreshProductReports() {
+    showLoading();
+    
+    // Simulate API refresh
+    setTimeout(() => {
+        if (categoryDistributionChart) {
+            categoryDistributionChart.destroy();
+        }
+        if (categoryRevenueChart) {
+            categoryRevenueChart.destroy();
+        }
+        
+        initializeCategoryCharts();
+        feather.replace();
+        
+        // Hide loading
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.remove();
+        }
+        
+        // Show success message
+        showToast('Product reports refreshed successfully!', 'success');
+    }, 1000);
+}
+
+function exportProductReport(format) {
+    let exportUrl;
+    let filename = `product-master-report-${new Date().toISOString().split('T')[0]}`;
+    
+    if (format === 'csv') {
+        exportUrl = '/reports/product/export/csv/';
+        filename += '.csv';
+    } else if (format === 'pdf') {
+        exportUrl = '/reports/product/export/pdf/';
+        filename += '.pdf';
+    } else if (format === 'excel') {
+        exportUrl = '/reports/product/export/excel/';
+        filename += '.xlsx';
+    }
+    
+    // Create temporary link and download
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`${format.toUpperCase()} export started!`, 'info');
+}
+
+function goBack() {
+    window.history.back();
+    // Or redirect to dashboard:
+    // window.location.href = '/reports/dashboard/';
+}
+
+function showLoading() {
+    // Add loading overlay
+    const loadingHTML = `
+        <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
+             style="background: rgba(255,255,255,0.8); z-index: 9999;">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading product reports...</p>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', loadingHTML);
+}
+
+function showToast(message, type = 'info') {
+    // Create toast element
+    const toastHTML = `
+        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        const container = document.createElement('div');
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    
+    document.querySelector('.toast-container').insertAdjacentHTML('beforeend', toastHTML);
+    
+    // Initialize and show toast
+    const toastEl = document.querySelector('.toast-container .toast:last-child');
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+}
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+    // Clean up any intervals or timeouts
+});
+</script>
+
+<style>
+/* Additional styles specific to product reports */
+.side-tabs-card {
+    height: fit-content;
+    min-height: 500px;
+}
+
+.side-tabs-container {
+    height: 400px;
+    overflow-y: auto;
+}
+
+.side-tabs {
+    border-right: 1px solid #dee2e6;
+}
+
+.side-tab {
+    padding: 1rem 1.25rem;
+    border: none;
+    border-left: 4px solid transparent;
+    border-radius: 0;
+    text-align: left;
+    color: #495057;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    background-color: transparent;
+    position: relative;
+    width: 100%;
+}
+
+.side-tab:hover {
+    background-color: rgba(74, 144, 226, 0.05);
+    color: #4A90E2;
+    border-left-color: rgba(74, 144, 226, 0.3);
+}
+
+.side-tab.active {
+    background-color: rgba(74, 144, 226, 0.1);
+    color: #4A90E2;
+    border-left-color: #4A90E2;
+    font-weight: 600;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 1rem 1.25rem;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+/* Responsive Design */
+@media (max-width: 992px) {
+    .side-tabs-card {
+        min-height: auto;
+        margin-bottom: 1rem;
+    }
+    
+    .side-tabs-container {
+        height: auto;
+        max-height: 300px;
+    }
+    
+    .side-tabs {
+        flex-direction: row !important;
+        overflow-x: auto;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .side-tab {
+        border-left: none;
+        border-bottom: 3px solid transparent;
+        white-space: nowrap;
+        padding: 0.75rem 1rem;
+    }
+    
+    .side-tab.active,
+    .side-tab:hover {
+        border-left-color: transparent;
+        border-bottom-color: #4A90E2;
+    }
+}
+
+@media (max-width: 768px) {
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .card-header .btn-group {
+        margin-top: 0.5rem;
+        align-self: flex-start;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .page-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .table-top-head {
+        justify-content: center;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+}
+
+/* Scrollbar styling */
+.side-tabs-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.side-tabs-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.side-tabs-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.side-tabs-container::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+{% endblock %}
