@@ -8,7 +8,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 <style>
-/* Your existing CSS styles */
+/* Your existing CSS styles remain the same */
 .side-tabs-card { height: fit-content; min-height: 500px; }
 .side-tabs-container { height: 400px; overflow-y: auto; }
 .side-tabs { border-right: 1px solid #dee2e6; }
@@ -233,6 +233,11 @@
             </div>
         </div>
 
+        <!-- Hidden JSON data for JavaScript -->
+        {{ monthly_trends|json_script:"monthlyTrendsData" }}
+        {{ category_performance|json_script:"categoryPerformanceData" }}
+        {{ top_products|json_script:"topProductsData" }}
+
         <!-- Tabbed Interface -->
         <div class="row">
             <!-- Side Tabs -->
@@ -330,16 +335,16 @@
                                             {% for month_key, data in monthly_trends.items %}
                                             <tr>
                                                 <td><strong>{{ data.date }}</strong></td>
-                                                <td>UGX {{ data.revenue|intcomma }}</td>
-                                                <td>UGX {{ data.cogs|intcomma }}</td>
+                                                <td>UGX {{ data.revenue|floatformat:0|intcomma }}</td>
+                                                <td>UGX {{ data.cogs|floatformat:0|intcomma }}</td>
                                                 <td>
                                                     {% if data.revenue > 0 %}
-                                                    {{ data.cogs|div:data.revenue|mul:100|floatformat:1 }}%
+                                                        {{ data.cogs|div:data.revenue|mul:100|floatformat:1 }}%
                                                     {% else %}
-                                                    0.0%
+                                                        0.0%
                                                     {% endif %}
                                                 </td>
-                                                <td>UGX {{ data.profit|intcomma }}</td>
+                                                <td>UGX {{ data.profit|floatformat:0|intcomma }}</td>
                                                 <td>
                                                     {% if data.margin > 30 %}
                                                     <span class="badge bg-success">{{ data.margin|floatformat:1 }}%</span>
@@ -369,15 +374,19 @@
                                                         <thead>
                                                             <tr>
                                                                 <th>Category</th>
+                                                                <th>Revenue (UGX)</th>
                                                                 <th>COGS (UGX)</th>
                                                                 <th>% of Total COGS</th>
+                                                                <th>Profit (UGX)</th>
+                                                                <th>Margin %</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {% for cat in category_performance %}
                                                             <tr>
                                                                 <td>{{ cat.category.name }}</td>
-                                                                <td>UGX {{ cat.cogs|intcomma }}</td>
+                                                                <td>UGX {{ cat.revenue|floatformat:0|intcomma }}</td>
+                                                                <td>UGX {{ cat.cogs|floatformat:0|intcomma }}</td>
                                                                 <td>
                                                                     {% if total_cogs > 0 %}
                                                                     {{ cat.cogs|div:total_cogs|mul:100|floatformat:1 }}%
@@ -385,10 +394,12 @@
                                                                     0.0%
                                                                     {% endif %}
                                                                 </td>
+                                                                <td>UGX {{ cat.profit|floatformat:0|intcomma }}</td>
+                                                                <td>{{ cat.margin|floatformat:1 }}%</td>
                                                             </tr>
                                                             {% empty %}
                                                             <tr>
-                                                                <td colspan="3" class="text-center">No category data available</td>
+                                                                <td colspan="6" class="text-center">No category data available</td>
                                                             </tr>
                                                             {% endfor %}
                                                         </tbody>
@@ -460,9 +471,9 @@
                                             {% for cat in category_performance %}
                                             <tr>
                                                 <td><strong>{{ cat.category.name }}</strong></td>
-                                                <td>UGX {{ cat.revenue|intcomma }}</td>
-                                                <td>UGX {{ cat.cogs|intcomma }}</td>
-                                                <td>UGX {{ cat.profit|intcomma }}</td>
+                                                <td>UGX {{ cat.revenue|floatformat:0|intcomma }}</td>
+                                                <td>UGX {{ cat.cogs|floatformat:0|intcomma }}</td>
+                                                <td>UGX {{ cat.profit|floatformat:0|intcomma }}</td>
                                                 <td>
                                                     {% if cat.margin > 30 %}
                                                     <span class="badge bg-success">{{ cat.margin|floatformat:1 }}%</span>
@@ -488,7 +499,7 @@
                                                 <td><strong><span class="badge bg-success">{{ gross_margin|floatformat:1 }}%</span></strong></td>
                                                 <td><strong>
                                                     {% with total_quantity=category_performance|sum_attr:"quantity" %}
-                                                    {{ total_quantity }}
+                                                    {{ total_quantity|default:"0" }}
                                                     {% endwith %}
                                                 </strong></td>
                                             </tr>
@@ -534,7 +545,7 @@
                                             {% for cat in category_performance %}
                                             <tr>
                                                 <td><strong>{{ cat.category.name }}</strong></td>
-                                                <td>UGX {{ cat.revenue|intcomma }}</td>
+                                                <td>UGX {{ cat.revenue|floatformat:0|intcomma }}</td>
                                                 <td>
                                                     {% if total_revenue > 0 %}
                                                     {{ cat.revenue|div:total_revenue|mul:100|floatformat:1 }}%
@@ -542,7 +553,7 @@
                                                     0.0%
                                                     {% endif %}
                                                 </td>
-                                                <td>UGX {{ cat.cogs|intcomma }}</td>
+                                                <td>UGX {{ cat.cogs|floatformat:0|intcomma }}</td>
                                                 <td>
                                                     {% if cat.revenue > 0 %}
                                                     {{ cat.cogs|div:cat.revenue|mul:100|floatformat:1 }}%
@@ -550,8 +561,16 @@
                                                     0.0%
                                                     {% endif %}
                                                 </td>
-                                                <td>UGX {{ cat.profit|intcomma }}</td>
-                                                <td>{{ cat.margin|floatformat:1 }}%</td>
+                                                <td>UGX {{ cat.profit|floatformat:0|intcomma }}</td>
+                                                <td>
+                                                    {% if cat.margin > 30 %}
+                                                    <span class="badge bg-success">{{ cat.margin|floatformat:1 }}%</span>
+                                                    {% elif cat.margin > 20 %}
+                                                    <span class="badge bg-warning">{{ cat.margin|floatformat:1 }}%</span>
+                                                    {% else %}
+                                                    <span class="badge bg-danger">{{ cat.margin|floatformat:1 }}%</span>
+                                                    {% endif %}
+                                                </td>
                                             </tr>
                                             {% empty %}
                                             <tr>
@@ -584,10 +603,10 @@
                                                             {% for product in top_products %}
                                                             <tr>
                                                                 <td>{{ product.product__name }}</td>
-                                                                <td>UGX {{ product.total_revenue|intcomma }}</td>
+                                                                <td>UGX {{ product.total_revenue|floatformat:0|intcomma }}</td>
                                                                 <td>{{ product.total_quantity }}</td>
-                                                                <td>UGX {{ product.avg_price|intcomma }}</td>
-                                                                <td>UGX {{ product.estimated_profit|intcomma }}</td>
+                                                                <td>UGX {{ product.avg_price|floatformat:0|intcomma }}</td>
+                                                                <td>UGX {{ product.estimated_profit|floatformat:0|intcomma }}</td>
                                                                 <td>
                                                                     {% if product.profit_margin > 30 %}
                                                                     <span class="badge bg-success">{{ product.profit_margin|floatformat:1 }}%</span>
@@ -624,6 +643,7 @@
                                 </h5>
                             </div>
                             <div class="card-body">
+                                {% if accounts_receivable %}
                                 <div class="row mb-4">
                                     <div class="col-md-3">
                                         <div class="card bg-light">
@@ -708,6 +728,12 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                {% else %}
+                                <div class="alert alert-info">
+                                    <i data-feather="info" class="feather-16 me-2"></i>
+                                    Accounts receivable data is not available for the selected filters.
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -717,246 +743,420 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// ============================================================================
+// FIXED JavaScript for Financial Reports Dashboard
+// Compatible with the enhanced Django view
+// ============================================================================
+
+// Global chart instances
 let cogsTrendChart = null;
 let profitMarginChart = null;
 let revenueCostChart = null;
 
+// Store parsed data
+let chartData = {
+    monthlyTrends: {},
+    categoryPerformance: [],
+    topProducts: []
+};
+
+// Main initialization
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Financial Reports: Initializing...');
+    
+    // Parse data from Django context
+    parseChartData();
+    
+    // Initialize date picker
     initializeDateRangePicker();
-    initializeCharts();
-    feather.replace();
+    
+    // Initialize only the active chart
+    initializeActiveChart();
+    
+    // Setup Bootstrap tab listeners
+    setupTabListeners();
+    
+    // Initialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
 });
 
-function initializeDateRangePicker() {
-    $('#date_range').daterangepicker({
-        opens: 'left',
-        startDate: '{{ start_date|date:"Y-m-d" }}',
-        endDate: '{{ end_date|date:"Y-m-d" }}',
-        locale: {
-            format: 'YYYY-MM-DD'
+// Safely parse data from JSON scripts
+function parseChartData() {
+    try {
+        // Parse monthly trends
+        const monthlyTrendsElement = document.getElementById('monthlyTrendsData');
+        if (monthlyTrendsElement && monthlyTrendsElement.textContent) {
+            chartData.monthlyTrends = JSON.parse(monthlyTrendsElement.textContent);
+            console.log('Monthly trends loaded:', Object.keys(chartData.monthlyTrends).length, 'months');
         }
+        
+        // Parse category performance
+        const categoryPerfElement = document.getElementById('categoryPerformanceData');
+        if (categoryPerfElement && categoryPerfElement.textContent) {
+            chartData.categoryPerformance = JSON.parse(categoryPerfElement.textContent);
+            console.log('Category performance loaded:', chartData.categoryPerformance.length, 'categories');
+        }
+        
+        // Parse top products
+        const topProductsElement = document.getElementById('topProductsData');
+        if (topProductsElement && topProductsElement.textContent) {
+            chartData.topProducts = JSON.parse(topProductsElement.textContent);
+            console.log('Top products loaded:', chartData.topProducts.length, 'products');
+        }
+    } catch (error) {
+        console.error('Error parsing chart data:', error);
+        // Set empty defaults
+        chartData.monthlyTrends = chartData.monthlyTrends || {};
+        chartData.categoryPerformance = chartData.categoryPerformance || [];
+        chartData.topProducts = chartData.topProducts || [];
+    }
+}
+
+function initializeDateRangePicker() {
+    // Check if jQuery and daterangepicker are available
+    if (typeof $ !== 'undefined' && $.fn.daterangepicker && $('#date_range').length) {
+        $('#date_range').daterangepicker({
+            opens: 'left',
+            startDate: '{{ start_date|date:"Y-m-d" }}',
+            endDate: '{{ end_date|date:"Y-m-d" }}',
+            locale: {
+                format: 'YYYY-MM-DD'
+            }
+        });
+    }
+}
+
+// Initialize only the active chart
+function initializeActiveChart() {
+    const activeTab = document.querySelector('.tab-pane.active');
+    if (!activeTab) return;
+    
+    const tabId = activeTab.id;
+    console.log('Initializing chart for tab:', tabId);
+    
+    switch(tabId) {
+        case 'cogs':
+            initializeCogsChart();
+            break;
+        case 'profit-margin':
+            initializeProfitMarginChart();
+            break;
+        case 'revenue-cost':
+            initializeRevenueCostChart();
+            break;
+    }
+}
+
+// Setup Bootstrap tab change listeners
+function setupTabListeners() {
+    const tabTriggers = document.querySelectorAll('[data-bs-toggle="pill"]');
+    
+    tabTriggers.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function(event) {
+            const targetId = event.target.getAttribute('data-bs-target').substring(1);
+            console.log('Tab shown:', targetId);
+            
+            // Destroy existing chart if it exists (cleanup)
+            destroyChartIfExists(targetId);
+            
+            // Initialize chart for the shown tab
+            switch(targetId) {
+                case 'cogs':
+                    initializeCogsChart();
+                    break;
+                case 'profit-margin':
+                    initializeProfitMarginChart();
+                    break;
+                case 'revenue-cost':
+                    initializeRevenueCostChart();
+                    break;
+            }
+        });
     });
 }
 
-function initializeCharts() {
-    // Initialize COGS Trend Chart
-    const cogsCtx = document.getElementById('cogsTrendChart')?.getContext('2d');
-    if (cogsCtx) {
-        try {
-            // Extract data from the table
-            const rows = document.querySelectorAll('#cogs tbody tr');
-            const months = [];
-            const revenueData = [];
-            const cogsData = [];
-            
-            rows.forEach(row => {
-                const cells = row.cells;
-                if (cells.length >= 6) {
-                    const monthCell = cells[0].textContent.trim();
-                    if (monthCell && monthCell !== 'No monthly data available') {
-                        months.push(monthCell);
-                        
-                        // Extract revenue
-                        const revenueText = cells[1].textContent.replace('UGX', '').replace(/,/g, '').trim();
-                        revenueData.push(parseFloat(revenueText) || 0);
-                        
-                        // Extract COGS
-                        const cogsText = cells[2].textContent.replace('UGX', '').replace(/,/g, '').trim();
-                        cogsData.push(parseFloat(cogsText) || 0);
-                    }
-                }
-            });
-            
-            if (months.length > 0) {
-                if (cogsTrendChart) cogsTrendChart.destroy();
-                
-                cogsTrendChart = new Chart(cogsCtx, {
-                    type: 'line',
-                    data: {
-                        labels: months,
-                        datasets: [
-                            {
-                                label: 'Revenue (UGX)',
-                                data: revenueData,
-                                borderColor: '#4A90E2',
-                                backgroundColor: 'rgba(74, 144, 226, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4
-                            },
-                            {
-                                label: 'COGS (UGX)',
-                                data: cogsData,
-                                borderColor: '#E74A3B',
-                                backgroundColor: 'rgba(231, 74, 59, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4
-                            }
-                        ]
-                    },
-                    options: getChartOptions('Revenue vs COGS Trend', 'UGX')
-                });
-            } else {
-                showChartError('cogsTrendChart', 'No data available for chart');
+// Destroy chart if it exists
+function destroyChartIfExists(tabId) {
+    switch(tabId) {
+        case 'cogs':
+            if (cogsTrendChart) {
+                cogsTrendChart.destroy();
+                cogsTrendChart = null;
             }
-        } catch (error) {
-            console.error('Error loading COGS chart:', error);
-            showChartError('cogsTrendChart', 'Unable to load chart data');
-        }
-    }
-    
-    // Initialize Profit Margin Chart
-    const profitCtx = document.getElementById('profitMarginChart')?.getContext('2d');
-    if (profitCtx) {
-        try {
-            const rows = document.querySelectorAll('#profit-margin tbody tr:not(.table-primary)');
-            const categories = [];
-            const margins = [];
-            
-            rows.forEach(row => {
-                const cells = row.cells;
-                if (cells.length >= 6) {
-                    const categoryName = cells[0].textContent.trim();
-                    const marginCell = cells[4];
-                    const marginBadge = marginCell.querySelector('.badge');
-                    
-                    if (marginBadge) {
-                        const marginText = marginBadge.textContent.replace('%', '').trim();
-                        const marginValue = parseFloat(marginText);
-                        
-                        if (!isNaN(marginValue)) {
-                            const shortName = categoryName.length > 15 ? 
-                                categoryName.substring(0, 12) + '...' : categoryName;
-                            
-                            categories.push(shortName);
-                            margins.push(marginValue);
-                        }
-                    }
-                }
-            });
-            
-            if (categories.length > 0) {
-                if (profitMarginChart) profitMarginChart.destroy();
-                
-                profitMarginChart = new Chart(profitCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: categories,
-                        datasets: [
-                            {
-                                label: 'Gross Margin %',
-                                data: margins,
-                                backgroundColor: '#1CC88A',
-                                borderColor: '#17A673',
-                                borderWidth: 1
-                            }
-                        ]
-                    },
-                    options: getChartOptions('Profit Margin by Category', '%')
-                });
-            } else {
-                showChartError('profitMarginChart', 'No data available for chart');
+            break;
+        case 'profit-margin':
+            if (profitMarginChart) {
+                profitMarginChart.destroy();
+                profitMarginChart = null;
             }
-        } catch (error) {
-            console.error('Error loading profit margin chart:', error);
-            showChartError('profitMarginChart', 'Unable to load chart data');
-        }
-    }
-    
-    // Initialize Revenue Cost Chart
-    const revenueCtx = document.getElementById('revenueCostChart')?.getContext('2d');
-    if (revenueCtx) {
-        try {
-            const rows = document.querySelectorAll('#revenue-cost tbody tr');
-            const categories = [];
-            const revenueData = [];
-            const profitData = [];
-            
-            rows.forEach(row => {
-                const cells = row.cells;
-                if (cells.length >= 7) {
-                    const categoryName = cells[0].textContent.trim();
-                    const revenueText = cells[1].textContent.replace('UGX', '').replace(/,/g, '').trim();
-                    const profitText = cells[5].textContent.replace('UGX', '').replace(/,/g, '').trim();
-                    
-                    const revenueValue = parseFloat(revenueText);
-                    const profitValue = parseFloat(profitText);
-                    
-                    if (!isNaN(revenueValue) && !isNaN(profitValue)) {
-                        const shortName = categoryName.length > 15 ? 
-                            categoryName.substring(0, 12) + '...' : categoryName;
-                        
-                        categories.push(shortName);
-                        revenueData.push(revenueValue);
-                        profitData.push(profitValue);
-                    }
-                }
-            });
-            
-            if (categories.length > 0) {
-                if (revenueCostChart) revenueCostChart.destroy();
-                
-                revenueCostChart = new Chart(revenueCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: categories,
-                        datasets: [
-                            {
-                                label: 'Revenue (UGX)',
-                                data: revenueData,
-                                backgroundColor: '#4A90E2',
-                                borderColor: '#357ABD',
-                                borderWidth: 1
-                            },
-                            {
-                                label: 'Gross Profit (UGX)',
-                                data: profitData,
-                                backgroundColor: '#1CC88A',
-                                borderColor: '#17A673',
-                                borderWidth: 1
-                            }
-                        ]
-                    },
-                    options: getChartOptions('Revenue & Profit by Category', 'UGX')
-                });
-            } else {
-                showChartError('revenueCostChart', 'No data available for chart');
+            break;
+        case 'revenue-cost':
+            if (revenueCostChart) {
+                revenueCostChart.destroy();
+                revenueCostChart = null;
             }
-        } catch (error) {
-            console.error('Error loading revenue cost chart:', error);
-            showChartError('revenueCostChart', 'Unable to load chart data');
-        }
+            break;
     }
 }
 
+// Initialize COGS Trend Chart
+function initializeCogsChart() {
+    const canvas = document.getElementById('cogsTrendChart');
+    if (!canvas) {
+        console.error('COGS chart canvas not found');
+        return;
+    }
+    
+    // Check if we have data
+    if (!chartData.monthlyTrends || Object.keys(chartData.monthlyTrends).length === 0) {
+        showChartError(canvas, 'No monthly data available');
+        return;
+    }
+    
+    try {
+        // Prepare data from monthly trends
+        const months = [];
+        const revenueData = [];
+        const cogsData = [];
+        
+        // Sort months chronologically
+        const sortedMonths = Object.keys(chartData.monthlyTrends).sort();
+        
+        sortedMonths.forEach(monthKey => {
+            const data = chartData.monthlyTrends[monthKey];
+            months.push(data.date);
+            revenueData.push(data.revenue || 0);
+            cogsData.push(data.cogs || 0);
+        });
+        
+        // Destroy existing chart
+        if (cogsTrendChart) {
+            cogsTrendChart.destroy();
+        }
+        
+        // Create new chart
+        cogsTrendChart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    {
+                        label: 'Revenue (UGX)',
+                        data: revenueData,
+                        borderColor: '#4A90E2',
+                        backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'COGS (UGX)',
+                        data: cogsData,
+                        borderColor: '#E74A3B',
+                        backgroundColor: 'rgba(231, 74, 59, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: getChartOptions('Revenue vs COGS Trend', 'UGX')
+        });
+        
+        console.log('COGS chart initialized successfully');
+    } catch (error) {
+        console.error('Error initializing COGS chart:', error);
+        showChartError(canvas, 'Unable to load chart data');
+    }
+}
+
+// Initialize Profit Margin Chart
+function initializeProfitMarginChart() {
+    const canvas = document.getElementById('profitMarginChart');
+    if (!canvas) {
+        console.error('Profit margin chart canvas not found');
+        return;
+    }
+    
+    // Check if we have data
+    if (!chartData.categoryPerformance || chartData.categoryPerformance.length === 0) {
+        showChartError(canvas, 'No category data available');
+        return;
+    }
+    
+    try {
+        // Prepare data from category performance - show margin by category
+        const categories = [];
+        const marginData = [];
+        
+        // Sort by margin descending
+        const sortedCategories = [...chartData.categoryPerformance].sort((a, b) => b.margin - a.margin);
+        
+        sortedCategories.forEach(cat => {
+            if (cat.category && cat.category.name) {
+                // Shorten long category names for display
+                const shortName = cat.category.name.length > 15 
+                    ? cat.category.name.substring(0, 12) + '...' 
+                    : cat.category.name;
+                
+                categories.push(shortName);
+                marginData.push(cat.margin || 0);
+            }
+        });
+        
+        // Destroy existing chart
+        if (profitMarginChart) {
+            profitMarginChart.destroy();
+        }
+        
+        // Create new chart - showing margin by category
+        profitMarginChart = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: categories,
+                datasets: [
+                    {
+                        label: 'Gross Margin %',
+                        data: marginData,
+                        backgroundColor: marginData.map(margin => {
+                            if (margin > 30) return '#1CC88A'; // Green for high margin
+                            if (margin > 20) return '#F6C23E'; // Yellow for medium margin
+                            return '#E74A3B'; // Red for low margin
+                        }),
+                        borderColor: '#17A673',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: getChartOptions('Profit Margin by Category', '%')
+        });
+        
+        console.log('Profit margin chart initialized successfully');
+    } catch (error) {
+        console.error('Error initializing profit margin chart:', error);
+        showChartError(canvas, 'Unable to load chart data');
+    }
+}
+
+// Initialize Revenue Cost Chart
+function initializeRevenueCostChart() {
+    const canvas = document.getElementById('revenueCostChart');
+    if (!canvas) {
+        console.error('Revenue cost chart canvas not found');
+        return;
+    }
+    
+    // Check if we have data
+    if (!chartData.categoryPerformance || chartData.categoryPerformance.length === 0) {
+        showChartError(canvas, 'No category data available');
+        return;
+    }
+    
+    try {
+        // Prepare data from category performance
+        const categories = [];
+        const revenueData = [];
+        const profitData = [];
+        
+        // Sort by revenue descending
+        const sortedCategories = [...chartData.categoryPerformance].sort((a, b) => b.revenue - a.revenue);
+        
+        sortedCategories.forEach(cat => {
+            if (cat.category && cat.category.name) {
+                // Shorten long category names for display
+                const shortName = cat.category.name.length > 15 
+                    ? cat.category.name.substring(0, 12) + '...' 
+                    : cat.category.name;
+                
+                categories.push(shortName);
+                revenueData.push(cat.revenue || 0);
+                profitData.push(cat.profit || 0);
+            }
+        });
+        
+        // Destroy existing chart
+        if (revenueCostChart) {
+            revenueCostChart.destroy();
+        }
+        
+        // Create new chart - showing revenue and profit by category
+        revenueCostChart = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: categories,
+                datasets: [
+                    {
+                        label: 'Revenue (UGX)',
+                        data: revenueData,
+                        backgroundColor: '#4A90E2',
+                        borderColor: '#357ABD',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Gross Profit (UGX)',
+                        data: profitData,
+                        backgroundColor: '#1CC88A',
+                        borderColor: '#17A673',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: getChartOptions('Revenue & Profit by Category', 'UGX')
+        });
+        
+        console.log('Revenue cost chart initialized successfully');
+    } catch (error) {
+        console.error('Error initializing revenue cost chart:', error);
+        showChartError(canvas, 'Unable to load chart data');
+    }
+}
+
+// Get chart options with proper formatting
 function getChartOptions(title, unit) {
     return {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'top' },
+            legend: { 
+                position: 'top',
+                labels: {
+                    usePointStyle: true,
+                    padding: 20
+                }
+            },
             title: {
                 display: true,
                 text: title,
-                font: { size: 14, weight: 'bold' }
+                font: { 
+                    size: 16, 
+                    weight: 'bold',
+                    family: "'Inter', 'Segoe UI', sans-serif"
+                },
+                padding: { top: 10, bottom: 30 }
             },
             tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: '#4A90E2',
+                borderWidth: 1,
+                padding: 12,
                 callbacks: {
                     label: function(context) {
                         const value = context.raw || 0;
                         if (unit === '%') {
                             return `${context.dataset.label}: ${value.toFixed(1)}%`;
                         } else if (unit === 'UGX') {
-                            if (value >= 1000000) {
-                                return `${context.dataset.label}: UGX ${(value / 1000000).toFixed(2)}M`;
-                            } else if (value >= 1000) {
-                                return `${context.dataset.label}: UGX ${(value / 1000).toFixed(1)}K`;
-                            } else {
-                                return `${context.dataset.label}: UGX ${value.toFixed(0)}`;
-                            }
+                            // Format UGX values with proper scaling
+                            const formattedValue = formatUGX(value);
+                            return `${context.dataset.label}: ${formattedValue}`;
                         }
                         return `${context.dataset.label}: ${value}`;
                     }
@@ -966,46 +1166,85 @@ function getChartOptions(title, unit) {
         scales: {
             y: {
                 beginAtZero: true,
+                grid: {
+                    drawBorder: false
+                },
                 ticks: {
                     callback: function(value) {
                         if (unit === '%') {
                             return value + '%';
                         } else if (unit === 'UGX') {
-                            if (value >= 1000000) {
-                                return 'UGX ' + (value / 1000000).toFixed(0) + 'M';
-                            } else if (value >= 1000) {
-                                return 'UGX ' + (value / 1000).toFixed(0) + 'K';
-                            } else {
-                                return 'UGX ' + value;
-                            }
+                            return formatUGX(value);
                         }
                         return value;
-                    }
+                    },
+                    padding: 10
                 }
             },
             x: {
+                grid: {
+                    display: false
+                },
                 ticks: {
                     maxRotation: 45,
-                    minRotation: 45
+                    minRotation: 45,
+                    padding: 10
                 }
             }
+        },
+        interaction: {
+            intersect: false,
+            mode: 'index'
+        },
+        animation: {
+            duration: 1000,
+            easing: 'easeOutQuart'
         }
     };
 }
 
-function showChartError(chartId, message) {
-    const canvas = document.getElementById(chartId);
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.font = '16px Arial';
-        ctx.fillStyle = '#666';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+// Format UGX values with proper scaling (K for thousands, M for millions)
+function formatUGX(value) {
+    const numValue = parseFloat(value) || 0;
+    if (numValue >= 1000000) {
+        return 'UGX ' + (numValue / 1000000).toFixed(1) + 'M';
+    } else if (numValue >= 1000) {
+        return 'UGX ' + (numValue / 1000).toFixed(1) + 'K';
+    } else {
+        return 'UGX ' + numValue.toFixed(0);
     }
 }
 
+// Show error message on chart canvas
+function showChartError(canvas, message) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    
+    // Draw error background
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw error text
+    ctx.font = '14px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#6c757d';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    const lines = message.split('\n');
+    const lineHeight = 20;
+    const startY = canvas.height / 2 - (lines.length - 1) * lineHeight / 2;
+    
+    lines.forEach((line, index) => {
+        ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
+    });
+    
+    ctx.restore();
+}
+
+// Utility functions
 function refreshReport() {
     window.location.reload();
 }
@@ -1015,8 +1254,8 @@ function resetFilters() {
 }
 
 function exportReport(format) {
-    const dateRange = document.getElementById('date_range').value;
-    const store = document.getElementById('store').value;
+    const dateRange = document.getElementById('date_range')?.value || '';
+    const store = document.getElementById('store')?.value || '';
     
     let exportUrl = `/finance/reports/export/${format}/?`;
     const params = new URLSearchParams();
@@ -1025,17 +1264,14 @@ function exportReport(format) {
     
     exportUrl += params.toString();
     
-    const link = document.createElement('a');
-    link.href = exportUrl;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Open export URL in new tab
+    window.open(exportUrl, '_blank');
 }
 </script>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 {% endblock %}

@@ -98,6 +98,17 @@ except ImportError:
     colors = None
 
 
+
+REVENUE_EXPR = ExpressionWrapper(
+    F('quantity') * F('sale_price'),
+    output_field=DecimalField(max_digits=16, decimal_places=2)
+)
+
+COST_EXPR = ExpressionWrapper(
+    F('quantity') * F('unit_cost'),
+    output_field=DecimalField(max_digits=16, decimal_places=2)
+)
+
 # Custom JSON encoder class (add this after imports)
 class CustomJSONEncoder(DjangoJSONEncoder):
     """Custom JSON encoder to handle dates and decimals"""
@@ -1846,26 +1857,18 @@ def sales_details(request, period=None):
 
     date_range = f"{start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}"
 
-    # DEBUG: Print what we're querying
-    # print(f"Date range: {start_date.date()} to {end_date.date()}")
+ 
     
     # Filter sales for the period - ALL sales
     sales_in_period = Sales.objects.filter(
         sale_date__range=[start_date.date(), end_date.date()]
     )
     
-    # DEBUG: Print sales count
-    # print(f"Sales in period: {sales_in_period.count()}")
-    for sale in sales_in_period:
-        print(f"Sale ID: {sale.id}, Date: {sale.sale_date}, Total: {sale.total_amount}, Status: {sale.status}")
-
     # Basic metrics
     total_sales = sales_in_period.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
     total_transactions = sales_in_period.count()
     
-    print(f"Total sales amount: {total_sales}")
-    print(f"Total transactions: {total_transactions}")
-
+    
     # Calculate average daily sales
     days_in_period = max((end_date.date() - start_date.date()).days + 1, 1)
     avg_daily_sales = total_sales / Decimal(days_in_period) if total_sales else Decimal('0')
@@ -1899,10 +1902,6 @@ def sales_details(request, period=None):
         transactions=Count('id')
     ).order_by('-total_spent')
     
-    # DEBUG: Print customer sales
-    # print(f"Customer sales count: {customer_sales.count()}")
-    for cs in customer_sales:
-        print(f"Customer: {cs['customer__name']}, Total: {cs['total_spent']}, Transactions: {cs['transactions']}")
 
     # Calculate average order value for each customer
     customer_sales_list = []
@@ -1917,8 +1916,6 @@ def sales_details(request, period=None):
             'avg_order': avg_order
         })
 
-    # Product performance - Check if there are SalesItem records
-    print(f"SalesItem count in period: {SalesItem.objects.filter(order__sale_date__range=[start_date.date(), end_date.date()]).count()}")
     
     product_performance = SalesItem.objects.filter(
         order__sale_date__range=[start_date.date(), end_date.date()]
@@ -1931,7 +1928,7 @@ def sales_details(request, period=None):
     ).order_by('-revenue')
     
     product_performance_list = list(product_performance)
-    print(f"Product performance count: {len(product_performance_list)}")
+   
 
     # Payment method analysis - Get ALL sales with payment methods
     payment_analysis = Sales.objects.filter(
@@ -1944,10 +1941,7 @@ def sales_details(request, period=None):
         total_amount=Sum('total_amount')
     ).order_by('-transactions')
     
-    # DEBUG: Print payment analysis
-    # print(f"Payment analysis count: {payment_analysis.count()}")
-    for pa in payment_analysis:
-        print(f"Payment method: {pa['payment_method__name']}, Transactions: {pa['transactions']}, Total: {pa['total_amount']}")
+
 
     # Calculate average transaction for payment methods
     payment_analysis_list = []
@@ -1971,10 +1965,7 @@ def sales_details(request, period=None):
         transactions=Count('id')
     ).order_by('-total_sales')
     
-    # DEBUG: Print store performance
-    # print(f"Store performance count: {store_performance.count()}")
-    for sp in store_performance:
-        print(f"Store: {sp['store__name']}, Total: {sp['total_sales']}, Transactions: {sp['transactions']}")
+   
 
     # Calculate average transaction for stores
     store_performance_list = []
@@ -2094,12 +2085,6 @@ def sales_details(request, period=None):
         # Additional calculated values for template
         'days_count': len(daily_sales_data),
     }
-    
-    # DEBUG: Print final context
-    # print(f"Context has payment data: {len(payment_analysis_list)} items")
-    # print(f"Context has store data: {len(store_performance_list)} items")
-    # print(f"Context has product data: {len(product_performance_list)} items")
-    
     return render(request, 'reports/sales_details.html', context)
 
 
@@ -3701,216 +3686,378 @@ def batch_details_api(request, batch_reference):
 # Accounts Receivable
 # ============================================================================
 
-
 @login_required
 def financial_details(request):
-    """Financial Reports dashboard view with calculated metrics"""
-    
-    # Get date range (default to last 3 months)
-    end_date = timezone.now()
+    end_date = timezone.now().date()
     start_date = end_date - timedelta(days=90)
-    
-    # Filter by date range if provided
-    date_range = request.GET.get('date_range', '')
+
+    date_range = request.GET.get('date_range')
     if date_range:
         try:
-            start_str, end_str = date_range.split(' - ')
-            start_date = date.strptime(start_str, '%Y-%m-%d')
-            end_date = date.strptime(end_str, '%Y-%m-%d')
-        except:
+            s, e = date_range.split(' - ')
+            start_date = timezone.datetime.strptime(s, "%Y-%m-%d").date()
+            end_date = timezone.datetime.strptime(e, "%Y-%m-%d").date()
+        except ValueError:
             pass
+
+    store_id = request.GET.get('store')
+    sales_filter = {'order__store_id': store_id} if store_id else {}
+    purchase_filter = {}
+    if store_id:
+        purchase_filter['order__store_id'] = store_id
+
+    # ---------------------
+    # EXPRESSIONS
+    # ---------------------
+    REVENUE_EXPR = ExpressionWrapper(
+        F('sale_price') * F('quantity'),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
     
-    # Get store filter
-    store_id = request.GET.get('store', '')
-    store_filter = {}
+    COST_EXPR = ExpressionWrapper(
+        F('unit_cost') * F('quantity'),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+
+    # ---------------------
+    # SALES (Revenue)
+    # ---------------------
+    sales_items = SalesItem.objects.filter(
+        order__sale_date__range=[start_date, end_date],
+        **sales_filter
+    ).select_related('product', 'product__category', 'order')
+
+    total_revenue = sales_items.aggregate(
+        total=Sum(REVENUE_EXPR)
+    )['total'] or Decimal('0')
+
+    # ---------------------
+    # PROPER COGS CALCULATION
+    # Using average cost method for simplicity
+    # ---------------------
+    total_cogs = Decimal('0')
+    product_cogs_map = {}
+    
+    # First, get all unique products sold
+    sold_products = sales_items.values('product_id').distinct()
+    
+    for sold_product in sold_products:
+        product_id = sold_product['product_id']
+        
+        # Get total quantity sold for this product
+        product_sales = sales_items.filter(product_id=product_id).aggregate(
+            total_quantity=Sum('quantity'),
+            total_revenue=Sum(REVENUE_EXPR)
+        )
+        
+        total_quantity_sold = product_sales['total_quantity'] or 0
+        
+        if total_quantity_sold > 0:
+            # Get average purchase cost for this product
+            # Look for purchases before the sale date range (FIFO principle)
+            avg_cost_result = PurchaseOrderItem.objects.filter(
+                product_id=product_id,
+                order__purchase_date__lte=end_date  # Purchases up to the report end date
+            ).aggregate(
+                avg_cost=Avg('unit_cost')
+            )
+            
+            avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+            
+            # Calculate COGS for this product
+            product_cogs = avg_cost * total_quantity_sold
+            total_cogs += product_cogs
+            product_cogs_map[product_id] = {
+                'avg_cost': float(avg_cost),
+                'quantity_sold': total_quantity_sold,
+                'cogs': float(product_cogs)
+            }
+
+    # If no proper COGS data, use estimated 60% COGS ratio
+    if total_cogs == 0 and total_revenue > 0:
+        total_cogs = total_revenue * Decimal('0.60')  # 60% COGS, 40% margin
+    
+    # Calculate financial metrics
+    cogs_ratio = (total_cogs / total_revenue * 100) if total_revenue else Decimal('0')
+    gross_profit = total_revenue - total_cogs
+    gross_margin = (gross_profit / total_revenue * 100) if total_revenue else Decimal('0')
+
+    # ---------------------
+    # MONTHLY TRENDS with PROPER COGS
+    # ---------------------
+    monthly_trends = []
+    
+    # Get all months in the date range
+    current_month = start_date.replace(day=1)
+    while current_month <= end_date.replace(day=1):
+        month_start = current_month
+        month_end = (current_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        
+        # Revenue for this month
+        month_sales = sales_items.filter(
+            order__sale_date__range=[month_start, month_end]
+        )
+        
+        month_revenue = month_sales.aggregate(
+            total=Sum(REVENUE_EXPR)
+        )['total'] or Decimal('0')
+        
+        # Calculate COGS for this month using product-level data
+        month_cogs = Decimal('0')
+        
+        if month_revenue > 0:
+            # Get unique products sold this month
+            month_products = month_sales.values('product_id').distinct()
+            
+            for product in month_products:
+                product_id = product['product_id']
+                
+                # Get quantity sold this month for this product
+                product_month_sales = month_sales.filter(
+                    product_id=product_id
+                ).aggregate(
+                    quantity=Sum('quantity')
+                )
+                
+                quantity_sold = product_month_sales['quantity'] or 0
+                
+                if quantity_sold > 0:
+                    # Use average cost from our product map
+                    if product_id in product_cogs_map:
+                        avg_cost = Decimal(str(product_cogs_map[product_id]['avg_cost']))
+                    else:
+                        # Fallback to average purchase cost
+                        avg_cost_result = PurchaseOrderItem.objects.filter(
+                            product_id=product_id
+                        ).aggregate(
+                            avg_cost=Avg('unit_cost')
+                        )
+                        avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+                    
+                    month_cogs += avg_cost * quantity_sold
+        
+        # If no proper COGS, use estimated
+        if month_cogs == 0 and month_revenue > 0:
+            month_cogs = month_revenue * Decimal('0.60')
+        
+        # Calculate profit and margin
+        month_profit = month_revenue - month_cogs
+        month_margin = (month_profit / month_revenue * 100) if month_revenue else Decimal('0')
+        
+        monthly_trends.append({
+            'month': current_month.strftime('%Y-%m'),
+            'date': current_month.strftime('%b %Y'),
+            'revenue': float(month_revenue),
+            'cogs': float(month_cogs),
+            'profit': float(month_profit),
+            'margin': float(month_margin)
+        })
+        
+        # Move to next month
+        current_month = (current_month + timedelta(days=32)).replace(day=1)
+
+    # Convert to dictionary for template
+    monthly_trends_dict = {item['month']: item for item in monthly_trends}
+
+    # ---------------------
+    # CATEGORY PERFORMANCE with PROPER COGS
+    # ---------------------
+    category_performance = []
+    
+    # Get all categories from sales
+    sales_by_category = sales_items.values(
+        'product__category__id', 'product__category__name'
+    ).annotate(
+        revenue=Sum(REVENUE_EXPR),
+        quantity=Sum('quantity')
+    ).order_by('-revenue')
+    
+    for cat_data in sales_by_category:
+        category_id = cat_data['product__category__id']
+        category_name = cat_data['product__category__name'] or 'Uncategorized'
+        revenue = cat_data['revenue'] or Decimal('0')
+        quantity = cat_data['quantity'] or 0
+        
+        # Calculate COGS for this category using products in the category
+        category_cogs = Decimal('0')
+        
+        if revenue > 0:
+            # Get products in this category that were sold
+            category_products = sales_items.filter(
+                product__category_id=category_id
+            ).values('product_id').distinct()
+            
+            for product in category_products:
+                product_id = product['product_id']
+                
+                # Get quantity sold for this product in this category
+                product_sales = sales_items.filter(
+                    product_id=product_id,
+                    product__category_id=category_id
+                ).aggregate(
+                    quantity=Sum('quantity')
+                )
+                
+                product_quantity = product_sales['quantity'] or 0
+                
+                if product_quantity > 0:
+                    # Use average cost from our product map
+                    if product_id in product_cogs_map:
+                        avg_cost = Decimal(str(product_cogs_map[product_id]['avg_cost']))
+                    else:
+                        # Fallback to average purchase cost
+                        avg_cost_result = PurchaseOrderItem.objects.filter(
+                            product_id=product_id
+                        ).aggregate(
+                            avg_cost=Avg('unit_cost')
+                        )
+                        avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+                    
+                    category_cogs += avg_cost * product_quantity
+        
+        # If no proper COGS, use estimated
+        if category_cogs == 0 and revenue > 0:
+            category_cogs = revenue * Decimal('0.60')
+        
+        profit = revenue - category_cogs
+        margin = (profit / revenue * 100) if revenue else Decimal('0')
+        
+        category_performance.append({
+            'category': {
+                'id': category_id,
+                'name': category_name
+            },
+            'revenue': float(revenue),
+            'cogs': float(category_cogs),
+            'profit': float(profit),
+            'margin': float(margin),
+            'quantity': quantity
+        })
+
+    # ---------------------
+    # TOP PRODUCTS with PROPER profit margin
+    # ---------------------
+    top_products = []
+    
+    # Get top selling products
+    top_sales = sales_items.values(
+        'product__id', 'product__name', 'product__sku'
+    ).annotate(
+        revenue=Sum(REVENUE_EXPR),
+        quantity=Sum('quantity'),
+        avg_price=Avg('sale_price')
+    ).order_by('-revenue')[:10]
+    
+    for product_data in top_sales:
+        product_id = product_data['product__id']
+        revenue = product_data['revenue'] or Decimal('0')
+        quantity = product_data['quantity'] or 0
+        avg_price = product_data['avg_price'] or Decimal('0')
+        
+        # Calculate COGS for this product
+        product_cogs = Decimal('0')
+        
+        if revenue > 0:
+            if product_id in product_cogs_map:
+                # Use calculated COGS from our map
+                product_cogs = Decimal(str(product_cogs_map[product_id]['cogs']))
+            else:
+                # Calculate using average cost
+                avg_cost_result = PurchaseOrderItem.objects.filter(
+                    product_id=product_id
+                ).aggregate(
+                    avg_cost=Avg('unit_cost')
+                )
+                avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+                product_cogs = avg_cost * quantity
+        
+        # If still no COGS, use estimated
+        if product_cogs == 0 and revenue > 0:
+            product_cogs = revenue * Decimal('0.60')
+        
+        estimated_profit = revenue - product_cogs
+        profit_margin = (estimated_profit / revenue * 100) if revenue else Decimal('0')
+        
+        top_products.append({
+            'product__id': product_id,
+            'product__name': product_data['product__name'],
+            'product__sku': product_data['product__sku'],
+            'total_revenue': float(revenue),
+            'total_quantity': quantity,
+            'avg_price': float(avg_price),
+            'estimated_cogs': float(product_cogs),
+            'estimated_profit': float(estimated_profit),
+            'profit_margin': float(profit_margin)
+        })
+
+    # ---------------------
+    # NET PROFIT CALCULATION
+    # For now, use gross profit as net profit (before operating expenses)
+    # ---------------------
+    net_profit = gross_profit
+    net_profit_margin = gross_margin
+
+    # ---------------------
+    # ACCOUNTS RECEIVABLE
+    # ---------------------
+    accounts_receivable = None
     if store_id:
         store_filter = {'store_id': store_id}
+    else:
+        store_filter = {}
     
-    # 1. Revenue calculations
-    sales_qs = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()],
-        **store_filter
-    ).select_related('store')
-    
-    total_revenue = sales_qs.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-    
-    # 2. COGS calculations (Cost of Goods Sold)
-    cogs_details = calculate_cogs(start_date, end_date, store_filter, total_revenue)
-    
-    # 3. Profit calculations
-    total_cogs = cogs_details.get('total_cogs', Decimal('0'))
-    gross_profit = total_revenue - total_cogs
-    gross_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else Decimal('0')
-    
-    # 4. Product category analysis
-    category_performance = calculate_category_performance(start_date, end_date, store_filter)
-    
-    # 5. Accounts Receivable (based on balance > 0)
-    accounts_receivable = calculate_accounts_receivable(store_filter)
-    
-    # 6. Monthly trends
-    monthly_trends = calculate_monthly_trends(start_date, end_date, store_filter)
-    
-    # 7. Top performing products
-    top_products = calculate_top_products(start_date, end_date, store_filter)
-    
-    # Get all stores for filter
-    stores = StoreLocation.objects.filter(is_active=True)
-    
-    # Calculate net profit (simplified - assuming 20% operating costs)
-    net_profit = gross_profit * Decimal('0.8')
-    net_profit_margin = (net_profit / total_revenue * 100) if total_revenue > 0 else Decimal('0')
-    
-    # Generate report ID
-    report_id = f"FIN-{timezone.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-    
+    try:
+        accounts_receivable = calculate_accounts_receivable(store_filter)
+    except Exception as e:
+        print(f"Error calculating accounts receivable: {e}")
+        accounts_receivable = {
+            'total_ar': Decimal('0'),
+            'aging_buckets': {
+                'current': {'amount': Decimal('0'), 'count': 0},
+                '1_30': {'amount': Decimal('0'), 'count': 0},
+                '31_60': {'amount': Decimal('0'), 'count': 0},
+                '60_plus': {'amount': Decimal('0'), 'count': 0},
+            },
+            'invoices': []
+        }
+
+    # ---------------------
+    # PREPARE CONTEXT
+    # ---------------------
     context = {
         'total_revenue': total_revenue,
         'total_cogs': total_cogs,
         'gross_profit': gross_profit,
         'gross_margin': gross_margin,
-        'start_date': start_date.date(),
-        'end_date': end_date.date(),
-        'stores': stores,
-        'selected_store': store_id,
-        'date_range': date_range,
-        'cogs_details': cogs_details,
-        'category_performance': category_performance,
-        'accounts_receivable': accounts_receivable,
-        'monthly_trends': monthly_trends,
-        'top_products': top_products,
         'net_profit': net_profit,
         'net_profit_margin': net_profit_margin,
-        'report_id': report_id,
+        'cogs_ratio': cogs_ratio,
+        
+        # Data for tables and charts
+        'monthly_trends': monthly_trends_dict,
+        'category_performance': category_performance,
+        'top_products': top_products,
+        
+        # Accounts receivable data
+        'accounts_receivable': accounts_receivable,
+        
+        # Filter data
+        'stores': StoreLocation.objects.filter(is_active=True),
+        'selected_store': store_id,
+        'start_date': start_date,
+        'end_date': end_date,
+        'date_range': f"{start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}",
+        'report_id': f"FIN-{timezone.now():%Y%m%d}-{random.randint(1000,9999)}",
+        
+        # COGS details for the template
+        'cogs_details': {
+            'cogs_ratio': float(cogs_ratio),
+            'total_cogs': float(total_cogs),
+            'gross_margin': float(gross_margin)
+        }
     }
     
     return render(request, 'reports/financial_details.html', context)
-
-
-def calculate_cogs(start_date, end_date, store_filter, total_revenue):
-    """Calculate Cost of Goods Sold"""
-    # Get all sales in period
-    sales_items = SalesItem.objects.filter(
-        order__sale_date__range=[start_date.date(), end_date.date()],
-        order__store_id=store_filter.get('store_id') if store_filter else None
-    ).select_related('product', 'order')
-    
-    cogs_total = Decimal('0')
-    cogs_by_month = {}
-    
-    if not sales_items.exists():
-        return {
-            'total_cogs': Decimal('0'),
-            'cogs_by_month': {},
-            'cogs_ratio': 0,
-        }
-    
-    for item in sales_items:
-        # Get average purchase cost for this product
-        purchase_items = PurchaseOrderItem.objects.filter(product=item.product)
-        
-        avg_cost = Decimal('0')
-        if purchase_items.exists():
-            # Calculate weighted average cost
-            total_quantity = purchase_items.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
-            total_cost = purchase_items.aggregate(total=Sum('cost'))['total'] or Decimal('0')
-            avg_cost = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
-        
-        # If no purchase data or purchase data gives 0 cost, use fallback
-        if avg_cost == Decimal('0'):
-            # Fallback: use product's default price * 0.6 (assuming 40% margin)
-            default_price = item.product.default_price or Decimal('0')
-            if default_price > 0:
-                avg_cost = default_price * Decimal('0.6')
-            else:
-                # If no default price, use sale price * 0.6
-                avg_cost = item.sale_price * Decimal('0.6')
-        
-        item_cogs = avg_cost * Decimal(str(item.quantity))
-        cogs_total += item_cogs
-        
-        # Group by month
-        month_key = item.order.sale_date.strftime('%Y-%m')
-        cogs_by_month[month_key] = cogs_by_month.get(month_key, Decimal('0')) + item_cogs
-    
-    # Calculate COGS ratio correctly
-    cogs_ratio = float((cogs_total / total_revenue * 100)) if total_revenue > 0 else 0
-    
-    return {
-        'total_cogs': cogs_total,
-        'cogs_by_month': cogs_by_month,
-        'cogs_ratio': cogs_ratio,
-    }
-
-
-def calculate_category_performance(start_date, end_date, store_filter):
-    """Calculate performance by product category"""
-    # Get all sales items in the period
-    sales_items = SalesItem.objects.filter(
-        order__sale_date__range=[start_date.date(), end_date.date()],
-        order__store_id=store_filter.get('store_id') if store_filter else None
-    ).select_related('product__category')
-    
-    # Group by category
-    category_totals = {}
-    
-    for item in sales_items:
-        category = item.product.category
-        if not category:
-            continue
-        
-        # Initialize category if not exists
-        if category.id not in category_totals:
-            category_totals[category.id] = {
-                'category': category,
-                'revenue': Decimal('0'),
-                'quantity': 0,
-                'cogs': Decimal('0'),
-            }
-        
-        # Revenue
-        item_revenue = Decimal(str(item.quantity)) * item.sale_price
-        category_totals[category.id]['revenue'] += item_revenue
-        category_totals[category.id]['quantity'] += item.quantity
-        
-        # Calculate COGS for this item
-        purchase_items = PurchaseOrderItem.objects.filter(product=item.product)
-        item_cogs = Decimal('0')
-        
-        if purchase_items.exists():
-            total_quantity = purchase_items.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
-            total_cost = purchase_items.aggregate(total=Sum('cost'))['total'] or Decimal('0')
-            avg_cost = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
-            
-            if avg_cost == Decimal('0'):
-                # Fallback to 60% of sale price
-                avg_cost = item.sale_price * Decimal('0.6')
-        else:
-            # No purchase data, use fallback
-            avg_cost = item.sale_price * Decimal('0.6')
-        
-        item_cogs = avg_cost * Decimal(str(item.quantity))
-        category_totals[category.id]['cogs'] += item_cogs
-    
-    # Convert to list format
-    category_data = []
-    for cat_data in category_totals.values():
-        revenue = cat_data['revenue']
-        cogs = cat_data['cogs']
-        profit = revenue - cogs
-        margin = float((profit / revenue * 100)) if revenue > 0 else 0
-        
-        category_data.append({
-            'category': cat_data['category'],
-            'revenue': revenue,
-            'quantity': cat_data['quantity'],
-            'cogs': cogs,
-            'profit': profit,
-            'margin': margin,
-        })
-    
-    # Sort by revenue descending
-    return sorted(category_data, key=lambda x: x['revenue'], reverse=True)
 
 
 def calculate_accounts_receivable(store_filter):
@@ -3966,218 +4113,28 @@ def calculate_accounts_receivable(store_filter):
         'aging_buckets': aging_buckets,
         'invoices': invoices,
     }
-
-
-def calculate_monthly_trends(start_date, end_date, store_filter):
-    """Calculate monthly revenue and profit trends"""
-    monthly_data = {}
     
-    # Generate all months in the range
-    # Convert start_date and end_date to date objects if they aren't already
-    if isinstance(start_date, date.date):
-        current = date.date(start_date.year, start_date.month, 1)
-        end = date.date(end_date.year, end_date.month, 1)
-    else:
-        # If start_date is already a date object
-        current = date.date(start_date.year, start_date.month, 1)
-        end = date.date(end_date.year, end_date.month, 1)
-    
-    while current <= end:
-        month_key = current.strftime('%Y-%m')
-        month_start = current
-        month_end = (current + timedelta(days=32)).replace(day=1)
-        
-        # Get monthly sales
-        monthly_sales = Sales.objects.filter(
-            sale_date__gte=month_start.date(),
-            sale_date__lt=month_end.date(),
-            **store_filter
-        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-        
-        # Get monthly COGS from sales items
-        sales_items = SalesItem.objects.filter(
-            order__sale_date__gte=month_start.date(),
-            order__sale_date__lt=month_end.date(),
-            order__store_id=store_filter.get('store_id') if store_filter else None
-        ).select_related('product', 'order')
-        
-        monthly_cogs = Decimal('0')
-        for item in sales_items:
-            purchase_items = PurchaseOrderItem.objects.filter(product=item.product)
-            
-            avg_cost = Decimal('0')
-            if purchase_items.exists():
-                total_quantity = purchase_items.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
-                total_cost = purchase_items.aggregate(total=Sum('cost'))['total'] or Decimal('0')
-                avg_cost = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
-            
-            if avg_cost == Decimal('0'):
-                # Fallback to 60% of sale price
-                avg_cost = item.sale_price * Decimal('0.6')
-            
-            monthly_cogs += avg_cost * Decimal(str(item.quantity))
-        
-        monthly_profit = monthly_sales - monthly_cogs
-        monthly_margin = float((monthly_profit / monthly_sales * 100)) if monthly_sales > 0 else 0
-        
-        monthly_data[month_key] = {
-            'revenue': monthly_sales,
-            'cogs': monthly_cogs,
-            'profit': monthly_profit,
-            'margin': monthly_margin,
-            'date': current.strftime('%b %Y'),
-        }
-        
-        # Move to next month
-        if current.month == 12:
-            current = date.date(current.year + 1, 1, 1)
-        else:
-            current = date.date(current.year, current.month + 1, 1)
-    
-    return monthly_data
-
-
-def calculate_top_products(start_date, end_date, store_filter, limit=10):
-    """Calculate top performing products"""
-    # Get sales items aggregated by product
-    sales_items = SalesItem.objects.filter(
-        order__sale_date__range=[start_date.date(), end_date.date()],
-        order__store_id=store_filter.get('store_id') if store_filter else None
-    ).values('product__id', 'product__name', 'product__sku').annotate(
-        total_quantity=Sum('quantity'),
-        total_revenue=Sum(F('quantity') * F('sale_price')),
-        avg_price=Avg('sale_price')
-    ).order_by('-total_revenue')[:limit]
-    
-    top_products_list = []
-    for item in sales_items:
-        if item['total_revenue']:
-            # Estimate profit margin (60% of price as cost)
-            avg_price = item['avg_price'] or Decimal('0')
-            total_quantity = item['total_quantity'] or 0
-            
-            if avg_price > 0:
-                estimated_cost = avg_price * Decimal('0.6')
-                estimated_profit = (avg_price - estimated_cost) * Decimal(str(total_quantity))
-                profit_margin = float(((avg_price - estimated_cost) / avg_price * 100))
-            else:
-                estimated_profit = Decimal('0')
-                profit_margin = 0
-            
-            top_products_list.append({
-                'product__name': item['product__name'] or 'Unknown Product',
-                'product__sku': item['product__sku'] or 'N/A',
-                'total_revenue': item['total_revenue'],
-                'total_quantity': total_quantity,
-                'avg_price': avg_price,
-                'estimated_profit': estimated_profit,
-                'profit_margin': profit_margin,
-            })
-    
-    return top_products_list
-
-
 
 @login_required
 def export_financial_report(request, format):
-    """Export financial report in different formats"""
-    # Get the same data as the main view
-    end_date = timezone.now()
+    end_date = timezone.now().date()
     start_date = end_date - timedelta(days=90)
-    
-    # Recalculate all metrics
-    sales_qs = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
+
+    sales_items = SalesItem.objects.filter(
+        order__sale_date__range=[start_date, end_date]
     )
-    total_revenue = sales_qs.aggregate(total=Sum('total_amount'))['total'] or 0
-    cogs_details = calculate_cogs(start_date, end_date, {})
-    total_cogs = cogs_details.get('total_cogs', 0)
+
+    total_revenue = sales_items.aggregate(
+        total=Sum(REVENUE_EXPR)
+    )['total'] or Decimal('0')
+
+    total_cogs = PurchaseOrderItem.objects.filter(
+        order__purchase_date__range=[start_date, end_date]
+    ).aggregate(
+        total=Sum(COST_EXPR)
+    )['total'] or Decimal('0')
+
     gross_profit = total_revenue - total_cogs
-    
-    if format == 'csv':
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="financial_report_{timezone.now().strftime("%Y%m%d")}.csv"'
-        
-        writer = csv.writer(response)
-        writer.writerow(['Financial Report', f'{start_date.date()} to {end_date.date()}'])
-        writer.writerow([])
-        writer.writerow(['Metric', 'Value (UGX)'])
-        writer.writerow(['Total Revenue', total_revenue])
-        writer.writerow(['Total COGS', total_cogs])
-        writer.writerow(['Gross Profit', gross_profit])
-        writer.writerow(['Gross Margin', f'{(gross_profit/total_revenue*100) if total_revenue > 0 else 0:.2f}%'])
-        
-        return response
-    
-    elif format == 'pdf':
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="financial_report_{timezone.now().strftime("%Y%m%d")}.pdf"'
-        
-        # Create PDF
-        p = canvas.Canvas(response, pagesize=letter)
-        width, height = letter
-        
-        # Add title
-        p.setFont("Helvetica-Bold", 16)
-        p.drawString(50, height - 50, "Financial Report")
-        p.setFont("Helvetica", 12)
-        p.drawString(50, height - 70, f"Period: {start_date.date()} to {end_date.date()}")
-        
-        # Add metrics
-        y = height - 100
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(50, y, "Financial Metrics")
-        p.setFont("Helvetica", 10)
-        
-        metrics = [
-            ("Total Revenue:", f"UGX {total_revenue:,}"),
-            ("Total COGS:", f"UGX {total_cogs:,}"),
-            ("Gross Profit:", f"UGX {gross_profit:,}"),
-            ("Gross Margin:", f"{(gross_profit/total_revenue*100) if total_revenue > 0 else 0:.2f}%"),
-        ]
-        
-        for label, value in metrics:
-            y -= 20
-            p.drawString(70, y, label)
-            p.drawString(200, y, value)
-        
-        p.save()
-        return response
-    
-    elif format == 'excel':
-        output = io.BytesIO()
-        workbook = xlsxwriter.Workbook(output)
-        worksheet = workbook.add_worksheet('Financial Report')
-        
-        # Add headers
-        worksheet.write(0, 0, 'Financial Report')
-        worksheet.write(1, 0, f'Period: {start_date.date()} to {end_date.date()}')
-        
-        # Add metrics
-        metrics = [
-            ('Metric', 'Value (UGX)'),
-            ('Total Revenue', total_revenue),
-            ('Total COGS', total_cogs),
-            ('Gross Profit', gross_profit),
-            ('Gross Margin', f'{(gross_profit/total_revenue*100) if total_revenue > 0 else 0:.2f}%'),
-        ]
-        
-        for row, (label, value) in enumerate(metrics, start=3):
-            worksheet.write(row, 0, label)
-            worksheet.write(row, 1, value)
-        
-        workbook.close()
-        output.seek(0)
-        
-        response = HttpResponse(
-            output,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="financial_report_{timezone.now().strftime("%Y%m%d")}.xlsx"'
-        
-        return response
-    
-    return HttpResponse("Invalid export format", status=400)
 
 
 # ============================================================================
