@@ -233,10 +233,62 @@
             </div>
         </div>
 
-        <!-- Hidden JSON data for JavaScript -->
-        {{ monthly_trends|json_script:"monthlyTrendsData" }}
-        {{ category_performance|json_script:"categoryPerformanceData" }}
-        {{ top_products|json_script:"topProductsData" }}
+        <!-- IMPORTANT: FIXED DATA FORMATTING -->
+        {% comment %}
+        Convert Django context data to proper JSON format for JavaScript
+        {% endcomment %}
+        <script id="monthlyTrendsData" type="application/json">
+        {
+            "data": [
+                {% for month_key, data in monthly_trends.items %}
+                {
+                    "month": "{{ month_key }}",
+                    "date": "{{ data.date }}",
+                    "revenue": {{ data.revenue|default:0 }},
+                    "cogs": {{ data.cogs|default:0 }},
+                    "profit": {{ data.profit|default:0 }},
+                    "margin": {{ data.margin|default:0 }}
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ]
+        }
+        </script>
+
+        <script id="categoryPerformanceData" type="application/json">
+        [
+            {% for cat in category_performance %}
+            {
+                "category": {
+                    "id": {{ cat.category.id|default:0 }},
+                    "name": "{{ cat.category.name|default:'Uncategorized'|escapejs }}"
+                },
+                "revenue": {{ cat.revenue|default:0 }},
+                "cogs": {{ cat.cogs|default:0 }},
+                "profit": {{ cat.profit|default:0 }},
+                "margin": {{ cat.margin|default:0 }},
+                "quantity": {{ cat.quantity|default:0 }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+        </script>
+
+        <script id="topProductsData" type="application/json">
+        [
+            {% for product in top_products %}
+            {
+                "product__id": {{ product.product__id|default:0 }},
+                "product__name": "{{ product.product__name|default:'Unknown Product'|escapejs }}",
+                "product__sku": "{{ product.product__sku|default:''|escapejs }}",
+                "total_revenue": {{ product.total_revenue|default:0 }},
+                "total_quantity": {{ product.total_quantity|default:0 }},
+                "avg_price": {{ product.avg_price|default:0 }},
+                "estimated_cogs": {{ product.estimated_cogs|default:0 }},
+                "estimated_profit": {{ product.estimated_profit|default:0 }},
+                "profit_margin": {{ product.profit_margin|default:0 }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+        </script>
 
         <!-- Tabbed Interface -->
         <div class="row">
@@ -756,7 +808,7 @@ let revenueCostChart = null;
 
 // Store parsed data
 let chartData = {
-    monthlyTrends: {},
+    monthlyTrends: [],
     categoryPerformance: [],
     topProducts: []
 };
@@ -786,11 +838,15 @@ document.addEventListener('DOMContentLoaded', function() {
 // Safely parse data from JSON scripts
 function parseChartData() {
     try {
-        // Parse monthly trends
+        // Parse monthly trends - FIXED: Your view sends monthly_trends as dict, but we need array
         const monthlyTrendsElement = document.getElementById('monthlyTrendsData');
         if (monthlyTrendsElement && monthlyTrendsElement.textContent) {
-            chartData.monthlyTrends = JSON.parse(monthlyTrendsElement.textContent);
-            console.log('Monthly trends loaded:', Object.keys(chartData.monthlyTrends).length, 'months');
+            const data = JSON.parse(monthlyTrendsElement.textContent);
+            chartData.monthlyTrends = data.data || [];
+            console.log('Monthly trends loaded:', chartData.monthlyTrends.length, 'months');
+        } else {
+            console.warn('No monthly trends data found in DOM');
+            chartData.monthlyTrends = [];
         }
         
         // Parse category performance
@@ -798,6 +854,9 @@ function parseChartData() {
         if (categoryPerfElement && categoryPerfElement.textContent) {
             chartData.categoryPerformance = JSON.parse(categoryPerfElement.textContent);
             console.log('Category performance loaded:', chartData.categoryPerformance.length, 'categories');
+        } else {
+            console.warn('No category performance data found in DOM');
+            chartData.categoryPerformance = [];
         }
         
         // Parse top products
@@ -805,13 +864,22 @@ function parseChartData() {
         if (topProductsElement && topProductsElement.textContent) {
             chartData.topProducts = JSON.parse(topProductsElement.textContent);
             console.log('Top products loaded:', chartData.topProducts.length, 'products');
+        } else {
+            console.warn('No top products data found in DOM');
+            chartData.topProducts = [];
         }
+        
+        // Debug: Show data structure
+        console.log('Parsed data structure:', chartData);
+        
     } catch (error) {
         console.error('Error parsing chart data:', error);
         // Set empty defaults
-        chartData.monthlyTrends = chartData.monthlyTrends || {};
-        chartData.categoryPerformance = chartData.categoryPerformance || [];
-        chartData.topProducts = chartData.topProducts || [];
+        chartData = {
+            monthlyTrends: [],
+            categoryPerformance: [],
+            topProducts: []
+        };
     }
 }
 
@@ -865,13 +933,13 @@ function setupTabListeners() {
             // Initialize chart for the shown tab
             switch(targetId) {
                 case 'cogs':
-                    initializeCogsChart();
+                    setTimeout(() => initializeCogsChart(), 100); // Small delay for DOM update
                     break;
                 case 'profit-margin':
-                    initializeProfitMarginChart();
+                    setTimeout(() => initializeProfitMarginChart(), 100);
                     break;
                 case 'revenue-cost':
-                    initializeRevenueCostChart();
+                    setTimeout(() => initializeRevenueCostChart(), 100);
                     break;
             }
         });
@@ -911,7 +979,8 @@ function initializeCogsChart() {
     }
     
     // Check if we have data
-    if (!chartData.monthlyTrends || Object.keys(chartData.monthlyTrends).length === 0) {
+    if (!chartData.monthlyTrends || chartData.monthlyTrends.length === 0) {
+        console.warn('No monthly data for COGS chart');
         showChartError(canvas, 'No monthly data available');
         return;
     }
@@ -922,15 +991,18 @@ function initializeCogsChart() {
         const revenueData = [];
         const cogsData = [];
         
-        // Sort months chronologically
-        const sortedMonths = Object.keys(chartData.monthlyTrends).sort();
+        // Sort months chronologically by month key
+        const sortedMonths = [...chartData.monthlyTrends].sort((a, b) => {
+            return a.month.localeCompare(b.month);
+        });
         
-        sortedMonths.forEach(monthKey => {
-            const data = chartData.monthlyTrends[monthKey];
+        sortedMonths.forEach(data => {
             months.push(data.date);
             revenueData.push(data.revenue || 0);
             cogsData.push(data.cogs || 0);
         });
+        
+        console.log('COGS Chart Data:', { months, revenueData, cogsData });
         
         // Destroy existing chart
         if (cogsTrendChart) {
@@ -985,6 +1057,7 @@ function initializeProfitMarginChart() {
     
     // Check if we have data
     if (!chartData.categoryPerformance || chartData.categoryPerformance.length === 0) {
+        console.warn('No category data for profit margin chart');
         showChartError(canvas, 'No category data available');
         return;
     }
@@ -1008,6 +1081,8 @@ function initializeProfitMarginChart() {
                 marginData.push(cat.margin || 0);
             }
         });
+        
+        console.log('Profit Margin Chart Data:', { categories, marginData });
         
         // Destroy existing chart
         if (profitMarginChart) {
@@ -1053,6 +1128,7 @@ function initializeRevenueCostChart() {
     
     // Check if we have data
     if (!chartData.categoryPerformance || chartData.categoryPerformance.length === 0) {
+        console.warn('No category data for revenue cost chart');
         showChartError(canvas, 'No category data available');
         return;
     }
@@ -1078,6 +1154,8 @@ function initializeRevenueCostChart() {
                 profitData.push(cat.profit || 0);
             }
         });
+        
+        console.log('Revenue Cost Chart Data:', { categories, revenueData, profitData });
         
         // Destroy existing chart
         if (revenueCostChart) {
@@ -1220,28 +1298,49 @@ function showChartError(canvas, message) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
     
-    // Draw error background
-    ctx.fillStyle = '#f8f9fa';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw error text
-    ctx.font = '14px "Segoe UI", sans-serif';
-    ctx.fillStyle = '#6c757d';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    const lines = message.split('\n');
-    const lineHeight = 20;
-    const startY = canvas.height / 2 - (lines.length - 1) * lineHeight / 2;
-    
-    lines.forEach((line, index) => {
-        ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
-    });
-    
-    ctx.restore();
+    // Create a simple placeholder chart with no data message
+    try {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['No Data'],
+                datasets: [{
+                    label: 'Information',
+                    data: [0],
+                    backgroundColor: '#f8f9fa'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: message,
+                        color: '#6c757d',
+                        font: { size: 14 }
+                    }
+                },
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                }
+            }
+        });
+    } catch (error) {
+        // Fallback to text if Chart.js fails
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '14px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#6c757d';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+    }
 }
 
 // Utility functions
@@ -1266,6 +1365,24 @@ function exportReport(format) {
     
     // Open export URL in new tab
     window.open(exportUrl, '_blank');
+}
+
+// Test Chart.js is loaded
+function testChartJs() {
+    try {
+        console.log('Chart.js version:', Chart.version);
+        return true;
+    } catch (error) {
+        console.error('Chart.js not loaded:', error);
+        return false;
+    }
+}
+
+// Run test when page loads
+if (typeof Chart !== 'undefined') {
+    console.log('Chart.js is available');
+} else {
+    console.error('Chart.js is NOT loaded. Check the script tags.');
 }
 </script>
 {% endblock %}
