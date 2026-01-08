@@ -3,7 +3,7 @@ from django.shortcuts import *
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from datetime import date, timedelta
+from datetime import date, timedelta, time
 import json
 import csv
 import random
@@ -12,7 +12,6 @@ import xlsxwriter
 import io
 import calendar
 from .reports import InventoryReports
-from django.db.models import *
 from django.utils import timezone
 from app.models.transactions import *
 from app.models.products import *
@@ -97,6 +96,17 @@ except ImportError:
             return {}
     colors = None
 
+
+
+REVENUE_EXPR = ExpressionWrapper(
+    F('quantity') * F('sale_price'),
+    output_field=DecimalField(max_digits=16, decimal_places=2)
+)
+
+COST_EXPR = ExpressionWrapper(
+    F('quantity') * F('unit_cost'),
+    output_field=DecimalField(max_digits=16, decimal_places=2)
+)
 
 # Custom JSON encoder class (add this after imports)
 class CustomJSONEncoder(DjangoJSONEncoder):
@@ -1846,26 +1856,18 @@ def sales_details(request, period=None):
 
     date_range = f"{start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}"
 
-    # DEBUG: Print what we're querying
-    # print(f"Date range: {start_date.date()} to {end_date.date()}")
+ 
     
     # Filter sales for the period - ALL sales
     sales_in_period = Sales.objects.filter(
         sale_date__range=[start_date.date(), end_date.date()]
     )
     
-    # DEBUG: Print sales count
-    # print(f"Sales in period: {sales_in_period.count()}")
-    for sale in sales_in_period:
-        print(f"Sale ID: {sale.id}, Date: {sale.sale_date}, Total: {sale.total_amount}, Status: {sale.status}")
-
     # Basic metrics
     total_sales = sales_in_period.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
     total_transactions = sales_in_period.count()
     
-    print(f"Total sales amount: {total_sales}")
-    print(f"Total transactions: {total_transactions}")
-
+    
     # Calculate average daily sales
     days_in_period = max((end_date.date() - start_date.date()).days + 1, 1)
     avg_daily_sales = total_sales / Decimal(days_in_period) if total_sales else Decimal('0')
@@ -1899,10 +1901,6 @@ def sales_details(request, period=None):
         transactions=Count('id')
     ).order_by('-total_spent')
     
-    # DEBUG: Print customer sales
-    # print(f"Customer sales count: {customer_sales.count()}")
-    for cs in customer_sales:
-        print(f"Customer: {cs['customer__name']}, Total: {cs['total_spent']}, Transactions: {cs['transactions']}")
 
     # Calculate average order value for each customer
     customer_sales_list = []
@@ -1917,8 +1915,6 @@ def sales_details(request, period=None):
             'avg_order': avg_order
         })
 
-    # Product performance - Check if there are SalesItem records
-    print(f"SalesItem count in period: {SalesItem.objects.filter(order__sale_date__range=[start_date.date(), end_date.date()]).count()}")
     
     product_performance = SalesItem.objects.filter(
         order__sale_date__range=[start_date.date(), end_date.date()]
@@ -1931,7 +1927,7 @@ def sales_details(request, period=None):
     ).order_by('-revenue')
     
     product_performance_list = list(product_performance)
-    print(f"Product performance count: {len(product_performance_list)}")
+   
 
     # Payment method analysis - Get ALL sales with payment methods
     payment_analysis = Sales.objects.filter(
@@ -1944,10 +1940,7 @@ def sales_details(request, period=None):
         total_amount=Sum('total_amount')
     ).order_by('-transactions')
     
-    # DEBUG: Print payment analysis
-    # print(f"Payment analysis count: {payment_analysis.count()}")
-    for pa in payment_analysis:
-        print(f"Payment method: {pa['payment_method__name']}, Transactions: {pa['transactions']}, Total: {pa['total_amount']}")
+
 
     # Calculate average transaction for payment methods
     payment_analysis_list = []
@@ -1971,10 +1964,7 @@ def sales_details(request, period=None):
         transactions=Count('id')
     ).order_by('-total_sales')
     
-    # DEBUG: Print store performance
-    # print(f"Store performance count: {store_performance.count()}")
-    for sp in store_performance:
-        print(f"Store: {sp['store__name']}, Total: {sp['total_sales']}, Transactions: {sp['transactions']}")
+   
 
     # Calculate average transaction for stores
     store_performance_list = []
@@ -2094,12 +2084,6 @@ def sales_details(request, period=None):
         # Additional calculated values for template
         'days_count': len(daily_sales_data),
     }
-    
-    # DEBUG: Print final context
-    # print(f"Context has payment data: {len(payment_analysis_list)} items")
-    # print(f"Context has store data: {len(store_performance_list)} items")
-    # print(f"Context has product data: {len(product_performance_list)} items")
-    
     return render(request, 'reports/sales_details.html', context)
 
 
@@ -3701,217 +3685,378 @@ def batch_details_api(request, batch_reference):
 # Accounts Receivable
 # ============================================================================
 
-
 @login_required
 def financial_details(request):
-    """Financial Reports dashboard view with calculated metrics"""
-    
-    # Get date range (default to last 3 months)
-    end_date = timezone.now()
+    end_date = timezone.now().date()
     start_date = end_date - timedelta(days=90)
-    
-    # Filter by date range if provided
-    date_range = request.GET.get('date_range', '')
+
+    date_range = request.GET.get('date_range')
     if date_range:
         try:
-            start_str, end_str = date_range.split(' - ')
-            start_date = date.strptime(start_str, '%Y-%m-%d')
-            end_date = date.strptime(end_str, '%Y-%m-%d')
-        except:
+            s, e = date_range.split(' - ')
+            start_date = timezone.datetime.strptime(s, "%Y-%m-%d").date()
+            end_date = timezone.datetime.strptime(e, "%Y-%m-%d").date()
+        except ValueError:
             pass
+
+    store_id = request.GET.get('store')
+    sales_filter = {'order__store_id': store_id} if store_id else {}
+    purchase_filter = {}
+    if store_id:
+        purchase_filter['order__store_id'] = store_id
+
+    # ---------------------
+    # EXPRESSIONS
+    # ---------------------
+    REVENUE_EXPR = ExpressionWrapper(
+        F('sale_price') * F('quantity'),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
     
-    # Get store filter
-    store_id = request.GET.get('store', '')
-    store_filter = {}
+    COST_EXPR = ExpressionWrapper(
+        F('unit_cost') * F('quantity'),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+
+    # ---------------------
+    # SALES (Revenue)
+    # ---------------------
+    sales_items = SalesItem.objects.filter(
+        order__sale_date__range=[start_date, end_date],
+        **sales_filter
+    ).select_related('product', 'product__category', 'order')
+
+    total_revenue = sales_items.aggregate(
+        total=Sum(REVENUE_EXPR)
+    )['total'] or Decimal('0')
+
+    # ---------------------
+    # PROPER COGS CALCULATION
+    # Using average cost method for simplicity
+    # ---------------------
+    total_cogs = Decimal('0')
+    product_cogs_map = {}
+    
+    # First, get all unique products sold
+    sold_products = sales_items.values('product_id').distinct()
+    
+    for sold_product in sold_products:
+        product_id = sold_product['product_id']
+        
+        # Get total quantity sold for this product
+        product_sales = sales_items.filter(product_id=product_id).aggregate(
+            total_quantity=Sum('quantity'),
+            total_revenue=Sum(REVENUE_EXPR)
+        )
+        
+        total_quantity_sold = product_sales['total_quantity'] or 0
+        
+        if total_quantity_sold > 0:
+            # Get average purchase cost for this product
+            # Look for purchases before the sale date range (FIFO principle)
+            avg_cost_result = PurchaseOrderItem.objects.filter(
+                product_id=product_id,
+                order__purchase_date__lte=end_date  # Purchases up to the report end date
+            ).aggregate(
+                avg_cost=Avg('unit_cost')
+            )
+            
+            avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+            
+            # Calculate COGS for this product
+            product_cogs = avg_cost * total_quantity_sold
+            total_cogs += product_cogs
+            product_cogs_map[product_id] = {
+                'avg_cost': float(avg_cost),
+                'quantity_sold': total_quantity_sold,
+                'cogs': float(product_cogs)
+            }
+
+    # If no proper COGS data, use estimated 60% COGS ratio
+    if total_cogs == 0 and total_revenue > 0:
+        total_cogs = total_revenue * Decimal('0.60')  # 60% COGS, 40% margin
+    
+    # Calculate financial metrics
+    cogs_ratio = (total_cogs / total_revenue * 100) if total_revenue else Decimal('0')
+    gross_profit = total_revenue - total_cogs
+    gross_margin = (gross_profit / total_revenue * 100) if total_revenue else Decimal('0')
+
+    # ---------------------
+    # MONTHLY TRENDS with PROPER COGS
+    # ---------------------
+    monthly_trends = []
+    
+    # Get all months in the date range
+    current_month = start_date.replace(day=1)
+    while current_month <= end_date.replace(day=1):
+        month_start = current_month
+        month_end = (current_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        
+        # Revenue for this month
+        month_sales = sales_items.filter(
+            order__sale_date__range=[month_start, month_end]
+        )
+        
+        month_revenue = month_sales.aggregate(
+            total=Sum(REVENUE_EXPR)
+        )['total'] or Decimal('0')
+        
+        # Calculate COGS for this month using product-level data
+        month_cogs = Decimal('0')
+        
+        if month_revenue > 0:
+            # Get unique products sold this month
+            month_products = month_sales.values('product_id').distinct()
+            
+            for product in month_products:
+                product_id = product['product_id']
+                
+                # Get quantity sold this month for this product
+                product_month_sales = month_sales.filter(
+                    product_id=product_id
+                ).aggregate(
+                    quantity=Sum('quantity')
+                )
+                
+                quantity_sold = product_month_sales['quantity'] or 0
+                
+                if quantity_sold > 0:
+                    # Use average cost from our product map
+                    if product_id in product_cogs_map:
+                        avg_cost = Decimal(str(product_cogs_map[product_id]['avg_cost']))
+                    else:
+                        # Fallback to average purchase cost
+                        avg_cost_result = PurchaseOrderItem.objects.filter(
+                            product_id=product_id
+                        ).aggregate(
+                            avg_cost=Avg('unit_cost')
+                        )
+                        avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+                    
+                    month_cogs += avg_cost * quantity_sold
+        
+        # If no proper COGS, use estimated
+        if month_cogs == 0 and month_revenue > 0:
+            month_cogs = month_revenue * Decimal('0.60')
+        
+        # Calculate profit and margin
+        month_profit = month_revenue - month_cogs
+        month_margin = (month_profit / month_revenue * 100) if month_revenue else Decimal('0')
+        
+        monthly_trends.append({
+            'month': current_month.strftime('%Y-%m'),
+            'date': current_month.strftime('%b %Y'),
+            'revenue': float(month_revenue),
+            'cogs': float(month_cogs),
+            'profit': float(month_profit),
+            'margin': float(month_margin)
+        })
+        
+        # Move to next month
+        current_month = (current_month + timedelta(days=32)).replace(day=1)
+
+    # Convert to dictionary for template
+    monthly_trends_dict = {item['month']: item for item in monthly_trends}
+
+    # ---------------------
+    # CATEGORY PERFORMANCE with PROPER COGS
+    # ---------------------
+    category_performance = []
+    
+    # Get all categories from sales
+    sales_by_category = sales_items.values(
+        'product__category__id', 'product__category__name'
+    ).annotate(
+        revenue=Sum(REVENUE_EXPR),
+        quantity=Sum('quantity')
+    ).order_by('-revenue')
+    
+    for cat_data in sales_by_category:
+        category_id = cat_data['product__category__id']
+        category_name = cat_data['product__category__name'] or 'Uncategorized'
+        revenue = cat_data['revenue'] or Decimal('0')
+        quantity = cat_data['quantity'] or 0
+        
+        # Calculate COGS for this category using products in the category
+        category_cogs = Decimal('0')
+        
+        if revenue > 0:
+            # Get products in this category that were sold
+            category_products = sales_items.filter(
+                product__category_id=category_id
+            ).values('product_id').distinct()
+            
+            for product in category_products:
+                product_id = product['product_id']
+                
+                # Get quantity sold for this product in this category
+                product_sales = sales_items.filter(
+                    product_id=product_id,
+                    product__category_id=category_id
+                ).aggregate(
+                    quantity=Sum('quantity')
+                )
+                
+                product_quantity = product_sales['quantity'] or 0
+                
+                if product_quantity > 0:
+                    # Use average cost from our product map
+                    if product_id in product_cogs_map:
+                        avg_cost = Decimal(str(product_cogs_map[product_id]['avg_cost']))
+                    else:
+                        # Fallback to average purchase cost
+                        avg_cost_result = PurchaseOrderItem.objects.filter(
+                            product_id=product_id
+                        ).aggregate(
+                            avg_cost=Avg('unit_cost')
+                        )
+                        avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+                    
+                    category_cogs += avg_cost * product_quantity
+        
+        # If no proper COGS, use estimated
+        if category_cogs == 0 and revenue > 0:
+            category_cogs = revenue * Decimal('0.60')
+        
+        profit = revenue - category_cogs
+        margin = (profit / revenue * 100) if revenue else Decimal('0')
+        
+        category_performance.append({
+            'category': {
+                'id': category_id,
+                'name': category_name
+            },
+            'revenue': float(revenue),
+            'cogs': float(category_cogs),
+            'profit': float(profit),
+            'margin': float(margin),
+            'quantity': quantity
+        })
+
+    # ---------------------
+    # TOP PRODUCTS with PROPER profit margin
+    # ---------------------
+    top_products = []
+    
+    # Get top selling products
+    top_sales = sales_items.values(
+        'product__id', 'product__name', 'product__sku'
+    ).annotate(
+        revenue=Sum(REVENUE_EXPR),
+        quantity=Sum('quantity'),
+        avg_price=Avg('sale_price')
+    ).order_by('-revenue')[:10]
+    
+    for product_data in top_sales:
+        product_id = product_data['product__id']
+        revenue = product_data['revenue'] or Decimal('0')
+        quantity = product_data['quantity'] or 0
+        avg_price = product_data['avg_price'] or Decimal('0')
+        
+        # Calculate COGS for this product
+        product_cogs = Decimal('0')
+        
+        if revenue > 0:
+            if product_id in product_cogs_map:
+                # Use calculated COGS from our map
+                product_cogs = Decimal(str(product_cogs_map[product_id]['cogs']))
+            else:
+                # Calculate using average cost
+                avg_cost_result = PurchaseOrderItem.objects.filter(
+                    product_id=product_id
+                ).aggregate(
+                    avg_cost=Avg('unit_cost')
+                )
+                avg_cost = avg_cost_result['avg_cost'] or Decimal('0')
+                product_cogs = avg_cost * quantity
+        
+        # If still no COGS, use estimated
+        if product_cogs == 0 and revenue > 0:
+            product_cogs = revenue * Decimal('0.60')
+        
+        estimated_profit = revenue - product_cogs
+        profit_margin = (estimated_profit / revenue * 100) if revenue else Decimal('0')
+        
+        top_products.append({
+            'product__id': product_id,
+            'product__name': product_data['product__name'],
+            'product__sku': product_data['product__sku'],
+            'total_revenue': float(revenue),
+            'total_quantity': quantity,
+            'avg_price': float(avg_price),
+            'estimated_cogs': float(product_cogs),
+            'estimated_profit': float(estimated_profit),
+            'profit_margin': float(profit_margin)
+        })
+
+    # ---------------------
+    # NET PROFIT CALCULATION
+    # For now, use gross profit as net profit (before operating expenses)
+    # ---------------------
+    net_profit = gross_profit
+    net_profit_margin = gross_margin
+
+    # ---------------------
+    # ACCOUNTS RECEIVABLE
+    # ---------------------
+    accounts_receivable = None
     if store_id:
         store_filter = {'store_id': store_id}
+    else:
+        store_filter = {}
     
-    # 1. Revenue calculations
-    sales_qs = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()],
-        **store_filter
-    ).select_related('store')
-    
-    total_revenue = sales_qs.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-    
-    # 2. COGS calculations (Cost of Goods Sold)
-    cogs_details = calculate_cogs(start_date, end_date, store_filter, total_revenue)
-    
-    # 3. Profit calculations
-    total_cogs = cogs_details.get('total_cogs', Decimal('0'))
-    gross_profit = total_revenue - total_cogs
-    gross_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else Decimal('0')
-    
-    # 4. Product category analysis
-    category_performance = calculate_category_performance(start_date, end_date, store_filter)
-    
-    # 5. Accounts Receivable (based on balance > 0)
-    accounts_receivable = calculate_accounts_receivable(store_filter)
-    
-    # 6. Monthly trends
-    monthly_trends = calculate_monthly_trends(start_date, end_date, store_filter)
-    
-    # 7. Top performing products
-    top_products = calculate_top_products(start_date, end_date, store_filter)
-    
-    # Get all stores for filter
-    stores = StoreLocation.objects.filter(is_active=True)
-    
-    # Calculate net profit (simplified - assuming 20% operating costs)
-    net_profit = gross_profit * Decimal('0.8')
-    net_profit_margin = (net_profit / total_revenue * 100) if total_revenue > 0 else Decimal('0')
-    
-    # Generate report ID
-    report_id = f"FIN-{timezone.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-    
+    try:
+        accounts_receivable = calculate_accounts_receivable(store_filter)
+    except Exception as e:
+        print(f"Error calculating accounts receivable: {e}")
+        accounts_receivable = {
+            'total_ar': Decimal('0'),
+            'aging_buckets': {
+                'current': {'amount': Decimal('0'), 'count': 0},
+                '1_30': {'amount': Decimal('0'), 'count': 0},
+                '31_60': {'amount': Decimal('0'), 'count': 0},
+                '60_plus': {'amount': Decimal('0'), 'count': 0},
+            },
+            'invoices': []
+        }
+
+    # ---------------------
+    # PREPARE CONTEXT
+    # ---------------------
     context = {
         'total_revenue': total_revenue,
         'total_cogs': total_cogs,
         'gross_profit': gross_profit,
         'gross_margin': gross_margin,
-        'start_date': start_date.date(),
-        'end_date': end_date.date(),
-        'stores': stores,
-        'selected_store': store_id,
-        'date_range': date_range,
-        'cogs_details': cogs_details,
-        'category_performance': category_performance,
-        'accounts_receivable': accounts_receivable,
-        'monthly_trends': monthly_trends,
-        'top_products': top_products,
         'net_profit': net_profit,
         'net_profit_margin': net_profit_margin,
-        'report_id': report_id,
+        'cogs_ratio': cogs_ratio,
+        
+        # Data for tables and charts
+        'monthly_trends': monthly_trends_dict,
+        'category_performance': category_performance,
+        'top_products': top_products,
+        
+        # Accounts receivable data
+        'accounts_receivable': accounts_receivable,
+        
+        # Filter data
+        'stores': StoreLocation.objects.filter(is_active=True),
+        'selected_store': store_id,
+        'start_date': start_date,
+        'end_date': end_date,
+        'date_range': f"{start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}",
+        'report_id': f"FIN-{timezone.now():%Y%m%d}-{random.randint(1000,9999)}",
+        
+        # COGS details for the template
+        'cogs_details': {
+            'cogs_ratio': float(cogs_ratio),
+            'total_cogs': float(total_cogs),
+            'gross_margin': float(gross_margin)
+        }
     }
     
     return render(request, 'reports/financial_details.html', context)
-
-
-def calculate_cogs(start_date, end_date, store_filter, total_revenue):
-    """Calculate Cost of Goods Sold"""
-    # Get all sales in period
-    sales_items = SalesItem.objects.filter(
-        order__sale_date__range=[start_date.date(), end_date.date()],
-        order__store_id=store_filter.get('store_id') if store_filter else None
-    ).select_related('product', 'order')
-    
-    cogs_total = Decimal('0')
-    cogs_by_month = {}
-    
-    if not sales_items.exists():
-        return {
-            'total_cogs': Decimal('0'),
-            'cogs_by_month': {},
-            'cogs_ratio': 0,
-        }
-    
-    for item in sales_items:
-        # Get average purchase cost for this product
-        purchase_items = PurchaseOrderItem.objects.filter(product=item.product)
-        
-        avg_cost = Decimal('0')
-        if purchase_items.exists():
-            # Calculate weighted average cost
-            total_quantity = purchase_items.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
-            total_cost = purchase_items.aggregate(total=Sum('cost'))['total'] or Decimal('0')
-            avg_cost = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
-        
-        # If no purchase data or purchase data gives 0 cost, use fallback
-        if avg_cost == Decimal('0'):
-            # Fallback: use product's default price * 0.6 (assuming 40% margin)
-            default_price = item.product.default_price or Decimal('0')
-            if default_price > 0:
-                avg_cost = default_price * Decimal('0.6')
-            else:
-                # If no default price, use sale price * 0.6
-                avg_cost = item.sale_price * Decimal('0.6')
-        
-        item_cogs = avg_cost * Decimal(str(item.quantity))
-        cogs_total += item_cogs
-        
-        # Group by month
-        month_key = item.order.sale_date.strftime('%Y-%m')
-        cogs_by_month[month_key] = cogs_by_month.get(month_key, Decimal('0')) + item_cogs
-    
-    # Calculate COGS ratio correctly
-    cogs_ratio = float((cogs_total / total_revenue * 100)) if total_revenue > 0 else 0
-    
-    return {
-        'total_cogs': cogs_total,
-        'cogs_by_month': cogs_by_month,
-        'cogs_ratio': cogs_ratio,
-    }
-
-
-def calculate_category_performance(start_date, end_date, store_filter):
-    """Calculate performance by product category"""
-    # Get all sales items in the period
-    sales_items = SalesItem.objects.filter(
-        order__sale_date__range=[start_date.date(), end_date.date()],
-        order__store_id=store_filter.get('store_id') if store_filter else None
-    ).select_related('product__category')
-    
-    # Group by category
-    category_totals = {}
-    
-    for item in sales_items:
-        category = item.product.category
-        if not category:
-            continue
-        
-        # Initialize category if not exists
-        if category.id not in category_totals:
-            category_totals[category.id] = {
-                'category': category,
-                'revenue': Decimal('0'),
-                'quantity': 0,
-                'cogs': Decimal('0'),
-            }
-        
-        # Revenue
-        item_revenue = Decimal(str(item.quantity)) * item.sale_price
-        category_totals[category.id]['revenue'] += item_revenue
-        category_totals[category.id]['quantity'] += item.quantity
-        
-        # Calculate COGS for this item
-        purchase_items = PurchaseOrderItem.objects.filter(product=item.product)
-        item_cogs = Decimal('0')
-        
-        if purchase_items.exists():
-            total_quantity = purchase_items.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
-            total_cost = purchase_items.aggregate(total=Sum('cost'))['total'] or Decimal('0')
-            avg_cost = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
-            
-            if avg_cost == Decimal('0'):
-                # Fallback to 60% of sale price
-                avg_cost = item.sale_price * Decimal('0.6')
-        else:
-            # No purchase data, use fallback
-            avg_cost = item.sale_price * Decimal('0.6')
-        
-        item_cogs = avg_cost * Decimal(str(item.quantity))
-        category_totals[category.id]['cogs'] += item_cogs
-    
-    # Convert to list format
-    category_data = []
-    for cat_data in category_totals.values():
-        revenue = cat_data['revenue']
-        cogs = cat_data['cogs']
-        profit = revenue - cogs
-        margin = float((profit / revenue * 100)) if revenue > 0 else 0
-        
-        category_data.append({
-            'category': cat_data['category'],
-            'revenue': revenue,
-            'quantity': cat_data['quantity'],
-            'cogs': cogs,
-            'profit': profit,
-            'margin': margin,
-        })
-    
-    # Sort by revenue descending
-    return sorted(category_data, key=lambda x: x['revenue'], reverse=True)
-
 
 def calculate_accounts_receivable(store_filter):
     """Calculate accounts receivable"""
@@ -3966,218 +4111,28 @@ def calculate_accounts_receivable(store_filter):
         'aging_buckets': aging_buckets,
         'invoices': invoices,
     }
-
-
-def calculate_monthly_trends(start_date, end_date, store_filter):
-    """Calculate monthly revenue and profit trends"""
-    monthly_data = {}
     
-    # Generate all months in the range
-    # Convert start_date and end_date to date objects if they aren't already
-    if isinstance(start_date, date.date):
-        current = date.date(start_date.year, start_date.month, 1)
-        end = date.date(end_date.year, end_date.month, 1)
-    else:
-        # If start_date is already a date object
-        current = date.date(start_date.year, start_date.month, 1)
-        end = date.date(end_date.year, end_date.month, 1)
-    
-    while current <= end:
-        month_key = current.strftime('%Y-%m')
-        month_start = current
-        month_end = (current + timedelta(days=32)).replace(day=1)
-        
-        # Get monthly sales
-        monthly_sales = Sales.objects.filter(
-            sale_date__gte=month_start.date(),
-            sale_date__lt=month_end.date(),
-            **store_filter
-        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-        
-        # Get monthly COGS from sales items
-        sales_items = SalesItem.objects.filter(
-            order__sale_date__gte=month_start.date(),
-            order__sale_date__lt=month_end.date(),
-            order__store_id=store_filter.get('store_id') if store_filter else None
-        ).select_related('product', 'order')
-        
-        monthly_cogs = Decimal('0')
-        for item in sales_items:
-            purchase_items = PurchaseOrderItem.objects.filter(product=item.product)
-            
-            avg_cost = Decimal('0')
-            if purchase_items.exists():
-                total_quantity = purchase_items.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
-                total_cost = purchase_items.aggregate(total=Sum('cost'))['total'] or Decimal('0')
-                avg_cost = total_cost / total_quantity if total_quantity > 0 else Decimal('0')
-            
-            if avg_cost == Decimal('0'):
-                # Fallback to 60% of sale price
-                avg_cost = item.sale_price * Decimal('0.6')
-            
-            monthly_cogs += avg_cost * Decimal(str(item.quantity))
-        
-        monthly_profit = monthly_sales - monthly_cogs
-        monthly_margin = float((monthly_profit / monthly_sales * 100)) if monthly_sales > 0 else 0
-        
-        monthly_data[month_key] = {
-            'revenue': monthly_sales,
-            'cogs': monthly_cogs,
-            'profit': monthly_profit,
-            'margin': monthly_margin,
-            'date': current.strftime('%b %Y'),
-        }
-        
-        # Move to next month
-        if current.month == 12:
-            current = date.date(current.year + 1, 1, 1)
-        else:
-            current = date.date(current.year, current.month + 1, 1)
-    
-    return monthly_data
-
-
-def calculate_top_products(start_date, end_date, store_filter, limit=10):
-    """Calculate top performing products"""
-    # Get sales items aggregated by product
-    sales_items = SalesItem.objects.filter(
-        order__sale_date__range=[start_date.date(), end_date.date()],
-        order__store_id=store_filter.get('store_id') if store_filter else None
-    ).values('product__id', 'product__name', 'product__sku').annotate(
-        total_quantity=Sum('quantity'),
-        total_revenue=Sum(F('quantity') * F('sale_price')),
-        avg_price=Avg('sale_price')
-    ).order_by('-total_revenue')[:limit]
-    
-    top_products_list = []
-    for item in sales_items:
-        if item['total_revenue']:
-            # Estimate profit margin (60% of price as cost)
-            avg_price = item['avg_price'] or Decimal('0')
-            total_quantity = item['total_quantity'] or 0
-            
-            if avg_price > 0:
-                estimated_cost = avg_price * Decimal('0.6')
-                estimated_profit = (avg_price - estimated_cost) * Decimal(str(total_quantity))
-                profit_margin = float(((avg_price - estimated_cost) / avg_price * 100))
-            else:
-                estimated_profit = Decimal('0')
-                profit_margin = 0
-            
-            top_products_list.append({
-                'product__name': item['product__name'] or 'Unknown Product',
-                'product__sku': item['product__sku'] or 'N/A',
-                'total_revenue': item['total_revenue'],
-                'total_quantity': total_quantity,
-                'avg_price': avg_price,
-                'estimated_profit': estimated_profit,
-                'profit_margin': profit_margin,
-            })
-    
-    return top_products_list
-
-
 
 @login_required
 def export_financial_report(request, format):
-    """Export financial report in different formats"""
-    # Get the same data as the main view
-    end_date = timezone.now()
+    end_date = timezone.now().date()
     start_date = end_date - timedelta(days=90)
-    
-    # Recalculate all metrics
-    sales_qs = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
+
+    sales_items = SalesItem.objects.filter(
+        order__sale_date__range=[start_date, end_date]
     )
-    total_revenue = sales_qs.aggregate(total=Sum('total_amount'))['total'] or 0
-    cogs_details = calculate_cogs(start_date, end_date, {})
-    total_cogs = cogs_details.get('total_cogs', 0)
+
+    total_revenue = sales_items.aggregate(
+        total=Sum(REVENUE_EXPR)
+    )['total'] or Decimal('0')
+
+    total_cogs = PurchaseOrderItem.objects.filter(
+        order__purchase_date__range=[start_date, end_date]
+    ).aggregate(
+        total=Sum(COST_EXPR)
+    )['total'] or Decimal('0')
+
     gross_profit = total_revenue - total_cogs
-    
-    if format == 'csv':
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="financial_report_{timezone.now().strftime("%Y%m%d")}.csv"'
-        
-        writer = csv.writer(response)
-        writer.writerow(['Financial Report', f'{start_date.date()} to {end_date.date()}'])
-        writer.writerow([])
-        writer.writerow(['Metric', 'Value (UGX)'])
-        writer.writerow(['Total Revenue', total_revenue])
-        writer.writerow(['Total COGS', total_cogs])
-        writer.writerow(['Gross Profit', gross_profit])
-        writer.writerow(['Gross Margin', f'{(gross_profit/total_revenue*100) if total_revenue > 0 else 0:.2f}%'])
-        
-        return response
-    
-    elif format == 'pdf':
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="financial_report_{timezone.now().strftime("%Y%m%d")}.pdf"'
-        
-        # Create PDF
-        p = canvas.Canvas(response, pagesize=letter)
-        width, height = letter
-        
-        # Add title
-        p.setFont("Helvetica-Bold", 16)
-        p.drawString(50, height - 50, "Financial Report")
-        p.setFont("Helvetica", 12)
-        p.drawString(50, height - 70, f"Period: {start_date.date()} to {end_date.date()}")
-        
-        # Add metrics
-        y = height - 100
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(50, y, "Financial Metrics")
-        p.setFont("Helvetica", 10)
-        
-        metrics = [
-            ("Total Revenue:", f"UGX {total_revenue:,}"),
-            ("Total COGS:", f"UGX {total_cogs:,}"),
-            ("Gross Profit:", f"UGX {gross_profit:,}"),
-            ("Gross Margin:", f"{(gross_profit/total_revenue*100) if total_revenue > 0 else 0:.2f}%"),
-        ]
-        
-        for label, value in metrics:
-            y -= 20
-            p.drawString(70, y, label)
-            p.drawString(200, y, value)
-        
-        p.save()
-        return response
-    
-    elif format == 'excel':
-        output = io.BytesIO()
-        workbook = xlsxwriter.Workbook(output)
-        worksheet = workbook.add_worksheet('Financial Report')
-        
-        # Add headers
-        worksheet.write(0, 0, 'Financial Report')
-        worksheet.write(1, 0, f'Period: {start_date.date()} to {end_date.date()}')
-        
-        # Add metrics
-        metrics = [
-            ('Metric', 'Value (UGX)'),
-            ('Total Revenue', total_revenue),
-            ('Total COGS', total_cogs),
-            ('Gross Profit', gross_profit),
-            ('Gross Margin', f'{(gross_profit/total_revenue*100) if total_revenue > 0 else 0:.2f}%'),
-        ]
-        
-        for row, (label, value) in enumerate(metrics, start=3):
-            worksheet.write(row, 0, label)
-            worksheet.write(row, 1, value)
-        
-        workbook.close()
-        output.seek(0)
-        
-        response = HttpResponse(
-            output,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="financial_report_{timezone.now().strftime("%Y%m%d")}.xlsx"'
-        
-        return response
-    
-    return HttpResponse("Invalid export format", status=400)
 
 
 # ============================================================================
@@ -4189,9 +4144,256 @@ def export_financial_report(request, format):
 
 @login_required
 def productmaster_details(request):
-    """Reports dashboard view"""
-    context = {}
+    """Product Master Reports - REAL production view using EXISTING models"""
+    
+    # Get all data using your existing models
+    all_products = Product.objects.select_related('category').prefetch_related('inventories').all()
+    
+    # 1. Basic Statistics
+    total_products = all_products.count()
+    active_products = all_products.filter(is_active=True).count()
+    inactive_products = total_products - active_products
+    
+    categories = Category.objects.annotate(product_count=Count('products')).order_by('-product_count')
+    categories_count = categories.count()
+    
+    # Calculate products with SKU
+    total_skus = all_products.filter(sku__isnull=False).exclude(sku='').count()
+    
+    # 2. Stock analysis
+    products_with_stock = sum(1 for p in all_products if p.total_stock > 0)
+    out_of_stock_products = total_products - products_with_stock
+    total_stock = sum(p.total_stock for p in all_products)
+    
+    # 3. Percentages
+    if total_products > 0:
+        active_percentage = (active_products / total_products) * 100
+        inactive_percentage = (inactive_products / total_products) * 100
+        with_stock_percentage = (products_with_stock / total_products) * 100
+        out_of_stock_percentage = (out_of_stock_products / total_products) * 100
+    else:
+        active_percentage = inactive_percentage = with_stock_percentage = out_of_stock_percentage = 0
+    
+    # 4. Category analysis
+    largest_category = categories.first() if categories else None
+    smallest_category = categories.last() if categories else None
+    empty_categories = categories.filter(product_count=0).count()
+    
+    # Calculate low stock categories - FIXED SYNTAX
+    low_stock_categories = 0
+    for category in categories:
+        category_products = category.products.all()
+        low_stock_count = 0
+        for p in category_products:
+            if p.inventories.exists():
+                inventory = p.inventories.first()
+                if p.total_stock <= inventory.reorder_level:
+                    low_stock_count += 1
+            else:
+                # If no inventory record, consider it out of stock
+                low_stock_count += 1
+        
+        if low_stock_count > 0:
+            low_stock_categories += 1
+    
+    # Average products per category
+    avg_products_per_category = categories.aggregate(avg=Avg('product_count'))['avg'] or 0
+    
+    # 5. Paginate products for catalog tab
+    page = request.GET.get('page', 1)
+    paginator = Paginator(all_products.order_by('name'), 12)  # 12 products per page
+    products_page = paginator.get_page(page)
+    
+    # 6. Products for status tab
+    status_page = request.GET.get('status_page', 1)
+    status_paginator = Paginator(all_products.order_by('-is_active', 'name'), 20)
+    status_products = status_paginator.get_page(status_page)
+    
+    # 7. Recent products (for timeline)
+    recent_products = all_products.order_by('-created_at')[:10]
+    
+    # 8. SKU/Barcode data
+    sku_products = all_products.filter(sku__isnull=False).exclude(sku='')[:50]
+    sku_count = all_products.filter(sku__isnull=False).exclude(sku='').count()
+    no_sku_count = total_products - sku_count
+    barcode_count = all_products.filter(barcode__isnull=False).exclude(barcode='').count()
+    no_barcode_count = total_products - barcode_count
+    
+    # 9. Creation statistics
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    week_start = today - timedelta(days=today.weekday())
+    
+    products_today = all_products.filter(created_at__date=today).count()
+    products_this_week = all_products.filter(created_at__date__gte=week_start).count()
+    products_this_month = all_products.filter(created_at__date__gte=month_start).count()
+    
+    # Calculate creation trend
+    last_month_start = (month_start - timedelta(days=1)).replace(day=1)
+    products_last_month = all_products.filter(
+        created_at__date__gte=last_month_start,
+        created_at__date__lt=month_start
+    ).count()
+    
+    if products_last_month > 0:
+        creation_trend = ((products_this_month - products_last_month) / products_last_month) * 100
+    else:
+        creation_trend = 0 if products_this_month == 0 else 100
+    
+    # Most active category (by product count)
+    most_active_category = categories.first()
+    
+    # Average creation rate per month
+    if all_products.exists():
+        first_product_date = all_products.order_by('created_at').first().created_at.date()
+        months_diff = (today.year - first_product_date.year) * 12 + (today.month - first_product_date.month) + 1
+        avg_creation_rate = total_products / max(months_diff, 1)
+    else:
+        avg_creation_rate = 0
+    
+    # Most active month
+    from django.db.models.functions import TruncMonth
+    month_counts = all_products.annotate(
+        month=TruncMonth('created_at')
+    ).values('month').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    most_active_month = month_counts.first()['month'].strftime('%B %Y') if month_counts else 'N/A'
+    
+    context = {
+        'current_date': timezone.now(),
+        
+        # Statistics
+        'total_products': total_products,
+        'active_products': active_products,
+        'inactive_products': inactive_products,
+        'categories_count': categories_count,
+        'total_skus': total_skus,
+        'total_stock': total_stock,
+        
+        # Stock analysis
+        'products_with_stock': products_with_stock,
+        'out_of_stock_products': out_of_stock_products,
+        
+        # Percentages
+        'active_percentage': active_percentage,
+        'inactive_percentage': inactive_percentage,
+        'with_stock_percentage': with_stock_percentage,
+        'out_of_stock_percentage': out_of_stock_percentage,
+        
+        # Category data
+        'categories': categories,
+        'largest_category': largest_category,
+        'smallest_category': smallest_category,
+        'empty_categories': empty_categories,
+        'low_stock_categories': low_stock_categories,
+        'avg_products_per_category': avg_products_per_category,
+        'most_active_category': most_active_category,
+        
+        # Paginated data
+        'products': products_page,
+        'status_products': status_products,
+        'recent_products': recent_products,
+        'sku_products': sku_products,
+        
+        # SKU/Barcode stats
+        'sku_count': sku_count,
+        'no_sku_count': no_sku_count,
+        'barcode_count': barcode_count,
+        'no_barcode_count': no_barcode_count,
+        
+        # Creation stats
+        'products_today': products_today,
+        'products_this_week': products_this_week,
+        'products_this_month': products_this_month,
+        'creation_trend': creation_trend,
+        'avg_creation_rate': avg_creation_rate,
+        'most_active_month': most_active_month,
+    }
+    
     return render(request, 'reports/productmaster_details.html', context)
+
+
+@login_required
+def export_product_report(request, format):
+    """Export product reports in various formats"""
+    from django.http import HttpResponse
+    import csv
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    import io
+    
+    if format == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="product_report.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow(['Product Name', 'SKU', 'Category', 'Status', 'Stock', 'Price'])
+        
+        for product in Product.objects.all():
+            writer.writerow([
+                product.name,
+                product.sku,
+                product.category.name if product.category else '',
+                'Active' if product.is_active else 'Inactive',
+                product.total_stock,
+                product.default_price or 0
+            ])
+        
+        return response
+    
+    elif format == 'pdf':
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="product_report.pdf"'
+        
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        p.drawString(100, 750, "Product Master Report")
+        p.drawString(100, 730, f"Generated: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+        p.drawString(100, 710, f"Total Products: {Product.objects.count()}")
+        p.showPage()
+        p.save()
+        
+        pdf = buffer.getvalue()
+        buffer.close()
+        response.write(pdf)
+        
+        return response
+    
+    return HttpResponse('Invalid format', status=400)
+
+
+@login_required
+def get_product_catalog_data(request):
+    """API endpoint for product catalog data (for AJAX)"""
+    import json
+    from django.core import serializers
+    
+    products = Product.objects.all()
+    data = serializers.serialize('json', products)
+    return HttpResponse(data, content_type='application/json')
+
+
+@login_required
+def get_product_statistics(request):
+    """API endpoint for product statistics"""
+    from django.http import JsonResponse
+    
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    
+    stats = {
+        'total_products': Product.objects.count(),
+        'active_products': Product.objects.filter(is_active=True).count(),
+        'new_this_month': Product.objects.filter(created_at__gte=month_start).count(),
+        'out_of_stock': Product.objects.filter(inventories__quantity_in_stock=0).distinct().count(),
+        'low_stock': Product.objects.filter(
+            inventories__quantity_in_stock__lte=F('inventories__reorder_level')
+        ).distinct().count(),
+    }
+    
+    return JsonResponse(stats)
 
 
 # ============================================================================
@@ -4203,8 +4405,240 @@ def productmaster_details(request):
 
 @login_required
 def reorder_details(request):
-    """Reports dashboard view"""
-    context = {}
+    """Reorder & Low Stock Reports view"""
+    
+    # Get all active stores
+    stores = StoreLocation.objects.filter(is_active=True)
+    
+    # Get current date for calculations
+    today = timezone.now().date()
+    
+    # 1. BELOW REORDER LEVEL ITEMS
+    below_reorder_items = []
+    for inventory in Inventory.objects.filter(
+        quantity_in_stock__gt=0  # Only items with some stock
+    ).select_related('product', 'store'):
+        
+        # Calculate stock percentage relative to reorder level
+        if inventory.reorder_level > 0:
+            stock_percentage = (inventory.quantity_in_stock / inventory.reorder_level) * 100
+        else:
+            stock_percentage = 0
+            
+        # Determine priority
+        if inventory.quantity_in_stock == 0:
+            priority = 'critical'
+        elif stock_percentage <= 50:
+            priority = 'critical'
+        elif stock_percentage <= 75:
+            priority = 'high'
+        elif stock_percentage <= 90:
+            priority = 'medium'
+        else:
+            priority = 'low'
+        
+        # Calculate average daily sales (last 30 days)
+        thirty_days_ago = today - timedelta(days=30)
+        total_sales = SalesItem.objects.filter(
+            product=inventory.product,
+            order__sale_date__gte=thirty_days_ago,
+            order__store=inventory.store
+        ).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+        
+        avg_daily_sales = total_sales / 30 if total_sales > 0 else 0
+        
+        # Calculate days until stockout
+        days_until_stockout = inventory.quantity_in_stock / avg_daily_sales if avg_daily_sales > 0 else 999
+        
+        # Get days below reorder level (simplified - would need historical tracking)
+        days_below_reorder = 0  # You would need to track this historically
+        
+        if inventory.quantity_in_stock <= inventory.reorder_level:
+            below_reorder_items.append({
+                'inventory': inventory,
+                'stock_percentage': stock_percentage,
+                'priority': priority,
+                'avg_daily_sales': round(avg_daily_sales, 1),
+                'days_until_stockout': round(days_until_stockout, 1),
+                'days_below_reorder': days_below_reorder,
+                'stock_value': inventory.quantity_in_stock * inventory.product.default_price
+            })
+    
+    # Sort by priority (critical first)
+    below_reorder_items.sort(key=lambda x: {
+        'critical': 0, 'high': 1, 'medium': 2, 'low': 3
+    }[x['priority']])
+    
+    # 2. OUT OF STOCK ITEMS
+    out_of_stock_items = []
+    for inventory in Inventory.objects.filter(
+        quantity_in_stock=0
+    ).select_related('product', 'store'):
+        
+        # Get last sale date
+        last_sale = SalesItem.objects.filter(
+            product=inventory.product,
+            order__store=inventory.store
+        ).order_by('-order__sale_date').first()
+        
+        # Count backorders/requests (would need a backorder model)
+        backorders = 0
+        
+        # Get supplier info (from purchase orders)
+        last_purchase = PurchaseOrderItem.objects.filter(
+            product=inventory.product
+        ).order_by('-order__purchase_date').first()
+        
+        supplier = last_purchase.order.supplier if last_purchase else None
+        
+        # Calculate days out of stock
+        days_out = 0  # You would need to track when it went out of stock
+        
+        # Determine urgency based on sales velocity
+        thirty_days_ago = today - timedelta(days=30)
+        sales_last_month = SalesItem.objects.filter(
+            product=inventory.product,
+            order__sale_date__gte=thirty_days_ago,
+            order__store=inventory.store
+        ).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+        
+        if sales_last_month > 20:
+            urgency = 'critical'
+        elif sales_last_month > 10:
+            urgency = 'high'
+        elif sales_last_month > 0:
+            urgency = 'medium'
+        else:
+            urgency = 'low'
+        
+        out_of_stock_items.append({
+            'inventory': inventory,
+            'last_sale': last_sale.order.sale_date if last_sale else None,
+            'backorders': backorders,
+            'supplier': supplier,
+            'days_out': days_out,
+            'urgency': urgency,
+            'sales_last_month': sales_last_month
+        })
+    
+    # Sort by urgency
+    out_of_stock_items.sort(key=lambda x: {
+        'critical': 0, 'high': 1, 'medium': 2, 'low': 3
+    }[x['urgency']])
+    
+    # 3. STORE-SPECIFIC LOW STOCK
+    store_specific_data = {}
+    for store in stores:
+        low_stock_in_store = []
+        
+        for inventory in Inventory.objects.filter(
+            store=store,
+            quantity_in_stock__gt=0,  # Has some stock
+            quantity_in_stock__lte=F('reorder_level') * 2  # Below 2x reorder level
+        ).select_related('product'):
+            
+            # Get stock in other stores
+            other_store_stock = []
+            for other_store in stores.exclude(id=store.id):
+                try:
+                    other_inv = Inventory.objects.get(
+                        product=inventory.product,
+                        store=other_store
+                    )
+                    if other_inv.quantity_in_stock > inventory.reorder_level * 1.5:  # Has excess stock
+                        other_store_stock.append({
+                            'store': other_store,
+                            'quantity': other_inv.quantity_in_stock
+                        })
+                except Inventory.DoesNotExist:
+                    continue
+            
+            # Determine transfer recommendation
+            if other_store_stock:
+                # Can transfer from other stores
+                best_source = max(other_store_stock, key=lambda x: x['quantity'])
+                
+                # Get the reorder level for the source store
+                try:
+                    source_inventory = Inventory.objects.get(
+                        product=inventory.product,
+                        store=best_source['store']
+                    )
+                    source_reorder_level = source_inventory.reorder_level
+                except Inventory.DoesNotExist:
+                    source_reorder_level = 10  # Default
+                
+                # Calculate suggested units
+                suggested_units = min(
+                    inventory.reorder_level - inventory.quantity_in_stock,
+                    best_source['quantity'] - source_reorder_level
+                )
+                suggested_units = max(suggested_units, 1)  # At least 1 unit
+                
+                recommendation = {
+                    'type': 'transfer',
+                    'from_store': best_source['store'],
+                    'suggested_units': suggested_units,
+                    'lead_time': '1-2 days'
+                }
+            else:
+                # Need to reorder from supplier
+                recommendation = {
+                    'type': 'reorder',
+                    'lead_time': '4-5 days'
+                }
+            
+            low_stock_in_store.append({
+                'inventory': inventory,
+                'other_store_stock': other_store_stock,
+                'recommendation': recommendation
+            })
+        
+        store_specific_data[store] = low_stock_in_store
+    
+    # 4. SUMMARY STATISTICS
+    total_out_of_stock = Inventory.objects.filter(quantity_in_stock=0).count()
+    total_below_reorder = len(below_reorder_items)
+    
+    # Calculate total value at risk
+    total_value_at_risk = sum(
+        item['stock_value'] for item in below_reorder_items
+    ) + sum(
+        item['inventory'].reorder_level * item['inventory'].product.default_price
+        for item in below_reorder_items if item['inventory'].quantity_in_stock == 0
+    )
+    
+    # Store-wise counts
+    store_stats = {}
+    for store in stores:
+        store_stats[store.name] = {
+            'low_stock': Inventory.objects.filter(
+                store=store,
+                quantity_in_stock__gt=0,
+                quantity_in_stock__lte=F('reorder_level')
+            ).count(),
+            'out_of_stock': Inventory.objects.filter(
+                store=store,
+                quantity_in_stock=0
+            ).count()
+        }
+    
+    context = {
+        'below_reorder_items': below_reorder_items[:50],  # Limit to 50 items
+        'out_of_stock_items': out_of_stock_items[:50],
+        'store_specific_data': store_specific_data,
+        'stores': stores,
+        'total_out_of_stock': total_out_of_stock,
+        'total_below_reorder': total_below_reorder,
+        'total_value_at_risk': total_value_at_risk,
+        'store_stats': store_stats,
+        'report_id': f"STOCK-ALERT-{today.strftime('%Y%m%d')}-001",
+        'report_date': today,
+        'urgent_count': len([item for item in below_reorder_items if item['priority'] == 'critical']),
+        'warning_count': len([item for item in below_reorder_items if item['priority'] == 'high']),
+        'monitor_count': len([item for item in below_reorder_items if item['priority'] in ['medium', 'low']]),
+    }
+    
     return render(request, 'reports/reorder_details.html', context)
 
 
@@ -4215,11 +4649,509 @@ def reorder_details(request):
 # Default Store Analysis
 # ============================================================================
 
+def decimal_to_float(obj):
+    """Convert Decimal objects to float for JSON serialization"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
 @login_required
 def stocklocation_details(request):
-    """Reports dashboard view"""
-    context = {}
+    """Store Location Reports dashboard view - Fully Dynamic"""
+    
+    # Get all active stores
+    stores = StoreLocation.objects.filter(is_active=True)
+    
+    # Date range - default to current month
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    
+    if start_date_str and end_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = date.today().replace(day=1)
+            end_date = date.today()
+    else:
+        start_date = date.today().replace(day=1)
+        end_date = date.today()
+    
+    # Get actual sales status from model
+    actual_sales_statuses = Sales.objects.values_list('status', flat=True).distinct()
+    
+    # Determine which status to use for "completed" sales
+    possible_statuses = ['FULFILLED', 'Fulfilled', 'COMPLETED', 'Completed']
+    sales_status = None
+    
+    for status in possible_statuses:
+        if status in actual_sales_statuses:
+            sales_status = status
+            break
+    
+    # If no matching status found, use the first available status
+    if not sales_status and actual_sales_statuses:
+        sales_status = actual_sales_statuses[0]
+    
+    # Calculate store metrics
+    store_reports = []
+    
+    # Get all store sales for calculating averages
+    all_store_sales = {}
+    for store in stores:
+        sales_data = Sales.objects.filter(
+            store=store,
+            sale_date__range=[start_date, end_date],
+            status=sales_status
+        ).aggregate(
+            total_sales=Sum('total_amount'),
+            total_transactions=Count('id'),
+            avg_sale_value=Avg('total_amount')
+        )
+        all_store_sales[store.id] = sales_data['total_sales'] or 0
+    
+    # Calculate average sales across all stores
+    total_sales_all_stores = sum(all_store_sales.values())
+    avg_sales_all_stores = float(total_sales_all_stores) / len(stores) if stores else 0 
+    
+    for store in stores:
+        # Sales metrics for the period
+        sales_data = Sales.objects.filter(
+            store=store,
+            sale_date__range=[start_date, end_date],
+            status=sales_status
+        ).aggregate(
+            total_sales=Sum('total_amount'),
+            total_transactions=Count('id'),
+            avg_sale_value=Avg('total_amount')
+        )
+        
+        # Convert Decimal to float for calculations
+        total_sales_val = float(sales_data['total_sales'] or 0)
+        avg_sale_val = float(sales_data['avg_sale_value'] or 0)
+        
+        # Inventory metrics
+        inventory_data = Inventory.objects.filter(store=store).aggregate(
+            total_skus=Count('product', distinct=True),
+            total_items=Sum('quantity_in_stock'),
+            low_stock_items=Count('id', filter=Q(quantity_in_stock__lte=F('reorder_level'))),
+            zero_stock_items=Count('id', filter=Q(quantity_in_stock=0))
+        )
+        
+        # Get purchase order status from model
+        purchase_statuses = PurchaseOrder.objects.values_list('status', flat=True).distinct()
+        purchase_status = 'received' if 'received' in purchase_statuses else purchase_statuses[0] if purchase_statuses else None
+        
+        # Purchase metrics
+        purchase_data = {}
+        if purchase_status:
+            purchase_data = PurchaseOrder.objects.filter(
+                store=store,
+                purchase_date__range=[start_date, end_date],
+                status=purchase_status
+            ).aggregate(
+                total_purchases=Sum('total_cost'),
+                purchase_orders=Count('id')
+            )
+            # Convert Decimal to float
+            if purchase_data['total_purchases']:
+                purchase_data['total_purchases'] = float(purchase_data['total_purchases'])
+        else:
+            purchase_data = {'total_purchases': 0, 'purchase_orders': 0}
+        
+        # Get stock transfer status from model
+        transfer_statuses = StockTransfer.objects.values_list('status', flat=True).distinct()
+        completed_status = 'completed' if 'completed' in transfer_statuses else transfer_statuses[0] if transfer_statuses else None
+        
+        # Transfer metrics
+        transfers_out = {'total_items': 0}
+        transfers_out_value = 0
+        
+        if completed_status:
+            transfers_out = StockTransfer.objects.filter(
+                from_store=store,
+                transfer_date__range=[start_date, end_date],
+                status=completed_status
+            ).aggregate(
+                total_items=Sum('items__quantity')
+            )
+            
+            completed_transfers = StockTransfer.objects.filter(
+                from_store=store,
+                transfer_date__range=[start_date, end_date],
+                status=completed_status
+            )
+            for transfer in completed_transfers:
+                transfers_out_value += float(transfer.total_value or 0)
+        
+        transfers_in = {'total_items': 0}
+        if completed_status:
+            transfers_in = StockTransfer.objects.filter(
+                to_store=store,
+                transfer_date__range=[start_date, end_date],
+                status=completed_status
+            ).aggregate(
+                total_items=Sum('items__quantity')
+            )
+        
+        # Stock movement activity (last 7 days)
+        week_ago = end_date - timedelta(days=7)
+        recent_activity = StockMovement.objects.filter(
+            store=store,
+            timestamp__date__gte=week_ago
+        ).count()
+        
+        # Capacity/utilization calculation
+        total_batches = InventoryBatch.objects.filter(store=store, remaining_quantity__gt=0)
+        total_units = total_batches.aggregate(total=Sum('remaining_quantity'))['total'] or 0
+        
+        max_quantity_ever = InventoryBatch.objects.filter(store=store).aggregate(
+            max_quantity=Sum('quantity')
+        )['max_quantity'] or 0
+        
+        if max_quantity_ever > 0:
+            utilization_percentage = min(100, round((total_units / max_quantity_ever) * 100, 1))
+        else:
+            utilization_percentage = 0
+        
+        # Determine performance score (0-10)
+        performance_score = 6.0
+        
+        # Adjust based on sales performance (0-2 points)
+        store_sales = total_sales_val
+        if avg_sales_all_stores > 0:
+            sales_ratio = store_sales / avg_sales_all_stores
+            if sales_ratio >= 1.5:
+                performance_score += 2.0
+            elif sales_ratio >= 1.2:
+                performance_score += 1.5
+            elif sales_ratio >= 0.8:
+                performance_score += 1.0
+            elif sales_ratio >= 0.5:
+                performance_score += 0.5
+        
+        # Adjust based on inventory utilization (0-1.5 points)
+        if 70 <= utilization_percentage <= 85:
+            performance_score += 1.5
+        elif 60 <= utilization_percentage < 70 or 85 < utilization_percentage <= 90:
+            performance_score += 1.0
+        elif 50 <= utilization_percentage < 60 or 90 < utilization_percentage <= 95:
+            performance_score += 0.5
+        elif utilization_percentage > 95:
+            performance_score -= 0.5
+        
+        # Adjust based on stock availability (0-1 point)
+        total_skus = inventory_data['total_skus'] or 0
+        low_stock_items = inventory_data['low_stock_items'] or 0
+        if total_skus > 0:
+            low_stock_ratio = low_stock_items / total_skus
+            if low_stock_ratio <= 0.1:
+                performance_score += 1.0
+            elif low_stock_ratio <= 0.2:
+                performance_score += 0.5
+            elif low_stock_ratio > 0.3:
+                performance_score -= 0.5
+        
+        # Adjust based on activity (0-0.5 points)
+        if recent_activity > 20:
+            performance_score += 0.5
+        elif recent_activity > 10:
+            performance_score += 0.25
+        
+        # Cap score between 0 and 10
+        performance_score = max(0, min(10, round(performance_score, 1)))
+        
+        # Determine performance category
+        if performance_score >= 8.5:
+            performance_category = 'excellent'
+            performance_badge = 'performance-excellent'
+            score_class = 'score-excellent'
+        elif performance_score >= 7.0:
+            performance_category = 'good'
+            performance_badge = 'performance-good'
+            score_class = 'score-good'
+        else:
+            performance_category = 'fair'
+            performance_badge = 'performance-fair'
+            score_class = 'score-fair'
+        
+        # Calculate efficiency score based on multiple factors
+        efficiency_score = 70
+        
+        # Add based on utilization (max 10 points)
+        if 70 <= utilization_percentage <= 85:
+            efficiency_score += 10
+        elif 60 <= utilization_percentage < 70 or 85 < utilization_percentage <= 90:
+            efficiency_score += 5
+        
+        # Add based on sales performance (max 10 points)
+        if store_sales > 0 and avg_sales_all_stores > 0:
+            sales_eff = min(store_sales / avg_sales_all_stores * 10, 10)
+            efficiency_score += sales_eff
+        
+        # Add based on low stock management (max 5 points)
+        if total_skus > 0:
+            low_stock_ratio = low_stock_items / total_skus
+            if low_stock_ratio <= 0.1:
+                efficiency_score += 5
+            elif low_stock_ratio <= 0.2:
+                efficiency_score += 3
+        
+        # Cap efficiency score at 100%
+        efficiency_score = min(100, efficiency_score)
+        
+        # Calculate growth rate
+        previous_month_start = (start_date - timedelta(days=30)).replace(day=1)
+        previous_month_end = start_date - timedelta(days=1)
+        
+        previous_sales = Sales.objects.filter(
+            store=store,
+            sale_date__range=[previous_month_start, previous_month_end],
+            status=sales_status
+        ).aggregate(total_sales=Sum('total_amount'))['total_sales'] or 0
+        previous_sales = float(previous_sales)
+
+        current_sales = store_sales
+        if previous_sales > 0:
+            growth_rate = ((current_sales - previous_sales) / previous_sales) * 100
+            # Cap unrealistic growth percentages
+            if growth_rate > 500:
+                growth_rate = 500
+        elif current_sales > 0:
+            growth_rate = 100  # First time sales
+        else:
+            growth_rate = 0
+            
+        
+        # Generate dynamic color based on store ID
+        color_index = store.id % 6
+        color_classes = ['store-primary', 'store-secondary', 'store-success', 
+                        'store-warning', 'store-danger', 'store-info']
+        store_color_class = color_classes[color_index]
+        
+        # Build store report with float values for JSON serialization
+        store_report = {
+            'store': store,
+            'color_class': store_color_class,
+            'sales_data': {
+                'total_sales': total_sales_val,
+                'total_transactions': sales_data['total_transactions'] or 0,
+                'avg_sale_value': avg_sale_val,
+            },
+            'inventory_data': {
+                'total_skus': inventory_data['total_skus'] or 0,
+                'total_items': inventory_data['total_items'] or 0,
+                'low_stock_items': inventory_data['low_stock_items'] or 0,
+                'zero_stock_items': inventory_data['zero_stock_items'] or 0,
+            },
+            'purchase_data': purchase_data,
+            'transfers_out': {
+                'total_items': transfers_out['total_items'] or 0,
+                'total_value': transfers_out_value
+            },
+            'transfers_in': transfers_in,
+            'recent_activity': recent_activity,
+            'utilization_percentage': utilization_percentage,
+            'performance_score': performance_score,
+            'performance_category': performance_category,
+            'performance_badge': performance_badge,
+            'score_class': score_class,
+            'efficiency_score': round(efficiency_score),
+            'growth_rate': round(growth_rate, 1),
+            'total_units': total_units,
+            'max_capacity': max_quantity_ever,
+            'is_default': store.is_default,
+        }
+        
+        store_reports.append(store_report)
+    
+    # Get default store
+    default_store = stores.filter(is_default=True).first()
+    
+    # Get default store report
+    default_store_report = None
+    if default_store:
+        for report in store_reports:
+            if report['store'].id == default_store.id:
+                default_store_report = report
+                break
+    
+    # Generate chart data
+    # Sales trend chart data
+    sales_trend_labels = []
+    sales_trend_data = {}
+    
+    # Generate labels for the last 7 days
+    for i in range(6, -1, -1):
+        day = end_date - timedelta(days=i)
+        sales_trend_labels.append(day.strftime('%b %d'))
+    
+    # Get sales data for each store for the last 7 days
+    for store_report in store_reports:
+        store = store_report['store']
+        store_data = []
+        
+        for i in range(6, -1, -1):
+            day = end_date - timedelta(days=i)
+            daily_sales = Sales.objects.filter(
+                store=store,
+                sale_date=day,
+                status=sales_status
+            ).aggregate(total=Sum('total_amount'))['total'] or 0
+            store_data.append(float(daily_sales) / 1000000)  # Convert to millions
+            
+        sales_trend_data[store.name] = {
+            'data': store_data,
+            'color': get_dynamic_chart_color(store.id)
+        }
+    
+    # Capacity utilization chart data
+    capacity_labels = [report['store'].name for report in store_reports]
+    capacity_data = [report['utilization_percentage'] for report in store_reports]
+    capacity_colors = [get_dynamic_chart_color(report['store'].id) for report in store_reports]
+    
+    # Activity chart data (transactions per day for last 7 days - not hourly)
+    activity_labels = []
+    activity_data = {}
+    
+    # Generate labels for the last 7 days
+    for i in range(6, -1, -1):
+        day = end_date - timedelta(days=i)
+        activity_labels.append(day.strftime('%a %d'))
+    
+    # Generate activity data based on recent transactions
+    for store_report in store_reports[:3]:  # Show only first 3 stores for clarity
+        store = store_report['store']
+        
+        daily_data = []
+        
+        for i in range(6, -1, -1):
+            day = end_date - timedelta(days=i)
+            
+            # Count transactions for this day
+            daily_transactions = Sales.objects.filter(
+                store=store,
+                sale_date=day,
+                status=sales_status
+            ).count()
+            
+            daily_data.append(daily_transactions)
+        
+        activity_data[store.name] = {
+            'data': daily_data,
+            'color': get_dynamic_chart_color(store.id)
+        }
+    
+    # Comparison radar chart data
+    comparison_labels = ['Sales', 'Efficiency', 'Growth', 'Activity', 'Utilization', 'Stock Health']
+    comparison_data = {}
+    
+    for store_report in store_reports[:3]:  # Show only first 3 stores
+        store = store_report['store']
+        
+        # Calculate radar scores (0-100)
+        sales_score = min(100, (store_report['sales_data']['total_sales'] or 0) / 1000000 * 20)
+        efficiency_score = store_report['efficiency_score']
+        growth_score = min(100, max(0, 50 + store_report['growth_rate']))
+        
+        # Activity score based on recent activity
+        activity_score = min(100, store_report['recent_activity'] * 5)
+        
+        # Utilization score
+        utilization_score = store_report['utilization_percentage']
+        
+        # Stock health score (higher is better - less low stock items)
+        total_skus = store_report['inventory_data']['total_skus'] or 1
+        low_stock_items = store_report['inventory_data']['low_stock_items'] or 0
+        stock_health_score = max(0, 100 - (low_stock_items / total_skus * 100))
+        
+        radar_data = [
+            sales_score,
+            efficiency_score,
+            growth_score,
+            activity_score,
+            utilization_score,
+            stock_health_score
+        ]
+        
+        comparison_data[store.name] = {
+            'data': radar_data,
+            'color': get_dynamic_chart_color(store.id),
+            'border_color': get_dynamic_border_color(store.id)
+        }
+    
+    # Calculate best performing store
+    best_performing = None
+    if store_reports:
+        best_performing_report = max(store_reports, key=lambda x: x['performance_score'])
+        best_performing = best_performing_report['store']
+    
+    # Calculate total sales across all stores
+    total_sales = sum((report['sales_data']['total_sales'] or 0) for report in store_reports)
+    
+    # Calculate average utilization
+    avg_utilization = 0
+    if store_reports:
+        avg_utilization = round(sum(report['utilization_percentage'] for report in store_reports) / len(store_reports), 1)
+    
+    # Prepare context - using custom JSON encoder for Decimal objects
+    context = {
+        'stores': stores,
+        'store_reports': store_reports,
+        'default_store': default_store,
+        'default_store_report': default_store_report,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_stores': stores.count(),
+        'total_sales': total_sales,
+        'avg_utilization': avg_utilization,
+        'best_performing': best_performing,
+        'sales_status': sales_status,
+        # Chart data as JSON - using custom encoder
+        'sales_trend_labels': json.dumps(sales_trend_labels),
+        'sales_trend_data': json.dumps(sales_trend_data, default=decimal_to_float),
+        'capacity_labels': json.dumps(capacity_labels),
+        'capacity_data': json.dumps(capacity_data, default=decimal_to_float),
+        'capacity_colors': json.dumps(capacity_colors),
+        'activity_labels': json.dumps(activity_labels),
+        'activity_data': json.dumps(activity_data, default=decimal_to_float),
+        'comparison_labels': json.dumps(comparison_labels),
+        'comparison_data': json.dumps(comparison_data, default=decimal_to_float),
+    }
+    
     return render(request, 'reports/stocklocation_details.html', context)
+
+# Dynamic color helper functions
+def get_dynamic_chart_color(store_id):
+    """Generate a consistent chart color based on store ID"""
+    colors = [
+        '#4A90E2',  # Blue
+        '#36B9CC',  # Cyan
+        '#1CC88A',  # Green
+        '#F6C23E',  # Yellow
+        '#E74A3B',  # Red
+        '#6C757D',  # Gray
+        '#4E73DF',  # Indigo
+        '#1CC88A',  # Teal
+        '#F6C23E',  # Orange
+    ]
+    return colors[store_id % len(colors)]
+
+
+def get_dynamic_border_color(store_id):
+    """Generate a consistent border color based on store ID"""
+    colors = [
+        '#357ABD',  # Darker Blue
+        '#2A9CA5',  # Darker Cyan
+        '#17A673',  # Darker Green
+        '#F4B619',  # Darker Yellow
+        '#E02D1B',  # Darker Red
+        '#495057',  # Darker Gray
+        '#2E59D9',  # Darker Indigo
+        '#17A673',  # Darker Teal
+        '#F4B619',  # Darker Orange
+    ]
+    return colors[store_id % len(colors)]
 
 
 # ============================================================================
@@ -4231,473 +5163,326 @@ def stocklocation_details(request):
 
 @login_required
 def productpricing_details(request):  
-    """Reports dashboard view"""
-    context = {}
+    """Pricing reports view with detailed analysis"""
+    
+    today = timezone.now()
+    currency = request.GET.get('currency', 'UGX')
+    
+    # Get filter parameters
+    category_filter = request.GET.get('category', '')
+    price_range_filter = request.GET.get('price_range', '')
+    margin_filter = request.GET.get('margin', '')
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset for products
+    products = Product.objects.filter(is_active=True).prefetch_related(
+        'unit_prices', 'category'
+    )
+    
+    # Apply filters
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(sku__icontains=search_query)
+        )
+    
+    if category_filter:
+        products = products.filter(category__name=category_filter)
+    
+    # Prepare product pricing data
+    product_pricing_data = []
+    total_selling_price = Decimal('0')
+    total_cost_price = Decimal('0')
+    products_count = 0
+    high_margin_count = 0
+    low_margin_count = 0
+    total_product_value = Decimal('0')
+    
+    for product in products:
+        default_unit_price = product.unit_prices.first()
+        
+        if default_unit_price:
+            selling_price = default_unit_price.price
+            
+            # Get cost from purchase history or use default
+            purchase_items = PurchaseOrderItem.objects.filter(product=product)
+            avg_cost = purchase_items.aggregate(avg=Avg('unit_cost'))['avg']
+            cost_price = avg_cost or (selling_price * Decimal('0.65'))
+            
+            # Calculate margin
+            if cost_price > 0:
+                margin = ((selling_price - cost_price) / cost_price) * 100
+            else:
+                margin = 0
+            
+            # Apply filters
+            if price_range_filter:
+                if price_range_filter == 'low' and selling_price >= 100000:
+                    continue
+                elif price_range_filter == 'medium' and (selling_price < 100000 or selling_price > 500000):
+                    continue
+                elif price_range_filter == 'high' and selling_price <= 500000:
+                    continue
+            
+            if margin_filter:
+                if margin_filter == 'low' and margin >= 30:
+                    continue
+                elif margin_filter == 'medium' and (margin < 30 or margin > 50):
+                    continue
+                elif margin_filter == 'high' and margin <= 50:
+                    continue
+            
+            # Determine price tier
+            if margin >= 50:
+                tier = 'Premium'
+                tier_class = 'tier-premium'
+                high_margin_count += 1
+            elif margin >= 30:
+                tier = 'Standard'
+                tier_class = 'tier-standard'
+            else:
+                tier = 'Economy'
+                tier_class = 'tier-economy'
+                low_margin_count += 1
+            
+            # Determine margin badge
+            if margin >= 50:
+                margin_class = 'margin-high'
+            elif margin >= 30:
+                margin_class = 'margin-medium'
+            else:
+                margin_class = 'margin-low'
+            
+            # Static price change for now
+            price_change = Decimal('0')
+            if price_change > 0:
+                price_change_class = 'price-up'
+                price_change_icon = 'trending-up'
+                change_text = f"+{price_change:.1f}%"
+            elif price_change < 0:
+                price_change_class = 'price-down'
+                price_change_icon = 'trending-down'
+                change_text = f"{price_change:.1f}%"
+            else:
+                price_change_class = 'price-stable'
+                price_change_icon = 'minus'
+                change_text = 'Stable'
+            
+            product_data = {
+                'sku': product.sku,
+                'name': product.name,
+                'category': product.category.name if product.category else 'Uncategorized',
+                'cost_price': cost_price,
+                'selling_price': selling_price,
+                'margin': margin,
+                'margin_class': margin_class,
+                'tier': tier,
+                'tier_class': tier_class,
+                'price_change': price_change,
+                'price_change_class': price_change_class,
+                'price_change_icon': price_change_icon,
+                'change_text': change_text,
+                'last_change_date': (today - timedelta(days=7)).strftime('%Y-%m-%d'),
+                'last_change_reason': 'Market adjustment',
+            }
+            
+            product_pricing_data.append(product_data)
+            total_selling_price += selling_price
+            total_cost_price += cost_price
+            total_product_value += selling_price
+            products_count += 1
+    
+    # Sort products
+    sort_by = request.GET.get('sort', 'name')
+    if sort_by == 'price_high':
+        product_pricing_data.sort(key=lambda x: x['selling_price'], reverse=True)
+    elif sort_by == 'price_low':
+        product_pricing_data.sort(key=lambda x: x['selling_price'])
+    elif sort_by == 'margin':
+        product_pricing_data.sort(key=lambda x: x['margin'], reverse=True)
+    else:
+        product_pricing_data.sort(key=lambda x: x['name'])
+    
+    # Calculate statistics
+    avg_selling_price = total_selling_price / products_count if products_count > 0 else 0
+    avg_cost_price = total_cost_price / products_count if products_count > 0 else 0
+    avg_margin = ((avg_selling_price - avg_cost_price) / avg_cost_price * 100) if avg_cost_price > 0 else 0
+    
+    # Get unit conversion data (products with multiple unit prices)
+    unit_conversion_data = []
+    for product in products:
+        unit_prices = product.unit_prices.all()
+        if len(unit_prices) >= 2:
+            # Sort by conversion factor (smallest to largest)
+            sorted_prices = sorted(unit_prices, key=lambda x: x.conversion_factor)
+            base_unit = sorted_prices[0]
+            pack_unit = sorted_prices[-1]
+            
+            if pack_unit.conversion_factor > base_unit.conversion_factor:
+                pack_price_per_base_unit = pack_unit.price / pack_unit.conversion_factor
+                base_price_per_unit = base_unit.price
+                savings_pct = ((base_price_per_unit - pack_price_per_base_unit) / base_price_per_unit * 100) if base_price_per_unit > 0 else 0
+                
+                unit_conversion_data.append({
+                    'product': product.name,
+                    'sku': product.sku,
+                    'base_unit': base_unit.unit.name,
+                    'pack_unit': f"{pack_unit.conversion_factor}{base_unit.unit.abbreviation}",
+                    'conversion_factor': f"1:{int(pack_unit.conversion_factor)}",
+                    'base_price': base_unit.price,
+                    'pack_price': pack_unit.price,
+                    'unit_price': pack_price_per_base_unit,
+                    'savings_pct': savings_pct,
+                })
+    
+    # Get missing pricing data
+    missing_pricing_products = Product.objects.filter(
+        is_active=True,
+        unit_prices__isnull=True
+    )
+    
+    missing_prices_count = missing_pricing_products.count()
+    missing_pricing_data = []
+    overdue_count = 0
+    new_products_count = 0
+    total_days_missing = 0
+    
+    for product in missing_pricing_products[:10]:  # Limit to 10 for display
+        days_without_price = (today - product.created_at).days
+        total_days_missing += days_without_price
+        
+        if days_without_price > 7:
+            overdue_count += 1
+            status = 'Overdue'
+            status_class = 'bg-danger'
+        else:
+            new_products_count += 1
+            status = 'New Product'
+            status_class = 'bg-warning'
+        
+        # Find similar products for price suggestion
+        similar_products = Product.objects.filter(
+            category=product.category,
+            unit_prices__isnull=False
+        )[:3]
+        
+        avg_similar_price = 0
+        if similar_products.exists():
+            avg_prices = []
+            for sim_product in similar_products:
+                price = sim_product.unit_prices.first()
+                if price:
+                    avg_prices.append(price.price)
+            if avg_prices:
+                avg_similar_price = sum(avg_prices) / len(avg_prices)
+        
+        # Get cost price from purchase history
+        purchase_items = PurchaseOrderItem.objects.filter(product=product)
+        avg_cost = purchase_items.aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+        
+        missing_pricing_data.append({
+            'sku': product.sku,
+            'name': product.name,
+            'category': product.category.name if product.category else 'Uncategorized',
+            'date_added': product.created_at.strftime('%Y-%m-%d'),
+            'days_without_price': days_without_price,
+            'similar_products_count': similar_products.count(),
+            'suggested_price': avg_similar_price,
+            'cost_price': avg_cost,
+            'status': status,
+            'status_class': status_class,
+        })
+    
+    # Calculate margin by category
+    categories = Category.objects.all()
+    category_margins = []
+    for category in categories:
+        category_products = products.filter(category=category)
+        if category_products.exists():
+            total_margin = 0
+            count = 0
+            for product in category_products:
+                unit_price = product.unit_prices.first()
+                if unit_price:
+                    purchase_items = PurchaseOrderItem.objects.filter(product=product)
+                    avg_cost = purchase_items.aggregate(avg=Avg('unit_cost'))['avg']
+                    cost_price = avg_cost or (unit_price.price * Decimal('0.65'))
+                    if cost_price > 0:
+                        margin = ((unit_price.price - cost_price) / cost_price) * 100
+                        total_margin += margin
+                        count += 1
+            if count > 0:
+                category_margins.append({
+                    'name': category.name,
+                    'avg_margin': total_margin / count
+                })
+    
+    # Find highest and lowest margin categories
+    if category_margins:
+        highest = max(category_margins, key=lambda x: x['avg_margin'])
+        lowest = min(category_margins, key=lambda x: x['avg_margin'])
+        highest_margin_category = highest['name']
+        highest_margin_pct = highest['avg_margin']
+        lowest_margin_category = lowest['name']
+        lowest_margin_pct = lowest['avg_margin']
+    else:
+        highest_margin_category = 'N/A'
+        highest_margin_pct = 0
+        lowest_margin_category = 'N/A'
+        lowest_margin_pct = 0
+    
+    # Prepare context
+    context = {
+        # Report metadata
+        'report_id': f"PRICE-{today.strftime('%Y%m%d')}-001",
+        'report_date': today.strftime('%B %Y'),
+        'currency': currency,
+        'products_analyzed': products_count,
+        'missing_prices_count': missing_prices_count,
+        
+        # Overall statistics
+        'avg_selling_price': avg_selling_price,
+        'avg_cost_price': avg_cost_price,
+        'avg_margin': avg_margin,
+        'avg_price_change': Decimal('2.5'),  # Static for now
+        'price_changes_this_month': 24,  # Static for now
+        
+        # Additional statistics
+        'total_product_value': total_product_value,
+        'high_margin_count': high_margin_count,
+        'low_margin_count': low_margin_count,
+        
+        # Margin analysis
+        'highest_margin_category': highest_margin_category,
+        'highest_margin_pct': highest_margin_pct,
+        'lowest_margin_category': lowest_margin_category,
+        'lowest_margin_pct': lowest_margin_pct,
+        
+        # Data for templates
+        'product_pricing_data': product_pricing_data,
+        'unit_conversion_data': unit_conversion_data,
+        'missing_pricing_data': missing_pricing_data,
+        
+        # Missing pricing statistics
+        'new_products_count': new_products_count,
+        'overdue_count': overdue_count,
+        'avg_days_missing': total_days_missing / missing_prices_count if missing_prices_count > 0 else 0,
+        'default_margin': 50,
+        
+        # Filter options
+        'categories': categories,
+        'selected_category': category_filter,
+        'selected_price_range': price_range_filter,
+        'selected_margin': margin_filter,
+        'selected_sort': sort_by,
+        'search_query': search_query,
+    }
+    
     return render(request, 'reports/productpricing_details.html', context)
 
 
-# ============================================================================
-# PERFORMANCE REPORTS VIEWS
-# ============================================================================
-# Stock Turnover Rate, Fast vs Slow Movers, Product Sales vs Purchases,
-# Category Performance
-# ============================================================================
-
-@login_required
-def performace_details(request):  
-    """Reports dashboard view"""
-    context = {}
-    return render(request, 'reports/performace_details.html', context)
-
-
-# ============================================================================
-# LIFECYCLE REPORTS VIEWS
-# ============================================================================
-# New Products Added, Inactive Products Report, Product Popularity Analysis,
-# Seasonal Product Analysis
-# ============================================================================
-
-@login_required
-def lifecycle_details(request):  
-    """Reports dashboard view"""
-    context = {}
-    return render(request, 'reports/lifecycle_details.html', context)
-
-
-# ============================================================================
-# OPERATIONAL REPORTS VIEWS
-# ============================================================================
-# User Activity Report, Stock Turnover Analysis, Reorder Point Effectiveness,
-# Transfer Impact Analysis
-# ============================================================================
-
-@login_required
-def operational_details(request):  
-    """Reports dashboard view"""
-    context = {}
-    return render(request, 'reports/operational_details.html', context)
-
-
-# ============================================================================
-# AUDIT & COMPLIANCE REPORTS VIEWS
-# ============================================================================
-# Complete Stock Movement Audit, Expiry Compliance Report, Batch Traceability Report,
-# Product Information Completeness, Price Standardization Check
-# ============================================================================
-
-@login_required
-def auditcompliance_details(request):  
-    """Reports dashboard view"""
-    context = {}
-    return render(request, 'reports/auditcompliance_details.html', context)
-
-
-# ============================================================================
-# CORRELATION REPORTS VIEWS
-# ============================================================================
-# Stock Availability vs Sales, Reorder Effectiveness Analysis,
-# Stock Accuracy Reconciliation
-# ============================================================================
-
-@login_required
-def correlation_details(request):  
-    """Reports dashboard view"""
-    context = {}
-    return render(request, 'reports/correlation_details.html', context)
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@login_required
-def reports_view(request, report_type):
-    """Handle inventory reports with dynamic templates"""
-    
-    # Get filters from request
-    store_id = request.GET.get('store_id')
-    product_id = request.GET.get('product_id')
-    days = int(request.GET.get('days', 30))
-    page = int(request.GET.get('page', 1))
-    per_page = int(request.GET.get('per_page', 50))
-    
-    # Map report types to methods
-    report_methods = {
-        'stock_summary': {
-            'method': InventoryReports.generate_stock_summary_report,
-            'title': 'Stock Summary Report',
-            'subtitle': 'Complete inventory overview with stock values',
-            'show_filters': False,
-            'show_date_filters': False,
-        },
-        'low_stock': {
-            'method': InventoryReports.generate_low_stock_alert_report,
-            'title': 'Low Stock Alert Report',
-            'subtitle': 'Products below reorder level requiring attention',
-            'show_filters': False,
-            'show_date_filters': False,
-        },
-        'store_performance': {
-            'method': lambda: InventoryReports.generate_store_performance_report(store_id),
-            'title': 'Store Performance Report',
-            'subtitle': 'Store-wise inventory metrics and performance',
-            'show_filters': True,
-            'show_date_filters': False,
-        },
-        'category_analysis': {
-            'method': InventoryReports.generate_category_analysis_report,
-            'title': 'Category Analysis Report',
-            'subtitle': 'Inventory performance by product category',
-            'show_filters': False,
-            'show_date_filters': False,
-        },
-        'product_movement': {
-            'method': lambda: InventoryReports.generate_product_movement_report(product_id, days),
-            'title': f'Product Movement Report ({days} days)',
-            'subtitle': 'Sales velocity and stock movement analysis',
-            'show_filters': True,
-            'show_date_filters': False,
-        },
-        'abc_analysis': {
-            'method': InventoryReports.generate_abc_analysis_report,
-            'title': 'ABC Analysis Report',
-            'subtitle': 'Inventory classification by value importance',
-            'show_filters': False,
-            'show_date_filters': False,
-        },
-        'inventory_valuation': {
-            'method': InventoryReports.generate_inventory_valuation_report,
-            'title': 'Inventory Valuation Report',
-            'subtitle': 'Complete inventory valuation with cost analysis',
-            'show_filters': False,
-            'show_date_filters': False,
-        },
-        'stock_transfer': {
-            'method': lambda: InventoryReports.generate_stock_transfer_report(store_id),
-            'title': 'Stock Transfer Report',
-            'subtitle': 'Transfer status and movement tracking',
-            'show_filters': True,
-            'show_date_filters': False,
-        },
-        'product_availability': {
-            'method': lambda: InventoryReports.generate_product_availability_report(product_id),
-            'title': 'Product Availability Report',
-            'subtitle': 'Product availability across all stores',
-            'show_filters': True,
-            'show_date_filters': False,
-        },
-    }
-    
-    if report_type not in report_methods:
-        return render(request, 'reports/error.html', {
-            'error': 'Invalid report type',
-            'report_type': report_type
-        })
-    
-    # Get report configuration
-    config = report_methods[report_type]
-    
-    try:
-        # Generate report data
-        report_data = config['method']()
-        
-        # Process report data for template
-        processed_data = process_report_data(report_data, report_type)
-        
-        # Add pagination if needed
-        if 'data' in processed_data and len(processed_data['data']) > per_page:
-            paginator = Paginator(processed_data['data'], per_page)
-            page_obj = paginator.get_page(page)
-            processed_data['data'] = page_obj
-        
-        # Prepare context
-        context = {
-            'report_type': report_type,
-            'report_title': config['title'],
-            'report_subtitle': config['subtitle'],
-            'report_data': processed_data,
-            'show_filters': config['show_filters'],
-            'show_date_filters': config.get('show_date_filters', False),
-            'filters': {
-                'store_id': store_id,
-                'product_id': product_id,
-                'days': days,
-                'date_from': request.GET.get('date_from'),
-                'date_to': request.GET.get('date_to'),
-            },
-            'currency_symbol': 'UGX',
-        }
-        
-        # Add filter options
-        from app.models import StoreLocation, Product
-        if config['show_filters']:
-            context['stores'] = StoreLocation.objects.filter(is_active=True)
-            context['products'] = Product.objects.filter(is_active=True)
-        
-        # Check if it's an AJAX request
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': True, 'data': report_data})
-        
-        # Regular request - render template
-        return render(request, 'reports/report_view.html', context)
-        
-    except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'error': str(e)})
-        
-        return render(request, 'reports/report_view.html', {
-            'error': str(e),
-            'report_type': report_type,
-            'report_title': config['title']
-        })
-
-
-def process_report_data(report_data, report_type):
-    """Process raw report data for template display"""
-    processed = {
-        'generated_at': report_data.get('generated_at', timezone.now()),
-        'report_type': report_data.get('report_type', report_type),
-        'data': [],
-        'headers': [],
-        'summary_stats': [],
-        'chart_data': None,
-    }
-    
-    # Extract summary statistics
-    summary_stats = extract_summary_stats(report_data, report_type)
-    if summary_stats:
-        processed['summary_stats'] = summary_stats
-    
-    # Process main data
-    if 'data' in report_data and report_data['data']:
-        if isinstance(report_data['data'], list) and len(report_data['data']) > 0:
-            # Get headers from first item
-            first_item = report_data['data'][0]
-            if isinstance(first_item, dict):
-                processed['headers'] = list(first_item.keys())
-                processed['data'] = report_data['data']
-    
-    # Add category summary if available
-    if 'category_summary' in report_data:
-        processed['category_summary'] = report_data['category_summary']
-    
-    # Add insights if available
-    if report_data.get('total_products'):
-        processed['insights'] = generate_insights(report_data, report_type)
-    
-    # Generate chart data if needed
-    if len(processed['data']) > 0:
-        processed['chart_data'] = generate_chart_data(processed['data'], report_type)
-    
-    return processed
-
-
-def extract_summary_stats(report_data, report_type):
-    """Extract summary statistics from report data"""
-    stats = []
-    
-    if report_type == 'stock_summary':
-        stats.extend([
-            {
-                'label': 'Total Products',
-                'value': report_data.get('total_products', 0),
-                'icon': 'package',
-                'color': 'primary'
-            },
-            {
-                'label': 'Total Stock Value',
-                'value': f"{report_data.get('total_stock_value', 0):,.0f}",
-                'icon': 'dollar-sign',
-                'color': 'success'
-            },
-            {
-                'label': 'Low Stock Items',
-                'value': report_data.get('total_low_stock', 0),
-                'icon': 'alert-triangle',
-                'color': 'warning'
-            },
-        ])
-    
-    elif report_type == 'low_stock':
-        stats.extend([
-            {
-                'label': 'Total Alerts',
-                'value': report_data.get('total_alerts', 0),
-                'icon': 'alert-circle',
-                'color': 'danger'
-            },
-            {
-                'label': 'Critical Alerts',
-                'value': report_data.get('critical_alerts', 0),
-                'icon': 'alert-triangle',
-                'color': 'warning'
-            },
-        ])
-    
-    elif report_type == 'store_performance':
-        if report_data.get('total_stores'):
-            stats.append({
-                'label': 'Stores',
-                'value': report_data.get('total_stores', 0),
-                'icon': 'store',
-                'color': 'info'
-            })
-    
-    return stats
-
-
-def generate_insights(report_data, report_type):
-    """Generate insights based on report data"""
-    insights = []
-    
-    if report_type == 'low_stock' and report_data.get('critical_alerts', 0) > 0:
-        insights.append({
-            'title': 'Immediate Action Required',
-            'message': f'{report_data["critical_alerts"]} products are critically low on stock.',
-            'type': 'danger',
-            'icon': 'alert-triangle',
-            'action': 'View Details',
-            'action_url': '#low-stock-section'
-        })
-    
-    if report_type == 'stock_summary':
-        low_stock_count = report_data.get('total_low_stock', 0)
-        if low_stock_count > 0:
-            insights.append({
-                'title': 'Reordering Required',
-                'message': f'{low_stock_count} products need reordering.',
-                'type': 'warning',
-                'icon': 'shopping-cart'
-            })
-    
-    return insights
-
-
-def generate_chart_data(data, report_type):
-    """Generate chart data from report data"""
-    if not data or not isinstance(data, list) or len(data) == 0:
-        return None
-    
-    try:
-        if report_type in ['stock_summary', 'inventory_valuation']:
-            # Bar chart for top items by value
-            sorted_data = sorted(data, key=lambda x: x.get('stock_value', 0), reverse=True)[:10]
-            labels = [item.get('product_name', f'Item {i}')[:20] for i, item in enumerate(sorted_data)]
-            values = [item.get('stock_value', 0) for item in sorted_data]
-            
-            return {
-                'labels': labels,
-                'datasets': [{
-                    'label': 'Stock Value',
-                    'data': values,
-                    'backgroundColor': 'rgba(54, 162, 235, 0.5)',
-                    'borderColor': 'rgba(54, 162, 235, 1)',
-                    'borderWidth': 1
-                }]
-            }
-        
-        elif report_type == 'abc_analysis':
-            # Pie chart for ABC classification
-            abc_counts = {'A': 0, 'B': 0, 'C': 0}
-            for item in data:
-                abc_class = item.get('abc_class', 'C')
-                if abc_class in abc_counts:
-                    abc_counts[abc_class] += 1
-            
-            return {
-                'labels': ['A Items (High Value)', 'B Items (Medium Value)', 'C Items (Low Value)'],
-                'datasets': [{
-                    'label': 'ABC Classification',
-                    'data': [abc_counts['A'], abc_counts['B'], abc_counts['C']],
-                    'backgroundColor': [
-                        'rgba(255, 99, 132, 0.5)',
-                        'rgba(54, 162, 235, 0.5)',
-                        'rgba(255, 205, 86, 0.5)'
-                    ],
-                    'borderColor': [
-                        'rgb(255, 99, 132)',
-                        'rgb(54, 162, 235)',
-                        'rgb(255, 205, 86)'
-                    ],
-                    'borderWidth': 1
-                }]
-            }
-    
-    except Exception as e:
-        print(f"Error generating chart data: {e}")
-        return None
-
-
-@login_required
-def export_report(request, report_type, format):
-    """Export report to various formats"""
-    
-    # Generate report data
-    report_methods = {
-        'stock_summary': InventoryReports.generate_stock_summary_report,
-        'low_stock': InventoryReports.generate_low_stock_alert_report,
-        'store_performance': lambda: InventoryReports.generate_store_performance_report(None),
-        'category_analysis': InventoryReports.generate_category_analysis_report,
-        'product_movement': lambda: InventoryReports.generate_product_movement_report(None, 30),
-        'abc_analysis': InventoryReports.generate_abc_analysis_report,
-        'inventory_valuation': InventoryReports.generate_inventory_valuation_report,
-        'stock_transfer': InventoryReports.generate_stock_transfer_report(None),
-        'product_availability': InventoryReports.generate_product_availability_report(None),
-    }
-    
-    if report_type not in report_methods:
-        return HttpResponse('Invalid report type', status=400)
-    
-    try:
-        report_data = report_methods[report_type]()
-        
-        if format == 'csv':
-            response = HttpResponse(content_type='text/csv')
-            filename = f"{report_type}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            
-            writer = csv.writer(response)
-            
-            # Write headers
-            if report_data.get('data') and len(report_data['data']) > 0:
-                headers = list(report_data['data'][0].keys())
-                writer.writerow(headers)
-                
-                # Write data rows
-                for row in report_data['data']:
-                    writer.writerow([row.get(header, '') for header in headers])
-            
-            return response
-        
-        elif format == 'json':
-            return JsonResponse(report_data, safe=False)
-        
-        else:
-            return HttpResponse('Format not supported', status=400)
-            
-    except Exception as e:
-        return HttpResponse(f'Error generating export: {str(e)}', status=500)

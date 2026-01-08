@@ -139,6 +139,15 @@ urlpatterns = [
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('product_autocomplete/', product_autocomplete, name='product_autocomplete'),
 
+    # API endpoints
+    path('api/products/autocomplete/', product_autocomplete, name='product_autocomplete'),
+    path('api/products/<int:product_id>/stock-info/', get_product_stock_info, name='product_stock_info'),
+    path('api/products/list/', get_products_list, name='get_products_list'),
+    path('api/units/list/', get_units_list, name='get_units_list'),
+    path('api/sales/validate-stock/', validate_sale_stock, name='validate_sale_stock'),
+    path('api/products/<int:product_id>/details/', get_product_details, name='get_product_details'),    
+
+
     #human resource
     path('employee_profile/<int:employee_id>', employee_profile_view, name = 'employee_profile_page'),
     path('employee_profile/', employee_profile_view, name = 'employee_profile_page'),
@@ -226,6 +235,8 @@ urlpatterns = [
     path('adjust-stock/', stock_adjustments.adjust_stock_view, name='adjust_stock'),
     path('api/inventory/available/', stock_adjustments.api_inventory_available, name='api_inventory_available'),
     
+    
+    
     # Inventory Reports
     path('reports/', inventory_reports.reports_dashboard, name='reports_dashboard'),   
     path('reports-details/', inventory_reports.reports_details, name='reports_details'),
@@ -240,11 +251,6 @@ urlpatterns = [
     path('stocklocation-details/', inventory_reports.stocklocation_details, name='stocklocation_details'),
     path('reorder-details/', inventory_reports.reorder_details, name='reorder_details'), 
     path('productpricing-details/', inventory_reports.productpricing_details, name='productpricing_details'),
-    path('performace-details/', inventory_reports.performace_details, name='performace_details'),
-    path('lifecycle-details/', inventory_reports.lifecycle_details, name='lifecycle_details'),
-    path('operational-details/', inventory_reports.operational_details, name='operational_details'),
-    path('auditcompliance-details/', inventory_reports.auditcompliance_details, name='auditcompliance_details'),
-    path('correlation-details/', inventory_reports.correlation_details, name='correlation_details'),
     path('profile-details/', profile_views.profile_view, name='profile_details'),
    
    
@@ -264,24 +270,13 @@ urlpatterns = [
     path('api/adjustments/<int:adjustment_id>/details/', inventory_reports.adjustment_details_api, name='adjustment_details_api'),
     path('api/adjustments/batch/<str:batch_reference>/', inventory_reports.batch_details_api, name='batch_details_api'),
   
-    
-    
-    
-    path('reports/stock-summary/', inventory_reports.reports_view, {'report_type': 'stock_summary'}, name='stock_summary_report'),
-    path('reports/low-stock/', inventory_reports.reports_view, {'report_type': 'low_stock'}, name='low_stock_report'),
-    path('reports/store-performance/', inventory_reports.reports_view, {'report_type': 'store_performance'}, name='store_performance_report'),
-    path('reports/category-analysis/', inventory_reports.reports_view, {'report_type': 'category_analysis'}, name='category_analysis_report'),
-    path('reports/product-movement/', inventory_reports.reports_view, {'report_type': 'product_movement'}, name='product_movement_report'),
-    path('reports/abc-analysis/', inventory_reports.reports_view, {'report_type': 'abc_analysis'}, name='abc_analysis_report'),
-    path('reports/inventory-valuation/', inventory_reports.reports_view, {'report_type': 'inventory_valuation'}, name='inventory_valuation_report'),
-    path('reports/stock-transfer/', inventory_reports.reports_view, {'report_type': 'stock_transfer'}, name='stock_transfer_report'),
-    path('reports/product-availability/', inventory_reports.reports_view, {'report_type': 'product_availability'}, name='product_availability_report'),
-    
-    # Export functionality
-    path('reports/export/<str:report_type>/', inventory_reports.export_report, name='export_report'),
-    
-    
-    
+     
+    # Add these new endpoints
+    path('productmaster-export/<str:format>/', inventory_reports.export_product_report, name='productmaster_export'),
+    path('product-catalog-data/', inventory_reports.get_product_catalog_data, name='product_catalog_data'),
+    path('product-statistics/', inventory_reports.get_product_statistics, name='product_statistics'),
+
+  
     
     # Role Management URLs (RBAC 2.0)
     path('roles/', roles_list_view, name='roles_list_page'),

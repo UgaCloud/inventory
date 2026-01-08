@@ -64,8 +64,8 @@ def app_menu(request):
                     'label': 'Dashboard',
                     'children': [
                         {'label': 'Dashboard', 'url_name': 'index_page'},
-                        {'label': 'Admin Dashboard 2', 'url_name': 'index_page'},
-                        {'label': 'Sales Dashboard', 'url_name': 'under_maintenance_page'},
+                        # {'label': 'Admin Dashboard 2', 'url_name': 'index_page'},
+                        # {'label': 'Sales Dashboard', 'url_name': 'under_maintenance_page'},
                     ],
                 }
             ],
@@ -156,16 +156,12 @@ def app_menu(request):
                 {'label': 'Inventory Report', 'url_name': 'inventory_details'},
                 {'label': 'Transfer Report', 'url_name': 'transfer_details'},
                 {'label': 'Stock Adjustment Report', 'url_name': 'stock_adjustment_details'},
-                # {'label': 'Financial Report', 'url_name': 'financial_details'},
-                # {'label': 'Product Master Report', 'url_name': 'productmaster_details'},
-                # {'label': 'Stock Location Report', 'url_name': 'stocklocation_details'},
-                # {'label': 'reorder Level Report', 'url_name': 'reorder_details'},
-                # {'label': 'Product Pricing Report', 'url_name': 'productpricing_details'},
-                # {'label': 'Performance Report', 'url_name': 'performace_details'},
-                # {'label': 'Lifecycle Report', 'url_name': 'lifecycle_details'},
-                # {'label': 'Operational Report', 'url_name': 'operational_details'},
-                # {'label': 'Audit & Compliance Report', 'url_name': 'auditcompliance_details'},
-                # {'label': 'Correlation Report', 'url_name': 'correlation_details'},
+                {'label': 'Financial Report', 'url_name': 'financial_details'},
+                {'label': 'Product Master Report', 'url_name': 'productmaster_details'},
+                {'label': 'Stock Location Report', 'url_name': 'stocklocation_details'},
+                {'label': 'reorder Level Report', 'url_name': 'reorder_details'},
+                {'label': 'Product Pricing Report', 'url_name': 'productpricing_details'},
+                
                 
                 
                 
