@@ -88,13 +88,13 @@
             <div class="table-responsive">
                 <table class="table datatable">
                     <thead class="thead-light">
-                        <tr>
+                        <!-- <tr>
                             <th class="no-sort">
                                 <label class="checkboxs">
                                     <input type="checkbox" id="select-all">
                                     <span class="checkmarks"></span>
                                 </label>
-                            </th>
+                            </th> -->
                             <th>ID</th>
                             <th>Receipt No</th>
                             <th>Sale Date</th>
@@ -112,12 +112,12 @@
                         {% if sales %}
                             {% for sale in sales %}
                             <tr class="{% if sale.is_cancelled %}table-danger{% endif %}">
-                                <td>
+                                <!-- <td>
                                     <label class="checkboxs">
                                         <input type="checkbox">
                                         <span class="checkmarks"></span>
                                     </label>
-                                </td>
+                                </td> -->
                                 <td>{{ forloop.counter }}</td>
                                 <td>
                                     <strong>{{ sale.receipt_no }}</strong>
