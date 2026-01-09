@@ -7,16 +7,36 @@ from django.db.models import Sum, Q, F
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db import transaction
-
+from app.views.salehelp import *
 from app.forms.transaction_forms import SalesForm, SalesItemFormSet
 from app.selectors.sales_selectors import get_all_sales, get_sale_by_id, get_sales_items_for_sale
 from app.models.transactions import *
 from app.models.products import *
-from app.services.customer_transactions import record_sale_and_payment
 
 @login_required
 def sales_list_view(request):
-    sales = get_all_sales()
+    # Get filter parameter - default to False (show active sales)
+    show_cancelled = request.GET.get('show_cancelled', 'false') == 'true'
+    
+    # Get sales based on filter
+    if show_cancelled:
+        # Show only cancelled sales
+        sales = get_all_sales().filter(is_cancelled=True)
+    else:
+        # Show only active sales (default)
+        sales = get_all_sales().filter(is_cancelled=False)
+    
+    # Get counts for statistics
+    active_count = Sales.objects.filter(is_cancelled=False).count()
+    cancelled_count = Sales.objects.filter(is_cancelled=True).count()
+    
+    # Calculate statistics for current view
+    total_sales_amount = sales.aggregate(total=Sum('total_amount'))['total'] or 0
+    
+    if not show_cancelled:
+        fulfilled_count = sales.filter(status='FULFILLED').count()
+    else:
+        fulfilled_count = 0
     
     # Add pagination
     paginator = Paginator(sales, 25)  # Show 25 sales per page
@@ -24,11 +44,18 @@ def sales_list_view(request):
     page_obj = paginator.get_page(page_number)
 
     context = {
-        'sales': sales,
+        'sales': page_obj.object_list,  # Use current page objects
         'page_obj': page_obj,
+        'show_cancelled': show_cancelled,
+        'total_sales_amount': total_sales_amount,
+        'fulfilled_count': fulfilled_count,
+        'cancelled_count': cancelled_count,
+        'active_count': active_count,
+        'is_paginated': paginator.count > 25,
     }
 
     return render(request, 'sales/sales_list.html', context)
+
 
 
 @login_required
@@ -37,127 +64,120 @@ def record_sales_view(request):
         form = SalesForm(request.POST)
         formset = SalesItemFormSet(request.POST, queryset=SalesItem.objects.none())
 
+        # values come as strings → cast to int
         total_amount = int(float(request.POST.get('total_amount', 0)))
         amount_paid = int(float(request.POST.get('amount_paid', 0)))
-        balance = total_amount - amount_paid
+        amount_received = int(float(request.POST.get('amount_received', 0)))
         
+        # Calculate balance (this is what triggers the status logic)
+        balance = total_amount - amount_paid
+
         if form.is_valid() and formset.is_valid():
             sale_data = form.save(commit=False)
-          
-            # Validate stock availability before saving
+
+            # ---- stock validation ----
             store = sale_data.store
             has_stock_errors = False
-            for formset_form in formset:
-                if formset_form.is_valid():
-                    product = formset_form.cleaned_data.get('product')
-                    quantity = formset_form.cleaned_data.get('quantity')
-                    unit = formset_form.cleaned_data.get('unit')
-                    
+
+            for item_form in formset:
+                if item_form.is_valid():
+                    product = item_form.cleaned_data.get('product')
+                    quantity = item_form.cleaned_data.get('quantity')
+                    unit = item_form.cleaned_data.get('unit')
+
                     if product and quantity and unit:
-                        # Get available stock
-                        available_stock = get_available_stock_for_product(product.id, store.id)
+                        available_stock = get_available_stock_for_product(
+                            product.id,
+                            store.id
+                        )
                         if quantity > available_stock:
-                            messages.error(request, f"Insufficient stock for {product.name}. Available: {available_stock}, Requested: {quantity}")
+                            messages.error(
+                                request,
+                                f"Insufficient stock for {product.name}. "
+                                f"Available: {available_stock}, Requested: {quantity}"
+                            )
                             has_stock_errors = True
-            
+
             if has_stock_errors:
-                # Re-render form with stock errors
-                products = Product.objects.filter(is_active=True).order_by('name')
-                units = UnitOfMeasure.objects.all().order_by('name')
-                context = {
+                return render(request, 'sales/record_sales.html', {
                     'form': form,
                     'formset': formset,
-                    'products': products,
-                    'units': units,
-                }
-                return render(request, 'sales/record_sales.html', context)
-            
-            # Set status based on balance using your SALE_ORDER_OPTIONS
-            if balance == 0:
-                sale_status = 'FULFILLED'  # Fully paid
-            elif amount_paid > 0:
-                sale_status = 'PARTIALLY_PAID'  # Has balance but some payment made
-            else:
-                sale_status = 'PENDING'  # No payment at all
-            
+                    'products': Product.objects.filter(is_active=True).order_by('name'),
+                    'units': UnitOfMeasure.objects.all().order_by('name'),
+                })
+
             try:
-                # Use transaction to ensure all operations succeed or fail together
                 with transaction.atomic():
-                    # Create the sale first
+                    # ---- create sale ----
+                    # DON'T set status manually - let the model's save() method handle it
                     sale = Sales(
                         receipt_no=sale_data.receipt_no,
                         store=sale_data.store,
                         customer=sale_data.customer,
                         total_amount=total_amount,
                         amount_paid=amount_paid,
-                        balance=balance,
-                        amount_received=sale_data.amount_received,
+                        balance=balance,  # This is the key field that determines status
+                        amount_received=amount_received,
                         change=sale_data.change,
                         payment_method=sale_data.payment_method,
                         note=sale_data.note,
                         recorded_by=request.user,
-                        status=sale_status  # Set status here
                     )
-                    sale.save()
-                    
-                    # Save sale items
+                    sale.save()  # Status will be auto-calculated in the save() method
+
+                    # ---- save items ----
                     sale_items = formset.save(commit=False)
                     for item in sale_items:
                         item.order = sale
                         item.save()
-                    
-                    # Update inventory only if sale is FULFILLED or PARTIALLY_PAID
+
+                    # ---- update inventory ----
+                    # Only update inventory if sale is FULFILLED or PARTIALLY_PAID
                     if sale.status in ['FULFILLED', 'PARTIALLY_PAID']:
                         update_inventory_after_sale(sale, sale_items)
-                    
-                    # DO NOT CALL record_sale_and_payment - it creates duplicate sales
-                    # Instead, if you need payment recording, create a payment-only function
-                    
+                    else:
+                        # For PENDING sales, you might want to reserve stock or do nothing
+                        messages.info(request, f"Sale #{sale.receipt_no} is PENDING. Inventory will be updated when payment is made.")
+
             except Exception as e:
-                # This catches any database errors during the transaction
-                messages.error(request, f"Failed to save sale: {str(e)}")
-                products = Product.objects.filter(is_active=True).order_by('name')
-                units = UnitOfMeasure.objects.all().order_by('name')
-                context = {
+                messages.error(request, f"Failed to save sale: {e}")
+                return render(request, 'sales/record_sales.html', {
                     'form': form,
                     'formset': formset,
-                    'products': products,
-                    'units': units,
-                }
-                return render(request, 'sales/record_sales.html', context)
-            
-            messages.success(request, f'Sale #{sale.receipt_no} created successfully with status: {sale.get_status_display()}.')
+                    'products': Product.objects.filter(is_active=True).order_by('name'),
+                    'units': UnitOfMeasure.objects.all().order_by('name'),
+                })
+
+            messages.success(
+                request,
+                f"Sale #{sale.receipt_no} created successfully "
+                f"with status: {sale.get_status_display()}."
+            )
             return redirect('sales_list')
-        else:
-            # Collect and display all form and formset errors in messages
-            error_list = []
-            for field, errors in form.errors.items():
+
+        # ---- form errors ----
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, f"{field}: {error}")
+
+        for item_form in formset:
+            for field, errors in item_form.errors.items():
                 for error in errors:
-                    error_list.append(f"{field}: {error}")
-            for formset_form in formset:
-                for field, errors in formset_form.errors.items():
-                    for error in errors:
-                        error_list.append(f"Item {formset_form.prefix} - {field}: {error}")
-            if not error_list:
-                error_list.append("Please correct the errors below.")
-            for error in error_list:
-                messages.error(request, error)
+                    messages.error(
+                        request,
+                        f"Item {item_form.prefix} - {field}: {error}"
+                    )
+
     else:
         form = SalesForm()
         formset = SalesItemFormSet(queryset=SalesItem.objects.none())
-    
-    # Get products and units for the template
-    products = Product.objects.filter(is_active=True).order_by('name')
-    units = UnitOfMeasure.objects.all().order_by('name')
-    
-    context = {
+
+    return render(request, 'sales/record_sales.html', {
         'form': form,
         'formset': formset,
-        'products': products,
-        'units': units,
-    }
-    return render(request, 'sales/record_sales.html', context)
-
+        'products': Product.objects.filter(is_active=True).order_by('name'),
+        'units': UnitOfMeasure.objects.all().order_by('name'),
+    })
 
 def update_inventory_after_sale(sale, sale_items):
     """
@@ -197,7 +217,6 @@ def update_inventory_after_sale(sale, sale_items):
     except Exception as e:
         raise Exception(f"Inventory update failed: {str(e)}")
 
-
 def update_inventory_batches_after_sale(product, store, quantity_sold):
     """
     Update inventory batches using FIFO method
@@ -226,43 +245,34 @@ def update_inventory_batches_after_sale(product, store, quantity_sold):
             batch.remaining_quantity = 0
             batch.save()
 
-
-
-
-
-
-
-
-
-
-
-
 @login_required
 def sales_detail_view(request, pk):
     sale = get_object_or_404(Sales, pk=pk)
     items = get_sales_items_for_sale(sale)
-
-    form = SalesForm(instance=sale)
-    formset = SalesItemFormSet(queryset=get_sales_items_for_sale(sale))
     
-    # Get products and units for the template
-    products = Product.objects.filter(is_active=True).order_by('name')
-    units = UnitOfMeasure.objects.all().order_by('name')
+    # Get stock movement records for this sale (for cancelled sales)
+    stock_movements = []
+    if sale.is_cancelled:
+        stock_movements = StockMovement.objects.filter(
+            transaction_id=sale.id,
+            transaction_type__in=['SALE', 'CANCELLATION']
+        ).order_by('-timestamp')
     
     context = {
         'sale': sale,
         'items': items,
-        'form': form,
-        'formset': formset,
-        'products': products,
-        'units': units,
+        'stock_movements': stock_movements,
     }
     return render(request, 'sales/sales_detail.html', context)
-
 
 @login_required
 def sales_update_view(request, pk):
     sale = get_object_or_404(Sales, pk=pk)
+    
+    # Don't allow updating cancelled sales
+    if sale.is_cancelled:
+        messages.error(request, f"Cannot update cancelled sale #{sale.receipt_no}.")
+        return redirect('sales_list')
     
     if request.method == 'POST':
         form = SalesForm(request.POST, instance=sale)
@@ -310,24 +320,19 @@ def sales_update_view(request, pk):
                     'products': products,
                     'units': units,
                 }
-                return render(request, 'sales/sales_form.html', context)
+                return render(request, 'sales/record_sales.html', context)
             
-            # Update sale amounts and status
+            # Update sale amounts - the status will be auto-calculated on save
             sale.total_amount = total_amount
             sale.amount_paid = amount_paid
-            sale.balance = balance
+            sale.balance = balance  # This triggers the status logic
             
-            # Set status based on balance using your SALE_ORDER_OPTIONS
-            if balance == 0:
-                sale.status = 'FULFILLED'  # Fully paid
-            elif amount_paid > 0:
-                sale.status = 'PARTIALLY_PAID'  # Has balance but some payment made
-            else:
-                sale.status = 'PENDING'  # No payment at all
+            # DON'T manually set status - let the model's save() method handle it
+            # The save() method will call resolve_status() automatically
             
-            # Set recorded_by to current user
+            # Set recorded_by to current user (or keep original if not changing)
             sale.recorded_by = request.user
-            sale.save()
+            sale.save()  # Status will be updated here
             
             sale_items = formset.save(commit=False)
             for item in sale_items:
@@ -337,10 +342,14 @@ def sales_update_view(request, pk):
             for obj in formset.deleted_objects:
                 obj.delete()
             
-            # Update inventory if status changed to FULFILLED or PARTIALLY_PAID
-            if sale.status in ['FULFILLED', 'PARTIALLY_PAID'] and sale._original_status not in ['FULFILLED', 'PARTIALLY_PAID']:
+            # Update inventory based on status change
+            if sale.status in ['FULFILLED', 'PARTIALLY_PAID']:
                 try:
-                    update_inventory_after_sale(sale, sale_items)
+                    # If sale was previously not FULFILLED/PARTIALLY_PAID, update inventory
+                    if hasattr(sale, '_original_status') and sale._original_status not in ['FULFILLED', 'PARTIALLY_PAID']:
+                        update_inventory_after_sale(sale, sale_items)
+                    # If sale is being updated and already had inventory deducted, 
+                    # you might need a more complex logic here
                 except Exception as e:
                     messages.warning(request, f"Sale updated but inventory update failed: {str(e)}")
             
@@ -366,8 +375,7 @@ def sales_update_view(request, pk):
         'products': products,
         'units': units,
     }
-    return render(request, 'sales/sales_form.html', context)
-
+    return render(request, 'sales/record_sales.html', context)
 
 @login_required
 def sales_delete_view(request, pk):
@@ -378,6 +386,43 @@ def sales_delete_view(request, pk):
     messages.success(request, f'Sale #{receipt_no} deleted successfully.')
         
     return redirect('sales_list')
+
+@login_required
+@transaction.atomic
+def cancel_sale_view(request, pk):
+    """
+    Cancel a sale and return stock to inventory
+    """
+    sale = get_object_or_404(Sales, pk=pk)
+    
+    # Check if sale is already cancelled
+    if sale.is_cancelled:
+        messages.warning(request, f"Sale #{sale.receipt_no} is already cancelled.")
+        return redirect('sales_list')
+    
+    if request.method == 'POST':
+        reason = request.POST.get('reason', '').strip()
+        
+        if not reason:
+            messages.error(request, "Please provide a reason for cancellation.")
+            return redirect('sales_detail', pk=pk)
+        
+        try:
+            # Use the model's cancel_sale method
+            success, message = sale.cancel_sale(request.user, reason)
+            
+            if success:
+                messages.success(request, message)
+            else:
+                messages.error(request, message)
+                
+        except Exception as e:
+            messages.error(request, f"Failed to cancel sale: {str(e)}")
+        
+        return redirect('sales_list')
+    
+    # If GET request, redirect to detail page
+    return redirect('sales_detail', pk=pk)
 
 
 # Helper function to get available stock
@@ -405,7 +450,8 @@ def get_available_stock_for_product(product_id, store_id):
         pending_sales_stock = SalesItem.objects.filter(
             product_id=product_id,
             order__store_id=store_id,
-            order__status__in=['PENDING', 'PARTIALLY_PAID']  # Updated to match your statuses
+            order__status__in=['PENDING', 'PARTIALLY_PAID'],
+            order__is_cancelled=False  # Exclude cancelled sales
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
         available_stock = max(0, physical_stock - committed_stock - pending_sales_stock)
@@ -415,7 +461,6 @@ def get_available_stock_for_product(product_id, store_id):
     except Exception as e:
         print(f"Error calculating available stock: {e}")
         return 0
-
 
 # API endpoint for product stock and price information
 @login_required
@@ -458,7 +503,8 @@ def get_product_stock_info(request, product_id):
         pending_sales_stock = SalesItem.objects.filter(
             product=product,
             order__store_id=store_id,
-            order__status__in=['PENDING', 'PARTIALLY_PAID']  # Updated
+            order__status__in=['PENDING', 'PARTIALLY_PAID'],
+            order__is_cancelled=False  # Exclude cancelled sales
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
         committed_stock = committed_transfer_stock + pending_sales_stock
@@ -501,7 +547,6 @@ def get_product_stock_info(request, product_id):
             'available_stock': 0,
             'unit_prices': []
         }, status=500)
-
 
 # API endpoint for product autocomplete
 @login_required
@@ -551,7 +596,6 @@ def product_autocomplete(request):
     
     return JsonResponse(results, safe=False)
 
-
 # API endpoint to get all products for dropdown
 @login_required
 @require_GET
@@ -586,7 +630,6 @@ def get_products_list(request):
             'products': []
         }, status=500)
 
-
 # API endpoint to get all units for dropdown
 @login_required
 @require_GET
@@ -617,7 +660,6 @@ def get_units_list(request):
             'error': str(e),
             'units': []
         }, status=500)
-
 
 # API endpoint to validate sale before submission
 @login_required
@@ -671,7 +713,6 @@ def validate_sale_stock(request):
             'success': False,
             'error': str(e)
         }, status=500)
-
 
 # API endpoint to get product details
 @login_required
@@ -735,3 +776,39 @@ def get_product_details(request, product_id):
             'success': False,
             'error': str(e)
         }, status=500)
+ 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
