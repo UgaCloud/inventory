@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.models import User
 
+
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 from app.models.products import StoreLocation
 
@@ -100,54 +101,90 @@ class InventoryBatch(models.Model):
         )
 
 
-
-
 class Sales(models.Model):
     receipt_no = models.CharField(max_length=50, unique=True, blank=True)
     customer = models.ForeignKey("app.Customer", on_delete=models.SET_NULL, null=True, blank=True)
     sale_date = models.DateField(auto_now_add=True)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
+
     status = models.CharField(max_length=20, choices=SALE_ORDER_OPTIONS)
+
     recorded_by = models.ForeignKey("auth.User", on_delete=models.DO_NOTHING)
-    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)  
-    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)     
-    amount_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)  
-    change = models.DecimalField(max_digits=12, decimal_places=2, default=0)       
+
+    amount_paid = models.PositiveBigIntegerField(default=0)
+    balance = models.BigIntegerField(default=0)
+    amount_received = models.PositiveBigIntegerField(default=0)
+    change = models.PositiveBigIntegerField(default=0)
+
     note = models.TextField(blank=True, null=True)
     payment_method = models.ForeignKey("app.PaymentMethod", on_delete=models.RESTRICT, null=True, blank=True)
-    total_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0) 
+    total_amount = models.PositiveBigIntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Cancellation fields
+    is_cancelled = models.BooleanField(default=False)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        "auth.User", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='cancelled_sales'
+    )
+    cancellation_reason = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        ordering = ['-updated_at', 'created_at']
+        indexes = [
+            models.Index(fields=['is_cancelled', 'status']),
+            models.Index(fields=['receipt_no']),
+        ]
+
+    def resolve_status(self):
+        if self.is_cancelled:
+            return 'CANCELLED'
+        if self.balance == 0:
+            return 'FULFILLED'
+        if self.amount_paid > 0:
+            return 'PARTIALLY_PAID'
+        return 'PENDING'
 
     def save(self, *args, **kwargs):
         # Auto-generate receipt number if not provided
         if not self.receipt_no:
-            # Create prefix based on store and current year
             current_year = date.today().year
+
             if hasattr(self.store, 'code') and self.store.code:
                 store_prefix = self.store.code[:3].upper()
             else:
                 store_prefix = self.store.name[:3].upper() if self.store.name else 'STR'
-            
+
             prefix = f"{store_prefix}{current_year}"
-            
-            # Find the highest existing receipt number for this prefix
-            existing_receipts = Sales.objects.filter(receipt_no__startswith=prefix).values_list('receipt_no', flat=True)
+
+            existing_receipts = Sales.objects.filter(
+                receipt_no__startswith=prefix
+            ).values_list('receipt_no', flat=True)
+
             max_num = 0
             for receipt in existing_receipts:
-                # Extract number from receipt format: STR2024-0001
                 match = re.match(rf"{prefix}[-]?(\d+)", receipt)
                 if match:
                     num = int(match.group(1))
                     if num > max_num:
                         max_num = num
-            
-            next_num = max_num + 1
-            self.receipt_no = f"{prefix}-{next_num:04d}"
-        
+
+            self.receipt_no = f"{prefix}-{max_num + 1:04d}"
+
+        # derive status from stored values
+        self.status = self.resolve_status()
+
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"SO-{self.receipt_no} ({self.customer.name if self.customer else 'Walk-in'})"
-    
+
     @property
     def total_items(self):
         return sum(item.quantity for item in self.items.all())
@@ -159,6 +196,34 @@ class Sales(models.Model):
     @property
     def number_of_items(self):
         return self.items.count()
+    
+    def cancel_sale(self, user, reason=""):
+        """Cancel the sale and return stock"""
+        from django.db import transaction
+        from django.utils import timezone
+        from app.views.salehelp import return_stock_to_inventory
+        
+        if self.is_cancelled:
+            return False, "Sale is already cancelled"
+        
+        try:
+            with transaction.atomic():
+                # Update sale fields
+                self.is_cancelled = True
+                self.cancelled_at = timezone.now()
+                self.cancelled_by = user
+                self.cancellation_reason = reason
+                
+                # Update status will happen in save()
+                self.save()
+                
+                # Return stock to inventory
+                return_stock_to_inventory(self)
+                
+                return True, "Sale cancelled successfully"
+                
+        except Exception as e:
+            return False, f"Failed to cancel sale: {str(e)}"
 
 
 class SalesItem(models.Model):
@@ -167,9 +232,13 @@ class SalesItem(models.Model):
     unit = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
     sale_price = models.DecimalField(max_digits=10, decimal_places=0)
+    is_cancelled = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("order", "product", "unit")
+        indexes = [
+            models.Index(fields=['order', 'is_cancelled']),
+        ]
 
     def amount(self):
         return self.quantity * self.sale_price
@@ -682,6 +751,27 @@ class StockAdjustmentItem(models.Model):
 
     def __str__(self):
         return f"{self.product.name} {self.quantity_change} ({self.unit}) for Adjustment {self.stock_adjustment.reference or self.stock_adjustment.id}"
-
-
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

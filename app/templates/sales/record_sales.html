@@ -36,7 +36,7 @@
             <h5>{% if sale %}Edit Sale #{{ sale.receipt_no }}{% else %}New Sale{% endif %}</h5>
         </div>
         <div class="card-body">
-            <form method="post" action="{% if sale %}{% url 'sales_update' sale.pk %}{% else %}{% url 'record_sale' %}{% endif %}" novalidate id="sales-form">
+            <form method="post" action="{% if sale %}{% url 'sales_update_view' sale.pk %}{% else %}{% url 'record_sale' %}{% endif %}" novalidate id="sales-form">
                 {% csrf_token %}
                 
                 <!-- Main form fields -->
@@ -113,7 +113,7 @@
                                         <input type="number" name="items-{{ forloop.counter0 }}-quantity" min="1" class="form-control quantity-input" id="id_items-{{ forloop.counter0 }}-quantity" value="{{ form.quantity.value|default:1 }}" style="text-align: center;">
                                     </td>
                                     <td style="vertical-align: middle;">
-                                        <input type="number" name="items-{{ forloop.counter0 }}-sale_price" min="0" step="1" class="form-control price-input" id="id_items-{{ forloop.counter0 }}-sale_price" value="{{ form.sale_price.value|default:0 }}" style="text-align: center;">
+                                        <input type="number" name="items-{{ forloop.counter0 }}-sale_price" min="0" step="0.01" class="form-control price-input" id="id_items-{{ forloop.counter0 }}-sale_price" value="{{ form.sale_price.value|default:0 }}" style="text-align: center;">
                                     </td>
                                     <td style="vertical-align: middle; text-align: center;">
                                         <div class="unit-price-container">
@@ -164,7 +164,7 @@
                                 <li class="border-bottom d-flex align-items-center">
                                     <h4 class="border-end m-0 p-3" style="width: 50%;">Amount Paid</h4>
                                     <h5 class="m-0 p-3" style="width: 50%;">
-                                        <input type="number" name="amount_paid" id="amount-paid" class="form-control fw-bold text-end" value="0" min="0" step="1" style="font-size:14px; color:#646B72;" />
+                                        <input type="number" name="amount_paid" id="amount-paid" class="form-control fw-bold text-end" value="0" min="0" step="0.01" style="font-size:14px; color:#646B72;" />
                                     </h5>
                                 </li>
                                 <li class="border-bottom d-flex align-items-center">
@@ -182,7 +182,7 @@
                                 <li class="border-bottom d-flex align-items-center">
                                     <h4 class="border-end m-0 p-3" style="width: 50%;">Amount Received</h4>
                                     <h5 class="m-0 p-3" style="width: 50%;">
-                                        <input type="number" name="amount_received" id="amount-received" class="form-control fw-bold text-end" value="0" min="0" step="1" style="font-size:14px; color:#646B72;" />
+                                        <input type="number" name="amount_received" id="amount-received" class="form-control fw-bold text-end" value="0" min="0" step="0.01" style="font-size:14px; color:#646B72;" />
                                     </h5>
                                 </li>
                                 <li class="border-bottom d-flex align-items-center">
@@ -370,7 +370,7 @@
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split('');
+                const cookies = document.cookie.split(';');
                 for (let i = 0; i < cookies.length; i++) {
                     const cookie = cookies[i].trim();
                     if (cookie.substring(0, name.length + 1) === (name + '=')) {
@@ -384,25 +384,78 @@
 
         // Format number with commas
         function formatNumber(value) {
-            return parseInt(value || 0).toLocaleString('en-UG');
+            const num = parseFloat(value) || 0;
+            return num.toLocaleString('en-UG', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            });
         }
 
-        // Global products data for autocomplete
-        let productsData = [];
-        
-        // Fetch products data
-        async function fetchProductsData() {
-            try {
-                const response = await fetch('/api/products/autocomplete/?term=', {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
-                if (response.ok) {
-                    productsData = await response.json();
+        // SINGLE RECALCULATION FUNCTION
+        function recalcAfterSelection(row) {
+            const quantityInput = row.querySelector('.quantity-input');
+            const salePriceInput = row.querySelector('.price-input');
+            const subtotalSpan = row.querySelector('.subtotal');
+            
+            if (!quantityInput || !salePriceInput || !subtotalSpan) return;
+            
+            // Quantity default: if empty, treat as 1, not 0
+            const quantityValue = quantityInput.value.trim();
+            const quantity = quantityValue === '' ? 1 : parseFloat(quantityValue) || 0;
+            
+            const salePrice = parseFloat(salePriceInput.value) || 0;
+            const subtotal = quantity * salePrice;
+            
+            subtotalSpan.textContent = formatNumber(subtotal);
+            updateGrandTotal();
+        }
+
+        // Update grand total
+        function updateGrandTotal() {
+            let grandTotal = 0;
+            document.querySelectorAll('.formset-row').forEach(row => {
+                const subtotalSpan = row.querySelector('.subtotal');
+                if (subtotalSpan) {
+                    const subtotalText = subtotalSpan.textContent.replace(/[^\d.-]/g, '');
+                    const subtotal = parseFloat(subtotalText) || 0;
+                    grandTotal += subtotal;
                 }
-            } catch (error) {
-                console.error('Error fetching products data:', error);
+            });
+            
+            const grandTotalElement = document.getElementById('grand-total');
+            if (grandTotalElement) {
+                grandTotalElement.textContent = formatNumber(grandTotal);
+            }
+            
+            const totalAmountInput = document.getElementById('total-amount');
+            if (totalAmountInput) {
+                totalAmountInput.value = grandTotal.toFixed(2);
+                updateBalance();
+            }
+        }
+
+        // Update balance
+        function updateBalance() {
+            const totalAmount = parseFloat(document.getElementById('total-amount').value) || 0;
+            const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
+            const balance = totalAmount - amountPaid;
+            
+            const balanceInput = document.getElementById('balance');
+            if (balanceInput) {
+                balanceInput.value = balance.toFixed(2);
+                updateChange();
+            }
+        }
+
+        // Update change
+        function updateChange() {
+            const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
+            const amountReceived = parseFloat(document.getElementById('amount-received').value) || 0;
+            const change = amountReceived - amountPaid;
+            
+            const changeInput = document.getElementById('change');
+            if (changeInput) {
+                changeInput.value = change.toFixed(2);
             }
         }
 
@@ -430,190 +483,139 @@
             }
         }
 
-        // Update stock display for a row
-        async function updateRowStock(row) {
-            const productSelect = row.querySelector('.product-select');
+        // Handle product selection
+        async function handleProductSelect(event) {
+            const productSelect = event.target;
+            const row = $(productSelect).closest('.formset-row')[0];
+            if (!row) return;
+            
             const unitSelect = row.querySelector('.unit-select');
-            const quantityInput = row.querySelector('.quantity-input');
-            const salePriceInput = row.querySelector('.price-input');
             const availableStockSpan = row.querySelector('.available-stock');
             const unitPriceSpan = row.querySelector('.unit-price');
+            const salePriceInput = row.querySelector('.price-input');
             const storeSelect = document.getElementById('id_store');
             
-            if (!productSelect || !storeSelect) {
-                return;
-            }
+            if (!productSelect || !storeSelect) return;
             
             const productId = productSelect.value;
             const storeId = storeSelect.value;
             
             if (!productId || !storeId) {
-                if (availableStockSpan) availableStockSpan.textContent = '0';
+                // Clear fields
+                if (availableStockSpan) {
+                    availableStockSpan.textContent = '0';
+                    availableStockSpan.className = 'badge bg-secondary available-stock';
+                }
                 if (unitPriceSpan) unitPriceSpan.textContent = '0';
-                row.classList.remove('stock-error-row');
-                return;
-            }
-            
-            const stockInfo = await fetchProductStockInfo(productId, storeId);
-            
-            if (!stockInfo || !stockInfo.success) {
-                if (availableStockSpan) availableStockSpan.textContent = '0';
-                if (unitPriceSpan) unitPriceSpan.textContent = '0';
-                return;
-            }
-            
-            // Update available stock
-            if (availableStockSpan) {
-                availableStockSpan.textContent = formatNumber(stockInfo.available_stock);
-                // Update badge color based on stock level
-                if (stockInfo.available_stock <= 0) {
-                    availableStockSpan.className = 'badge bg-danger available-stock';
-                } else if (stockInfo.available_stock < 10) {
-                    availableStockSpan.className = 'badge bg-warning available-stock';
-                } else {
-                    availableStockSpan.className = 'badge bg-success available-stock';
-                }
-            }
-            
-            // Update unit select options
-            if (unitSelect && stockInfo.unit_prices && stockInfo.unit_prices.length > 0) {
-                const currentValue = unitSelect.value;
-                unitSelect.innerHTML = '<option value="">Select Unit</option>';
-                
-                // Add unit options
-                stockInfo.unit_prices.forEach(unitPrice => {
-                    const option = document.createElement('option');
-                    option.value = unitPrice.unit_id;
-                    option.textContent = `${unitPrice.unit_name} (${formatNumber(unitPrice.price)})`;
-                    option.dataset.price = unitPrice.price;
-                    unitSelect.appendChild(option);
-                });
-                
-                // Restore previous selection if exists
-                if (currentValue) {
-                    unitSelect.value = currentValue;
-                }
-                
-                // If no unit selected and only one option, auto-select it
-                if (!unitSelect.value && stockInfo.unit_prices.length === 1) {
-                    unitSelect.value = stockInfo.unit_prices[0].unit_id;
-                    unitSelect.dispatchEvent(new Event('change'));
-                }
-                
-                // Update select2
-                if (window.jQuery && jQuery().select2) {
-                    $(unitSelect).select2({ width: '100%' });
-                }
-            }
-            
-            // Update unit price display
-            if (unitSelect && unitSelect.value) {
-                const selectedOption = unitSelect.options[unitSelect.selectedIndex];
-                if (selectedOption.dataset.price) {
-                    const unitPrice = parseInt(selectedOption.dataset.price);
-                    if (unitPriceSpan) unitPriceSpan.textContent = formatNumber(unitPrice);
-                    if (salePriceInput && (!salePriceInput.value || salePriceInput.value === '0')) {
-                        salePriceInput.value = unitPrice;
-                        updateRowSubtotal(row);
+                if (salePriceInput) salePriceInput.value = '0';
+                if (unitSelect) {
+                    unitSelect.innerHTML = '<option value="">Select Unit</option>';
+                    if (window.jQuery && jQuery().select2) {
+                        $(unitSelect).select2({ width: '100%' });
                     }
                 }
+                recalcAfterSelection(row);
+                return;
             }
             
-            // Check stock availability
-            if (quantityInput && availableStockSpan) {
-                const availableStock = parseInt(stockInfo.available_stock) || 0;
-                const quantity = parseInt(quantityInput.value) || 0;
+            try {
+                // Show loading
+                if (availableStockSpan) {
+                    availableStockSpan.textContent = '...';
+                    availableStockSpan.className = 'badge bg-secondary available-stock';
+                }
                 
-                if (quantity > availableStock) {
-                    quantityInput.classList.add('stock-error-input');
-                    row.classList.add('stock-error-row');
-                    row.classList.remove('stock-warning-row');
-                } else if (quantity > 0 && quantity <= availableStock) {
-                    quantityInput.classList.remove('stock-error-input');
-                    row.classList.remove('stock-error-row', 'stock-warning-row');
+                const stockInfo = await fetchProductStockInfo(productId, storeId);
+                
+                if (!stockInfo || !stockInfo.success) {
+                    if (availableStockSpan) {
+                        availableStockSpan.textContent = '0';
+                        availableStockSpan.className = 'badge bg-danger available-stock';
+                    }
+                    if (unitPriceSpan) unitPriceSpan.textContent = '0';
+                    recalcAfterSelection(row);
+                    return;
                 }
+                
+                // 1. Update Available Stock
+                if (availableStockSpan) {
+                    availableStockSpan.textContent = formatNumber(stockInfo.available_stock);
+                    if (stockInfo.available_stock <= 0) {
+                        availableStockSpan.className = 'badge bg-danger available-stock';
+                    } else if (stockInfo.available_stock < 10) {
+                        availableStockSpan.className = 'badge bg-warning available-stock';
+                    } else {
+                        availableStockSpan.className = 'badge bg-success available-stock';
+                    }
+                }
+                
+                // 2. Populate Unit Dropdown
+                if (unitSelect && stockInfo.unit_prices && stockInfo.unit_prices.length > 0) {
+                    unitSelect.innerHTML = '<option value="">Select Unit</option>';
+                    
+                    stockInfo.unit_prices.forEach(unitPrice => {
+                        const option = document.createElement('option');
+                        option.value = unitPrice.unit_id;
+                        option.textContent = unitPrice.unit_name;
+                        option.dataset.price = unitPrice.price;
+                        unitSelect.appendChild(option);
+                    });
+                    
+                    // 3. Auto-select First Unit
+                    if (stockInfo.unit_prices.length > 0) {
+                        unitSelect.value = stockInfo.unit_prices[0].unit_id;
+                        
+                        // 4. Update Unit Price Display
+                        if (unitPriceSpan) {
+                            unitPriceSpan.textContent = formatNumber(stockInfo.unit_prices[0].price);
+                        }
+                        
+                        // 5. Auto-fill Sale Price
+                        if (salePriceInput) {
+                            salePriceInput.value = stockInfo.unit_prices[0].price;
+                        }
+                    }
+                    
+                    // Update Select2
+                    if (window.jQuery && jQuery().select2) {
+                        $(unitSelect).select2({ width: '100%' });
+                    }
+                }
+                
+                // 6. Recalculate
+                recalcAfterSelection(row);
+                
+            } catch (error) {
+                console.error('Error in handleProductSelect:', error);
             }
-            
-            // Calculate subtotal
-            updateRowSubtotal(row);
-            
-            // Highlight row
-            row.classList.add('highlight-row');
-            setTimeout(() => row.classList.remove('highlight-row'), 1500);
         }
 
-        // Update subtotal for a row
-        function updateRowSubtotal(row) {
-            const quantityInput = row.querySelector('.quantity-input');
+        // Handle unit selection
+        function handleUnitSelect(event) {
+            const unitSelect = event.target;
+            const row = $(unitSelect).closest('.formset-row')[0];
+            if (!row) return;
+            
+            const selectedOption = unitSelect.options[unitSelect.selectedIndex];
             const salePriceInput = row.querySelector('.price-input');
-            const subtotalSpan = row.querySelector('.subtotal');
+            const unitPriceSpan = row.querySelector('.unit-price');
             
-            if (!quantityInput || !salePriceInput || !subtotalSpan) return;
-            
-            const quantity = parseInt(quantityInput.value) || 0;
-            const salePrice = parseInt(salePriceInput.value) || 0;
-            const subtotal = quantity * salePrice;
-            
-            subtotalSpan.textContent = formatNumber(subtotal);
-            updateGrandTotal();
-        }
-
-        // Update grand total
-        function updateGrandTotal() {
-            let grandTotal = 0;
-            document.querySelectorAll('.formset-row').forEach(row => {
-                const subtotalSpan = row.querySelector('.subtotal');
-                if (subtotalSpan) {
-                    const subtotalText = subtotalSpan.textContent.replace(/[^\d.-]/g, '');
-                    const subtotal = parseInt(subtotalText) || 0;
-                    grandTotal += subtotal;
+            if (selectedOption && selectedOption.dataset.price) {
+                const unitPrice = parseFloat(selectedOption.dataset.price);
+                
+                // Update Unit Price Display
+                if (unitPriceSpan) {
+                    unitPriceSpan.textContent = formatNumber(unitPrice);
                 }
-            });
-            
-            document.getElementById('grand-total').textContent = formatNumber(grandTotal);
-            const totalAmountInput = document.getElementById('total-amount');
-            totalAmountInput.value = grandTotal;
-            
-            // Auto-fill amount paid and received
-            const amountPaidInput = document.getElementById('amount-paid');
-            const amountReceivedInput = document.getElementById('amount-received');
-            
-            if (amountPaidInput && (!amountPaidInput.value || amountPaidInput.value === '0')) {
-                amountPaidInput.value = grandTotal;
+                
+                // Update Sale Price Input
+                if (salePriceInput) {
+                    salePriceInput.value = unitPrice;
+                }
+                
+                // Recalculate
+                recalcAfterSelection(row);
             }
-            if (amountReceivedInput && (!amountReceivedInput.value || amountReceivedInput.value === '0')) {
-                amountReceivedInput.value = grandTotal;
-            }
-            
-            updateBalance();
-        }
-
-        // Update balance
-        function updateBalance() {
-            const totalAmount = parseInt(document.getElementById('total-amount').value) || 0;
-            const amountPaid = parseInt(document.getElementById('amount-paid').value) || 0;
-            const balance = totalAmount - amountPaid;
-            
-            document.getElementById('balance').value = balance;
-            updateChange();
-        }
-
-        // Update change
-        function updateChange() {
-            const amountPaid = parseInt(document.getElementById('amount-paid').value) || 0;
-            const amountReceived = parseInt(document.getElementById('amount-received').value) || 0;
-            const change = amountReceived - amountPaid;
-            
-            document.getElementById('change').value = change;
-        }
-
-        // Update all rows stock
-        async function updateAllStock() {
-            const rows = document.querySelectorAll('.formset-row');
-            for (const row of rows) {
-                await updateRowStock(row);
-            }
-            updateGrandTotal();
         }
 
         // Initialize the formset
@@ -645,23 +647,23 @@
                 </td>
                 <td style="vertical-align: middle; text-align: center;">
                     <div class="available-stock-container">
-                        <span class="badge bg-info available-stock">0</span>
+                        <span class="badge bg-secondary available-stock" id="available-stock-${index}">0</span>
                     </div>
                 </td>
                 <td style="vertical-align: middle;">
-                    <input type="number" name="items-${index}-quantity" min="0" class="form-control quantity-input" id="id_items-${index}-quantity" value="0" style="text-align: center;">
+                    <input type="number" name="items-${index}-quantity" min="1" class="form-control quantity-input" id="id_items-${index}-quantity" value="1" style="text-align: center;">
                 </td>
                 <td style="vertical-align: middle;">
-                    <input type="number" name="items-${index}-sale_price" min="0" step="1" class="form-control price-input" id="id_items-${index}-sale_price" value="0" style="text-align: center;">
+                    <input type="number" name="items-${index}-sale_price" min="0" step="0.01" class="form-control price-input" id="id_items-${index}-sale_price" value="0" style="text-align: center;">
                 </td>
                 <td style="vertical-align: middle; text-align: center;">
                     <div class="unit-price-container">
-                        <span class="unit-price fw-bold">0</span>
+                        <span class="unit-price fw-bold" id="unit-price-${index}">0</span>
                     </div>
                 </td>
                 <td style="vertical-align: middle; text-align: center;">
                     <div class="subtotal-container">
-                        <span class="subtotal fw-bold">0</span>
+                        <span class="subtotal fw-bold" id="subtotal-${index}">0</span>
                     </div>
                 </td>
                 <td style="vertical-align: middle; text-align: center;">
@@ -670,6 +672,32 @@
                     </button>
                 </td>
             </tr>`;
+            
+            // JQUERY DELEGATED EVENTS FOR SELECT2
+            $(document).on('select2:select', '.product-select', handleProductSelect);
+            $(document).on('select2:select', '.unit-select', handleUnitSelect);
+            
+            // Remove row handler (preserved)
+            $(document).on('click', '.remove-form-row', function() {
+                const row = $(this).closest('.formset-row')[0];
+                if (row && confirm('Are you sure you want to remove this item?')) {
+                    row.remove();
+                    updateGrandTotal();
+                }
+            });
+            
+            // Store change handler
+            const storeSelect = document.getElementById('id_store');
+            if (storeSelect) {
+                storeSelect.addEventListener('change', function() {
+                    // Re-trigger product selection logic for all rows using jQuery Select2 events
+                    $('.product-select').each(function() {
+                        if (this.value) {
+                            $(this).trigger('select2:select');
+                        }
+                    });
+                });
+            }
             
             // Add new row
             if (addBtn) {
@@ -680,12 +708,10 @@
                         return;
                     }
                     
-                    // Add new row
                     const newRowHtml = emptyRowTemplate(formCount);
                     formsetBody.insertAdjacentHTML('beforeend', newRowHtml);
                     totalForms.value = formCount + 1;
                     
-                    // Initialize select2 for new row
                     const lastRow = formsetBody.querySelector('.formset-row:last-child');
                     if (lastRow && window.jQuery && jQuery().select2) {
                         const selects = lastRow.querySelectorAll('.select2');
@@ -697,105 +723,13 @@
                         });
                     }
                     
-                    // Add event listeners to new row
-                    addRowEventListeners(lastRow);
-                    
-                    // Update stock after a short delay
-                    setTimeout(() => updateRowStock(lastRow), 300);
-                });
-            }
-            
-            // Function to add event listeners to a row
-            function addRowEventListeners(row) {
-                if (!row) return;
-                
-                // Product change
-                const productSelect = row.querySelector('.product-select');
-                if (productSelect) {
-                    productSelect.addEventListener('change', function() {
-                        updateRowStock(row);
-                    });
-                }
-                
-                // Unit change
-                const unitSelect = row.querySelector('.unit-select');
-                if (unitSelect) {
-                    unitSelect.addEventListener('change', function() {
-                        const selectedOption = this.options[this.selectedIndex];
-                        const salePriceInput = row.querySelector('.price-input');
-                        const unitPriceSpan = row.querySelector('.unit-price');
-                        
-                        if (selectedOption && selectedOption.dataset.price) {
-                            const unitPrice = parseInt(selectedOption.dataset.price);
-                            if (unitPriceSpan) unitPriceSpan.textContent = formatNumber(unitPrice);
-                            if (salePriceInput) {
-                                salePriceInput.value = unitPrice;
-                                updateRowSubtotal(row);
-                            }
-                        }
-                    });
-                }
-                
-                // Quantity input
-                const quantityInput = row.querySelector('.quantity-input');
-                if (quantityInput) {
-                    quantityInput.addEventListener('input', function() {
-                        updateRowStock(row);
-                        updateRowSubtotal(row);
-                    });
-                }
-                
-                // Price input
-                const priceInput = row.querySelector('.price-input');
-                if (priceInput) {
-                    priceInput.addEventListener('input', function() {
-                        updateRowSubtotal(row);
-                    });
-                }
-                
-                // Remove button
-                const removeBtn = row.querySelector('.remove-form-row');
-                if (removeBtn) {
-                    removeBtn.addEventListener('click', function() {
-                        if (confirm('Are you sure you want to remove this item?')) {
-                            row.remove();
-                            updateGrandTotal();
-                        }
-                    });
-                }
-            }
-            
-            // Add event listeners to existing rows
-            document.querySelectorAll('.formset-row').forEach(row => {
-                addRowEventListeners(row);
-            });
-            
-            // Store change event
-            const storeSelect = document.getElementById('id_store');
-            if (storeSelect) {
-                storeSelect.addEventListener('change', function() {
-                    updateAllStock();
-                });
-            }
-            
-            // Payment amount events
-            const amountPaidInput = document.getElementById('amount-paid');
-            const amountReceivedInput = document.getElementById('amount-received');
-            
-            if (amountPaidInput) {
-                amountPaidInput.addEventListener('input', function() {
-                    this.value = parseInt(this.value) || 0;
-                    updateBalance();
-                    if (amountReceivedInput && !amountReceivedInput.value) {
-                        amountReceivedInput.value = this.value;
+                    // Auto-focus on product select
+                    const productSelect = lastRow.querySelector('.product-select');
+                    if (productSelect) {
+                        setTimeout(() => {
+                            $(productSelect).select2('open');
+                        }, 100);
                     }
-                });
-            }
-            
-            if (amountReceivedInput) {
-                amountReceivedInput.addEventListener('input', function() {
-                    this.value = parseInt(this.value) || 0;
-                    updateChange();
                 });
             }
             
@@ -809,16 +743,15 @@
                 });
             }
             
-            // Initialize data and calculations
+            // Initialize totals
             setTimeout(() => {
-                fetchProductsData();
-                updateAllStock();
+                updateGrandTotal();
                 updateBalance();
                 updateChange();
             }, 500);
         });
 
-        // Add customer modal logic
+        // Add customer modal logic (preserved)
         (function() {
             const openBtn = document.getElementById('open-add-customer-modal');
             const addCustomerModalEl = document.getElementById('addCustomerModal');
@@ -872,7 +805,6 @@
                             const modal = bootstrap.Modal.getInstance(addCustomerModalEl);
                             if (modal) modal.hide();
                             
-                            // Reset form
                             addCustomerForm.reset();
                         }
                     })

@@ -138,6 +138,7 @@ urlpatterns = [
     path('sales/record_sale/', record_sales_view, name='record_sale'),  
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('product_autocomplete/', product_autocomplete, name='product_autocomplete'),
+    path('sales/<int:pk>/cancel/', cancel_sale_view, name='cancel_sale'),
 
     # API endpoints
     path('api/products/autocomplete/', product_autocomplete, name='product_autocomplete'),

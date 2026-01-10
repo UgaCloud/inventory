@@ -8,12 +8,18 @@ from django.db.models.functions import TruncDate, Cast
 from django.db.models import DateField
 from datetime import timedelta
 
+
+
 def get_order_statistics(days=7, user=None):
     today = timezone.now().date()
     start_date = today - timedelta(days=days-1)
-    qs = Sales.objects.filter(sale_date__range=(start_date, today))
+    qs = Sales.objects.filter(
+        sale_date__range=(start_date, today),
+        is_cancelled=False  # Exclude cancelled sales
+    )
     if user:
         qs = qs.filter(recorded_by=user)
+    
     if connection.vendor == 'sqlite':
         # SQLite: Cast to Date
         stats = (
@@ -30,6 +36,7 @@ def get_order_statistics(days=7, user=None):
             .annotate(count=Count('id'), total=Sum('total_amount'))
             .order_by('day')
         )
+    
     # Fill missing days with zeroes
     result = []
     day_map = {s['day']: s for s in stats}
@@ -38,6 +45,9 @@ def get_order_statistics(days=7, user=None):
         entry = day_map.get(d, {'day': d, 'count': 0, 'total': 0})
         result.append({'date': d.strftime('%Y-%m-%d'), 'count': entry['count'], 'total': float(entry['total'] or 0)})
     return result
+
+
+
 from django.db.models import Sum, Count, F
 from datetime import date
 from app.models.transactions import *
@@ -49,50 +59,55 @@ from app.models.expense import Expense
 # ===========================
 
 def get_all_sales(user=None):
-    qs = Sales.objects.all()
+    qs = Sales.objects.filter(is_cancelled=False)
     if user:
         qs = qs.filter(recorded_by=user)
     return qs.order_by("-sale_date")
 
 
 def get_sale_by_id(sale_id, user=None):
-    qs = Sales.objects.filter(id=sale_id)
+    qs = Sales.objects.filter(id=sale_id, is_cancelled=False)  
     if user:
         qs = qs.filter(recorded_by=user)
     return qs.first()
 
 
 def get_sales_by_customer(customer, user=None):
-    qs = Sales.objects.filter(customer=customer)
+    qs = Sales.objects.filter(customer=customer, is_cancelled=False)  
     if user:
         qs = qs.filter(recorded_by=user)
     return qs
 
 
+
 def get_sales_in_date_range(start_date, end_date, user=None):
-    qs = Sales.objects.filter(sale_date__range=(start_date, end_date))
+    qs = Sales.objects.filter(
+        sale_date__range=(start_date, end_date), 
+        is_cancelled=False  
+    )
     if user:
         qs = qs.filter(recorded_by=user)
     return qs
 
 
 def get_recent_sales(user=None, limit=5):
-    qs = Sales.objects.order_by("-sale_date")
+    qs = Sales.objects.filter(is_cancelled=False).order_by("-sale_date")  
     if user:
         qs = qs.filter(recorded_by=user)
     return qs[:limit]
 
 
 def get_total_sales(user=None):
-    qs = Sales.objects.all()
+    qs = Sales.objects.filter(is_cancelled=False) 
     if user:
         qs = qs.filter(recorded_by=user)
     return qs.aggregate(total=Sum("total_amount"))["total"] or 0
 
 
+
 def get_todays_number_of_sales(user=None):
     today = date.today()
-    qs = Sales.objects.filter(sale_date=today)
+    qs = Sales.objects.filter(sale_date=today, is_cancelled=False)  
     if user:
         qs = qs.filter(recorded_by=user)
     return qs.count()
@@ -100,7 +115,7 @@ def get_todays_number_of_sales(user=None):
 
 def get_total_payments_received(user=None):
     today = date.today()
-    qs = Sales.objects.filter(sale_date=today)
+    qs = Sales.objects.filter(sale_date=today, is_cancelled=False) 
     if user:
         qs = qs.filter(recorded_by=user)
     return qs.aggregate(total=Sum("amount_received"))["total"] or 0
@@ -108,15 +123,20 @@ def get_total_payments_received(user=None):
 
 def get_todays_outstanding_balances(user=None):
     today = date.today()
-    qs = Sales.objects.filter(sale_date=today)
+    qs = Sales.objects.filter(sale_date=today, is_cancelled=False)  
     if user:
         qs = qs.filter(recorded_by=user)
     return qs.aggregate(total=Sum("balance"))["total"] or 0
 
 
+
 def get_todays_fully_paid_sales(user=None):
     today = date.today()
-    qs = Sales.objects.filter(sale_date=today, balance=0)
+    qs = Sales.objects.filter(
+        sale_date=today, 
+        balance=0, 
+        is_cancelled=False  # Exclude cancelled
+    )
     if user:
         qs = qs.filter(recorded_by=user)
     data = qs.aggregate(
@@ -134,7 +154,8 @@ def get_todays_partially_paid_sales(user=None):
     qs = Sales.objects.filter(
         sale_date=today,
         balance__gt=0,
-        amount_received__gt=0
+        amount_received__gt=0,
+        is_cancelled=False  # Exclude cancelled
     )
     if user:
         qs = qs.filter(recorded_by=user)
@@ -150,7 +171,7 @@ def get_todays_partially_paid_sales(user=None):
 
 def get_todays_collection_rate(user=None):
     today = date.today()
-    qs = Sales.objects.filter(sale_date=today)
+    qs = Sales.objects.filter(sale_date=today, is_cancelled=False)  # Exclude cancelled
     if user:
         qs = qs.filter(recorded_by=user)
 
@@ -175,10 +196,14 @@ def get_items_by_sale(sale):
 
 def get_top_selling_products(limit=5):
     return (
-        SalesItem.objects.values("product__id", "product__name")
+        SalesItem.objects.filter(
+            order__is_cancelled=False  # Exclude items from cancelled sales
+        )
+        .values("product__id", "product__name")
         .annotate(total_sold=Sum("quantity"))
         .order_by("-total_sold")[:limit]
     )
+
 
 
 # ===========================
@@ -284,6 +309,7 @@ def get_pending_stock_adjustments_count():
 
 
 def get_total_revenue():
-    total_sales = Sales.objects.aggregate(total=Sum("total_amount"))["total"] or 0
+    total_sales = Sales.objects.filter(is_cancelled=False).aggregate(total=Sum("total_amount"))["total"] or 0
     total_expenses = Expense.objects.aggregate(total=Sum("amount"))["total"] or 0
     return total_sales - total_expenses
+
