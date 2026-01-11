@@ -86,8 +86,8 @@ urlpatterns = [
     path('purchase_order/item/<int:item_id>/edit/', edit_purchase_order_item, name='edit_purchase_order_item'),
     path('purchase_order/item/<int:item_id>/delete/', delete_purchase_order_item, name='delete_purchase_order_item'),
     # Bulk upload / template for PurchaseOrderItem
-    path('purchase_order/<int:order_id>/items/bulk-upload/', purchase_order_items_bulk_upload, name='purchase_order_items_bulk_upload'),
-    path('purchase_order/items/bulk-template/', download_purchase_order_item_template, name='download_purchase_order_item_template'),
+    # path('purchase_order/<int:order_id>/items/bulk-upload/', purchase_order_items_bulk_upload, name='purchase_order_items_bulk_upload'),
+    # path('purchase_order/items/bulk-template/', download_purchase_order_item_template, name='download_purchase_order_item_template'),
     
     # Transfer Requests
     path('transfer_requests/', transfer_request_list, name='transfer_request_list'),
@@ -119,7 +119,7 @@ urlpatterns = [
     # JSON API Endpoints
     path('approved_transfer_requests/', approved_transfer_requests_api, name='approved_transfer_requests'),
     path('approved-transfer-requests/', approved_transfer_requests_json, name='approved_transfer_requests_json'),  # NEW
-    path('product-stock-info/', get_product_stock_info, name='get_product_stock_info'),  # NEW
+    path('product-stock-transfer-info/', get_product_stock_transfer_info, name='get_product_stock_transfer_info'),  # NEW
         
 
     # Stock Adjustments

@@ -131,14 +131,6 @@ def record_sales_view(request):
                         item.order = sale
                         item.save()
 
-                    # ---- update inventory ----
-                    # Only update inventory if sale is FULFILLED or PARTIALLY_PAID
-                    if sale.status in ['FULFILLED', 'PARTIALLY_PAID']:
-                        update_inventory_after_sale(sale, sale_items)
-                    else:
-                        # For PENDING sales, you might want to reserve stock or do nothing
-                        messages.info(request, f"Sale #{sale.receipt_no} is PENDING. Inventory will be updated when payment is made.")
-
             except Exception as e:
                 messages.error(request, f"Failed to save sale: {e}")
                 return render(request, 'sales/record_sales.html', {
@@ -179,43 +171,45 @@ def record_sales_view(request):
         'units': UnitOfMeasure.objects.all().order_by('name'),
     })
 
-def update_inventory_after_sale(sale, sale_items):
-    """
-    Update inventory after a successful sale
-    """
-    try:
-        with transaction.atomic():
-            for item in sale_items:
-                # Get inventory for this product in this store
-                inventory, created = Inventory.objects.get_or_create(
-                    product=item.product,
-                    store=sale.store,
-                    defaults={'quantity_in_stock': 0}
-                )
+
+
+# def update_inventory_after_sale(sale, sale_items):
+#     """
+#     Update inventory after a successful sale
+#     """
+#     try:
+#         with transaction.atomic():
+#             for item in sale_items:
+#                 # Get inventory for this product in this store
+#                 inventory, created = Inventory.objects.get_or_create(
+#                     product=item.product,
+#                     store=sale.store,
+#                     defaults={'quantity_in_stock': 0}
+#                 )
                 
-                # Deduct sold quantity from inventory
-                old_stock = inventory.quantity_in_stock
-                inventory.quantity_in_stock = F('quantity_in_stock') - item.quantity
-                inventory.save()
-                inventory.refresh_from_db()
+#                 # Deduct sold quantity from inventory
+#                 old_stock = inventory.quantity_in_stock
+#                 inventory.quantity_in_stock = F('quantity_in_stock') - item.quantity
+#                 inventory.save()
+#                 inventory.refresh_from_db()
                 
-                # Create stock movement record
-                StockMovement.objects.create(
-                    product=item.product,
-                    store=sale.store,
-                    transaction_type='SALE',
-                    quantity=-item.quantity,  # Negative for deduction
-                    transaction_id=sale.id,
-                    note=f"Sale #{sale.receipt_no}",
-                    units_in_stock=inventory.quantity_in_stock,
-                    user=str(sale.recorded_by)
-                )
+#                 # Create stock movement record
+#                 StockMovement.objects.create(
+#                     product=item.product,
+#                     store=sale.store,
+#                     transaction_type='SALE',
+#                     quantity=-item.quantity,  # Negative for deduction
+#                     transaction_id=sale.id,
+#                     note=f"Sale #{sale.receipt_no}",
+#                     units_in_stock=inventory.quantity_in_stock,
+#                     user=str(sale.recorded_by)
+#                 )
                 
-                # Update inventory batches using FIFO
-                update_inventory_batches_after_sale(item.product, sale.store, item.quantity)
+#                 # Update inventory batches using FIFO
+#                 update_inventory_batches_after_sale(item.product, sale.store, item.quantity)
                 
-    except Exception as e:
-        raise Exception(f"Inventory update failed: {str(e)}")
+#     except Exception as e:
+#         raise Exception(f"Inventory update failed: {str(e)}")
 
 def update_inventory_batches_after_sale(product, store, quantity_sold):
     """
@@ -245,6 +239,9 @@ def update_inventory_batches_after_sale(product, store, quantity_sold):
             batch.remaining_quantity = 0
             batch.save()
 
+
+
+
 @login_required
 def sales_detail_view(request, pk):
     sale = get_object_or_404(Sales, pk=pk)
@@ -264,6 +261,7 @@ def sales_detail_view(request, pk):
         'stock_movements': stock_movements,
     }
     return render(request, 'sales/sales_detail.html', context)
+
 
 @login_required
 def sales_update_view(request, pk):
@@ -322,47 +320,59 @@ def sales_update_view(request, pk):
                 }
                 return render(request, 'sales/record_sales.html', context)
             
-            # Update sale amounts - the status will be auto-calculated on save
-            sale.total_amount = total_amount
-            sale.amount_paid = amount_paid
-            sale.balance = balance  # This triggers the status logic
-            
-            # DON'T manually set status - let the model's save() method handle it
-            # The save() method will call resolve_status() automatically
-            
-            # Set recorded_by to current user (or keep original if not changing)
-            sale.recorded_by = request.user
-            sale.save()  # Status will be updated here
-            
-            sale_items = formset.save(commit=False)
-            for item in sale_items:
-                item.order = sale
-                item.save()
-            
-            for obj in formset.deleted_objects:
-                obj.delete()
-            
-            # Update inventory based on status change
-            if sale.status in ['FULFILLED', 'PARTIALLY_PAID']:
-                try:
-                    # If sale was previously not FULFILLED/PARTIALLY_PAID, update inventory
-                    if hasattr(sale, '_original_status') and sale._original_status not in ['FULFILLED', 'PARTIALLY_PAID']:
-                        update_inventory_after_sale(sale, sale_items)
-                    # If sale is being updated and already had inventory deducted, 
-                    # you might need a more complex logic here
-                except Exception as e:
-                    messages.warning(request, f"Sale updated but inventory update failed: {str(e)}")
+            try:
+                with transaction.atomic():
+                    # Update sale amounts - the status will be auto-calculated on save
+                    sale.total_amount = total_amount
+                    sale.amount_paid = amount_paid
+                    sale.balance = balance  # This triggers the status logic
+                    
+                    # Set recorded_by to current user (or keep original if not changing)
+                    sale.recorded_by = request.user
+                    sale.save()  # Status will be updated here
+                    
+                    # Save sale items
+                    sale_items = formset.save(commit=False)
+                    for item in sale_items:
+                        item.order = sale
+                        item.save()
+                    
+                    # Delete removed items
+                    for obj in formset.deleted_objects:
+                        obj.delete()
+                    
+                    # NOTE: Inventory updates are now handled by signals
+                    # When SalesItems are saved/deleted, signals will automatically
+                    # update inventory accordingly
+                    
+            except Exception as e:
+                messages.error(request, f"Failed to update sale: {e}")
+                return render(request, 'sales/record_sales.html', {
+                    'form': form,
+                    'formset': formset,
+                    'sale': sale,
+                    'products': Product.objects.filter(is_active=True).order_by('name'),
+                    'units': UnitOfMeasure.objects.all().order_by('name'),
+                })
             
             messages.success(request, f'Sale #{sale.receipt_no} updated successfully. Status: {sale.get_status_display()}')
             return redirect('sales_list')
         else:
-            messages.error(request, 'Please correct the errors below.')
+            # Display form errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+
+            for item_form in formset:
+                for field, errors in item_form.errors.items():
+                    for error in errors:
+                        messages.error(
+                            request,
+                            f"Item {item_form.prefix} - {field}: {error}"
+                        )
     else:
         form = SalesForm(instance=sale)
         formset = SalesItemFormSet(queryset=get_sales_items_for_sale(sale))
-        
-        # Store original status for comparison
-        sale._original_status = sale.status
     
     # Get products and units for the template
     products = Product.objects.filter(is_active=True).order_by('name')
@@ -376,6 +386,9 @@ def sales_update_view(request, pk):
         'units': units,
     }
     return render(request, 'sales/record_sales.html', context)
+
+
+
 
 @login_required
 def sales_delete_view(request, pk):

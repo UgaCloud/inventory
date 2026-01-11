@@ -50,7 +50,6 @@
             </ul>
           </div>
         </li>
-        
       </ul>
     </div>
 
@@ -63,7 +62,7 @@
           <strong>{{ pending_approved_requests }} approved request{{ pending_approved_requests|pluralize }}</strong> 
           waiting to be converted to stock transfers.
         </div>
-  <button class="btn btn-sm btn-primary me-2" data-action="showApprovedRequestsModal">
+        <button class="btn btn-sm btn-primary me-2" data-action="showApprovedRequestsModal">
           View Requests
         </button>
       </div>
@@ -137,17 +136,12 @@
       <div class="col-lg-2 col-md-4 col-sm-6">
         <div class="card bg-primary text-white">
           <div class="card-body text-center">
-            <!-- <div class="mb-2">
-              <i data-feather="dollar-sign" class="feather-24"></i>
-            </div> -->
-            
             <h4 class="mb-1">UGX {{ total_values|default:0|floatformat:"0"|intcomma }}</h4>
             <p class="mb-0">Total Value</p>
             <small>Active Transfers</small>
           </div>
         </div>
       </div>
-      
     </div>
 
     <!-- Active Transfers Table -->
@@ -437,7 +431,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-  <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
+        <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
           <i data-feather="truck" class="feather-16 me-1"></i>
           Create Selected Transfers
         </button>
@@ -445,7 +439,6 @@
     </div>
   </div>
 </div>
-
 
 <!-- Direct Transfer Modal -->
 <div class="modal fade" id="directTransferModal" tabindex="-1" aria-labelledby="directTransferModalLabel" aria-hidden="true">
@@ -458,7 +451,7 @@
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form id="directTransferForm" method="post" action="{% url 'direct_stock_transfer_create' %}">
+      <form id="directTransferForm" method="post" action="{% url 'direct_stock_transfer_create' %}" class="needs-validation" novalidate>
         {% csrf_token %}
         
         <div class="modal-body">
@@ -468,12 +461,14 @@
               <div class="mb-3">
                 <label for="id_from_store" class="form-label">From Store *</label>
                 {{ stock_form.from_store }}
+                <div class="invalid-feedback">Please select a from store.</div>
               </div>
             </div>
             <div class="col-md-6">
               <div class="mb-3">
                 <label for="id_to_store" class="form-label">To Store *</label>
                 {{ stock_form.to_store }}
+                <div class="invalid-feedback">Please select a to store.</div>
               </div>
             </div>
           </div>
@@ -496,10 +491,15 @@
           <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0">Transfer Items *</h6>
-              <button type="button" class="btn btn-sm btn-primary" data-action="addFormsetRow">
-                <i data-feather="plus" class="feather-12 me-1"></i>
-                Add Item
-              </button>
+              <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="refreshStockBtn" title="Refresh Stock Info">
+                  <i data-feather="refresh-cw" class="feather-12"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" data-action="addFormsetRow">
+                  <i data-feather="plus" class="feather-12 me-1"></i>
+                  Add Item
+                </button>
+              </div>
             </div>
             <div class="card-body">
               <!-- Formset management data -->
@@ -516,6 +516,7 @@
                       <th>Available</th>
                       <th>Quantity *</th>
                       <th>Units *</th>
+                      <th>Unit Cost</th>
                       <th>Total</th>
                       <th>Actions</th>
                     </tr>
@@ -525,7 +526,7 @@
                   </tbody>
                   <tfoot>
                     <tr class="table-info">
-                      <td colspan="4" class="text-end fw-bold">Total Value:</td>
+                      <td colspan="5" class="text-end fw-bold">Total Value:</td>
                       <td colspan="2" class="fw-bold" id="grand-total">UGX 0.00</td>
                     </tr>
                   </tfoot>
@@ -551,6 +552,7 @@
 
 
 
+
 <script>
 // Helper: read CSRF token from cookie
 function getCookie(name) {
@@ -559,32 +561,17 @@ function getCookie(name) {
   if (parts.length === 2) return parts.pop().split(';').shift();
 }
 
-// Helper: POST JSON with CSRF and return parsed JSON
-async function postJSON(url, data) {
-  const csrftoken = getCookie('csrftoken');
-  const resp = await fetch(url, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrftoken
-    },
-    body: JSON.stringify(data)
-  });
-
-  const text = await resp.text();
-  try { return { ok: resp.ok, status: resp.status, data: JSON.parse(text) }; } catch (e) { return { ok: resp.ok, status: resp.status, data: text }; }
-}
-
 // ========== STOCK MANAGER CLASS ==========
 class StockManager {
     constructor() {
         this.pendingRequests = new Map();
         this.localCache = new Map();
         this.debounceTimers = new Map();
+        this.abortControllers = new Map();
+        this.rowStocks = new Map(); // Track original stock per row
     }
 
-    // Debounced stock update to prevent API spam
+    // Debounced stock update
     async updateProductStock(selectElement, delay = 300) {
         const row = selectElement.closest('tr');
         const cacheKey = this.getCacheKey(selectElement);
@@ -596,7 +583,26 @@ class StockManager {
         
         // Show loading state immediately
         const availableStock = row.querySelector('.available-stock');
-        this.updateStockDisplay(availableStock, 'Loading...', 'muted');
+        const unitCost = row.querySelector('.unit-cost');
+        const quantityInput = row.querySelector('.quantity-input');
+        
+        if (availableStock) {
+            availableStock.textContent = 'Loading...';
+            availableStock.className = 'available-stock text-warning';
+        }
+        if (unitCost) {
+            unitCost.textContent = 'Loading...';
+        }
+        if (quantityInput) {
+            quantityInput.value = '';
+            quantityInput.classList.remove('is-invalid', 'is-valid');
+        }
+        
+        // Clear unit dropdown
+        const unitsSelect = row.querySelector('select[name*="units"]');
+        if (unitsSelect) {
+            unitsSelect.innerHTML = '<option value="">Select Unit</option>';
+        }
         
         // Set new debounced request
         const timeoutId = setTimeout(async () => {
@@ -614,38 +620,53 @@ class StockManager {
         const storeId = fromStoreSelect ? fromStoreSelect.value : '';
         
         const availableStock = row.querySelector('.available-stock');
+        const unitCost = row.querySelector('.unit-cost');
         const cacheKey = this.getCacheKey(selectElement);
         
         if (!productId || !storeId) {
-            this.updateStockDisplay(availableStock, '-', 'muted');
+            if (availableStock) {
+                availableStock.textContent = '-';
+                availableStock.className = 'available-stock text-muted';
+            }
+            if (unitCost) unitCost.textContent = 'UGX 0.00';
             return;
         }
         
-        // Check local cache first (1 second cache for rapid updates)
+        // Check local cache first (5 second cache)
         const cached = this.localCache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp) < 1000) {
+        if (cached && (Date.now() - cached.timestamp) < 5000) {
             console.log(`Using cached stock for product ${productId}`);
             this.updateFromCache(selectElement, cached.data);
             return;
         }
         
+        // Abort any previous request for this cache key
+        if (this.abortControllers.has(cacheKey)) {
+            this.abortControllers.get(cacheKey).abort();
+        }
+        
+        // Create new abort controller
+        const controller = new AbortController();
+        this.abortControllers.set(cacheKey, controller);
+        
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
-            const url = `{% url "get_product_stock_info" %}?product_id=${productId}&store_id=${storeId}&t=${Date.now()}`;
+            const url = `{% url "get_product_stock_transfer_info" %}?product_id=${productId}&store_id=${storeId}&t=${Date.now()}`;
             console.log('Fetching stock from:', url);
             
-            const response = await fetch(url, { signal: controller.signal });
-            
-            clearTimeout(timeoutId);
+            const response = await fetch(url, { 
+                signal: controller.signal,
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            });
             
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const data = await response.json();
+            console.log('Stock data received:', data);
             
-            if (data.error) {
-                throw new Error(data.error);
+            if (data.success === false) {
+                throw new Error(data.error || 'Failed to fetch stock');
             }
             
             // Cache the successful response
@@ -654,84 +675,182 @@ class StockManager {
                 timestamp: Date.now()
             });
             
-            this.updateStockDisplayFromData(availableStock, data);
+            // Store original stock for this row
+            const rowId = row.id;
+            this.rowStocks.set(rowId, {
+                originalStock: data.available_stock,
+                currentStock: data.available_stock,
+                productId: productId
+            });
             
-            // Validate quantity if already entered
-            const quantityInput = row.querySelector('.quantity-input');
-            if (quantityInput && quantityInput.value) {
-                this.validateQuantity(quantityInput, data.available_stock);
-            }
+            this.updateStockDisplayFromData(row, data);
+            
+            // Populate units dropdown with all available units
+            this.populateUnitsDropdown(row, data);
             
         } catch (error) {
             console.error('Stock fetch error:', error);
             if (error.name === 'AbortError') {
-                this.updateStockDisplay(availableStock, 'Timeout', 'danger');
-            } else {
-                this.updateStockDisplay(availableStock, 'Error', 'danger');
+                console.log('Request was aborted');
+                return;
             }
+            if (availableStock) {
+                availableStock.textContent = 'Error';
+                availableStock.className = 'available-stock text-danger';
+            }
+            if (unitCost) unitCost.textContent = 'Error';
+        } finally {
+            this.abortControllers.delete(cacheKey);
         }
     }
 
-    updateStockDisplayFromData(element, data) {
-        if (!element) return;
+    populateUnitsDropdown(row, data) {
+        const unitsSelect = row.querySelector('select[name*="units"]');
+        if (!unitsSelect || !data.units) return;
         
-        const stockLevel = data.available_stock || 0;
-        let status = 'muted';
+        // Clear existing options
+        unitsSelect.innerHTML = '<option value="">Select Unit</option>';
         
-        if (stockLevel === 0) {
-            status = 'danger';
-        } else if (stockLevel <= (data.reorder_level || 0)) {
-            status = 'warning';
-        } else {
-            status = 'success';
+        // Add all available units
+        data.units.forEach(unit => {
+            const option = document.createElement('option');
+            option.value = unit.id;
+            option.textContent = `${unit.name} (UGX ${unit.price.toLocaleString()})`;
+            option.dataset.price = unit.price;
+            unitsSelect.appendChild(option);
+        });
+        
+        // Auto-select the first unit (or default unit from response)
+        if (data.units.length > 0) {
+            // Try to select the unit from response first
+            if (data.unit_id) {
+                const unitOption = unitsSelect.querySelector(`option[value="${data.unit_id}"]`);
+                if (unitOption) {
+                    unitOption.selected = true;
+                } else {
+                    // Fallback to first unit
+                    unitsSelect.selectedIndex = 1;
+                }
+            } else {
+                unitsSelect.selectedIndex = 1;
+            }
+            
+            // Trigger change to update costs
+            unitsSelect.dispatchEvent(new Event('change'));
         }
-        
-        this.updateStockDisplay(element, stockLevel, status);
     }
 
-    updateStockDisplay(element, value, status) {
-        if (!element) return;
+    updateStockDisplayFromData(row, data) {
+        const availableStock = row.querySelector('.available-stock');
+        const unitCost = row.querySelector('.unit-cost');
         
-        element.textContent = value;
-        element.className = 'available-stock'; // Reset classes
+        if (availableStock) {
+            const stockLevel = data.available_stock || 0;
+            let status = 'muted';
+            
+            if (stockLevel === 0) {
+                status = 'danger';
+            } else if (stockLevel <= (data.reorder_level || 0)) {
+                status = 'warning';
+            } else {
+                status = 'success';
+            }
+            
+            availableStock.textContent = stockLevel;
+            availableStock.className = 'available-stock';
+            if (status === 'success') {
+                availableStock.classList.add('text-success', 'fw-bold');
+            } else if (status === 'warning') {
+                availableStock.classList.add('text-warning', 'fw-bold');
+            } else if (status === 'danger') {
+                availableStock.classList.add('text-danger', 'fw-bold');
+            } else if (status === 'muted') {
+                availableStock.classList.add('text-muted');
+            }
+            
+            // Add title with more info
+            availableStock.title = `Available: ${data.available_stock}\nTotal: ${data.total_stock}\nCommitted: ${data.committed_stock}`;
+        }
         
-        if (status === 'success') {
-            element.classList.add('text-success', 'fw-bold');
-        } else if (status === 'warning') {
-            element.classList.add('text-warning', 'fw-bold');
-        } else if (status === 'danger') {
-            element.classList.add('text-danger', 'fw-bold');
-        } else if (status === 'muted') {
-            element.classList.add('text-muted');
+        if (unitCost && data.unit_cost) {
+            unitCost.textContent = `UGX ${parseFloat(data.unit_cost).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         }
     }
 
     updateFromCache(selectElement, data) {
         const row = selectElement.closest('tr');
-        const availableStock = row.querySelector('.available-stock');
+        this.updateStockDisplayFromData(row, data);
+        this.populateUnitsDropdown(row, data);
         
-        this.updateStockDisplayFromData(availableStock, data);
+        // Store original stock for this row
+        const rowId = row.id;
+        this.rowStocks.set(rowId, {
+            originalStock: data.available_stock,
+            currentStock: data.available_stock,
+            productId: selectElement.value
+        });
         
-        // Validate quantity if already entered
-        const quantityInput = row.querySelector('.quantity-input');
-        if (quantityInput && quantityInput.value) {
-            this.validateQuantity(quantityInput, data.available_stock);
-        }
+        // Update row total
+        this.updateRowTotal(row);
     }
 
-    validateQuantity(quantityInput, availableStock) {
+    // REAL-TIME STOCK DEDUCTION: Update available stock when quantity changes
+    updateAvailableStock(row, quantity) {
+        const availableStock = row.querySelector('.available-stock');
+        const rowId = row.id;
+        
+        if (!availableStock || !this.rowStocks.has(rowId)) return;
+        
+        const rowData = this.rowStocks.get(rowId);
+        const originalStock = rowData.originalStock;
+        const requestedQuantity = parseInt(quantity) || 0;
+        
+        // Calculate remaining stock after this transfer
+        const remainingStock = originalStock - requestedQuantity;
+        
+        // Update display
+        availableStock.textContent = remainingStock;
+        
+        // Update color based on stock level
+        availableStock.classList.remove('text-success', 'text-warning', 'text-danger', 'text-muted');
+        
+        if (remainingStock < 0) {
+            availableStock.classList.add('text-danger', 'fw-bold');
+        } else if (remainingStock === 0) {
+            availableStock.classList.add('text-danger', 'fw-bold');
+        } else if (remainingStock <= (parseInt(availableStock.dataset.reorderLevel) || 0)) {
+            availableStock.classList.add('text-warning', 'fw-bold');
+        } else {
+            availableStock.classList.add('text-success', 'fw-bold');
+        }
+        
+        // Store updated current stock
+        rowData.currentStock = remainingStock;
+        this.rowStocks.set(rowId, rowData);
+        
+        // Validate quantity
+        this.validateQuantity(row.querySelector('.quantity-input'), originalStock);
+    }
+
+    validateQuantity(quantityInput, originalStock) {
         const row = quantityInput.closest('tr');
         const quantity = parseInt(quantityInput.value) || 0;
+        const available = parseInt(originalStock) || 0;
         
-        if (quantity > availableStock) {
-            quantityInput.classList.add('is-invalid');
-            this.showStockWarning(row, `Only ${availableStock} available in stock`);
-        } else if (quantity <= 0) {
+        quantityInput.classList.remove('is-invalid', 'is-valid');
+        
+        if (quantity <= 0) {
             quantityInput.classList.add('is-invalid');
             this.showStockWarning(row, 'Quantity must be greater than 0');
+            return false;
+        } else if (quantity > available) {
+            quantityInput.classList.add('is-invalid');
+            this.showStockWarning(row, `Only ${available} available in stock`);
+            return false;
         } else {
-            quantityInput.classList.remove('is-invalid');
+            quantityInput.classList.add('is-valid');
             this.hideStockWarning(row);
+            return true;
         }
     }
 
@@ -765,19 +884,52 @@ class StockManager {
         console.log('Updating all product stock info...');
         const productSelects = document.querySelectorAll('#directTransferModal .product-select');
         
+        // Clear cache for this store
+        const storeId = document.querySelector('#directTransferModal select[name="from_store"]')?.value || '';
+        for (const key of this.localCache.keys()) {
+            if (key.includes(`_${storeId}`)) {
+                this.localCache.delete(key);
+            }
+        }
+        
         const updates = Array.from(productSelects)
             .filter(select => select.value)
             .map(select => this.fetchStockInfo(select));
         
-        // Use Promise.allSettled to handle individual failures gracefully
-        const results = await Promise.allSettled(updates);
+        await Promise.allSettled(updates);
+    }
+
+    // Force refresh all stocks (bypass cache)
+    async forceRefreshAllStocks() {
+        this.localCache.clear();
+        await this.updateAllStocks();
+    }
+
+    updateRowTotal(row) {
+        const productSelect = row.querySelector('.product-select');
+        const quantityInput = row.querySelector('.quantity-input');
+        const unitsSelect = row.querySelector('select[name*="units"]');
+        const rowTotal = row.querySelector('.row-total');
+        const unitCost = row.querySelector('.unit-cost');
         
-        // Log any failures
-        results.forEach((result, index) => {
-            if (result.status === 'rejected') {
-                console.error(`Failed to update stock for product ${index}:`, result.reason);
+        if (productSelect && quantityInput && unitsSelect && rowTotal && unitCost) {
+            const selectedUnit = unitsSelect.options[unitsSelect.selectedIndex];
+            const unitPrice = selectedUnit ? parseFloat(selectedUnit.dataset.price || 0) : 0;
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const total = unitPrice * quantity;
+            
+            rowTotal.textContent = `UGX ${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            
+            // Update unit cost display
+            if (unitPrice > 0) {
+                unitCost.textContent = `UGX ${unitPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             }
-        });
+            
+            updateGrandTotal();
+            
+            // REAL-TIME: Update available stock display
+            this.updateAvailableStock(row, quantity);
+        }
     }
 
     // Clear cache when modal closes
@@ -785,13 +937,10 @@ class StockManager {
         this.localCache.clear();
         this.debounceTimers.forEach(timeoutId => clearTimeout(timeoutId));
         this.debounceTimers.clear();
+        this.abortControllers.forEach(controller => controller.abort());
+        this.abortControllers.clear();
         this.pendingRequests.clear();
-    }
-
-    // Force refresh all stocks (bypass cache)
-    async forceRefreshAllStocks() {
-        this.localCache.clear();
-        await this.updateAllStocks();
+        this.rowStocks.clear();
     }
 }
 
@@ -859,7 +1008,7 @@ function showApprovedRequestsModal() {
               </td>
               <td>${request.approved_date ? new Date(request.approved_date).toLocaleDateString() : 'N/A'}</td>
               <td>
-                <button class="btn btn-sm btn-primary" data-id="createSingleTransfer(${request.id})">
+                <button class="btn btn-sm btn-primary" data-action="createSingleTransfer" data-request-id="${request.id}">
                   <i data-feather="truck" class="feather-12"></i>
                 </button>
               </td>
@@ -912,40 +1061,45 @@ function showApprovedRequestsModal() {
 }
 
 // ========== TRANSFER ACTIONS ==========
-function createSingleTransfer(requestId) {
-  if (!confirm('Create stock transfer from this request?')) return;
+function createSingleTransfer(event) {
+    const requestId = event.target.closest('[data-request-id]').dataset.requestId;
+    if (!confirm('Create stock transfer from this request?')) return;
 
-  const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', requestId);
-  const csrftoken = getCookie('csrftoken');
+    const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', requestId);
+    const csrftoken = getCookie('csrftoken');
 
-  fetch(url, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrftoken,
-      'X-Requested-With': 'XMLHttpRequest'
-    },
-    credentials: 'same-origin'
-  }).then(resp => {
-    // Expect JSON when called via AJAX
-    if (resp.ok) {
-      return resp.json().then(data => {
-        if (data && data.success) {
-          // Refresh transfers list to show newly created transfer
-          refreshTransfers();
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    }).then(async resp => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('approvedRequestsModal'));
+        if (modal) modal.hide();
+        
+        if (resp.ok) {
+            try {
+                const data = await resp.json();
+                if (data.success) {
+                    alert('Transfer created successfully!');
+                    refreshTransfers();
+                } else {
+                    alert('Failed to create transfer');
+                }
+            } catch {
+                // If response is not JSON, assume success
+                alert('Transfer created successfully!');
+                refreshTransfers();
+            }
         } else {
-          alert('Failed to create transfer');
+            alert('Failed to create transfer');
         }
-      }).catch(() => {
-        // In case server returned HTML but responded 200, still refresh
-        refreshTransfers();
-      });
-    } else {
-      resp.text().then(t => alert('Failed to create transfer: ' + resp.status));
-    }
-  }).catch(err => {
-    console.error('Error creating transfer from request:', err);
-    alert('Error creating transfer from request');
-  });
+    }).catch(err => {
+        console.error('Error creating transfer from request:', err);
+        alert('Error creating transfer from request');
+    });
 }
 
 function createBulkTransfers() {
@@ -958,71 +1112,39 @@ function createBulkTransfers() {
   if (!confirm(`Create transfers for ${selectedRequests.length} request(s)?`)) return;
 
   const csrftoken = getCookie('csrftoken');
-  const results = { success: [], failed: [] };
+  const formData = new FormData();
+  selectedRequests.forEach(id => formData.append('request_ids', id));
 
-  // Create each transfer by calling the server endpoint for creating from request
-  const promises = selectedRequests.map(id => {
-    const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', id);
-    return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-      .then(r => r.json().then(j => ({ id, ok: r.ok && j.success, status: r.status, json: j })).catch(() => ({ id, ok: r.ok, status: r.status })))
-      .catch(err => ({ id, ok: false, error: String(err) }));
-  });
-
-  Promise.all(promises).then(resps => {
-    resps.forEach(r => {
-      if (r.ok) results.success.push(r.id); else results.failed.push(r.id);
-    });
-
-    let message = '';
-    if (results.success.length) message += `Created ${results.success.length} transfers.`;
-    if (results.failed.length) message += ` Failed for ${results.failed.length} requests.`;
-    alert(message || 'No action taken');
-    refreshTransfers();
-  });
-}
-
-function startTransfer(transferId) {
-  if (!confirm('Start this transfer? This will mark it as in transit.')) return;
-
-  const url = '{% url "api_stock_transfer_start" %}';
-  postJSON(url, { transfer_id: transferId }).then(result => {
-    if (result.ok) {
-      alert('Transfer started');
+  fetch('{% url "create_bulk_transfers" %}', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrftoken,
+    },
+    body: formData
+  }).then(async resp => {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('approvedRequestsModal'));
+    if (modal) modal.hide();
+    
+    try {
+      const data = await resp.json();
+      if (data.success) {
+        alert(`Successfully created ${data.created} transfer(s)`);
+        if (data.errors && data.errors.length > 0) {
+          console.warn('Errors:', data.errors);
+        }
+        refreshTransfers();
+      } else {
+        alert('Failed to create bulk transfers');
+      }
+    } catch {
+      // Assume success if we get here
+      alert('Transfers created successfully!');
       refreshTransfers();
-    } else {
-      alert('Failed to start transfer: ' + (result.data.detail || result.status));
     }
   }).catch(err => {
-    console.error('Start transfer error', err);
-    alert('Error starting transfer');
+    console.error('Error creating bulk transfers:', err);
+    alert('Error creating bulk transfers');
   });
-}
-
-function completeTransfer(transferId) {
-  if (!confirm('Mark this transfer as complete? This will update inventory.')) return;
-
-  const url = '{% url "api_stock_transfer_complete" %}';
-  postJSON(url, { transfer_id: transferId }).then(result => {
-    if (result.ok) {
-      alert('Transfer completed');
-      refreshTransfers();
-    } else {
-      alert('Failed to complete transfer: ' + (result.data.detail || result.status));
-    }
-  }).catch(err => {
-    console.error('Complete transfer error', err);
-    alert('Error completing transfer');
-  });
-}
-
-function cancelTransfer(transferId) {
-    if (confirm('Cancel this transfer?')) {
-        alert('Cancel functionality not yet implemented');
-    }
-}
-
-function refreshTransfers() {
-    window.location.reload();
 }
 
 // ========== DIRECT TRANSFER MODAL ==========
@@ -1038,8 +1160,11 @@ function showDirectTransferModal() {
     const form = document.getElementById('directTransferForm');
     if (form) {
         form.reset();
+        form.classList.remove('was-validated');
         // Remove any existing validation classes
-        form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        form.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
+            el.classList.remove('is-invalid', 'is-valid');
+        });
         form.querySelectorAll('.stock-warning').forEach(el => el.remove());
     }
 
@@ -1060,6 +1185,9 @@ function showDirectTransferModal() {
     if (grandTotalElement) {
         grandTotalElement.textContent = 'UGX 0.00';
     }
+
+    // Clear stock cache
+    stockManager.clearCache();
 
     // Show modal
     const bootstrapModal = new bootstrap.Modal(modal);
@@ -1092,6 +1220,14 @@ function setupRealTimeStockListeners() {
         });
     }
 
+    // Manual refresh button
+    const refreshBtn = modal.querySelector('#refreshStockBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            stockManager.forceRefreshAllStocks();
+        });
+    }
+
     // Product change with debouncing
     modal.addEventListener('change', function(e) {
         if (e.target.classList.contains('product-select')) {
@@ -1100,13 +1236,38 @@ function setupRealTimeStockListeners() {
         }
     });
 
-    // Manual refresh button (optional - add this to your modal UI)
-    const refreshBtn = modal.querySelector('#refreshStockBtn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
-            stockManager.forceRefreshAllStocks();
-        });
-    }
+    // Quantity input - REAL-TIME UPDATES
+    modal.addEventListener('input', function(e) {
+        if (e.target.classList.contains('quantity-input')) {
+            const row = e.target.closest('tr');
+            
+            // Update row total and available stock in real-time
+            stockManager.updateRowTotal(row);
+            
+            // Don't validate here - validation happens on blur
+        }
+    });
+
+    // Quantity blur - validate against stock
+    modal.addEventListener('blur', function(e) {
+        if (e.target.classList.contains('quantity-input')) {
+            const row = e.target.closest('tr');
+            const rowId = row.id;
+            
+            if (stockManager.rowStocks.has(rowId)) {
+                const rowData = stockManager.rowStocks.get(rowId);
+                stockManager.validateQuantity(e.target, rowData.originalStock);
+            }
+        }
+    });
+
+    // Unit change - update costs
+    modal.addEventListener('change', function(e) {
+        if (e.target.matches('select[name*="units"]')) {
+            const row = e.target.closest('tr');
+            stockManager.updateRowTotal(row);
+        }
+    });
 }
 
 function addFormsetRow() {
@@ -1130,12 +1291,12 @@ function addFormsetRow() {
                 <option value="">Select Product</option>
                 {% for product in products %}
                 <option value="{{ product.id }}" 
-                        data-cost="{{ product.default_price|default:'0' }}"
                         data-sku="{{ product.sku }}">
                     {{ product.name }} ({{ product.sku }})
                 </option>
                 {% endfor %}
             </select>
+            <div class="invalid-feedback">Please select a product.</div>
         </td>
         <td>
             <span class="available-stock text-muted">-</span>
@@ -1144,21 +1305,24 @@ function addFormsetRow() {
             <input type="number" name="items-${currentForms}-quantity" 
                    class="form-control form-control-sm quantity-input" 
                    min="1" step="1" value="" placeholder="Qty" required>
+            <div class="invalid-feedback">Please enter a valid quantity.</div>
         </td>
         <td>
             <select name="items-${currentForms}-units"
                    class="form-select form-select-sm" required>
                 <option value="">Select Unit</option>
-                {% for unit in units %}
-                <option value="{{ unit.id }}">{{ unit.name }}</option>
-                {% endfor %}
+                <!-- Units will be auto-populated when product is selected -->
             </select>
+            <div class="invalid-feedback">Please select a unit.</div>
+        </td>
+        <td>
+            <span class="unit-cost">UGX 0.00</span>
         </td>
         <td>
             <span class="row-total">UGX 0.00</span>
         </td>
         <td>
-            <button type="button" class="btn btn-sm btn-outline-danger" data-id="removeFormsetRow(this)">
+            <button type="button" class="btn btn-sm btn-outline-danger" data-action="removeFormsetRow">
                 <i data-feather="trash-2" class="feather-12"></i>
             </button>
         </td>
@@ -1178,49 +1342,10 @@ function addFormsetRow() {
     }
 }
 
-function initializeRowFeatures(row) {
-    // Product select
-    const productSelect = row.querySelector('.product-select');
-    if (productSelect) {
-        productSelect.addEventListener('change', function() {
-            updateRowTotal(row);
-            
-            // Auto-select first unit if not selected
-            const unitsSelect = row.querySelector('select[name*="units"]');
-            if (unitsSelect && !unitsSelect.value && unitsSelect.options.length > 1) {
-                unitsSelect.selectedIndex = 1;
-            }
-        });
-    }
-
-    // Quantity input
-    const quantityInput = row.querySelector('.quantity-input');
-    if (quantityInput) {
-        quantityInput.addEventListener('input', function() {
-            updateRowTotal(row);
-            // Validation handled by stock manager
-        });
-
-        // Also validate on blur for immediate feedback
-        quantityInput.addEventListener('blur', function() {
-            const availableStockElement = row.querySelector('.available-stock');
-            const availableStock = parseInt(availableStockElement.textContent);
-            if (!isNaN(availableStock)) {
-                stockManager.validateQuantity(this, availableStock);
-            }
-        });
-    }
-
-    // Units select
-    const unitsSelect = row.querySelector('select[name*="units"]');
-    if (unitsSelect) {
-        unitsSelect.addEventListener('change', function() {
-            updateRowTotal(row);
-        });
-    }
-}
-
-function removeFormsetRow(button) {
+function removeFormsetRow(event) {
+    const button = event.target.closest('[data-action="removeFormsetRow"]');
+    if (!button) return;
+    
     const row = button.closest('tr');
     const tbody = document.getElementById('formset-tbody');
     
@@ -1229,12 +1354,20 @@ function removeFormsetRow(button) {
         const inputs = row.querySelectorAll('input:not([type="hidden"]), select');
         inputs.forEach(input => {
             input.value = '';
-            input.classList.remove('is-invalid');
+            input.classList.remove('is-invalid', 'is-valid');
         });
         row.querySelector('.available-stock').textContent = '-';
         row.querySelector('.available-stock').className = 'available-stock text-muted';
+        row.querySelector('.unit-cost').textContent = 'UGX 0.00';
         row.querySelector('.row-total').textContent = 'UGX 0.00';
         stockManager.hideStockWarning(row);
+        
+        // Clear units dropdown
+        const unitsSelect = row.querySelector('select[name*="units"]');
+        if (unitsSelect) {
+            unitsSelect.innerHTML = '<option value="">Select Unit</option>';
+        }
+        
         updateGrandTotal();
         return;
     }
@@ -1265,23 +1398,29 @@ function removeFormsetRow(button) {
     console.log(`🗑️ Removed formset row, total forms now: ${totalFormsInput.value}`);
 }
 
-// ========== CALCULATION FUNCTIONS ==========
-function updateRowTotal(row) {
+function initializeRowFeatures(row) {
+    // Product select
     const productSelect = row.querySelector('.product-select');
+    if (productSelect) {
+        productSelect.addEventListener('change', function() {
+            // Unit selection will be handled by stockManager
+        });
+    }
+
+    // Quantity input
     const quantityInput = row.querySelector('.quantity-input');
-    const rowTotal = row.querySelector('.row-total');
-    
-    if (productSelect && quantityInput && rowTotal) {
-        const selectedOption = productSelect.options[productSelect.selectedIndex];
-        const cost = selectedOption ? parseFloat(selectedOption.dataset.cost || 0) : 0;
-        const quantity = parseFloat(quantityInput.value) || 0;
-        const total = cost * quantity;
-        
-        rowTotal.textContent = `UGX ${total.toLocaleString()}`;
-        updateGrandTotal();
+    if (quantityInput) {
+        quantityInput.addEventListener('blur', function() {
+            const rowId = row.id;
+            if (stockManager.rowStocks.has(rowId)) {
+                const rowData = stockManager.rowStocks.get(rowId);
+                stockManager.validateQuantity(this, rowData.originalStock);
+            }
+        });
     }
 }
 
+// ========== CALCULATION FUNCTIONS ==========
 function updateGrandTotal() {
     const rowTotals = document.querySelectorAll('.row-total');
     let grandTotal = 0;
@@ -1294,8 +1433,12 @@ function updateGrandTotal() {
     
     const grandTotalElement = document.getElementById('grand-total');
     if (grandTotalElement) {
-        grandTotalElement.textContent = `UGX ${grandTotal.toLocaleString()}`;
+        grandTotalElement.textContent = `UGX ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     }
+}
+
+function refreshTransfers() {
+    window.location.reload();
 }
 
 // ========== FORM SUBMISSION ==========
@@ -1319,6 +1462,15 @@ function setupFormSubmission() {
         if (icon) icon.style.display = 'none';
         submitBtn.disabled = true;
         
+        // Validate form
+        if (!directTransferForm.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+            directTransferForm.classList.add('was-validated');
+            resetSubmitButton(submitBtn, spinner, icon);
+            return;
+        }
+        
         // Validate at least one item exists
         const totalForms = parseInt(document.getElementById('id_items-TOTAL_FORMS').value);
         console.log(`📋 Total forms: ${totalForms}`);
@@ -1331,6 +1483,8 @@ function setupFormSubmission() {
         
         // Validate all items have product, quantity, and units
         let validItems = 0;
+        let hasInvalidStock = false;
+        
         for (let i = 0; i < totalForms; i++) {
             const product = document.querySelector(`select[name="items-${i}-product"]`);
             const quantity = document.querySelector(`input[name="items-${i}-quantity"]`);
@@ -1338,6 +1492,26 @@ function setupFormSubmission() {
             
             if (product && product.value && quantity && quantity.value && units && units.value) {
                 validItems++;
+                
+                // Check stock availability
+                const row = product.closest('tr');
+                const rowId = row.id;
+                
+                if (stockManager.rowStocks.has(rowId)) {
+                    const rowData = stockManager.rowStocks.get(rowId);
+                    const available = rowData.originalStock;
+                    const qty = parseInt(quantity.value) || 0;
+                    
+                    if (qty > available) {
+                        hasInvalidStock = true;
+                        quantity.classList.add('is-invalid');
+                        const warning = row.querySelector('.stock-warning') || 
+                                        document.createElement('div');
+                        warning.className = 'stock-warning text-danger small mt-1';
+                        warning.textContent = `Only ${available} available`;
+                        quantity.parentElement.appendChild(warning);
+                    }
+                }
             }
         }
         
@@ -1349,16 +1523,16 @@ function setupFormSubmission() {
             return;
         }
         
-        // Validate from_store and to_store
-        const fromStore = document.querySelector('select[name="from_store"]');
-        const toStore = document.querySelector('select[name="to_store"]');
-        
-        if (!fromStore || !fromStore.value || !toStore || !toStore.value) {
+        if (hasInvalidStock) {
             e.preventDefault();
-            alert('Please select both From Store and To Store.');
+            alert('Some items have quantities exceeding available stock. Please adjust the quantities.');
             resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
+        
+        // Validate from_store and to_store
+        const fromStore = document.querySelector('select[name="from_store"]');
+        const toStore = document.querySelector('select[name="to_store"]');
         
         if (fromStore.value === toStore.value) {
             e.preventDefault();
@@ -1367,57 +1541,30 @@ function setupFormSubmission() {
             return;
         }
         
-        // Check for stock validation errors
-        const invalidQuantities = document.querySelectorAll('.is-invalid');
-        if (invalidQuantities.length > 0) {
-            e.preventDefault();
-            alert('Some items have quantities exceeding available stock. Please adjust the quantities.');
-            resetSubmitButton(submitBtn, spinner, icon);
-            return;
-        }
+        console.log('🎉 Form validation passed, submitting...');
+        // Allow normal form submission
+    });
+
+    // Real-time validation for store fields
+    const fromStore = directTransferForm.querySelector('select[name="from_store"]');
+    const toStore = directTransferForm.querySelector('select[name="to_store"]');
+    
+    if (fromStore && toStore) {
+        const validateStores = () => {
+            if (fromStore.value && toStore.value && fromStore.value === toStore.value) {
+                fromStore.classList.add('is-invalid');
+                toStore.classList.add('is-invalid');
+                fromStore.parentElement.querySelector('.invalid-feedback').textContent = 'Cannot be same as To Store';
+                toStore.parentElement.querySelector('.invalid-feedback').textContent = 'Cannot be same as From Store';
+            } else {
+                fromStore.classList.remove('is-invalid');
+                toStore.classList.remove('is-invalid');
+            }
+        };
         
-    console.log('🎉 Form validation passed, submitting via AJAX...');
-    e.preventDefault();
-
-    const url = directTransferForm.action;
-    const formData = new FormData(directTransferForm);
-    const csrftoken = getCookie('csrftoken');
-
-    fetch(url, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'X-CSRFToken': csrftoken
-      },
-      body: formData
-    }).then(async resp => {
-      if (resp.ok) {
-        // Created/redirected; refresh list or navigate to detail if Location header exists
-        try {
-          // Try to detect redirect URL
-          const loc = resp.headers.get('Location');
-          if (loc) {
-            window.location.href = loc;
-            return;
-          }
-        } catch (e) {}
-        // Otherwise just refresh the transfers list
-        resetSubmitButton(submitBtn, spinner, icon);
-        const text = await resp.text();
-        // Best-effort: show success and refresh
-        alert('Transfer created successfully');
-        refreshTransfers();
-      } else {
-        const txt = await resp.text();
-        resetSubmitButton(submitBtn, spinner, icon);
-        alert('Failed to create transfer: ' + resp.status + '\n' + txt);
-      }
-    }).catch(err => {
-      console.error('AJAX create transfer error', err);
-      resetSubmitButton(submitBtn, spinner, icon);
-      alert('Error creating transfer');
-    });
-    });
+        fromStore.addEventListener('change', validateStores);
+        toStore.addEventListener('change', validateStores);
+    }
 }
 
 function resetSubmitButton(submitBtn, spinner, icon) {
@@ -1438,50 +1585,53 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeRowFeatures(row);
     });
 
-  // Global event delegation for elements with data-action attribute
-  document.body.addEventListener('click', function(e) {
-    const el = e.target.closest('[data-action]');
-    if (!el) return;
-    const action = el.getAttribute('data-action');
-    if (!action) return;
+    // Global event delegation for elements with data-action attribute
+    document.body.addEventListener('click', function(e) {
+        const el = e.target.closest('[data-action]');
+        if (!el) return;
+        const action = el.getAttribute('data-action');
+        if (!action) return;
 
-    try {
-      switch (action) {
-        case 'showApprovedRequestsModal':
-          showApprovedRequestsModal();
-          break;
-        case 'showDirectTransferModal':
-          showDirectTransferModal();
-          break;
-        case 'refreshTransfers':
-          refreshTransfers();
-          break;
-        case 'startTransfer':
-          startTransfer(el.dataset.transferId);
-          break;
-        case 'completeTransfer':
-          completeTransfer(el.dataset.transferId);
-          break;
-        case 'trackTransfer':
-          trackTransfer(el.dataset.transferId);
-          break;
-        case 'cancelTransfer':
-          cancelTransfer(el.dataset.transferId);
-          break;
-        case 'createBulkTransfers':
-          createBulkTransfers();
-          break;
-        case 'addFormsetRow':
-          addFormsetRow();
-          break;
-        default:
-          // no-op
-          break;
-      }
-    } catch (err) {
-      console.error('Error handling action', action, err);
-    }
-  });
+        try {
+            switch (action) {
+                case 'showApprovedRequestsModal':
+                    showApprovedRequestsModal();
+                    break;
+                case 'showDirectTransferModal':
+                    showDirectTransferModal();
+                    break;
+                case 'refreshTransfers':
+                    refreshTransfers();
+                    break;
+                case 'startTransfer':
+                    // Implement start transfer
+                    break;
+                case 'completeTransfer':
+                    // Implement complete transfer
+                    break;
+                case 'cancelTransfer':
+                    // Implement cancel transfer
+                    break;
+                case 'createBulkTransfers':
+                    createBulkTransfers();
+                    break;
+                case 'createSingleTransfer':
+                    createSingleTransfer(e);
+                    break;
+                case 'addFormsetRow':
+                    addFormsetRow();
+                    break;
+                case 'removeFormsetRow':
+                    removeFormsetRow(e);
+                    break;
+                default:
+                    // no-op
+                    break;
+            }
+        } catch (err) {
+            console.error('Error handling action', action, err);
+        }
+    });
     
     console.log('✅ Stock transfer system fully initialized');
 });
@@ -1492,43 +1642,6 @@ function refreshFeatherIcons() {
         feather.replace();
     }
 }
-
-
-document.addEventListener('click', function (e) {
-
-    // START TRANSFER
-    const startBtn = e.target.closest('.start-transfer-btn');
-    if (startBtn) {
-        const id = startBtn.dataset.id;
-        startTransfer(id);
-        return;
-    }
-
-    // COMPLETE TRANSFER
-    const completeBtn = e.target.closest('.complete-transfer-btn');
-    if (completeBtn) {
-        const id = completeBtn.dataset.id;
-        completeTransfer(id);
-        return;
-    }
-
-    // CREATE SINGLE TRANSFER FROM REQUEST
-    const createBtn = e.target.closest('.create-single-transfer-btn');
-    if (createBtn) {
-        const id = createBtn.dataset.id;
-        createSingleTransfer(id);
-        return;
-    }
-
-    // CANCEL (if you add later)
-    const cancelBtn = e.target.closest('.cancel-transfer-btn');
-    if (cancelBtn) {
-        const id = cancelBtn.dataset.id;
-        cancelTransfer(id);
-        return;
-    }
-});
-
 </script>
 
 
@@ -1537,128 +1650,102 @@ document.addEventListener('click', function (e) {
 
 <style>
 .transfer-route {
-  font-size: 0.875rem;
-  margin-bottom: 2px;
+    font-size: 0.875rem;
+    margin-bottom: 2px;
 }
 
 .progress-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
 }
 
 .progress {
-  border-radius: 3px;
-  background-color: #e9ecef;
+    border-radius: 3px;
+    background-color: #e9ecef;
 }
 
 .empty-state {
-  padding: 3rem 1rem;
+    padding: 3rem 1rem;
 }
 
 .table-warning {
-  --bs-table-bg: rgba(255, 193, 7, 0.1);
+    --bs-table-bg: rgba(255, 193, 7, 0.1);
 }
 
 .action-table-data .btn {
-  margin: 0 2px;
+    margin: 0 2px;
 }
 
-
 .feather-48 {
-  width: 48px;
-  height: 48px;
+    width: 48px;
+    height: 48px;
 }
 
 .feather-24 {
-  width: 24px;
-  height: 24px;
+    width: 24px;
+    height: 24px;
 }
 
 .feather-12 {
-  width: 12px;
-  height: 12px;
+    width: 12px;
+    height: 12px;
 }
 
 /* Direct Transfer Modal Styles */
-#transferItemsTable .form-select-sm,
-#transferItemsTable .form-control-sm {
-  font-size: 0.875rem;
+#formset-table .form-select-sm,
+#formset-table .form-control-sm {
+    font-size: 0.875rem;
 }
 
 .available-stock {
-  font-weight: 600;
+    font-weight: 600;
+    min-height: 24px;
+    display: inline-block;
 }
 
-.item-total {
-  color: #0d6efd;
-}
-
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-}
-
-.is-invalid {
-  border-color: #dc3545;
-}
-
-
-@media (max-width: 768px) {
-  .table-responsive {
-    font-size: 0.875rem;
-  }
-  
-  .transfer-route {
-    font-size: 0.75rem;
-  }
-  
-  .btn-sm {
-    padding: 0.25rem 0.5rem;
-  }
-  
-  .modal-xl {
-    max-width: 95%;
-  }
-}
-
-/* Top bar list styling for actions */
-.table-top-head {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-.table-top-head li { display: inline-block; }
-.table-top-head .btn { border-radius: 0.38rem; }
-.table-top-head .btn i.feather-16 { margin-right: 0.45rem; }
-
-/* Small-screen adjustments */
-@media (max-width: 576px) {
-  .table-top-head { flex-direction: column; gap: 0.4rem; align-items: stretch; }
-  .table-top-head .btn { width: 100%; justify-content: flex-start; }
-}
-
-/* Enhanced stock display styles */
 .available-stock.text-success {
-    font-weight: bold;
+    color: #198754 !important;
+}
+
+.available-stock.text-warning {
+    color: #ffc107 !important;
 }
 
 .available-stock.text-danger {
-    font-weight: bold;
+    color: #dc3545 !important;
+}
+
+.available-stock.text-muted {
+    color: #6c757d !important;
+}
+
+.row-total, .unit-cost {
+    font-weight: 600;
+    color: #0d6efd;
 }
 
 .stock-warning {
     font-size: 0.75rem;
     font-weight: 500;
+    display: none;
 }
 
 .is-invalid {
     border-color: #dc3545;
-    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+.is-valid {
+    border-color: #198754;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
 }
 
 /* Loading animation for stock */
@@ -1677,6 +1764,78 @@ document.addEventListener('click', function (e) {
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .transfer-route {
+        font-size: 0.75rem;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .modal-xl {
+        max-width: 95%;
+    }
+    
+    #formset-table {
+        display: block;
+        overflow-x: auto;
+    }
+    
+    #formset-table thead {
+        display: none;
+    }
+    
+    #formset-table tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+    }
+    
+    #formset-table tbody td {
+        display: block;
+        text-align: right;
+        padding: 0.5rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    #formset-table tbody td:before {
+        content: attr(data-label);
+        float: left;
+        font-weight: bold;
+        color: #6c757d;
+    }
+    
+    #formset-table tbody td:last-child {
+        border-bottom: none;
+    }
+}
+
+/* Top bar list styling for actions */
+.table-top-head {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.table-top-head li { display: inline-block; }
+.table-top-head .btn { border-radius: 0.38rem; }
+.table-top-head .btn i.feather-16 { margin-right: 0.45rem; }
+
+/* Small-screen adjustments */
+@media (max-width: 576px) {
+    .table-top-head { flex-direction: column; gap: 0.4rem; align-items: stretch; }
+    .table-top-head .btn { width: 100%; justify-content: flex-start; }
 }
 </style>
 {% endblock %}

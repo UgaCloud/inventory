@@ -107,10 +107,12 @@
                                     <td style="vertical-align: middle; text-align: center;">
                                         <div class="available-stock-container">
                                             <span class="badge bg-info available-stock" id="available-stock-{{ forloop.counter0 }}">0</span>
+                                            <input type="hidden" class="original-stock-input" id="original-stock-{{ forloop.counter0 }}" value="0">
                                         </div>
                                     </td>
                                     <td style="vertical-align: middle;">
                                         <input type="number" name="items-{{ forloop.counter0 }}-quantity" min="1" class="form-control quantity-input" id="id_items-{{ forloop.counter0 }}-quantity" value="{{ form.quantity.value|default:1 }}" style="text-align: center;">
+                                        <div class="error-message stock-error-message" id="stock-error-{{ forloop.counter0 }}" style="display: none;"></div>
                                     </td>
                                     <td style="vertical-align: middle;">
                                         <input type="number" name="items-{{ forloop.counter0 }}-sale_price" min="0" step="0.01" class="form-control price-input" id="id_items-{{ forloop.counter0 }}-sale_price" value="{{ form.sale_price.value|default:0 }}" style="text-align: center;">
@@ -140,6 +142,11 @@
                                         <span id="grand-total">0</span>
                                     </td>
                                 </tr>
+                                <tr id="validation-summary-row" style="display: none;">
+                                    <td colspan="8" class="text-center text-danger fw-bold">
+                                        <i class="fas fa-exclamation-triangle"></i> <span id="validation-summary-text"></span>
+                                    </td>
+                                </tr>
                             </tfoot>
                         </table>
                     </div>
@@ -164,7 +171,7 @@
                                 <li class="border-bottom d-flex align-items-center">
                                     <h4 class="border-end m-0 p-3" style="width: 50%;">Amount Paid</h4>
                                     <h5 class="m-0 p-3" style="width: 50%;">
-                                        <input type="number" name="amount_paid" id="amount-paid" class="form-control fw-bold text-end" value="0" min="0" step="0.01" style="font-size:14px; color:#646B72;" />
+                                        <input type="number" name="amount_paid" id="amount-paid" class="form-control fw-bold text-end" value="0" min="0" step="1" style="font-size:14px; color:#646B72;" />
                                     </h5>
                                 </li>
                                 <li class="border-bottom d-flex align-items-center">
@@ -182,7 +189,7 @@
                                 <li class="border-bottom d-flex align-items-center">
                                     <h4 class="border-end m-0 p-3" style="width: 50%;">Amount Received</h4>
                                     <h5 class="m-0 p-3" style="width: 50%;">
-                                        <input type="number" name="amount_received" id="amount-received" class="form-control fw-bold text-end" value="0" min="0" step="0.01" style="font-size:14px; color:#646B72;" />
+                                        <input type="number" name="amount_received" id="amount-received" class="form-control fw-bold text-end" value="0" min="0" step="1" style="font-size:14px; color:#646B72;" />
                                     </h5>
                                 </li>
                                 <li class="border-bottom d-flex align-items-center">
@@ -197,7 +204,7 @@
                 </div>
                 
                 <div class="mt-3">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" id="submit-btn">
                         <i class="fas fa-save"></i> {% if sale %}Update Sale{% else %}Save Sale{% endif %}
                     </button>
                     <a href="{% url 'sales_list' %}" class="btn btn-secondary">
@@ -238,6 +245,45 @@
                 <button type="submit" class="btn btn-primary">Save Customer</button>
               </div>
           </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stock Validation Error Modal -->
+    <div class="modal fade" id="stockValidationModal" tabindex="-1" aria-labelledby="stockValidationModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title" id="stockValidationModalLabel">
+              <i class="fas fa-exclamation-triangle me-2"></i>Stock Validation Error
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close">x</button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-danger">
+              <i class="fas fa-times-circle me-2"></i>Cannot proceed with sale. Please correct quantities that exceed available stock.
+            </div>
+            <div class="mt-3">
+              <h6 class="fw-bold">Issues Found:</h6>
+              <ul id="validation-issues-list" class="list-group mt-2">
+                <!-- Issues will be populated here -->
+              </ul>
+            </div>
+            <div class="mt-3">
+              <p class="text-muted small">
+                <i class="fas fa-info-circle me-1"></i> 
+                Please adjust the quantities or remove items to match available stock.
+              </p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-1"></i> Close
+            </button>
+            <!-- <button type="button" class="btn btn-primary" id="scroll-to-first-error">
+              <i class="fas fa-arrow-down me-1"></i> Go to First Error
+            </button> -->
+          </div>
         </div>
       </div>
     </div>
@@ -309,6 +355,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-direction: column;
+        }
+        
+        /* Error message styling */
+        .stock-error-message {
+            font-size: 11px;
+            margin-top: 3px;
+            color: #dc3545;
         }
         
         /* Select2 styling */
@@ -363,6 +417,42 @@
             margin-top: 3px;
             display: block;
         }
+        
+        /* Payment section styling */
+        .total-order input[readonly] {
+            cursor: default;
+            color: #646B72 !important;
+        }
+        
+        .total-order input:focus {
+            outline: none;
+            box-shadow: none;
+            border-color: #dee2e6;
+        }
+        
+        /* Modal styling */
+        .modal-content {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .modal-header.bg-danger {
+            background-color: #dc3545 !important;
+        }
+        
+        .btn-close-white {
+            filter: invert(1) grayscale(100%) brightness(200%);
+        }
+        
+        /* Validation issues list */
+        .list-group-item {
+            border-left: 3px solid #dc3545;
+            margin-bottom: 5px;
+        }
+        
+        .list-group-item:last-child {
+            margin-bottom: 0;
+        }
     </style>
 
     <script>
@@ -382,81 +472,309 @@
             return cookieValue;
         }
 
-        // Format number with commas
+        // Format number with commas for display (no decimal places)
         function formatNumber(value) {
             const num = parseFloat(value) || 0;
             return num.toLocaleString('en-UG', {
                 minimumFractionDigits: 0,
-                maximumFractionDigits: 2
+                maximumFractionDigits: 0
             });
         }
 
-        // SINGLE RECALCULATION FUNCTION
-        function recalcAfterSelection(row) {
-            const quantityInput = row.querySelector('.quantity-input');
-            const salePriceInput = row.querySelector('.price-input');
-            const subtotalSpan = row.querySelector('.subtotal');
-            
-            if (!quantityInput || !salePriceInput || !subtotalSpan) return;
-            
-            // Quantity default: if empty, treat as 1, not 0
-            const quantityValue = quantityInput.value.trim();
-            const quantity = quantityValue === '' ? 1 : parseFloat(quantityValue) || 0;
-            
-            const salePrice = parseFloat(salePriceInput.value) || 0;
-            const subtotal = quantity * salePrice;
-            
-            subtotalSpan.textContent = formatNumber(subtotal);
-            updateGrandTotal();
+        // Format number for input fields (no decimal places)
+        function formatNumberInput(value) {
+            const num = parseFloat(value) || 0;
+            return Math.round(num);
         }
 
-        // Update grand total
-        function updateGrandTotal() {
-            let grandTotal = 0;
-            document.querySelectorAll('.formset-row').forEach(row => {
-                const subtotalSpan = row.querySelector('.subtotal');
-                if (subtotalSpan) {
-                    const subtotalText = subtotalSpan.textContent.replace(/[^\d.-]/g, '');
-                    const subtotal = parseFloat(subtotalText) || 0;
-                    grandTotal += subtotal;
+        // Track original stock for each product
+        const productStockMap = new Map();
+        
+        // Track if user has manually changed Amount Received
+        let userModifiedAmountReceived = false;
+        
+        // Store validation errors for modal display
+        let validationErrors = [];
+
+        // Calculate subtotal for a single row
+        function calculateRowSubtotal(row) {
+            const quantityInput = row.querySelector('.quantity-input');
+            const salePriceInput = row.querySelector('.price-input');
+            
+            if (!quantityInput || !salePriceInput) return 0;
+            
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const salePrice = parseFloat(salePriceInput.value) || 0;
+            
+            return quantity * salePrice;
+        }
+
+        // Update subtotal display for a row
+        function updateRowSubtotal(row) {
+            const subtotalSpan = row.querySelector('.subtotal');
+            if (!subtotalSpan) return;
+            
+            const subtotal = calculateRowSubtotal(row);
+            subtotalSpan.textContent = formatNumber(subtotal);
+        }
+
+        // Validate quantity against available stock for a row
+        function validateQuantity(row) {
+            const quantityInput = row.querySelector('.quantity-input');
+            const originalStockInput = row.querySelector('.original-stock-input');
+            const errorMessage = row.querySelector('.stock-error-message');
+            
+            if (!quantityInput || !originalStockInput || !errorMessage) return true;
+            
+            const originalStock = parseFloat(originalStockInput.value) || 0;
+            const quantity = parseFloat(quantityInput.value) || 0;
+            
+            // Clear previous error
+            errorMessage.style.display = 'none';
+            errorMessage.textContent = '';
+            quantityInput.classList.remove('stock-error-input');
+            
+            // Check if quantity exceeds available stock
+            if (quantity > originalStock) {
+                const errorText = `Cannot exceed available stock of ${formatNumber(originalStock)}`;
+                errorMessage.textContent = errorText;
+                errorMessage.style.display = 'block';
+                quantityInput.classList.add('stock-error-input');
+                return false;
+            }
+            
+            // Additional validation for minimum quantity
+            if (quantity <= 0) {
+                const errorText = 'Quantity must be at least 1';
+                errorMessage.textContent = errorText;
+                errorMessage.style.display = 'block';
+                quantityInput.classList.add('stock-error-input');
+                return false;
+            }
+            
+            return true;
+        }
+
+        // Validate all rows for stock availability
+        function validateAllRows() {
+            validationErrors = [];
+            let isValid = true;
+            
+            $('.formset-row').each(function() {
+                const row = this;
+                const productSelect = row.querySelector('.product-select');
+                const quantityInput = row.querySelector('.quantity-input');
+                const originalStockInput = row.querySelector('.original-stock-input');
+                
+                // Only validate rows with selected products
+                if (productSelect && productSelect.value && quantityInput && originalStockInput) {
+                    const originalStock = parseFloat(originalStockInput.value) || 0;
+                    const quantity = parseFloat(quantityInput.value) || 0;
+                    const productName = productSelect.options[productSelect.selectedIndex].text;
+                    
+                    if (quantity > originalStock) {
+                        isValid = false;
+                        const errorMessage = `"${productName}" quantity (${quantity}) exceeds available stock (${formatNumber(originalStock)})`;
+                        validationErrors.push({
+                            row: row,
+                            message: errorMessage,
+                            input: quantityInput
+                        });
+                        
+                        // Highlight the row
+                        row.classList.add('stock-error-row');
+                        quantityInput.classList.add('stock-error-input');
+                    }
                 }
             });
             
-            const grandTotalElement = document.getElementById('grand-total');
-            if (grandTotalElement) {
-                grandTotalElement.textContent = formatNumber(grandTotal);
+            // Show/hide validation summary
+            const validationRow = document.getElementById('validation-summary-row');
+            const validationText = document.getElementById('validation-summary-text');
+            
+            if (!isValid) {
+                if (validationRow && validationText) {
+                    validationText.textContent = `${validationErrors.length} item(s) exceed available stock`;
+                    validationRow.style.display = '';
+                }
+            } else {
+                if (validationRow) {
+                    validationRow.style.display = 'none';
+                }
             }
             
-            const totalAmountInput = document.getElementById('total-amount');
-            if (totalAmountInput) {
-                totalAmountInput.value = grandTotal.toFixed(2);
-                updateBalance();
-            }
+            return isValid;
         }
 
-        // Update balance
+        // Show validation error modal
+        function showValidationErrorModal() {
+            const modal = new bootstrap.Modal(document.getElementById('stockValidationModal'));
+            const issuesList = document.getElementById('validation-issues-list');
+            
+            // Clear previous issues
+            issuesList.innerHTML = '';
+            
+            // Add current issues to the list
+            validationErrors.forEach((error, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item d-flex align-items-start';
+                listItem.innerHTML = `
+                    <i class="fas fa-exclamation-circle text-danger mt-1 me-2"></i>
+                    <span>${error.message}</span>
+                `;
+                issuesList.appendChild(listItem);
+            });
+            
+            // Show modal
+            modal.show();
+            
+            // Scroll to first error when modal is shown
+            document.getElementById('stockValidationModal').addEventListener('shown.bs.modal', function() {
+                // Store the first error element for later use
+                const firstError = validationErrors[0];
+                if (firstError && firstError.input) {
+                    const scrollBtn = document.getElementById('scroll-to-first-error');
+                    scrollBtn.onclick = function() {
+                        modal.hide();
+                        setTimeout(() => {
+                            firstError.input.scrollIntoView({ 
+                                behavior: 'smooth', 
+                                block: 'center' 
+                            });
+                            firstError.input.focus();
+                            // Add highlight animation
+                            firstError.row.classList.add('highlight-row');
+                            setTimeout(() => {
+                                firstError.row.classList.remove('highlight-row');
+                            }, 1500);
+                        }, 300);
+                    };
+                }
+            });
+        }
+
+        // Update available stock display for a row
+        function updateAvailableStock(row, originalStock) {
+            const availableStockSpan = row.querySelector('.available-stock');
+            const originalStockInput = row.querySelector('.original-stock-input');
+            const quantityInput = row.querySelector('.quantity-input');
+            
+            if (!availableStockSpan || !originalStockInput || !quantityInput) return;
+            
+            const originalStockNum = parseFloat(originalStock) || 0;
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const remainingStock = Math.max(0, originalStockNum - quantity);
+            
+            // Store original stock in hidden input for validation
+            originalStockInput.value = originalStockNum;
+            
+            // Update display
+            availableStockSpan.textContent = formatNumber(remainingStock);
+            
+            // Update badge color based on stock level
+            if (remainingStock <= 0) {
+                availableStockSpan.className = 'badge bg-danger available-stock';
+                row.classList.add('stock-error-row');
+            } else if (remainingStock < 10) {
+                availableStockSpan.className = 'badge bg-warning available-stock';
+                row.classList.add('stock-warning-row');
+                row.classList.remove('stock-error-row');
+            } else {
+                availableStockSpan.className = 'badge bg-success available-stock';
+                row.classList.remove('stock-error-row', 'stock-warning-row');
+            }
+            
+            // Validate quantity after update
+            validateQuantity(row);
+        }
+
+        // Update payment fields when total amount changes
+        function updatePaymentFields(totalAmount) {
+            const amountPaidInput = document.getElementById('amount-paid');
+            const amountReceivedInput = document.getElementById('amount-received');
+            
+            if (!amountPaidInput || !amountReceivedInput) return;
+            
+            // Always update Amount Paid to match total amount
+            amountPaidInput.value = formatNumberInput(totalAmount);
+            
+            // Update Amount Received to match Amount Paid, unless user modified it
+            if (!userModifiedAmountReceived) {
+                amountReceivedInput.value = formatNumberInput(totalAmount);
+            }
+            
+            // Trigger calculations
+            updateBalance();
+            updateChange();
+        }
+
+        // Update balance (no decimal places)
         function updateBalance() {
             const totalAmount = parseFloat(document.getElementById('total-amount').value) || 0;
             const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
-            const balance = totalAmount - amountPaid;
+            const balance = Math.round(totalAmount - amountPaid);
             
             const balanceInput = document.getElementById('balance');
             if (balanceInput) {
-                balanceInput.value = balance.toFixed(2);
-                updateChange();
+                balanceInput.value = formatNumberInput(balance);
             }
         }
 
-        // Update change
+        // Update change (no decimal places)
         function updateChange() {
             const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
             const amountReceived = parseFloat(document.getElementById('amount-received').value) || 0;
-            const change = amountReceived - amountPaid;
+            const change = Math.round(amountReceived - amountPaid);
             
             const changeInput = document.getElementById('change');
             if (changeInput) {
-                changeInput.value = change.toFixed(2);
+                changeInput.value = formatNumberInput(change);
             }
+        }
+
+        // Initialize event listeners for payment fields
+        function initPaymentFieldListeners() {
+            const amountPaidInput = document.getElementById('amount-paid');
+            const amountReceivedInput = document.getElementById('amount-received');
+            
+            if (amountPaidInput) {
+                amountPaidInput.addEventListener('input', function() {
+                    // When Amount Paid changes, update Amount Received to match (unless user modified it)
+                    if (!userModifiedAmountReceived) {
+                        const amountReceivedInput = document.getElementById('amount-received');
+                        if (amountReceivedInput) {
+                            amountReceivedInput.value = this.value;
+                        }
+                    }
+                    
+                    updateBalance();
+                    updateChange();
+                });
+            }
+            
+            if (amountReceivedInput) {
+                amountReceivedInput.addEventListener('input', function() {
+                    // Mark as user-modified when user types in Amount Received
+                    userModifiedAmountReceived = true;
+                    updateChange();
+                });
+                
+                amountReceivedInput.addEventListener('blur', function() {
+                    // If user clears the field or sets to 0, auto-fill with Amount Paid
+                    const value = parseFloat(this.value) || 0;
+                    if (value === 0) {
+                        const amountPaid = parseFloat(document.getElementById('amount-paid').value) || 0;
+                        this.value = formatNumberInput(amountPaid);
+                        userModifiedAmountReceived = false;
+                        updateChange();
+                    }
+                });
+            }
+            
+            // Reset userModified flag when form is reset
+            document.getElementById('sales-form').addEventListener('reset', function() {
+                userModifiedAmountReceived = false;
+            });
         }
 
         // Fetch product stock and price information
@@ -491,8 +809,10 @@
             
             const unitSelect = row.querySelector('.unit-select');
             const availableStockSpan = row.querySelector('.available-stock');
+            const originalStockInput = row.querySelector('.original-stock-input');
             const unitPriceSpan = row.querySelector('.unit-price');
             const salePriceInput = row.querySelector('.price-input');
+            const quantityInput = row.querySelector('.quantity-input');
             const storeSelect = document.getElementById('id_store');
             
             if (!productSelect || !storeSelect) return;
@@ -506,6 +826,7 @@
                     availableStockSpan.textContent = '0';
                     availableStockSpan.className = 'badge bg-secondary available-stock';
                 }
+                if (originalStockInput) originalStockInput.value = '0';
                 if (unitPriceSpan) unitPriceSpan.textContent = '0';
                 if (salePriceInput) salePriceInput.value = '0';
                 if (unitSelect) {
@@ -514,7 +835,8 @@
                         $(unitSelect).select2({ width: '100%' });
                     }
                 }
-                recalcAfterSelection(row);
+                updateRowSubtotal(row);
+                updateGrandTotal();
                 return;
             }
             
@@ -532,24 +854,25 @@
                         availableStockSpan.textContent = '0';
                         availableStockSpan.className = 'badge bg-danger available-stock';
                     }
+                    if (originalStockInput) originalStockInput.value = '0';
                     if (unitPriceSpan) unitPriceSpan.textContent = '0';
-                    recalcAfterSelection(row);
+                    updateRowSubtotal(row);
+                    updateGrandTotal();
                     return;
                 }
                 
-                // 1. Update Available Stock
-                if (availableStockSpan) {
-                    availableStockSpan.textContent = formatNumber(stockInfo.available_stock);
-                    if (stockInfo.available_stock <= 0) {
-                        availableStockSpan.className = 'badge bg-danger available-stock';
-                    } else if (stockInfo.available_stock < 10) {
-                        availableStockSpan.className = 'badge bg-warning available-stock';
-                    } else {
-                        availableStockSpan.className = 'badge bg-success available-stock';
-                    }
+                // Store original stock for this product in this row
+                productStockMap.set(row, stockInfo.available_stock);
+                
+                // 1. Store original stock in hidden input
+                if (originalStockInput) {
+                    originalStockInput.value = stockInfo.available_stock;
                 }
                 
-                // 2. Populate Unit Dropdown
+                // 2. Update Available Stock (initial display without deduction)
+                updateAvailableStock(row, stockInfo.available_stock);
+                
+                // 3. Populate Unit Dropdown
                 if (unitSelect && stockInfo.unit_prices && stockInfo.unit_prices.length > 0) {
                     unitSelect.innerHTML = '<option value="">Select Unit</option>';
                     
@@ -561,16 +884,16 @@
                         unitSelect.appendChild(option);
                     });
                     
-                    // 3. Auto-select First Unit
+                    // 4. Auto-select First Unit
                     if (stockInfo.unit_prices.length > 0) {
                         unitSelect.value = stockInfo.unit_prices[0].unit_id;
                         
-                        // 4. Update Unit Price Display
+                        // 5. Update Unit Price Display
                         if (unitPriceSpan) {
                             unitPriceSpan.textContent = formatNumber(stockInfo.unit_prices[0].price);
                         }
                         
-                        // 5. Auto-fill Sale Price
+                        // 6. Auto-fill Sale Price
                         if (salePriceInput) {
                             salePriceInput.value = stockInfo.unit_prices[0].price;
                         }
@@ -582,8 +905,19 @@
                     }
                 }
                 
-                // 6. Recalculate
-                recalcAfterSelection(row);
+                // 7. Auto-fill quantity as 1 if empty
+                if (quantityInput && (!quantityInput.value || parseFloat(quantityInput.value) === 0)) {
+                    quantityInput.value = '1';
+                    // Update stock display with quantity deducted
+                    updateAvailableStock(row, stockInfo.available_stock);
+                }
+                
+                // 8. Validate quantity
+                validateQuantity(row);
+                
+                // 9. Update calculations
+                updateRowSubtotal(row);
+                updateGrandTotal();
                 
             } catch (error) {
                 console.error('Error in handleProductSelect:', error);
@@ -613,8 +947,63 @@
                     salePriceInput.value = unitPrice;
                 }
                 
-                // Recalculate
-                recalcAfterSelection(row);
+                // Update calculations
+                updateRowSubtotal(row);
+                updateGrandTotal();
+            }
+        }
+
+        // Handle quantity or price input change
+        function handleQuantityOrPriceChange(event) {
+            const input = event.target;
+            const row = $(input).closest('.formset-row')[0];
+            if (!row) return;
+            
+            // Update unit price display if price changed
+            if (input.classList.contains('price-input')) {
+                const unitPriceSpan = row.querySelector('.unit-price');
+                if (unitPriceSpan) {
+                    unitPriceSpan.textContent = formatNumber(input.value);
+                }
+            }
+            
+            // Update available stock if quantity changed
+            if (input.classList.contains('quantity-input')) {
+                const originalStockInput = row.querySelector('.original-stock-input');
+                if (originalStockInput && originalStockInput.value) {
+                    const originalStock = parseFloat(originalStockInput.value);
+                    updateAvailableStock(row, originalStock);
+                }
+            }
+            
+            // Update row subtotal
+            updateRowSubtotal(row);
+            
+            // Update all calculations
+            updateGrandTotal();
+        }
+
+        // Update grand total and all related calculations
+        function updateGrandTotal() {
+            // Calculate grand total from all rows
+            let grandTotal = 0;
+            document.querySelectorAll('.formset-row').forEach(row => {
+                grandTotal += calculateRowSubtotal(row);
+            });
+            
+            // Update grand total display
+            const grandTotalElement = document.getElementById('grand-total');
+            if (grandTotalElement) {
+                grandTotalElement.textContent = formatNumber(grandTotal);
+            }
+            
+            // Update total amount input (rounded to whole number)
+            const totalAmountInput = document.getElementById('total-amount');
+            if (totalAmountInput) {
+                totalAmountInput.value = Math.round(grandTotal);
+                
+                // Update payment fields
+                updatePaymentFields(grandTotal);
             }
         }
 
@@ -624,6 +1013,8 @@
             const addBtn = document.getElementById('add-form-row');
             const totalForms = document.getElementById('id_items-TOTAL_FORMS');
             const maxForms = document.getElementById('id_items-MAX_NUM_FORMS');
+            const salesForm = document.getElementById('sales-form');
+            const submitBtn = document.getElementById('submit-btn');
             
             // Template for new row
             const emptyRowTemplate = (index) => `
@@ -648,10 +1039,12 @@
                 <td style="vertical-align: middle; text-align: center;">
                     <div class="available-stock-container">
                         <span class="badge bg-secondary available-stock" id="available-stock-${index}">0</span>
+                        <input type="hidden" class="original-stock-input" id="original-stock-${index}" value="0">
                     </div>
                 </td>
                 <td style="vertical-align: middle;">
                     <input type="number" name="items-${index}-quantity" min="1" class="form-control quantity-input" id="id_items-${index}-quantity" value="1" style="text-align: center;">
+                    <div class="error-message stock-error-message" id="stock-error-${index}" style="display: none;"></div>
                 </td>
                 <td style="vertical-align: middle;">
                     <input type="number" name="items-${index}-sale_price" min="0" step="0.01" class="form-control price-input" id="id_items-${index}-sale_price" value="0" style="text-align: center;">
@@ -673,16 +1066,98 @@
                 </td>
             </tr>`;
             
+            // Form submission validation
+            if (salesForm && submitBtn) {
+                salesForm.addEventListener('submit', function(event) {
+                    // Validate all rows before submission
+                    if (!validateAllRows()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        
+                        // Show modal instead of alert
+                        showValidationErrorModal();
+                        return false;
+                    }
+                    
+                    // Additional validation: Check if there's at least one item
+                    const productSelects = document.querySelectorAll('.product-select');
+                    let hasValidItem = false;
+                    productSelects.forEach(select => {
+                        if (select.value) {
+                            hasValidItem = true;
+                        }
+                    });
+                    
+                    if (!hasValidItem) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        
+                        // Show modal for no items
+                        const modal = new bootstrap.Modal(document.getElementById('stockValidationModal'));
+                        const issuesList = document.getElementById('validation-issues-list');
+                        const modalTitle = document.getElementById('stockValidationModalLabel');
+                        const modalHeader = document.querySelector('#stockValidationModal .modal-header');
+                        
+                        // Update modal content
+                        modalTitle.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>No Items Added';
+                        modalHeader.className = 'modal-header bg-warning text-white';
+                        
+                        // Clear and update issues list
+                        issuesList.innerHTML = '';
+                        const listItem = document.createElement('li');
+                        listItem.className = 'list-group-item d-flex align-items-start';
+                        listItem.innerHTML = `
+                            <i class="fas fa-shopping-cart text-warning mt-1 me-2"></i>
+                            <span>Please add at least one item to the sale before saving.</span>
+                        `;
+                        issuesList.appendChild(listItem);
+                        
+                        // Update buttons
+                        const scrollBtn = document.getElementById('scroll-to-first-error');
+                        scrollBtn.innerHTML = '<i class="fas fa-plus me-1"></i> Add Item';
+                        scrollBtn.onclick = function() {
+                            modal.hide();
+                            setTimeout(() => {
+                                document.getElementById('add-form-row').click();
+                            }, 300);
+                        };
+                        
+                        modal.show();
+                        return false;
+                    }
+                    
+                    return true;
+                });
+            }
+            
             // JQUERY DELEGATED EVENTS FOR SELECT2
             $(document).on('select2:select', '.product-select', handleProductSelect);
             $(document).on('select2:select', '.unit-select', handleUnitSelect);
             
-            // Remove row handler (preserved)
+            // Quantity and price input event listeners
+            $(document).on('input', '.quantity-input', handleQuantityOrPriceChange);
+            $(document).on('change', '.quantity-input', handleQuantityOrPriceChange);
+            $(document).on('input', '.price-input', handleQuantityOrPriceChange);
+            $(document).on('change', '.price-input', handleQuantityOrPriceChange);
+            
+            // Real-time validation on quantity blur
+            $(document).on('blur', '.quantity-input', function() {
+                const row = $(this).closest('.formset-row')[0];
+                if (row) {
+                    validateQuantity(row);
+                    validateAllRows();
+                }
+            });
+            
+            // Remove row handler
             $(document).on('click', '.remove-form-row', function() {
                 const row = $(this).closest('.formset-row')[0];
                 if (row && confirm('Are you sure you want to remove this item?')) {
+                    // Remove from stock map
+                    productStockMap.delete(row);
                     row.remove();
                     updateGrandTotal();
+                    validateAllRows();
                 }
             });
             
@@ -690,12 +1165,20 @@
             const storeSelect = document.getElementById('id_store');
             if (storeSelect) {
                 storeSelect.addEventListener('change', function() {
-                    // Re-trigger product selection logic for all rows using jQuery Select2 events
+                    // Clear stock map for all rows
+                    productStockMap.clear();
+                    
+                    // Re-trigger product selection logic for all rows
                     $('.product-select').each(function() {
                         if (this.value) {
                             $(this).trigger('select2:select');
                         }
                     });
+                    
+                    // Re-validate all rows
+                    setTimeout(() => {
+                        validateAllRows();
+                    }, 500);
                 });
             }
             
@@ -704,7 +1187,34 @@
                 addBtn.addEventListener('click', function() {
                     const formCount = parseInt(totalForms.value);
                     if (maxForms && formCount >= parseInt(maxForms.value)) {
-                        alert('Maximum number of items reached');
+                        // Show modal for max items reached
+                        const modal = new bootstrap.Modal(document.getElementById('stockValidationModal'));
+                        const issuesList = document.getElementById('validation-issues-list');
+                        const modalTitle = document.getElementById('stockValidationModalLabel');
+                        const modalHeader = document.querySelector('#stockValidationModal .modal-header');
+                        
+                        // Update modal content
+                        modalTitle.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Maximum Items Reached';
+                        modalHeader.className = 'modal-header bg-info text-white';
+                        
+                        // Clear and update issues list
+                        issuesList.innerHTML = '';
+                        const listItem = document.createElement('li');
+                        listItem.className = 'list-group-item d-flex align-items-start';
+                        listItem.innerHTML = `
+                            <i class="fas fa-info-circle text-info mt-1 me-2"></i>
+                            <span>You have reached the maximum number of items allowed for a single sale (${maxForms.value}).</span>
+                        `;
+                        issuesList.appendChild(listItem);
+                        
+                        // Update buttons
+                        const scrollBtn = document.getElementById('scroll-to-first-error');
+                        scrollBtn.innerHTML = '<i class="fas fa-check me-1"></i> OK';
+                        scrollBtn.onclick = function() {
+                            modal.hide();
+                        };
+                        
+                        modal.show();
                         return;
                     }
                     
@@ -743,15 +1253,33 @@
                 });
             }
             
-            // Initialize totals
+            // Initialize payment field listeners
+            initPaymentFieldListeners();
+            
+            // Initialize calculations
             setTimeout(() => {
+                // Initialize calculations for existing rows
+                $('.formset-row').each(function() {
+                    updateRowSubtotal(this);
+                });
+                
+                // Do initial calculations
                 updateGrandTotal();
-                updateBalance();
-                updateChange();
-            }, 500);
+                
+                // Load initial stock data for existing products
+                $('.product-select').each(function() {
+                    if (this.value) {
+                        // Trigger the product select handler to load stock
+                        setTimeout(() => {
+                            $(this).trigger('select2:select');
+                        }, 300);
+                    }
+                });
+                
+            }, 100);
         });
 
-        // Add customer modal logic (preserved)
+        // Add customer modal logic
         (function() {
             const openBtn = document.getElementById('open-add-customer-modal');
             const addCustomerModalEl = document.getElementById('addCustomerModal');

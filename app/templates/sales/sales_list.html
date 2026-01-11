@@ -158,7 +158,7 @@
                                             <i data-feather="eye" class="feather-eye"></i>
                                         </a>
                                         
-                                        {% if not sale.is_cancelled %}
+                                        {% if not sale.is_cancelled and sale.status != 'FULFILLED' %}
                                         <!-- Edit button (only for non-cancelled sales) -->
                                         <a class="me-2 edit-icon p-2" href="{% url 'sales_update_view' sale.id %}" title="Edit Sale">
                                             <i class="ti ti-edit"></i>
