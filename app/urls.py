@@ -120,6 +120,15 @@ urlpatterns = [
     path('approved_transfer_requests/', approved_transfer_requests_api, name='approved_transfer_requests'),
     path('approved-transfer-requests/', approved_transfer_requests_json, name='approved_transfer_requests_json'),  # NEW
     path('product-stock-transfer-info/', get_product_stock_transfer_info, name='get_product_stock_transfer_info'),  # NEW
+    
+    # API endpoints for transfer request modal
+    path('api/product/<int:product_id>/units/', get_product_units, name='product_units'),
+    path('api/product/<int:product_id>/stock/<int:store_id>/', get_product_stock_for_store, name='product_stock_for_store'),
+    path('api/product/unit-price/<int:product_id>/<int:unit_id>/', get_product_unit_price, name='product_unit_price'),
+    path('api/product/<int:product_id>/stock-calculation/', product_stock_calculation, name='product_stock_calculation'),
+    # path('transfer_requests/<int:request_id>/json/', transfer_request_json, name='transfer_request_json'),
+    # path('transfer_requests/create/', create_transfer_request, name='create_transfer_request'),
+
         
 
     # Stock Adjustments

@@ -18,29 +18,31 @@
           <h6>Manage stock transfer requests across stores</h6>
         </div>
       </div>
-      <ul class="table-top-head">
-        <li>
-          <div class="dropdown">
-            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-              <i data-feather="filter" class="feather-16"></i>
-              Filter
-            </button>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="?status=all">All Requests</a></li>
-              <li><a class="dropdown-item" href="?status=pending">Pending</a></li>
-              <li><a class="dropdown-item" href="?status=approved">Approved</a></li>
-              <li><a class="dropdown-item" href="?status=rejected">Rejected</a></li>
-              <li><a class="dropdown-item" href="?status=completed">Completed</a></li>
-            </ul>
-          </div>
-        </li>
-        <li>
-          <button class="btn btn-primary" data-action="showNewRequestModal">
-            <i data-feather="plus" class="feather-16"></i>
-            New Request
-          </button>
-        </li>
+<!-- In the table-top-head section -->
+<ul class="table-top-head">
+  <li>
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i data-feather="filter" class="feather-16"></i>
+        Filter
+      </button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="?status=all">All Requests</a></li>
+        <li><a class="dropdown-item" href="?status=pending">Pending</a></li>
+        <li><a class="dropdown-item" href="?status=approved">Approved</a></li>
+        <li><a class="dropdown-item" href="?status=rejected">Rejected</a></li>
+        <li><a class="dropdown-item" href="?status=completed">Completed</a></li>
       </ul>
+    </div>
+  </li>
+  <li>
+    <!-- FIXED: Changed data-action to onclick -->
+    <button class="btn btn-primary" onclick="showNewRequestModal()">
+      <i data-feather="plus" class="feather-16"></i>
+      New Request
+    </button>
+  </li>
+</ul>
     </div>
 
     <!-- Status Summary Cards -->
@@ -223,7 +225,7 @@
                       {% endif %}
                       
                       {% if request.status == 'pending' and request.requested_by == user %}
-                        <button class="btn btn-sm btn-warning me-1" data-action="editRequest" data-request-id="{{ request.id }}" title="Edit">
+                        <button class="btn btn-sm btn-warning me-1" onclick="editRequest({{ request.id }})" title="Edit">
                           <i data-feather="edit" class="feather-14"></i>
                         </button>
                       {% endif %}
@@ -247,7 +249,7 @@
                           </a></li>
                           {% if request.status == 'pending' and request.requested_by == user %}
                           <li><hr class="dropdown-divider"></li>
-                          <li><a class="dropdown-item text-danger" href="#" data-action="cancelRequest" data-request-id="{{ request.id }}">
+                          <li><a class="dropdown-item text-danger" href="#" onclick="cancelRequest({{ request.id }})">
                             <i data-feather="trash-2" class="feather-14 me-2"></i>Cancel Request
                           </a></li>
                           {% endif %}
@@ -264,7 +266,7 @@
                     <i data-feather="inbox" class="feather-48 text-muted mb-3"></i>
                     <h5 class="text-muted">No transfer requests found</h5>
                     <p class="text-muted">Create your first transfer request to get started.</p>
-                    <button class="btn btn-primary" data-action="showNewRequestModal">
+                    <button class="btn btn-primary" onclick="showNewRequestModal()">
                       <i data-feather="plus" class="feather-16 me-1"></i>
                       Create First Request
                     </button>
@@ -327,12 +329,12 @@
       <div class="modal-header">
         <h5 class="modal-title" id="newRequestModalLabel">
           <i data-feather="plus-circle" class="feather-16 me-2"></i>
-          Create New Transfer Request
+          <span id="modalTitle">Create New Transfer Request</span>
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="newRequestForm" method="post">
+        <form id="newRequestForm">
           {% csrf_token %}
           <input type="hidden" id="editRequestId" name="edit_request_id" value="">
           
@@ -347,6 +349,7 @@
                   <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
                   {% endfor %}
                 </select>
+                <div class="invalid-feedback">Please select a source store</div>
               </div>
             </div>
             <div class="col-md-6">
@@ -358,6 +361,7 @@
                   <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
                   {% endfor %}
                 </select>
+                <div class="invalid-feedback">Please select a destination store different from source store</div>
               </div>
             </div>
           </div>
@@ -387,9 +391,6 @@
                   {% for dept in departments %}
                   <option value="{{ dept.id }}">{{ dept.name }}</option>
                   {% endfor %}
-                  {% if not departments %}
-                  <!-- Debug: No departments in context -->
-                  {% endif %}
                 </select>
               </div>
             </div>
@@ -400,6 +401,7 @@
               <div class="mb-3">
                 <label for="reason" class="form-label">Reason for Transfer <span class="text-danger">*</span></label>
                 <textarea id="reason" name="reason" class="form-control" rows="3" placeholder="Explain why this transfer is needed..." required></textarea>
+                <div class="invalid-feedback">Please provide a reason for the transfer</div>
               </div>
             </div>
           </div>
@@ -408,7 +410,7 @@
           <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0">Request Items</h6>
-              <button type="button" class="btn btn-sm btn-primary" data-action="addRequestItem">
+              <button type="button" class="btn btn-sm btn-primary" onclick="addRequestItem()">
                 <i data-feather="plus" class="feather-12 me-1"></i>
                 Add Item
               </button>
@@ -418,17 +420,17 @@
                 <table class="table table-sm" id="requestItemsTable">
                   <thead class="table-light">
                     <tr>
-                      <th width="35%">Product</th>
+                      <th width="30%">Product</th>
                       <th width="15%">Available</th>
                       <th width="15%">Requested Qty</th>
-                      <th width="15%">Unit</th>
+                      <th width="20%">Unit</th>
                       <th width="15%">Notes</th>
                       <th width="5%">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="requestItemsBody">
-                        <!-- Dynamic rows will be added here -->
-                      </tbody>
+                    <!-- Dynamic rows will be added here -->
+                  </tbody>
                 </table>
               </div>
               
@@ -436,7 +438,7 @@
                 <i data-feather="alert-triangle" class="feather-16 me-2"></i>
                 <span id="stockAlertMessage"></span>
               </div>
-              <!-- Form validation / server error alert -->
+              
               <div class="alert alert-danger mt-3" style="display: none;" id="formErrorsAlert">
                 <i data-feather="alert-circle" class="feather-16 me-2"></i>
                 <span id="formErrorsMessage"></span>
@@ -447,10 +449,10 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-    <button type="button" class="btn btn-primary" data-action="submitNewRequest">
+        <button type="button" class="btn btn-primary" id="submitRequestBtn" onclick="submitNewRequest()">
           <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
           <i data-feather="send" class="feather-16 me-1"></i>
-          Submit Request
+          <span id="submitBtnText">Submit Request</span>
         </button>
       </div>
     </div>
@@ -479,7 +481,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="confirmActionBtn" data-action="confirmApproveReject">
+        <button type="button" class="btn btn-primary" id="confirmActionBtn" onclick="confirmAction()">
           <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
           Confirm
         </button>
@@ -488,10 +490,36 @@
   </div>
 </div>
 
+
+
+
+
+
 <script>
-// Global functions for approve/reject functionality
+// Global variables
+let requestItemCounter = 0;
+let availableProducts = [];
+let currentEditRequestId = null;
+
+// CSRF token for AJAX requests
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+// Show toast notification
 function showToast(message, kind = 'success') {
-  // create container
   let container = document.getElementById('toastContainer');
   if (!container) {
     container = document.createElement('div');
@@ -506,9 +534,6 @@ function showToast(message, kind = 'success') {
   const toast = document.createElement('div');
   toast.className = `toast align-items-center text-bg-${kind} border-0 show`;
   toast.role = 'alert';
-  toast.ariaLive = 'assertive';
-  toast.ariaAtomic = 'true';
-  toast.style.minWidth = '200px';
   toast.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
 
   container.appendChild(toast);
@@ -519,106 +544,126 @@ function showToast(message, kind = 'success') {
   }, 3500);
 }
 
-function updateStatusCounts(incrementStatus, decrementStatus) {
-  // Update the count for the new status
-  const incrementCard = document.querySelector(`.card.border-${incrementStatus === 'approved' ? 'success' : incrementStatus === 'rejected' ? 'danger' : 'info'}`);
-  if (incrementCard) {
-    const countEl = incrementCard.querySelector('h3');
-    if (countEl) {
-      const currentCount = parseInt(countEl.textContent) || 0;
-      countEl.textContent = currentCount + 1;
-    }
-  }
-  
-  // Decrease the count for pending status
-  if (decrementStatus === 'pending') {
-    const decrementCard = document.querySelector('.card.border-warning');
-    if (decrementCard) {
-      const countEl = decrementCard.querySelector('h3');
-      if (countEl) {
-        const currentCount = parseInt(countEl.textContent) || 0;
-        countEl.textContent = Math.max(0, currentCount - 1);
-      }
-    }
-  }
-}
-
-let requestItemCounter = 0; // legacy counter (not required for naming; DOM indexes are used)
-let availableProducts = [];
-// Pre-render units options from server-side context (context processor provides `units`)
-const unitsOptions = `
-  <option value="">Select unit...</option>
-  {% for unit in units %}
-    <option value="{{ unit.id }}">{{ unit.name }}</option>
-  {% endfor %}
-`;
-
 // Show new request modal
 function showNewRequestModal() {
-  // Reset form and counter
+  console.log('showNewRequestModal called');
+  
+  // Reset everything
   requestItemCounter = 0;
+  currentEditRequestId = null;
   document.getElementById('newRequestForm').reset();
   document.getElementById('requestItemsBody').innerHTML = '';
   document.getElementById('stockAlert').style.display = 'none';
+  document.getElementById('formErrorsAlert').style.display = 'none';
   
-  // Load available products
-  loadAvailableProducts();
+  // Reset edit mode
+  document.getElementById('editRequestId').value = '';
+  document.getElementById('modalTitle').textContent = 'Create New Transfer Request';
+  document.getElementById('submitBtnText').textContent = 'Submit Request';
   
-  // Add initial item row
-  addRequestItem();
-  // mark as create mode (no initial forms)
-  const formEl = document.getElementById('newRequestForm');
-  if (formEl) formEl.dataset.initialForms = '0';
+  // Clear validation classes
+  document.getElementById('from_store').classList.remove('is-invalid');
+  document.getElementById('to_store').classList.remove('is-invalid');
+  document.getElementById('reason').classList.remove('is-invalid');
   
-  const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
-  modal.show();
+  // Load products and show modal
+  loadAvailableProducts().then(() => {
+    // Add initial item
+    addRequestItem();
+    
+    // Initialize Bootstrap modal
+    const modalElement = document.getElementById('newRequestModal');
+    if (modalElement) {
+      const modal = new bootstrap.Modal(modalElement);
+      modal.show();
+      
+      // Focus on first field
+      setTimeout(() => {
+        document.getElementById('from_store').focus();
+      }, 500);
+    }
+  }).catch(error => {
+    console.error('Error loading products:', error);
+    // Still show modal
+    const modalElement = document.getElementById('newRequestModal');
+    if (modalElement) {
+      const modal = new bootstrap.Modal(modalElement);
+      modal.show();
+    }
+  });
 }
 
 // Load available products
-function loadAvailableProducts() {
-  return fetch('/api/products/?active_only=true')
-    .then(response => response.json())
-    .then(data => {
-      if (data && data.success) {
-        availableProducts = data.products;
-      }
-      return data;
-    })
-    .catch(error => {
-      console.error('Error loading products:', error);
-      return null;
-    });
+async function loadAvailableProducts() {
+  try {
+    const response = await fetch('/api/products/?active_only=true');
+    const data = await response.json();
+    if (data && data.success) {
+      availableProducts = data.products;
+      console.log(`Loaded ${availableProducts.length} products`);
+    } else {
+      availableProducts = [];
+      console.warn('No products loaded');
+    }
+    return data;
+  } catch (error) {
+    console.error('Error loading products:', error);
+    availableProducts = [];
+    return null;
+  }
 }
 
 // Add request item row
 function addRequestItem() {
   const tbody = document.getElementById('requestItemsBody');
-  const idx = tbody.children.length; // zero-based index for formset
+  const idx = tbody.children.length;
   const row = document.createElement('tr');
   row.id = `request-item-row-${idx}`;
   row.dataset.index = String(idx);
+  
+  // Create product options HTML
+  let productOptions = '<option value="">Select product...</option>';
+  if (availableProducts && availableProducts.length > 0) {
+    productOptions += availableProducts.map(product => 
+      `<option value="${product.id}">${product.name} (${product.sku})</option>`
+    ).join('');
+  } else {
+    productOptions += '<option value="" disabled>Loading products...</option>';
+  }
+  
   row.innerHTML = `
     <td>
       <select name="items-${idx}-product" class="form-select form-select-sm product-select" 
-              data-item-id="${idx}" required>
-        <option value="">Select product...</option>
-        ${availableProducts.map(product => 
-          `<option value="${product.id}">${product.name} (${product.sku})</option>`
-        ).join('')}
+              data-item-id="${idx}" required
+              onchange="handleProductChange(${idx})">
+        ${productOptions}
       </select>
     </td>
     <td>
-      <span class="available-stock text-muted" id="available-${idx}">-</span>
+      <div class="stock-info">
+        <span class="available-stock text-muted" id="available-${idx}">-</span>
+        <div class="remaining-stock small text-muted" id="remaining-${idx}" style="display: none;"></div>
+      </div>
+      <input type="hidden" class="available-stock-value" id="available-value-${idx}" value="0">
     </td>
     <td>
       <input type="number" name="items-${idx}-quantity" 
-             class="form-control form-control-sm" 
-             min="1" step="1" placeholder="0" required>
+             class="form-control form-control-sm requested-qty" 
+             min="1" step="1" placeholder="0" required
+             onchange="updateStockCalculation(${idx})"
+             oninput="updateStockCalculation(${idx})">
+      <div class="invalid-feedback">Quantity exceeds available stock</div>
     </td>
     <td>
-      <select name="items-${idx}-units" class="form-select form-select-sm">
-        ${unitsOptions}
+      <select name="items-${idx}-units" class="form-select form-select-sm unit-select"
+              data-item-id="${idx}"
+              onchange="handleUnitChange(${idx})">
+        <option value="">Select unit...</option>
       </select>
+      <div class="unit-price-info mt-1">
+        <small class="unit-price-text" id="unit-price-text-${idx}"></small>
+        <input type="hidden" class="unit-price-display" id="unit-price-${idx}" value="0">
+      </div>
     </td>
     <td>
       <input type="text" name="items-${idx}-notes" 
@@ -626,7 +671,7 @@ function addRequestItem() {
              placeholder="Optional notes...">
     </td>
     <td>
-      <button type="button" class="btn btn-sm btn-outline-danger" data-action="removeRequestItem" data-item-id="${idx}">
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRequestItem(${idx})">
         <i data-feather="trash-2" class="feather-12"></i>
       </button>
     </td>
@@ -640,6 +685,390 @@ function addRequestItem() {
   }
   return idx;
 }
+
+// Handle product selection
+async function handleProductChange(itemId) {
+  console.log(`Product changed for item ${itemId}`);
+  
+  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
+  const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
+  const fromStoreSelect = document.getElementById('from_store');
+  const unitPriceText = document.getElementById(`unit-price-text-${itemId}`);
+  
+  if (!productSelect.value) {
+    // Reset if no product selected
+    unitSelect.innerHTML = '<option value="">Select unit...</option>';
+    unitPriceText.textContent = '';
+    return;
+  }
+  
+  if (!fromStoreSelect.value) {
+    showToast('Please select a source store first', 'warning');
+    productSelect.value = '';
+    return;
+  }
+  
+  // Show loading state for units
+  unitSelect.innerHTML = '<option value="">Loading units...</option>';
+  unitSelect.disabled = true;
+  unitPriceText.textContent = 'Loading price...';
+  
+  try {
+    // Fetch product units
+    const response = await fetch(`/api/product/${productSelect.value}/units/`);
+    const data = await response.json();
+    
+    if (data.success && data.units && data.units.length > 0) {
+      // Populate unit dropdown
+      unitSelect.innerHTML = '<option value="">Select unit...</option>';
+      data.units.forEach(unit => {
+        const option = document.createElement('option');
+        option.value = unit.id;
+        option.textContent = `${unit.name} (${unit.abbreviation})`;
+        option.dataset.price = unit.price;
+        unitSelect.appendChild(option);
+      });
+      unitSelect.disabled = false;
+      
+      // Auto-select first unit and load its price
+      if (data.units.length > 0) {
+        unitSelect.value = data.units[0].id;
+        await handleUnitChange(itemId);
+      }
+    } else {
+      unitSelect.innerHTML = '<option value="">No units available</option>';
+      unitPriceText.textContent = 'No price available';
+      unitPriceText.className = 'text-danger unit-price-text';
+    }
+    
+    // Update stock availability
+    await updateStockAvailability(itemId);
+    
+  } catch (error) {
+    console.error('Error fetching product units:', error);
+    unitSelect.innerHTML = '<option value="">Error loading units</option>';
+    unitPriceText.textContent = 'Error loading price';
+    unitPriceText.className = 'text-danger unit-price-text';
+  }
+}
+
+// Handle unit selection
+async function handleUnitChange(itemId) {
+  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
+  const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
+  const unitPriceDisplay = document.getElementById(`unit-price-${itemId}`);
+  const unitPriceText = document.getElementById(`unit-price-text-${itemId}`);
+  
+  if (!productSelect.value || !unitSelect.value) {
+    unitPriceText.textContent = '';
+    return;
+  }
+  
+  // Get selected option's price
+  const selectedOption = unitSelect.options[unitSelect.selectedIndex];
+  if (selectedOption.dataset.price) {
+    const price = parseFloat(selectedOption.dataset.price);
+    unitPriceDisplay.value = price;
+    unitPriceText.textContent = `Price: ${price.toLocaleString()} /unit`;
+    unitPriceText.className = 'text-success unit-price-text';
+  } else {
+    // Fetch from API
+    try {
+      const response = await fetch(`/api/product/unit-price/${productSelect.value}/${unitSelect.value}/`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const price = data.unit_price.price;
+        unitPriceDisplay.value = price;
+        unitPriceText.textContent = `Price: ${price.toLocaleString()} /unit`;
+        unitPriceText.className = 'text-success unit-price-text';
+      } else {
+        unitPriceText.textContent = 'Price: N/A';
+        unitPriceText.className = 'text-muted unit-price-text';
+      }
+    } catch (error) {
+      console.error('Error fetching unit price:', error);
+      unitPriceText.textContent = 'Price: Error loading';
+      unitPriceText.className = 'text-danger unit-price-text';
+    }
+  }
+}
+
+// Update product availability
+async function updateStockAvailability(itemId) {
+  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
+  const availableSpan = document.getElementById(`available-${itemId}`);
+  const availableValueInput = document.getElementById(`available-value-${itemId}`);
+  const fromStoreSelect = document.getElementById('from_store');
+  
+  if (!productSelect.value || !fromStoreSelect.value) {
+    availableSpan.textContent = '-';
+    availableSpan.className = 'available-stock text-muted';
+    availableValueInput.value = 0;
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/product/${productSelect.value}/stock/${fromStoreSelect.value}/`);
+    const data = await response.json();
+    
+    if (data.success) {
+      const available = data.stock.available_stock;
+      availableSpan.textContent = available;
+      availableValueInput.value = available;
+      
+      if (available === 0) {
+        availableSpan.className = 'available-stock text-danger';
+        availableSpan.innerHTML = `<span class="badge bg-danger">${available}</span>`;
+      } else if (available < 10) {
+        availableSpan.className = 'available-stock text-warning';
+        availableSpan.innerHTML = `<span class="badge bg-warning">${available}</span>`;
+      } else {
+        availableSpan.className = 'available-stock text-success';
+        availableSpan.innerHTML = `<span class="badge bg-success">${available}</span>`;
+      }
+      
+      // Validate quantity if already entered
+      const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+      if (quantityInput && quantityInput.value) {
+        await updateStockCalculation(itemId);
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching stock info:', error);
+    availableSpan.textContent = 'Error';
+    availableSpan.className = 'available-stock text-danger';
+    availableValueInput.value = 0;
+  }
+}
+
+// Update stock calculation when quantity changes (INSTANT DEDUCTION)
+async function updateStockCalculation(itemId) {
+  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
+  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+  const fromStoreSelect = document.getElementById('from_store');
+  const availableSpan = document.getElementById(`available-${itemId}`);
+  const remainingSpan = document.getElementById(`remaining-${itemId}`);
+  
+  if (!productSelect.value || !fromStoreSelect.value || !quantityInput.value) {
+    return;
+  }
+  
+  const requestedQty = parseInt(quantityInput.value) || 0;
+  
+  if (requestedQty <= 0) {
+    quantityInput.classList.remove('is-invalid');
+    remainingSpan.style.display = 'none';
+    hideStockAlert();
+    return;
+  }
+  
+  // Show calculating
+  availableSpan.textContent = 'Calculating...';
+  availableSpan.className = 'available-stock text-info';
+  
+  try {
+    // Build URL with parameters
+    let url = `/api/product/${productSelect.value}/stock-calculation/?store_id=${fromStoreSelect.value}&requested_qty=${requestedQty}`;
+    
+    // Include current request ID if editing
+    const editId = document.getElementById('editRequestId').value;
+    if (editId) {
+      url += `&current_request_id=${editId}`;
+    }
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.success) {
+      const availableStock = data.stock_info.available_stock;
+      const remainingStock = data.stock_info.remaining_stock;
+      const status = data.status;
+      
+      // Update available stock display
+      availableSpan.textContent = availableStock;
+      availableSpan.className = 'available-stock text-muted';
+      
+      // Update available value input
+      document.getElementById(`available-value-${itemId}`).value = availableStock;
+      
+      // Show remaining stock
+      remainingSpan.textContent = `After transfer: ${remainingStock}`;
+      remainingSpan.style.display = 'block';
+      
+      if (status === 'sufficient') {
+        quantityInput.classList.remove('is-invalid');
+        remainingSpan.className = 'text-success';
+        hideStockAlert();
+      } else {
+        quantityInput.classList.add('is-invalid');
+        remainingSpan.className = 'text-danger';
+        showStockAlert(`Insufficient stock for ${data.product.name}. Available: ${availableStock}, Requested: ${requestedQty}`);
+      }
+      
+      // Update total value if unit price is set
+      const unitPrice = parseFloat(document.getElementById(`unit-price-${itemId}`).value) || 0;
+      if (unitPrice > 0) {
+        const totalValue = unitPrice * requestedQty;
+        const unitPriceText = document.getElementById(`unit-price-text-${itemId}`);
+        unitPriceText.textContent = `Price: ${unitPrice.toLocaleString()} /unit | Total: ${totalValue.toLocaleString()}`;
+      }
+    }
+  } catch (error) {
+    console.error('Error calculating stock:', error);
+    availableSpan.textContent = 'Error';
+    availableSpan.className = 'available-stock text-danger';
+    quantityInput.classList.remove('is-invalid');
+  }
+}
+
+// Validate quantity against available stock (legacy function)
+function validateQuantity(itemId) {
+  // This is now handled by updateStockCalculation
+  return true;
+}
+
+// Validate form before submission
+function validateForm() {
+  let isValid = true;
+  let errors = [];
+  
+  // Check if from_store and to_store are the same
+  const fromStore = document.getElementById('from_store').value;
+  const toStore = document.getElementById('to_store').value;
+  
+  if (fromStore && toStore && fromStore === toStore) {
+    errors.push('Cannot transfer stock to the same store');
+    document.getElementById('from_store').classList.add('is-invalid');
+    document.getElementById('to_store').classList.add('is-invalid');
+    isValid = false;
+  } else {
+    document.getElementById('from_store').classList.remove('is-invalid');
+    document.getElementById('to_store').classList.remove('is-invalid');
+  }
+  
+  // Check required fields
+  if (!fromStore) {
+    errors.push('Source store is required');
+    document.getElementById('from_store').classList.add('is-invalid');
+    isValid = false;
+  }
+  
+  if (!toStore) {
+    errors.push('Destination store is required');
+    document.getElementById('to_store').classList.add('is-invalid');
+    isValid = false;
+  }
+  
+  if (!document.getElementById('reason').value.trim()) {
+    errors.push('Reason for transfer is required');
+    document.getElementById('reason').classList.add('is-invalid');
+    isValid = false;
+  } else {
+    document.getElementById('reason').classList.remove('is-invalid');
+  }
+  
+  // Check at least one item is added
+  const tbody = document.getElementById('requestItemsBody');
+  if (tbody.children.length === 0) {
+    errors.push('Please add at least one item to request.');
+    isValid = false;
+  }
+  
+  // Validate each item
+  const productSelects = document.querySelectorAll('.product-select');
+  let hasValidItems = false;
+  
+  productSelects.forEach((select, index) => {
+    if (!select.value) {
+      errors.push(`Item ${index + 1}: Product selection is required`);
+      isValid = false;
+    } else {
+      hasValidItems = true;
+    }
+    
+    // Validate quantity
+    const quantityInput = document.querySelector(`input[name="items-${index}-quantity"]`);
+    if (select.value && (!quantityInput.value || parseInt(quantityInput.value) <= 0)) {
+      errors.push(`Item ${index + 1}: Valid quantity is required`);
+      isValid = false;
+      quantityInput.classList.add('is-invalid');
+    }
+    
+    // Check for insufficient stock (has is-invalid class from updateStockCalculation)
+    if (quantityInput.classList.contains('is-invalid')) {
+      errors.push(`Item ${index + 1}: Insufficient stock available`);
+      isValid = false;
+    }
+    
+    // Validate unit selection
+    const unitSelect = document.querySelector(`.unit-select[data-item-id="${index}"]`);
+    if (select.value && (!unitSelect.value || unitSelect.value === '')) {
+      errors.push(`Item ${index + 1}: Unit selection is required`);
+      isValid = false;
+    }
+  });
+  
+  if (!hasValidItems) {
+    errors.push('Please add at least one valid item to the request.');
+    isValid = false;
+  }
+  
+  // Display errors
+  if (errors.length > 0) {
+    const errorContainer = document.getElementById('formErrorsAlert');
+    const errorMessage = document.getElementById('formErrorsMessage');
+    errorMessage.innerHTML = errors.map(error => `<div>• ${error}</div>`).join('');
+    errorContainer.style.display = 'block';
+    
+    // Scroll to errors
+    setTimeout(() => {
+      errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  } else {
+    document.getElementById('formErrorsAlert').style.display = 'none';
+  }
+  
+  return isValid;
+}
+
+// Store change handler - update all product availabilities
+document.getElementById('from_store')?.addEventListener('change', async function() {
+  console.log('Source store changed to:', this.value);
+  
+  const toStoreSelect = document.getElementById('to_store');
+  
+  // Clear to_store selection if same as from_store
+  if (toStoreSelect.value === this.value) {
+    toStoreSelect.value = '';
+    toStoreSelect.classList.add('is-invalid');
+    showStockAlert('Cannot transfer stock to the same store');
+  } else {
+    toStoreSelect.classList.remove('is-invalid');
+    hideStockAlert();
+  }
+  
+  // Update all product availabilities
+  const productSelects = document.querySelectorAll('.product-select');
+  for (const select of productSelects) {
+    if (select.value) {
+      const itemId = select.getAttribute('data-item-id');
+      await updateStockAvailability(itemId);
+    }
+  }
+});
+
+// To store change handler - prevent same store selection
+document.getElementById('to_store')?.addEventListener('change', function() {
+  const fromStoreSelect = document.getElementById('from_store');
+  if (this.value && this.value === fromStoreSelect.value) {
+    this.classList.add('is-invalid');
+    showStockAlert('Cannot transfer stock to the same store');
+  } else {
+    this.classList.remove('is-invalid');
+    hideStockAlert();
+  }
+});
 
 // Remove request item row
 function removeRequestItem(itemId) {
@@ -655,56 +1084,17 @@ function removeRequestItem(itemId) {
   }
 }
 
-// Update product availability when product is selected
-function updateProductAvailability(itemId) {
-  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`) || document.querySelector(`select[name="items-${itemId}-product"]`);
-  const availableSpan = document.getElementById(`available-${itemId}`);
-  const fromStoreSelect = document.getElementById('from_store');
-  
-  if (productSelect.value && fromStoreSelect.value) {
-    fetch(`/api/products/${productSelect.value}/stock/?store_id=${fromStoreSelect.value}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          const available = data.stock.available_stock;
-          availableSpan.textContent = available;
-          availableSpan.className = available > 0 ? 'available-stock text-success' : 'available-stock text-danger';
-          
-          if (available === 0) {
-            showStockAlert(`${data.product.name} is out of stock in the selected store.`);
-          } else {
-            hideStockAlert();
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching stock info:', error);
-        availableSpan.textContent = '-';
-        availableSpan.className = 'available-stock text-muted';
-      });
-  } else {
-    availableSpan.textContent = '-';
-    availableSpan.className = 'available-stock text-muted';
-  }
-}
-
-// Store change handler to update all product availability
-document.getElementById('from_store')?.addEventListener('change', function() {
-  const productSelects = document.querySelectorAll('.product-select');
-  productSelects.forEach((select, index) => {
-    if (select.value) {
-      const itemId = select.name.match(/items-(\d+)-product/)[1];
-      updateProductAvailability(itemId);
-    }
-  });
-});
-
 // Show stock alert
 function showStockAlert(message) {
   const alert = document.getElementById('stockAlert');
   const messageSpan = document.getElementById('stockAlertMessage');
   messageSpan.textContent = message;
   alert.style.display = 'block';
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    hideStockAlert();
+  }, 5000);
 }
 
 // Hide stock alert
@@ -712,175 +1102,203 @@ function hideStockAlert() {
   document.getElementById('stockAlert').style.display = 'none';
 }
 
-// Submit new request
-function submitNewRequest() {
-  const form = document.getElementById('newRequestForm');
-  // Prefer selecting the explicit submit button (there are other .btn-primary buttons inside the modal)
-  const submitBtn = document.querySelector('#newRequestModal [data-action="submitNewRequest"]') || document.querySelector('#newRequestModal .btn-primary');
-  const spinner = submitBtn ? submitBtn.querySelector('.spinner-border') : null;
-  
-  // Validate form
-  if (!form.checkValidity()) {
-    form.reportValidity();
+// Enhanced submit function
+async function submitNewRequest() {
+  if (!validateForm()) {
     return;
   }
   
-  // Check if at least one item is added
-  const tbody = document.getElementById('requestItemsBody');
-  if (tbody.children.length === 0) {
-    alert('Please add at least one item to request.');
-    return;
-  }
+  const submitBtn = document.getElementById('submitRequestBtn');
+  const spinner = submitBtn.querySelector('.spinner-border');
+  const editId = document.getElementById('editRequestId').value;
   
   // Show loading state
-  if (submitBtn) submitBtn.disabled = true;
-  if (spinner && spinner.classList) spinner.classList.remove('d-none');
+  submitBtn.disabled = true;
+  spinner.classList.remove('d-none');
   
   // Collect form data
-  // Build FormData manually to include inline formset management fields (required by Django)
-  const formData = new FormData();
-  // CSRF token
-  const csrf = form.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
-  if (csrf) formData.append('csrfmiddlewaretoken', csrf);
-  // Append basic fields
-  ['from_store','to_store','priority','required_date','department','reason'].forEach(name => {
-    const el = form.querySelector(`[name="${name}"]`);
-    if (el) formData.append(name, el.value);
-  });
-
-  // Collect item rows and append with zero-based indices expected by Django formsets
-  const rows = Array.from(document.querySelectorAll('#requestItemsBody tr'));
-  rows.forEach((row, idx) => {
-    const product = row.querySelector(`select[name^="items-"]`);
-    const qty = row.querySelector(`input[name^="items-"][type="number"]`);
-    const units = row.querySelector(`input[name^="items-"][name$="-units"], select[name$="-units"]`);
-    const notes = row.querySelector(`input[name$="-notes"]`);
-    const existingId = row.querySelector(`input[name$="-id"]`);
-
-    if (product && product.value) formData.append(`items-${idx}-product`, product.value);
-    if (qty && qty.value) formData.append(`items-${idx}-quantity`, qty.value);
-    if (units && units.value) formData.append(`items-${idx}-units`, units.value);
-    if (notes && notes.value !== undefined) formData.append(`items-${idx}-notes`, notes.value);
-    // include existing item id when editing so formset treats it as initial form
-    if (existingId && existingId.value) formData.append(`items-${idx}-id`, existingId.value);
-  });
-
-  // Management form fields for inline formset
-  formData.append('items-TOTAL_FORMS', String(rows.length));
-  // If editing, use dataset.initialForms set when modal opened; otherwise 0
-  const editId = document.getElementById('editRequestId')?.value;
-  const initialForms = (form.dataset.initialForms && editId) ? String(form.dataset.initialForms) : '0';
-  formData.append('items-INITIAL_FORMS', initialForms);
-  formData.append('items-MIN_NUM_FORMS', '0');
-  formData.append('items-MAX_NUM_FORMS', '1000');
+  const formData = {
+    from_store: document.getElementById('from_store').value,
+    to_store: document.getElementById('to_store').value,
+    priority: document.getElementById('priority').value,
+    required_date: document.getElementById('required_date').value,
+    department: document.getElementById('department').value,
+    reason: document.getElementById('reason').value,
+    items: []
+  };
   
-  // Hide any previous errors
-  const errContainer = document.getElementById('formErrorsAlert');
-  if (errContainer) errContainer.style.display = 'none';
-
-  // Submit via AJAX (create or edit)
-  const submitUrl = editId ? `/transfer_requests/${editId}/edit/` : '/transfer_requests/create/';
-  fetch(submitUrl, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    body: formData
-  })
-  .then(async response => {
-    // Try to parse JSON if possible
-    let data = null;
-    try {
-      data = await response.json();
-    } catch (err) {
-      console.error('Failed to parse JSON response:', err);
+  // Collect items
+  const rows = document.querySelectorAll('#requestItemsBody tr');
+  rows.forEach((row, index) => {
+    const product = row.querySelector('.product-select');
+    const quantity = row.querySelector('.requested-qty');
+    const units = row.querySelector('.unit-select');
+    const notes = row.querySelector('input[name$="-notes"]');
+    const itemId = row.querySelector('input[name$="-id"]'); // For editing
+    
+    if (product.value && quantity.value && units.value) {
+      const itemData = {
+        product_id: product.value,
+        quantity: quantity.value,
+        units_id: units.value,
+        notes: notes?.value || ''
+      };
+      
+      // Include item ID for editing
+      if (itemId && itemId.value) {
+        itemData.id = itemId.value;
+      }
+      
+      formData.items.push(itemData);
     }
-
-    if (response.ok && data && data.success) {
-      // Close modal and redirect/reload
+  });
+  
+  // Determine URL based on edit mode
+  const url = editId ? `/transfer_requests/${editId}/edit/` : '/transfer_requests/create/';
+  const method = editId ? 'PUT' : 'POST';
+  
+  try {
+    const response = await fetch(url, {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(formData)
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Close modal and show success message
       const modal = bootstrap.Modal.getInstance(document.getElementById('newRequestModal'));
       if (modal) modal.hide();
-      // Show success message and reload
-      alert(`Transfer request #TR${String(data.request_id).padStart(4, '0')} created successfully!`);
-      location.reload();
-      return;
+      
+      const action = editId ? 'updated' : 'created';
+      showToast(`Transfer request #TR${String(data.request_id).padStart(4, '0')} ${action} successfully!`, 'success');
+      
+      // Reload page after a short delay
+      setTimeout(() => {
+        location.reload();
+      }, 1500);
+    } else {
+      // Display errors
+      const errorContainer = document.getElementById('formErrorsAlert');
+      const errorMessage = document.getElementById('formErrorsMessage');
+      
+      let errorHtml = `<div><strong>Error:</strong> ${data.error}</div>`;
+      if (data.details && Array.isArray(data.details)) {
+        errorHtml += data.details.map(detail => `<div>• ${detail}</div>`).join('');
+      }
+      
+      errorMessage.innerHTML = errorHtml;
+      errorContainer.style.display = 'block';
+      
+      // Scroll to errors
+      errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
-    // Handle validation errors (400) or other JSON error payloads
-    if (data) {
-      // If server provided structured errors, show them in the modal
-      const errContainer = document.getElementById('formErrorsAlert');
-      const errMessage = document.getElementById('formErrorsMessage');
-      let messages = [];
-
-      if (data.errors) {
-        // form_errors might be a dict mapping field->list
-        if (data.errors.form_errors) {
-          try {
-            const fe = data.errors.form_errors;
-            for (const [field, msgs] of Object.entries(fe)) {
-              if (Array.isArray(msgs)) {
-                msgs.forEach(m => messages.push(`${field}: ${m}`));
-              } else {
-                messages.push(`${field}: ${msgs}`);
-              }
-            }
-          } catch (e) {
-            console.warn('Unexpected form_errors shape', e);
-          }
-        }
-
-        if (data.errors.formset_errors && Array.isArray(data.errors.formset_errors)) {
-          data.errors.formset_errors.forEach((rowErr, idx) => {
-            if (rowErr) {
-              // rowErr may be an object mapping field->errors
-              if (typeof rowErr === 'object') {
-                for (const [f, msgs] of Object.entries(rowErr)) {
-                  if (Array.isArray(msgs)) msgs.forEach(m => messages.push(`Item ${idx + 1} ${f}: ${m}`));
-                  else messages.push(`Item ${idx + 1} ${f}: ${msgs}`);
-                }
-              } else {
-                messages.push(`Item ${idx + 1}: ${rowErr}`);
-              }
-            }
-          });
-        }
-
-        if (data.errors.non_field_errors) {
-          const nf = data.errors.non_field_errors;
-          if (Array.isArray(nf)) nf.forEach(m => messages.push(m));
-          else messages.push(nf);
-        }
-      }
-
-      // fallback to generic message
-      if (messages.length === 0) {
-        if (data.error) messages.push(data.error);
-        else messages.push('Validation failed. Please check the form.');
-      }
-
-      if (errContainer && errMessage) {
-        errMessage.innerHTML = messages.map(m => `<div>${m}</div>`).join('');
-        errContainer.style.display = 'block';
-      } else {
-        alert(messages.join('\n'));
-      }
-
-      return;
-    }
-
-    // If we reach here, response was not ok and we couldn't parse JSON
-    alert('An error occurred while creating the request.');
-  })
-  .catch(error => {
+  } catch (error) {
     console.error('Error:', error);
-    alert('An error occurred while creating the request.');
-  })
-  .finally(() => {
-    if (submitBtn) submitBtn.disabled = false;
-    if (spinner && spinner.classList) spinner.classList.add('d-none');
-  });
+    showToast('An error occurred while processing the request.', 'danger');
+  } finally {
+    // Reset button state
+    submitBtn.disabled = false;
+    spinner.classList.add('d-none');
+  }
+}
+
+// Edit request function
+async function editRequest(requestId) {
+  try {
+    const response = await fetch(`/transfer_requests/${requestId}/json/`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      alert('Failed to load request data');
+      return;
+    }
+    
+    const r = data.request;
+    currentEditRequestId = r.id;
+    
+    // Reset modal
+    requestItemCounter = 0;
+    document.getElementById('newRequestForm').reset();
+    document.getElementById('requestItemsBody').innerHTML = '';
+    document.getElementById('stockAlert').style.display = 'none';
+    document.getElementById('formErrorsAlert').style.display = 'none';
+    
+    // Set edit mode
+    document.getElementById('editRequestId').value = r.id;
+    document.getElementById('modalTitle').textContent = 'Edit Transfer Request';
+    document.getElementById('submitBtnText').textContent = 'Update Request';
+    
+    // Fill basic fields
+    document.getElementById('from_store').value = r.from_store || '';
+    document.getElementById('to_store').value = r.to_store || '';
+    document.getElementById('priority').value = r.priority || 'normal';
+    document.getElementById('required_date').value = r.required_date || '';
+    document.getElementById('department').value = r.department || '';
+    document.getElementById('reason').value = r.reason || '';
+    
+    // Load products first
+    await loadAvailableProducts();
+    
+    // Fill items
+    for (const item of r.items) {
+      const idx = addRequestItem();
+      const row = document.getElementById(`request-item-row-${idx}`);
+      
+      // Set product (triggers unit load)
+      const productSelect = document.querySelector(`.product-select[data-item-id="${idx}"]`);
+      productSelect.value = item.product_id;
+      
+      // Wait for units to load
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Set quantity
+      const qtyInput = document.querySelector(`input[name="items-${idx}-quantity"]`);
+      qtyInput.value = item.quantity;
+      
+      // Set unit
+      const unitSelect = document.querySelector(`.unit-select[data-item-id="${idx}"]`);
+      if (item.units_id) {
+        unitSelect.value = item.units_id;
+        // Wait for unit selection to take effect
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Trigger unit change to load price
+        await handleUnitChange(idx);
+      }
+      
+      // Set notes
+      const notesInput = document.querySelector(`input[name="items-${idx}-notes"]`);
+      if (notesInput && item.notes) {
+        notesInput.value = item.notes;
+      }
+      
+      // Add hidden id field for editing
+      if (item.id) {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = `items-${idx}-id`;
+        hidden.value = item.id;
+        row.appendChild(hidden);
+      }
+      
+      // Update availability and calculate stock
+      await updateStockAvailability(idx);
+      await updateStockCalculation(idx);
+    }
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
+    modal.show();
+    
+  } catch (error) {
+    console.error('Error loading request JSON:', error);
+    alert('Error loading request for edit.');
+  }
 }
 
 // Approve request
@@ -894,38 +1312,6 @@ function approveRequest(requestId) {
   const modal = new bootstrap.Modal(document.getElementById('approveRejectModal'));
   modal.show();
 }
-
-function confirmAction(actionUrl) {
-    fetch(actionUrl, {
-        method: "POST",
-        headers: {
-            "X-CSRFToken": csrftoken,   // VERY IMPORTANT
-            "Accept": "application/json",
-        },
-        body: new FormData(),  // or remove if not needed
-    })
-    .then(async (res) => {
-        const type = res.headers.get("content-type");
-        if (!type || !type.includes("application/json")) {
-            throw new Error("HTML returned instead of JSON — likely CSRF error");
-        }
-        return res.json();
-    })
-    .then(data => {
-        if (data.success) {
-            toastr.success(data.message);
-            setTimeout(() => location.reload(), 500);
-        } else {
-            toastr.error(data.error);
-        }
-    })
-    .catch(err => {
-        console.error("Approve error:", err);
-        toastr.error("Unexpected error. Refresh page.");
-    });
-}
-
-
 
 // Reject request
 function rejectRequest(requestId) {
@@ -947,21 +1333,20 @@ function confirmAction() {
   const action = formData.get('action');
   
   const submitBtn = document.getElementById('confirmActionBtn');
-  const spinner = submitBtn ? submitBtn.querySelector('.spinner-border') : null;
+  const spinner = submitBtn.querySelector('.spinner-border');
 
-  if (submitBtn) submitBtn.disabled = true;
-  if (spinner && spinner.classList) spinner.classList.remove('d-none');
+  submitBtn.disabled = true;
+  spinner.classList.remove('d-none');
 
   fetch(`/transfer_requests/${requestId}/${action}/`, {
     method: 'POST',
     headers: {
-      'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+      'X-CSRFToken': csrftoken,
       'X-Requested-With': 'XMLHttpRequest',
     },
     body: formData
   })
   .then(async response => {
-    // protect against HTML responses (e.g. session timeout / redirect to login or error page)
     const contentType = response.headers.get('content-type') || '';
     let data = null;
     if (contentType.includes('application/json')) {
@@ -974,8 +1359,7 @@ function confirmAction() {
     } else {
       const text = await response.text();
       console.error('Server returned non-JSON response for approve/reject:', text);
-      // surface a helpful error to the user
-      throw new Error('Server returned HTML (possible session expiry or server error). Check server logs.');
+      throw new Error('Server returned HTML (possible session expiry or server error).');
     }
 
     if (data && data.success) {
@@ -985,7 +1369,7 @@ function confirmAction() {
       // Update the row in-place
       const row = document.getElementById(`transfer-request-row-${requestId}`);
       if (row) {
-        // Update status badge cell (9th cell index is 8 zero-based? but we will query by data-status)
+        // Update status badge cell
         row.setAttribute('data-status', action === 'approve' ? 'approved' : 'rejected');
         const statusCell = row.querySelector('td:nth-child(8)');
         if (statusCell) {
@@ -998,22 +1382,13 @@ function confirmAction() {
         }
 
         // Disable approve/reject buttons
-  const approveBtn = row.querySelector(`[data-action="approveRequest"][data-request-id="${requestId}"]`);
-  const rejectBtn = row.querySelector(`[data-action="rejectRequest"][data-request-id="${requestId}"]`);
+        const approveBtn = row.querySelector(`[data-action="approveRequest"]`);
+        const rejectBtn = row.querySelector(`[data-action="rejectRequest"]`);
         if (approveBtn) approveBtn.disabled = true;
         if (rejectBtn) rejectBtn.disabled = true;
       }
 
-      // small toast
       showToast(`Request #TR${String(requestId).padStart(4, '0')} ${action === 'approve' ? 'approved' : 'rejected'}.`, action === 'approve' ? 'success' : 'danger');
-      // If server returned updated stock for affected products, refresh UI elements
-      if (data.updated_stock) {
-        try {
-          refreshAffectedProducts(data.updated_stock);
-        } catch (e) {
-          console.warn('Failed to refresh affected products in UI:', e);
-        }
-      }
     } else {
       alert('Error: ' + (data && data.error ? data.error : 'Unknown error'));
     }
@@ -1023,21 +1398,17 @@ function confirmAction() {
     alert(error.message || 'An error occurred while processing the request.');
   })
   .finally(() => {
-    if (submitBtn) submitBtn.disabled = false;
-    if (spinner && spinner.classList) spinner.classList.add('d-none');
+    submitBtn.disabled = false;
+    spinner.classList.add('d-none');
   });
 }
 
-// Other action functions
-function editRequest(requestId) {
-  // Redirect to edit page for now (could be made modal in future)
-  window.location.href = `/transfer_requests/${requestId}/edit/`;
-}
-
+// Other functions
 function cancelRequest(requestId) {
   if (confirm('Are you sure you want to cancel this transfer request?')) {
     // Implementation for canceling request
     console.log('Cancel request:', requestId);
+    showToast('Cancel functionality not yet implemented', 'warning');
   }
 }
 
@@ -1045,179 +1416,159 @@ function refreshRequests() {
   location.reload();
 }
 
-// Update UI elements for affected products after a transfer
-function refreshAffectedProducts(updatedStockMap) {
-  // updatedStockMap: { product_id: available_stock }
-  Object.entries(updatedStockMap).forEach(([pid, available]) => {
-    // Update any inventory tables with rows having data-product-id attribute
-    const rows = document.querySelectorAll(`tr[data-product-id="${pid}"]`);
-    rows.forEach(row => {
-      const availEl = row.querySelector('.available-stock');
-      if (availEl) {
-        availEl.textContent = available != null ? available : '-';
-        availEl.className = available > 0 ? 'available-stock text-success' : 'available-stock text-danger';
-      }
-    });
-
-    // Update any modal item availability spans (id pattern: available-<idx>)
-    // find selects bound to this product and update the sibling availability span
-    const selects = document.querySelectorAll(`select.product-select option[value="${pid}"]`);
-    selects.forEach(opt => {
-      // try to find parent row
-      const row = opt.closest('tr');
-      if (row) {
-        const span = row.querySelector('.available-stock');
-        if (span) {
-          span.textContent = available != null ? available : '-';
-          span.className = available > 0 ? 'available-stock text-success' : 'available-stock text-danger';
-        }
-      }
-    });
-  });
-}
-
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded');
+  
   // Initialize feather icons
   if (typeof feather !== 'undefined') {
     feather.replace();
   }
   
-  // Initialize tooltips
-  if (typeof bootstrap !== 'undefined') {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
-    tooltipTriggerList.map(function(tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-  }
-  
-  // Load products for new request modal
+  // Load products for modal (but don't wait for it)
   loadAvailableProducts();
-
-  // Delegated click/change handlers for actions
-  document.body.addEventListener('click', function(e) {
-    const el = e.target.closest('[data-action]');
-    if (!el) return;
-    const action = el.getAttribute('data-action');
-    const reqId = el.getAttribute('data-request-id');
-    const itemId = el.getAttribute('data-item-id');
-
-    switch(action) {
-      case 'showNewRequestModal': showNewRequestModal(); break;
-      case 'addRequestItem': addRequestItem(); break;
-      case 'removeRequestItem': removeRequestItem(itemId); break;
-      case 'approveRequest': approveRequest(reqId); break;
-      case 'rejectRequest': rejectRequest(reqId); break;
-      case 'editRequest': openEditModal(reqId); break;
-      case 'cancelRequest': cancelRequest(reqId); break;
-      case 'submitNewRequest': submitNewRequest(); break;
-      case 'confirmApproveReject': confirmAction(); break;
-      default: break;
+  
+  // Event delegation for buttons with data-action
+  document.addEventListener('click', function(e) {
+    // Handle approve/reject buttons
+    if (e.target.closest('[data-action="approveRequest"]')) {
+      const button = e.target.closest('[data-action="approveRequest"]');
+      const requestId = button.getAttribute('data-request-id');
+      approveRequest(requestId);
+    }
+    
+    if (e.target.closest('[data-action="rejectRequest"]')) {
+      const button = e.target.closest('[data-action="rejectRequest"]');
+      const requestId = button.getAttribute('data-request-id');
+      rejectRequest(requestId);
+    }
+    
+    if (e.target.closest('[data-action="editRequest"]')) {
+      const button = e.target.closest('[data-action="editRequest"]');
+      const requestId = button.getAttribute('data-request-id');
+      editRequest(requestId);
     }
   });
-
-  document.body.addEventListener('change', function(e) {
-    if (e.target && e.target.classList.contains('product-select')) {
-      const itemId = e.target.getAttribute('data-item-id');
-      if (itemId) updateProductAvailability(itemId);
-    }
-  });
-
-  // Open edit modal and populate with data from server
-  function openEditModal(requestId) {
-    fetch(`/transfer_requests/${requestId}/json/`, {
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(resp => resp.json())
-    .then(data => {
-      if (!data.success) {
-        alert('Failed to load request data');
-        return;
-      }
-
-      const r = data.request;
-      // Reset and show modal
-      requestItemCounter = 0;
-      document.getElementById('newRequestForm').reset();
-      document.getElementById('requestItemsBody').innerHTML = '';
-      document.getElementById('stockAlert').style.display = 'none';
-  const editIdInput = document.getElementById('editRequestId');
-  if (editIdInput) editIdInput.value = r.id;
-  // record how many initial forms existed on server (used for formset management)
-  const formEl = document.getElementById('newRequestForm');
-  if (formEl) formEl.dataset.initialForms = Array.isArray(r.items) ? String(r.items.length) : '0';
-
-      // Fill basic fields
-      const fromEl = document.querySelector('#newRequestForm [name="from_store"]');
-      const toEl = document.querySelector('#newRequestForm [name="to_store"]');
-      const priorityEl = document.querySelector('#newRequestForm [name="priority"]');
-      const requiredEl = document.querySelector('#newRequestForm [name="required_date"]');
-      const deptEl = document.querySelector('#newRequestForm [name="department"]');
-      const reasonEl = document.querySelector('#newRequestForm [name="reason"]');
-
-      if (fromEl) fromEl.value = r.from_store || '';
-      if (toEl) toEl.value = r.to_store || '';
-      if (priorityEl) priorityEl.value = r.priority || 'normal';
-      if (requiredEl) requiredEl.value = r.required_date ? r.required_date.split('T')[0] : '';
-      if (deptEl) deptEl.value = r.department || '';
-      if (reasonEl) reasonEl.value = r.reason || '';
-
-      // Fill items (ensure products are loaded first)
-      if (Array.isArray(r.items)) {
-        // ensure availableProducts present
-        const ensureProducts = availableProducts && availableProducts.length ? Promise.resolve() : loadAvailableProducts();
-        ensureProducts.then(() => {
-          r.items.forEach(item => {
-            const idx = addRequestItem();
-            const prodSel = document.querySelector(`select[name="items-${idx}-product"]`);
-            const qtyInput = document.querySelector(`input[name="items-${idx}-quantity"]`);
-            const unitsSel = document.querySelector(`select[name="items-${idx}-units"]`);
-            const notesInput = document.querySelector(`input[name="items-${idx}-notes"]`);
-
-            if (prodSel) prodSel.value = item.product_id;
-            if (qtyInput) qtyInput.value = item.quantity;
-            if (unitsSel) unitsSel.value = item.units_id;
-            if (notesInput) notesInput.value = item.notes || '';
-
-            // Update availability for this product (prefill available stock)
-            try {
-              updateProductAvailability(idx);
-            } catch (e) {
-              console.warn('Could not update availability for item', idx, e);
-            }
-
-            // include existing item id for formset update
-            if (item.id) {
-              const row = document.getElementById(`request-item-row-${idx}`);
-              if (row) {
-                const hidden = document.createElement('input');
-                hidden.type = 'hidden';
-                hidden.name = `items-${idx}-id`;
-                hidden.value = item.id;
-                row.appendChild(hidden);
-              }
-            }
-          });
-
-          // Show modal after items added
-          const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
-          modal.show();
-        });
-      } else {
-        const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
-        modal.show();
-      }
-    })
-    .catch(err => {
-      console.error('Error loading request JSON:', err);
-      alert('Error loading request for edit.');
-    });
-  }
-
 });
 </script>
 
+
+
 <style>
+/* Validation styles */
+.is-invalid {
+  border-color: #dc3545 !important;
+}
+
+.is-invalid:focus {
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.invalid-feedback {
+  display: none;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.875em;
+  color: #dc3545;
+}
+
+.is-invalid ~ .invalid-feedback {
+  display: block;
+}
+
+/* Stock info display */
+.stock-info {
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.available-stock {
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.available-stock.text-success .badge {
+  background-color: #198754 !important;
+}
+
+.available-stock.text-warning .badge {
+  background-color: #ffc107 !important;
+  color: #000 !important;
+}
+
+.available-stock.text-danger .badge {
+  background-color: #dc3545 !important;
+}
+
+.available-stock.text-muted .badge {
+  background-color: #6c757d !important;
+}
+
+.remaining-stock {
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+/* Unit price display */
+.unit-price-info {
+  min-height: 30px;
+}
+
+.unit-price-text {
+  font-size: 0.75rem;
+  display: block;
+  margin-top: 2px;
+}
+
+.unit-price-text.text-success {
+  color: #198754;
+  font-weight: 500;
+}
+
+.unit-price-text.text-danger {
+  color: #dc3545;
+}
+
+/* Modal styles */
+.modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Item row hover effect */
+#requestItemsTable tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Responsive table in modal */
+@media (max-width: 768px) {
+  #requestItemsTable {
+    font-size: 0.75rem;
+  }
+  
+  #requestItemsTable .form-control-sm,
+  #requestItemsTable .form-select-sm {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  #requestItemsTable th,
+  #requestItemsTable td {
+    padding: 0.5rem 0.25rem;
+  }
+  
+  .available-stock {
+    font-size: 0.8rem;
+  }
+  
+  .unit-price-text {
+    font-size: 0.7rem;
+  }
+}
+
+/* Transfer route styling */
 .transfer-route {
   font-size: 0.875rem;
   margin-bottom: 2px;
@@ -1250,14 +1601,10 @@ document.addEventListener('DOMContentLoaded', function() {
   height: 12px;
 }
 
-/* New Request Modal Styles */
-#requestItemsTable .form-select-sm,
-#requestItemsTable .form-control-sm {
-  font-size: 0.875rem;
-}
-
-.available-stock {
-  font-weight: 600;
+/* Loading states */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .spinner-border-sm {
@@ -1308,4 +1655,3 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 {% endblock %}
-

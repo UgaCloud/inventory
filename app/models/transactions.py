@@ -285,6 +285,7 @@ class TransferRequestItem(models.Model):
     product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
     units = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
+    notes = models.TextField(blank=True, null=True)
 
     class Meta:
         unique_together = ("transfer_request", "product")
