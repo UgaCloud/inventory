@@ -112,8 +112,6 @@ urlpatterns = [
     path('stock_transfers/<int:transfer_id>/update/', stock_transfer_update, name='stock_transfer_update'),
     path('stock_transfers/<int:transfer_id>/start/', start_stock_transfer, name='start_stock_transfer'),  # NEW
     path('stock_transfers/<int:transfer_id>/complete/', complete_stock_transfer, name='complete_stock_transfer'),  # NEW
-    # path('stock_transfers/<int:transfer_id>/cancel/', cancel_stock_transfer, name='cancel_stock_transfer'),  # NEW
-    # path('stock_transfers/<int:transfer_id>/delete/', delete_stock_transfer, name='delete_stock_transfer'),  # NEW
     path('stock_transfers/<int:transfer_id>/update_status/', update_transfer_status, name='update_transfer_status'),
 
     # JSON API Endpoints
@@ -126,9 +124,7 @@ urlpatterns = [
     path('api/product/<int:product_id>/stock/<int:store_id>/', get_product_stock_for_store, name='product_stock_for_store'),
     path('api/product/unit-price/<int:product_id>/<int:unit_id>/', get_product_unit_price, name='product_unit_price'),
     path('api/product/<int:product_id>/stock-calculation/', product_stock_calculation, name='product_stock_calculation'),
-    # path('transfer_requests/<int:request_id>/json/', transfer_request_json, name='transfer_request_json'),
-    # path('transfer_requests/create/', create_transfer_request, name='create_transfer_request'),
-
+    
         
 
     # Stock Adjustments
