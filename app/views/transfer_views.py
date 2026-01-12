@@ -9,12 +9,17 @@ from django.db.models import Sum
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import *
+from decimal import Decimal
+import logging
+
 from app.models.transactions import *
 from app.models.human_resource import *
 from app.models.products import *
 from app.forms.transaction_forms import *
 from app.selectors.transfer_selectors import *
 from app.selectors.product_selectors import get_stores
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def transfer_request_list(request):
@@ -28,8 +33,7 @@ def transfer_request_list(request):
         'pending': requests.filter(status='pending').count(),
         'approved': requests.filter(status='approved').count(),
         'rejected': requests.filter(status='rejected').count(),
-        'in_transit': requests.filter(status='in_transit').count(),
-        'completed': requests.filter(status='completed').count(),
+        'fulfilled': requests.filter(status='fulfilled').count(),
     }
     
     # Get filter status from URL
@@ -62,7 +66,7 @@ def transfer_request_list(request):
 
 @login_required
 def create_transfer_request(request):
-    """Handle transfer request creation via AJAX"""
+    """Handle transfer request creation via AJAX with conversion factor support"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -90,37 +94,73 @@ def create_transfer_request(request):
                     'error': 'At least one item is required'
                 }, status=400)
             
-            # Check stock availability for each item
+            from_store = StoreLocation.objects.get(pk=data['from_store'])
             errors = []
+            
+            # Check stock availability for each item WITH CONVERSION FACTORS
             for i, item in enumerate(data['items']):
                 try:
                     product = Product.objects.get(pk=item['product_id'])
-                    store = StoreLocation.objects.get(pk=data['from_store'])
+                    unit = UnitOfMeasure.objects.get(pk=item['units_id'])
                     
-                    # Get available stock
+                    # Get conversion factor for this product-unit combination
                     try:
-                        inventory = Inventory.objects.get(product=product, store=store)
-                        physical_stock = inventory.quantity_in_stock
+                        product_unit = ProductUnitPrice.objects.get(
+                            product=product,
+                            unit=unit
+                        )
+                        conversion_factor = Decimal(str(product_unit.conversion_factor))
+                    except ProductUnitPrice.DoesNotExist:
+                        conversion_factor = Decimal('1.0')
+                        logger.warning(f"No conversion factor found for product {product.id} with unit {unit.id}, using 1.0")
+                    
+                    # Calculate quantity in base units
+                    display_quantity = Decimal(str(item['quantity']))
+                    base_quantity_needed = int(display_quantity * conversion_factor)
+                    
+                    # Get available stock in base units
+                    try:
+                        inventory = Inventory.objects.get(product=product, store=from_store)
+                        physical_stock = inventory.quantity_in_stock  # Already in base units
                     except Inventory.DoesNotExist:
                         physical_stock = 0
                     
-                    # Calculate committed stock
-                    committed_stock = StockTransferItem.objects.filter(
+                    # Calculate committed stock in base units
+                    committed_stock_base = 0
+                    committed_items = StockTransferItem.objects.filter(
                         product=product,
-                        stock_transfer__from_store=store,
+                        stock_transfer__from_store=from_store,
                         stock_transfer__status__in=['pending', 'in_transit']
-                    ).aggregate(committed=Sum('quantity'))['committed'] or 0
+                    ).select_related('units')
                     
-                    available_stock = max(0, physical_stock - committed_stock)
-                    requested_qty = int(item['quantity'])
+                    for committed_item in committed_items:
+                        committed_stock_base += committed_item.base_quantity
                     
-                    if requested_qty > available_stock:
-                        errors.append(
-                            f"Item {i+1} ({product.name}): Requested quantity ({requested_qty}) "
-                            f"exceeds available stock ({available_stock}) in {store.name}"
+                    available_stock = max(0, physical_stock - committed_stock_base)
+                    
+                    # Validate against base quantity needed
+                    if base_quantity_needed > available_stock:
+                        # Calculate max display units possible
+                        max_display_units = int(available_stock / conversion_factor) if conversion_factor > 0 else 0
+                        remaining_base_units = available_stock % conversion_factor
+                        
+                        error_msg = (
+                            f"Item {i+1} ({product.name}): "
+                            f"Requested {display_quantity} {unit.name} "
+                            f"(= {base_quantity_needed} base units) "
+                            f"exceeds available stock ({available_stock} base units). "
+                            f"Maximum: {max_display_units} {unit.name}"
                         )
-                except (Product.DoesNotExist, StoreLocation.DoesNotExist):
-                    errors.append(f"Item {i+1}: Product or store not found")
+                        
+                        if remaining_base_units > 0:
+                            error_msg += f" + {remaining_base_units} base units"
+                        
+                        errors.append(error_msg)
+                        
+                except (Product.DoesNotExist, UnitOfMeasure.DoesNotExist) as e:
+                    errors.append(f"Item {i+1}: {str(e)}")
+                except Exception as e:
+                    errors.append(f"Item {i+1}: Error - {str(e)}")
             
             if errors:
                 return JsonResponse({
@@ -129,7 +169,7 @@ def create_transfer_request(request):
                     'details': errors
                 }, status=400)
             
-            # Create transfer request
+            # Create transfer request with conversion factors
             with transaction.atomic():
                 transfer_request = TransferRequest.objects.create(
                     requested_by=request.user,
@@ -142,13 +182,30 @@ def create_transfer_request(request):
                     status='pending'
                 )
                 
-                # Create items
+                # Create items with base quantity calculation
                 for item in data['items']:
+                    product = Product.objects.get(pk=item['product_id'])
+                    unit = UnitOfMeasure.objects.get(pk=item['units_id'])
+                    
+                    # Get conversion factor
+                    try:
+                        product_unit = ProductUnitPrice.objects.get(
+                            product=product,
+                            unit=unit
+                        )
+                        conversion_factor = Decimal(str(product_unit.conversion_factor))
+                    except ProductUnitPrice.DoesNotExist:
+                        conversion_factor = Decimal('1.0')
+                    
+                    display_quantity = Decimal(str(item['quantity']))
+                    base_quantity = int(display_quantity * conversion_factor)
+                    
                     TransferRequestItem.objects.create(
                         transfer_request=transfer_request,
-                        product_id=item['product_id'],
-                        quantity=item['quantity'],
-                        units_id=item['units_id'],
+                        product=product,
+                        quantity=int(display_quantity),  # Store display quantity
+                        units=unit,
+                        base_quantity=base_quantity,  # Store calculated base quantity
                         notes=item.get('notes', '')
                     )
             
@@ -161,6 +218,7 @@ def create_transfer_request(request):
         except json.JSONDecodeError:
             return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
+            logger.error(f"Error creating transfer request: {str(e)}", exc_info=True)
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
     
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
@@ -168,7 +226,7 @@ def create_transfer_request(request):
 @login_required
 @csrf_exempt
 def update_transfer_request(request, request_id):
-    """Update transfer request via AJAX"""
+    """Update transfer request via AJAX with conversion factor support"""
     if request.method == 'POST':
         try:
             transfer_request = TransferRequest.objects.get(pk=request_id, requested_by=request.user)
@@ -205,39 +263,74 @@ def update_transfer_request(request, request_id):
                     'error': 'At least one item is required'
                 }, status=400)
             
-            # Check stock availability for each item
+            from_store = StoreLocation.objects.get(pk=data['from_store'])
             errors = []
+            
+            # Check stock availability for each item WITH CONVERSION FACTORS
             for i, item in enumerate(data['items']):
                 try:
                     product = Product.objects.get(pk=item['product_id'])
-                    store = StoreLocation.objects.get(pk=data['from_store'])
+                    unit = UnitOfMeasure.objects.get(pk=item['units_id'])
                     
-                    # Get available stock plus already allocated for this request
+                    # Get conversion factor
                     try:
-                        inventory = Inventory.objects.get(product=product, store=store)
+                        product_unit = ProductUnitPrice.objects.get(
+                            product=product,
+                            unit=unit
+                        )
+                        conversion_factor = Decimal(str(product_unit.conversion_factor))
+                    except ProductUnitPrice.DoesNotExist:
+                        conversion_factor = Decimal('1.0')
+                    
+                    # Calculate base quantity needed
+                    display_quantity = Decimal(str(item['quantity']))
+                    base_quantity_needed = int(display_quantity * conversion_factor)
+                    
+                    # Get available stock in base units
+                    try:
+                        inventory = Inventory.objects.get(product=product, store=from_store)
                         physical_stock = inventory.quantity_in_stock
                     except Inventory.DoesNotExist:
                         physical_stock = 0
                     
                     # Calculate committed stock excluding this request's items
-                    committed_stock = StockTransferItem.objects.filter(
+                    committed_stock_base = 0
+                    committed_items = StockTransferItem.objects.filter(
                         product=product,
-                        stock_transfer__from_store=store,
+                        stock_transfer__from_store=from_store,
                         stock_transfer__status__in=['pending', 'in_transit']
                     ).exclude(
                         stock_transfer__transfer_request=transfer_request
-                    ).aggregate(committed=Sum('quantity'))['committed'] or 0
+                    ).select_related('units')
                     
-                    available_stock = max(0, physical_stock - committed_stock)
-                    requested_qty = int(item['quantity'])
+                    for committed_item in committed_items:
+                        committed_stock_base += committed_item.base_quantity
                     
-                    if requested_qty > available_stock:
-                        errors.append(
-                            f"Item {i+1} ({product.name}): Requested quantity ({requested_qty}) "
-                            f"exceeds available stock ({available_stock}) in {store.name}"
+                    available_stock = max(0, physical_stock - committed_stock_base)
+                    
+                    # Validate against base quantity needed
+                    if base_quantity_needed > available_stock:
+                        # Calculate max display units possible
+                        max_display_units = int(available_stock / conversion_factor) if conversion_factor > 0 else 0
+                        remaining_base_units = available_stock % conversion_factor
+                        
+                        error_msg = (
+                            f"Item {i+1} ({product.name}): "
+                            f"Requested {display_quantity} {unit.name} "
+                            f"(= {base_quantity_needed} base units) "
+                            f"exceeds available stock ({available_stock} base units). "
+                            f"Maximum: {max_display_units} {unit.name}"
                         )
-                except (Product.DoesNotExist, StoreLocation.DoesNotExist):
-                    errors.append(f"Item {i+1}: Product or store not found")
+                        
+                        if remaining_base_units > 0:
+                            error_msg += f" + {remaining_base_units} base units"
+                        
+                        errors.append(error_msg)
+                        
+                except (Product.DoesNotExist, UnitOfMeasure.DoesNotExist) as e:
+                    errors.append(f"Item {i+1}: {str(e)}")
+                except Exception as e:
+                    errors.append(f"Item {i+1}: Error - {str(e)}")
             
             if errors:
                 return JsonResponse({
@@ -246,7 +339,7 @@ def update_transfer_request(request, request_id):
                     'details': errors
                 }, status=400)
             
-            # Update transfer request
+            # Update transfer request with conversion factors
             with transaction.atomic():
                 transfer_request.from_store_id = data['from_store']
                 transfer_request.to_store_id = data['to_store']
@@ -259,13 +352,30 @@ def update_transfer_request(request, request_id):
                 # Delete existing items
                 transfer_request.items.all().delete()
                 
-                # Create new items
+                # Create new items with base quantity calculation
                 for item in data['items']:
+                    product = Product.objects.get(pk=item['product_id'])
+                    unit = UnitOfMeasure.objects.get(pk=item['units_id'])
+                    
+                    # Get conversion factor
+                    try:
+                        product_unit = ProductUnitPrice.objects.get(
+                            product=product,
+                            unit=unit
+                        )
+                        conversion_factor = Decimal(str(product_unit.conversion_factor))
+                    except ProductUnitPrice.DoesNotExist:
+                        conversion_factor = Decimal('1.0')
+                    
+                    display_quantity = Decimal(str(item['quantity']))
+                    base_quantity = int(display_quantity * conversion_factor)
+                    
                     TransferRequestItem.objects.create(
                         transfer_request=transfer_request,
-                        product_id=item['product_id'],
-                        quantity=item['quantity'],
-                        units_id=item['units_id'],
+                        product=product,
+                        quantity=int(display_quantity),
+                        units=unit,
+                        base_quantity=base_quantity,
                         notes=item.get('notes', '')
                     )
             
@@ -280,6 +390,7 @@ def update_transfer_request(request, request_id):
         except json.JSONDecodeError:
             return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
+            logger.error(f"Error updating transfer request: {str(e)}", exc_info=True)
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
     
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
@@ -300,7 +411,7 @@ def transfer_request_detail(request, request_id):
 
 @login_required
 def get_product_units(request, product_id):
-    """Get units available for a specific product"""
+    """Get units available for a specific product with conversion factors"""
     try:
         product = Product.objects.get(pk=product_id)
         units = product.unit_prices.all().select_related('unit')
@@ -310,11 +421,15 @@ def get_product_units(request, product_id):
                 'id': unit.unit.id,
                 'name': unit.unit.name,
                 'abbreviation': unit.unit.abbreviation,
-                'conversion_factor': unit.conversion_factor,
-                'price': float(unit.price)
+                'conversion_factor': float(unit.conversion_factor),
+                'price': float(unit.price),
+                'is_base_unit': unit.conversion_factor == Decimal('1.0')
             }
             for unit in units
         ]
+        
+        # Sort: base unit first, then by conversion factor
+        units_data.sort(key=lambda x: (not x['is_base_unit'], x['conversion_factor']))
         
         return JsonResponse({
             'success': True,
@@ -328,11 +443,12 @@ def get_product_units(request, product_id):
     except Product.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Product not found'}, status=404)
     except Exception as e:
+        logger.error(f"Error getting product units: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
 def get_product_stock_for_store(request, product_id, store_id):
-    """Get real-time stock for a product in a specific store"""
+    """Get real-time stock for a product in a specific store with conversion factor context"""
     try:
         product = Product.objects.get(pk=product_id)
         store = StoreLocation.objects.get(pk=store_id)
@@ -340,25 +456,29 @@ def get_product_stock_for_store(request, product_id, store_id):
         # Get inventory
         try:
             inventory = Inventory.objects.get(product=product, store=store)
-            physical_stock = inventory.quantity_in_stock
+            physical_stock = inventory.quantity_in_stock  # Base units
         except Inventory.DoesNotExist:
             physical_stock = 0
         
-        # Calculate committed stock (pending/in-transit transfers)
-        committed_stock = StockTransferItem.objects.filter(
+        # Calculate committed stock in BASE UNITS
+        committed_stock_base = 0
+        committed_items = StockTransferItem.objects.filter(
             product=product,
             stock_transfer__from_store=store,
             stock_transfer__status__in=['pending', 'in_transit']
-        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        ).select_related('units')
         
-        available_stock = max(0, physical_stock - committed_stock)
+        for item in committed_items:
+            committed_stock_base += item.base_quantity
+        
+        available_stock = max(0, physical_stock - committed_stock_base)
         
         return JsonResponse({
             'success': True,
             'stock': {
-                'physical_stock': physical_stock,
-                'committed_stock': committed_stock,
-                'available_stock': available_stock,
+                'physical_stock': physical_stock,  # Base units
+                'committed_stock': committed_stock_base,  # Base units
+                'available_stock': available_stock,  # Base units
                 'reorder_level': inventory.reorder_level if 'inventory' in locals() else 0
             },
             'product': {
@@ -374,11 +494,12 @@ def get_product_stock_for_store(request, product_id, store_id):
     except (Product.DoesNotExist, StoreLocation.DoesNotExist):
         return JsonResponse({'success': False, 'error': 'Product or Store not found'}, status=404)
     except Exception as e:
+        logger.error(f"Error getting product stock: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
 def get_product_unit_price(request, product_id, unit_id):
-    """Get price for a specific product unit"""
+    """Get price and conversion factor for a specific product unit"""
     try:
         unit_price = ProductUnitPrice.objects.get(product_id=product_id, unit_id=unit_id)
         
@@ -389,13 +510,16 @@ def get_product_unit_price(request, product_id, unit_id):
                 'product_id': unit_price.product_id,
                 'unit_id': unit_price.unit_id,
                 'unit_name': unit_price.unit.name,
+                'unit_abbreviation': unit_price.unit.abbreviation,
                 'price': float(unit_price.price),
-                'conversion_factor': unit_price.conversion_factor
+                'conversion_factor': float(unit_price.conversion_factor),
+                'is_base_unit': unit_price.conversion_factor == Decimal('1.0')
             }
         })
     except ProductUnitPrice.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Unit price not found'}, status=404)
     except Exception as e:
+        logger.error(f"Error getting product unit price: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
@@ -410,14 +534,27 @@ def transfer_request_json(request, request_id):
         
         items_data = []
         for item in transfer_request.items.all().select_related('product', 'units'):
+            # Get conversion factor for this item
+            try:
+                product_unit = ProductUnitPrice.objects.get(
+                    product=item.product,
+                    unit=item.units
+                )
+                conversion_factor = float(product_unit.conversion_factor)
+            except ProductUnitPrice.DoesNotExist:
+                conversion_factor = 1.0
+            
             items_data.append({
                 'id': item.id,
                 'product_id': item.product_id,
                 'product_name': item.product.name,
                 'product_sku': item.product.sku,
-                'quantity': item.quantity,
+                'quantity': item.quantity,  # Display quantity
+                'base_quantity': item.base_quantity,  # Base units
                 'units_id': item.units_id,
                 'units_name': item.units.name if item.units else None,
+                'units_abbreviation': item.units.abbreviation if item.units else '',
+                'conversion_factor': conversion_factor,
                 'notes': item.notes if hasattr(item, 'notes') else ''
             })
         
@@ -430,7 +567,7 @@ def transfer_request_json(request, request_id):
                 'priority': transfer_request.priority,
                 'required_date': transfer_request.required_date.strftime('%Y-%m-%d') if transfer_request.required_date else None,
                 'department': transfer_request.department_id,
-                'reason': transfer_request.reason if hasattr(transfer_request, 'reason') else transfer_request.note,
+                'reason': transfer_request.note,
                 'status': transfer_request.status,
                 'items': items_data
             }
@@ -438,12 +575,13 @@ def transfer_request_json(request, request_id):
     except TransferRequest.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Transfer request not found'}, status=404)
     except Exception as e:
+        logger.error(f"Error getting transfer request JSON: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
 def stock_transfer_list(request):
     # Delegate to the canonical stock_transfer_list implementation in app.views.transfers
-    from app.views.transfers import stock_transfer_list as canonical_stock_transfer_list
+    from app.views.stock_views import stock_transfer_list as canonical_stock_transfer_list
     return canonical_stock_transfer_list(request)
 
 @login_required
@@ -453,36 +591,120 @@ def stock_transfer_create(request):
         formset = StockTransferItemFormSet(request.POST)
         
         if form.is_valid() and formset.is_valid():
-            transfer = form.save()
-            formset.instance = transfer
-            formset.save()
+            transfer = form.save(commit=False)
+            transfer.created_by = request.user
+            transfer.save()
+            
+            # Process items with conversion factors
+            for form_item in formset:
+                if form_item.is_valid() and form_item.cleaned_data:
+                    item = form_item.save(commit=False)
+                    item.stock_transfer = transfer
+                    
+                    # Calculate base quantity if units are selected
+                    if item.units and item.quantity:
+                        try:
+                            product_unit = ProductUnitPrice.objects.get(
+                                product=item.product,
+                                unit=item.units
+                            )
+                            conversion_factor = product_unit.conversion_factor
+                            item.base_quantity = int(item.quantity * conversion_factor)
+                            item.original_quantity = item.quantity
+                        except ProductUnitPrice.DoesNotExist:
+                            item.base_quantity = item.quantity
+                            item.original_quantity = item.quantity
+                    
+                    item.save()
            
             messages.success(request, 'Stock transfer created successfully.')
             
         return redirect(stock_transfer_list)
+    
+    else:
+        form = StockTransferForm()
+        formset = StockTransferItemFormSet()
+    
+    return render(request, 'transfers/stock_transfer_form.html', {
+        'form': form,
+        'formset': formset
+    })
 
 @login_required
 def stock_transfer_detail(request, pk):
     transfer_obj = get_stock_transfer_by_id(pk)
     if not transfer_obj:
         return render(request, '404.html', status=404)
-    return render(request, 'transfers/stock_transfer_detail.html', {'transfer_obj': transfer_obj})
+    
+    # Add conversion factor info to items
+    items_with_cf = []
+    for item in transfer_obj.items.all():
+        try:
+            product_unit = ProductUnitPrice.objects.get(
+                product=item.product,
+                unit=item.units
+            )
+            conversion_factor = product_unit.conversion_factor
+            display_quantity = item.original_quantity or item.quantity
+        except (ProductUnitPrice.DoesNotExist, AttributeError):
+            conversion_factor = 1.0
+            display_quantity = item.quantity
+        
+        items_with_cf.append({
+            'item': item,
+            'conversion_factor': conversion_factor,
+            'display_quantity': display_quantity,
+            'base_quantity': item.base_quantity or item.quantity
+        })
+    
+    return render(request, 'transfers/stock_transfer_detail.html', {
+        'transfer_obj': transfer_obj,
+        'items_with_cf': items_with_cf
+    })
 
 @login_required
 def stock_transfer_update(request, pk):
     transfer = get_object_or_404(StockTransfer, pk=pk)
+    
     if request.method == 'POST':
         form = StockTransferForm(request.POST, instance=transfer)
         formset = StockTransferItemFormSet(request.POST, instance=transfer)
+        
         if form.is_valid() and formset.is_valid():
             form.save()
-            formset.save()
+            
+            # Update items with conversion factors
+            for form_item in formset:
+                if form_item.is_valid() and form_item.cleaned_data:
+                    item = form_item.save(commit=False)
+                    
+                    # Calculate base quantity if units are selected
+                    if item.units and item.quantity:
+                        try:
+                            product_unit = ProductUnitPrice.objects.get(
+                                product=item.product,
+                                unit=item.units
+                            )
+                            conversion_factor = product_unit.conversion_factor
+                            item.base_quantity = int(item.quantity * conversion_factor)
+                            item.original_quantity = item.quantity
+                        except ProductUnitPrice.DoesNotExist:
+                            item.base_quantity = item.quantity
+                            item.original_quantity = item.quantity
+                    
+                    item.save()
+            
             messages.success(request, 'Stock transfer updated successfully.')
             return redirect('stock_transfer_list')
     else:
         form = StockTransferForm(instance=transfer)
         formset = StockTransferItemFormSet(instance=transfer)
-    return render(request, 'stock_transfer_form.html', {'form': form, 'item_formset': formset})
+    
+    return render(request, 'stock_transfer_form.html', {
+        'form': form, 
+        'item_formset': formset,
+        'transfer': transfer
+    })
 
 @login_required
 def pending_transfer_requests_for_approval(request):
@@ -519,6 +741,66 @@ def approve_transfer_request(request, request_id):
             error_msg = f'Cannot approve request. Current status is: {transfer_request.get_status_display()}'
             return JsonResponse({'success': False, 'error': error_msg}, status=400)
         
+        # Validate stock availability before approval
+        errors = []
+        for item in transfer_request.items.all():
+            try:
+                # Get conversion factor for this item
+                try:
+                    product_unit = ProductUnitPrice.objects.get(
+                        product=item.product,
+                        unit=item.units
+                    )
+                    conversion_factor = product_unit.conversion_factor
+                except ProductUnitPrice.DoesNotExist:
+                    conversion_factor = Decimal('1.0')
+                
+                # Calculate base quantity needed
+                base_quantity_needed = item.base_quantity
+                
+                # Get available stock
+                try:
+                    inventory = Inventory.objects.get(
+                        product=item.product,
+                        store=transfer_request.from_store
+                    )
+                    physical_stock = inventory.quantity_in_stock
+                except Inventory.DoesNotExist:
+                    physical_stock = 0
+                
+                # Calculate committed stock
+                committed_stock_base = 0
+                committed_items = StockTransferItem.objects.filter(
+                    product=item.product,
+                    stock_transfer__from_store=transfer_request.from_store,
+                    stock_transfer__status__in=['pending', 'in_transit']
+                ).exclude(
+                    stock_transfer__transfer_request=transfer_request
+                ).select_related('units')
+                
+                for committed_item in committed_items:
+                    committed_stock_base += committed_item.base_quantity
+                
+                available_stock = max(0, physical_stock - committed_stock_base)
+                
+                if base_quantity_needed > available_stock:
+                    errors.append(
+                        f"{item.product.name}: Insufficient stock. "
+                        f"Available: {available_stock} base units, "
+                        f"Needed: {base_quantity_needed} base units "
+                        f"({item.quantity} {item.units.name if item.units else 'units'})"
+                    )
+                    
+            except Exception as e:
+                errors.append(f"{item.product.name}: Error checking stock - {str(e)}")
+        
+        if errors:
+            return JsonResponse({
+                'success': False,
+                'error': 'Stock validation failed',
+                'details': errors
+            }, status=400)
+        
         # Update status and approver info
         transfer_request.status = 'approved'
         transfer_request.approved_by = request.user
@@ -541,9 +823,7 @@ def approve_transfer_request(request, request_id):
         })
     except Exception as e:
         # Catch any unexpected errors and return JSON
-        import traceback
-        print(f"Error in approve_transfer_request: {e}")
-        print(traceback.format_exc())
+        logger.error(f"Error approving transfer request: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': f'Server error: {str(e)}'}, status=500)
 
 @login_required
@@ -588,40 +868,55 @@ def reject_transfer_request(request, request_id):
         })
     except Exception as e:
         # Catch any unexpected errors and return JSON
-        import traceback
-        print(f"Error in reject_transfer_request: {e}")
-        print(traceback.format_exc())
+        logger.error(f"Error rejecting transfer request: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': f'Server error: {str(e)}'}, status=500)
 
-
-
-# views.py - add this function
 @login_required
 def product_stock_calculation(request, product_id):
-    """Calculate available stock after considering requested quantity"""
+    """Calculate available stock after considering requested quantity WITH CONVERSION FACTORS"""
     try:
         product = Product.objects.get(pk=product_id)
         store_id = request.GET.get('store_id')
-        requested_qty = int(request.GET.get('requested_qty', 0))
+        requested_qty = Decimal(request.GET.get('requested_qty', '0'))
+        unit_id = request.GET.get('unit_id')
         
         if not store_id:
             return JsonResponse({'success': False, 'error': 'Store ID is required'}, status=400)
         
         store = StoreLocation.objects.get(pk=store_id)
         
-        # Get current inventory
+        # Get conversion factor if unit is specified
+        conversion_factor = Decimal('1.0')
+        if unit_id:
+            try:
+                product_unit = ProductUnitPrice.objects.get(
+                    product=product,
+                    unit_id=unit_id
+                )
+                conversion_factor = product_unit.conversion_factor
+            except ProductUnitPrice.DoesNotExist:
+                conversion_factor = Decimal('1.0')
+        
+        # Calculate base quantity needed
+        base_quantity_needed = int(requested_qty * conversion_factor)
+        
+        # Get current inventory in base units
         try:
             inventory = Inventory.objects.get(product=product, store=store)
             physical_stock = inventory.quantity_in_stock
         except Inventory.DoesNotExist:
             physical_stock = 0
         
-        # Calculate committed stock (excluding this request if editing)
-        committed_stock = StockTransferItem.objects.filter(
+        # Calculate committed stock in base units
+        committed_stock_base = 0
+        committed_items = StockTransferItem.objects.filter(
             product=product,
             stock_transfer__from_store=store,
             stock_transfer__status__in=['pending', 'in_transit']
-        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        ).select_related('units')
+        
+        for item in committed_items:
+            committed_stock_base += item.base_quantity
         
         # Get current request items being edited (if any)
         current_request_id = request.GET.get('current_request_id')
@@ -629,19 +924,25 @@ def product_stock_calculation(request, product_id):
             try:
                 current_request = TransferRequest.objects.get(pk=current_request_id)
                 # Exclude this request's items from committed stock
-                current_request_items = TransferRequestItem.objects.filter(
-                    transfer_request=current_request,
-                    product=product
-                ).aggregate(total=Sum('quantity'))['total'] or 0
-                committed_stock = max(0, committed_stock - current_request_items)
+                current_request_items = current_request.items.filter(product=product)
+                for item in current_request_items:
+                    committed_stock_base = max(0, committed_stock_base - item.base_quantity)
             except TransferRequest.DoesNotExist:
                 pass
         
-        # Calculate available stock
-        available_stock = max(0, physical_stock - committed_stock)
+        # Calculate available stock in base units
+        available_stock_base = max(0, physical_stock - committed_stock_base)
         
-        # Calculate remaining stock if this quantity is requested
-        remaining_stock = max(0, available_stock - requested_qty)
+        # Calculate remaining stock in base units
+        remaining_stock_base = max(0, available_stock_base - base_quantity_needed)
+        
+        # Calculate display units
+        if conversion_factor > 0:
+            max_display_units = int(available_stock_base / conversion_factor)
+            remaining_display_units = int(remaining_stock_base / conversion_factor)
+        else:
+            max_display_units = 0
+            remaining_display_units = 0
         
         return JsonResponse({
             'success': True,
@@ -654,36 +955,23 @@ def product_stock_calculation(request, product_id):
                 'id': store.id,
                 'name': store.name
             },
+            'conversion_factor': float(conversion_factor),
             'stock_info': {
                 'physical_stock': physical_stock,
-                'committed_stock': committed_stock,
-                'available_stock': available_stock,
-                'requested_quantity': requested_qty,
-                'remaining_stock': remaining_stock
+                'committed_stock': committed_stock_base,
+                'available_stock_base': available_stock_base,
+                'available_stock_display': max_display_units,
+                'requested_quantity': int(requested_qty),
+                'requested_base_quantity': base_quantity_needed,
+                'remaining_stock_base': remaining_stock_base,
+                'remaining_stock_display': remaining_display_units,
+                'base_unit_available': available_stock_base % conversion_factor if conversion_factor > 0 else 0
             },
-            'status': 'sufficient' if requested_qty <= available_stock else 'insufficient'
+            'status': 'sufficient' if base_quantity_needed <= available_stock_base else 'insufficient'
         })
         
     except (Product.DoesNotExist, StoreLocation.DoesNotExist):
         return JsonResponse({'success': False, 'error': 'Product or Store not found'}, status=404)
     except Exception as e:
+        logger.error(f"Error in product stock calculation: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

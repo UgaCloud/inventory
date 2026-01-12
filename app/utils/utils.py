@@ -8,7 +8,6 @@ def convert_to_base_units(product, unit, quantity):
         product_unit = ProductUnitPrice.objects.get(product=product, unit=unit)
         return Decimal(quantity) * Decimal(product_unit.conversion_factor)
     except ProductUnitPrice.DoesNotExist:
-        # If no CF exists, assume it's the base unit
         return Decimal(quantity)
 
 def convert_from_base_units(product, unit, base_quantity):

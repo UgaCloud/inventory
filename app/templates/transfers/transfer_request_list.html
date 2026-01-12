@@ -1,3 +1,4 @@
+
 {# app/templates/transfers/transfer_request_list.html #}
 {% extends 'basic/base.html' %}
 {% load crispy_forms_tags %}
@@ -31,7 +32,7 @@
               <li><a class="dropdown-item" href="?status=pending">Pending</a></li>
               <li><a class="dropdown-item" href="?status=approved">Approved</a></li>
               <li><a class="dropdown-item" href="?status=rejected">Rejected</a></li>
-              <li><a class="dropdown-item" href="?status=completed">Completed</a></li>
+              <li><a class="dropdown-item" href="?status=fulfilled">Fulfilled</a></li>
             </ul>
           </div>
         </li>
@@ -66,6 +67,7 @@
             </div>
             <h3 class="text-success">{{ status_counts.approved }}</h3>
             <p class="mb-0">Approved</p>
+            <small class="text-success">Ready for Transfer</small>
           </div>
         </div>
       </div>
@@ -75,8 +77,9 @@
             <div class="mb-2">
               <i data-feather="truck" class="feather-24 text-info"></i>
             </div>
-            <h3 class="text-info">{{ status_counts.in_transit }}</h3>
-            <p class="mb-0">In Transit</p>
+            <h3 class="text-info">{{ status_counts.rejected }}</h3>
+            <p class="mb-0">Rejected</p>
+            <small class="text-info">Not Approved</small>
           </div>
         </div>
       </div>
@@ -86,8 +89,9 @@
             <div class="mb-2">
               <i data-feather="package" class="feather-24 text-primary"></i>
             </div>
-            <h3 class="text-primary">{{ status_counts.completed }}</h3>
-            <p class="mb-0">Completed</p>
+            <h3 class="text-primary">{{ status_counts.fulfilled }}</h3>
+            <p class="mb-0">Fulfilled</p>
+            <small class="text-primary">Transfers Created</small>
           </div>
         </div>
       </div>
@@ -147,7 +151,21 @@
                 <td>
                   <div class="d-flex align-items-center">
                     <span class="badge bg-info me-2">{{ request.items.count }}</span>
-                    <small class="text-muted">item{{ request.items.count|pluralize }}</small>
+                    <small class="text-muted">
+                      {% for item in request.items.all %}
+                        {% if forloop.counter <= 2 %}
+                          {% if item.units %}
+                            {{ item.quantity }} {{ item.units.abbreviation }}{% if not forloop.last %}, {% endif %}
+                          {% else %}
+                            {{ item.quantity }} units{% if not forloop.last %}, {% endif %}
+                          {% endif %}
+                        {% elif forloop.counter == 3 %}
+                          ...and {{ request.items.count|add:"-2" }} more
+                        {% endif %}
+                      {% empty %}
+                        No items
+                      {% endfor %}
+                    </small>
                   </div>
                 </td>
                 <td>
@@ -202,9 +220,9 @@
                     <span class="badge bg-danger">
                       <i data-feather="x-circle" class="feather-12 me-1"></i>Rejected
                     </span>
-                  {% elif request.status == 'completed' %}
+                  {% elif request.status == 'fulfilled' %}
                     <span class="badge bg-primary">
-                      <i data-feather="package" class="feather-12 me-1"></i>Completed
+                      <i data-feather="package" class="feather-12 me-1"></i>Fulfilled
                     </span>
                   {% endif %}
                 </td>
@@ -231,9 +249,9 @@
                       {% endif %}
                       
                       {% if request.status == 'approved' %}
-                        <a href="{% url 'stock_transfer_create' %}?request={{ request.id }}" class="btn btn-sm btn-primary me-1" title="Create Transfer">
+                        <button class="btn btn-sm btn-primary me-1" onclick="createTransferFromRequest({{ request.id }})" title="Create Transfer">
                           <i data-feather="truck" class="feather-14"></i>
-                        </a>
+                        </button>
                       {% endif %}
                       
                       <div class="dropdown">
@@ -346,7 +364,7 @@
                 <select id="from_store" name="from_store" class="form-select" required>
                   <option value="">Select source store</option>
                   {% for store in stores %}
-                  <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
+                  <option value="{{ store.id }}">{{ store.name }}</option>
                   {% endfor %}
                 </select>
                 <div class="invalid-feedback">Please select a source store</div>
@@ -358,7 +376,7 @@
                 <select id="to_store" name="to_store" class="form-select" required>
                   <option value="">Select destination store</option>
                   {% for store in stores %}
-                  <option value="{{ store.id }}">{{ store.name }} - {{ store.location|default:"No location" }}</option>
+                  <option value="{{ store.id }}">{{ store.name }}</option>
                   {% endfor %}
                 </select>
                 <div class="invalid-feedback">Please select a destination store different from source store</div>
@@ -420,10 +438,10 @@
                 <table class="table table-sm" id="requestItemsTable">
                   <thead class="table-light">
                     <tr>
-                      <th width="30%">Product</th>
-                      <th width="15%">Available</th>
+                      <th width="25%">Product</th>
+                      <th width="15%">Available Stock</th>
                       <th width="15%">Requested Qty</th>
-                      <th width="20%">Unit</th>
+                      <th width="25%">Unit</th>
                       <th width="15%">Notes</th>
                       <th width="5%">Actions</th>
                     </tr>
@@ -431,6 +449,14 @@
                   <tbody id="requestItemsBody">
                     <!-- Dynamic rows will be added here -->
                   </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="6" class="text-muted small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Stock is shown in base units. Conversion factors are applied automatically when units are selected.
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
               
@@ -601,85 +627,76 @@ function showNewRequestModal() {
   document.getElementById('to_store').classList.remove('is-invalid');
   document.getElementById('reason').classList.remove('is-invalid');
   
-  // Load products and show modal
-  loadAvailableProducts().then(() => {
-    // Add initial item
-    addRequestItem();
+  // Show modal first, then load products
+  const modalElement = document.getElementById('newRequestModal');
+  if (modalElement) {
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
     
-    // Initialize Bootstrap modal
-    const modalElement = document.getElementById('newRequestModal');
-    if (modalElement) {
-      const modal = new bootstrap.Modal(modalElement);
-      modal.show();
-      
-      // Focus on first field
-      setTimeout(() => {
+    // Load products and add initial item after modal is shown
+    setTimeout(() => {
+      // Use the API products endpoint that you have
+      loadProductsFromAPI().then(() => {
+        addRequestItem();
+        
+        // Focus on first field
         document.getElementById('from_store').focus();
-      }, 500);
-    }
-  }).catch(error => {
-    console.error('Error loading products:', error);
-    // Still show modal
-    const modalElement = document.getElementById('newRequestModal');
-    if (modalElement) {
-      const modal = new bootstrap.Modal(modalElement);
-      modal.show();
-    }
-  });
+      }).catch(error => {
+        console.error('Error loading products:', error);
+        addRequestItem(); // Still add item even if products fail to load
+      });
+    }, 500);
+  }
 }
 
-// Load available products
-async function loadAvailableProducts() {
+// Load products from the API endpoint
+async function loadProductsFromAPI() {
   try {
+    // Use the endpoint from your logs: /api/products/?active_only=true
     const response = await fetch('/api/products/?active_only=true');
-    const data = await response.json();
-    if (data && data.success) {
-      availableProducts = data.products;
-      console.log(`Loaded ${availableProducts.length} products`);
+    if (response.ok) {
+      const data = await response.json();
+      // Adapt based on the actual response structure
+      if (data.products || data.results) {
+        availableProducts = data.products || data.results || [];
+      } else {
+        // If the structure is different, try to extract products
+        availableProducts = data || [];
+      }
     } else {
       availableProducts = [];
-      console.warn('No products loaded');
     }
-    return data;
   } catch (error) {
     console.error('Error loading products:', error);
     availableProducts = [];
-    return null;
   }
 }
 
-// Add request item row
+// Add request item row with conversion factor support
 function addRequestItem() {
   const tbody = document.getElementById('requestItemsBody');
-  const idx = tbody.children.length;
+  const idx = requestItemCounter++;
   const row = document.createElement('tr');
   row.id = `request-item-row-${idx}`;
   row.dataset.index = String(idx);
-  
-  // Create product options HTML
-  let productOptions = '<option value="">Select product...</option>';
-  if (availableProducts && availableProducts.length > 0) {
-    productOptions += availableProducts.map(product => 
-      `<option value="${product.id}">${product.name} (${product.sku})</option>`
-    ).join('');
-  } else {
-    productOptions += '<option value="" disabled>Loading products...</option>';
-  }
   
   row.innerHTML = `
     <td>
       <select name="items-${idx}-product" class="form-select form-select-sm product-select" 
               data-item-id="${idx}" required
               onchange="handleProductChange(${idx})">
-        ${productOptions}
+        <option value="">Select product...</option>
+        <!-- Products will be loaded dynamically -->
       </select>
+      <div class="conversion-factor-info small text-muted mt-1" id="cf-info-${idx}" style="display: none;"></div>
     </td>
     <td>
       <div class="stock-info">
         <span class="available-stock text-muted" id="available-${idx}">-</span>
-        <div class="remaining-stock small text-muted" id="remaining-${idx}" style="display: none;"></div>
+        <div class="remaining-stock small" id="remaining-${idx}" style="display: none;"></div>
       </div>
       <input type="hidden" class="available-stock-value" id="available-value-${idx}" value="0">
+      <input type="hidden" class="conversion-factor" id="conversion-factor-${idx}" value="1">
     </td>
     <td>
       <input type="number" name="items-${idx}-quantity" 
@@ -697,7 +714,6 @@ function addRequestItem() {
       </select>
       <div class="unit-price-info mt-1">
         <small class="unit-price-text" id="unit-price-text-${idx}"></small>
-        <input type="hidden" class="unit-price-display" id="unit-price-${idx}" value="0">
       </div>
     </td>
     <td>
@@ -714,26 +730,75 @@ function addRequestItem() {
 
   tbody.appendChild(row);
   
+  // Load products into dropdown
+  loadProductsIntoDropdown(idx);
+  
   // Re-initialize feather icons
   if (typeof feather !== 'undefined') {
     feather.replace();
   }
+  
   return idx;
 }
 
-// Handle product selection
+// Load products into dropdown
+async function loadProductsIntoDropdown(itemId) {
+  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
+  
+  // Clear existing options except the first one
+  while (productSelect.options.length > 1) {
+    productSelect.remove(1);
+  }
+  
+  // Add products from availableProducts array
+  if (availableProducts && availableProducts.length > 0) {
+    availableProducts.forEach(product => {
+      const option = document.createElement('option');
+      option.value = product.id;
+      option.textContent = `${product.name} (${product.sku || product.code || ''})`;
+      productSelect.appendChild(option);
+    });
+  } else {
+    // Fallback: try to fetch products from the API endpoint
+    try {
+      const response = await fetch('/api/products/?active_only=true');
+      if (response.ok) {
+        const data = await response.json();
+        const products = data.products || data.results || data;
+        
+        if (products && Array.isArray(products)) {
+          products.forEach(product => {
+            const option = document.createElement('option');
+            option.value = product.id;
+            option.textContent = `${product.name} (${product.sku || product.code || ''})`;
+            productSelect.appendChild(option);
+          });
+        } else {
+          productSelect.innerHTML += '<option value="" disabled>No products available</option>';
+        }
+      } else {
+        productSelect.innerHTML += '<option value="" disabled>Error loading products</option>';
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+      productSelect.innerHTML += '<option value="" disabled>Error loading products</option>';
+    }
+  }
+}
+
+// Handle product selection with conversion factor support
 async function handleProductChange(itemId) {
   console.log(`Product changed for item ${itemId}`);
   
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
   const fromStoreSelect = document.getElementById('from_store');
-  const unitPriceText = document.getElementById(`unit-price-text-${itemId}`);
+  const cfInfo = document.getElementById(`cf-info-${itemId}`);
   
   if (!productSelect.value) {
     // Reset if no product selected
     unitSelect.innerHTML = '<option value="">Select unit...</option>';
-    unitPriceText.textContent = '';
+    cfInfo.style.display = 'none';
     return;
   }
   
@@ -746,34 +811,51 @@ async function handleProductChange(itemId) {
   // Show loading state for units
   unitSelect.innerHTML = '<option value="">Loading units...</option>';
   unitSelect.disabled = true;
-  unitPriceText.textContent = 'Loading price...';
+  cfInfo.style.display = 'none';
   
   try {
-    // Fetch product units
-    const response = await fetch(`/api/product/${productSelect.value}/units/`);
+    // Fetch product units with conversion factors - USING CORRECT URL NAME
+    const response = await fetch('{% url "product_units" 0 %}'.replace('0', productSelect.value));
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
     
     if (data.success && data.units && data.units.length > 0) {
-      // Populate unit dropdown
+      // Populate unit dropdown with conversion factors
       unitSelect.innerHTML = '<option value="">Select unit...</option>';
       data.units.forEach(unit => {
         const option = document.createElement('option');
         option.value = unit.id;
-        option.textContent = `${unit.name} (${unit.abbreviation})`;
+        
+        // Display conversion factor in dropdown
+        const cfText = unit.conversion_factor === 1 ? 'Base Unit' : `CF: ${unit.conversion_factor}`;
+        const baseUnitIndicator = unit.is_base_unit ? ' (Base Unit)' : '';
+        
+        option.textContent = `${unit.name} ${baseUnitIndicator} - ${cfText}`;
         option.dataset.price = unit.price;
+        option.dataset.conversion_factor = unit.conversion_factor;
+        option.dataset.is_base_unit = unit.is_base_unit;
+        option.dataset.abbreviation = unit.abbreviation;
+        
         unitSelect.appendChild(option);
       });
       unitSelect.disabled = false;
       
-      // Auto-select first unit and load its price
-      if (data.units.length > 0) {
+      // Auto-select base unit if available
+      const baseUnit = Array.from(unitSelect.options).find(opt => opt.dataset.is_base_unit === 'true');
+      if (baseUnit) {
+        unitSelect.value = baseUnit.value;
+      } else if (data.units.length > 0) {
         unitSelect.value = data.units[0].id;
-        await handleUnitChange(itemId);
       }
+      
+      // Trigger unit change
+      await handleUnitChange(itemId);
     } else {
       unitSelect.innerHTML = '<option value="">No units available</option>';
-      unitPriceText.textContent = 'No price available';
-      unitPriceText.className = 'text-danger unit-price-text';
+      unitSelect.disabled = false;
     }
     
     // Update stock availability
@@ -782,41 +864,62 @@ async function handleProductChange(itemId) {
   } catch (error) {
     console.error('Error fetching product units:', error);
     unitSelect.innerHTML = '<option value="">Error loading units</option>';
-    unitPriceText.textContent = 'Error loading price';
-    unitPriceText.className = 'text-danger unit-price-text';
+    unitSelect.disabled = false;
   }
 }
 
-// Handle unit selection
+// Handle unit selection with conversion factor
 async function handleUnitChange(itemId) {
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
-  const unitPriceDisplay = document.getElementById(`unit-price-${itemId}`);
   const unitPriceText = document.getElementById(`unit-price-text-${itemId}`);
+  const cfInput = document.getElementById(`conversion-factor-${itemId}`);
+  const cfInfo = document.getElementById(`cf-info-${itemId}`);
   
   if (!productSelect.value || !unitSelect.value) {
     unitPriceText.textContent = '';
+    cfInfo.style.display = 'none';
     return;
   }
   
-  // Get selected option's price
+  // Get selected option's data
   const selectedOption = unitSelect.options[unitSelect.selectedIndex];
+  const conversionFactor = parseFloat(selectedOption.dataset.conversion_factor) || 1.0;
+  const isBaseUnit = selectedOption.dataset.is_base_unit === 'true';
+  const unitAbbreviation = selectedOption.dataset.abbreviation || '';
+  
+  // Store conversion factor for calculations
+  cfInput.value = conversionFactor;
+  
+  // Show conversion factor info
+  if (conversionFactor === 1) {
+    cfInfo.textContent = 'Base unit';
+    cfInfo.className = 'conversion-factor-info small text-success';
+  } else {
+    cfInfo.textContent = `1 ${unitAbbreviation} = ${conversionFactor} base units`;
+    cfInfo.className = 'conversion-factor-info small text-info';
+  }
+  cfInfo.style.display = 'block';
+  
+  // Get price from dataset or fetch from API
   if (selectedOption.dataset.price) {
     const price = parseFloat(selectedOption.dataset.price);
-    unitPriceDisplay.value = price;
-    unitPriceText.textContent = `Price: ${price.toLocaleString()} /unit`;
+    unitPriceText.textContent = `Price: UGX ${price.toLocaleString()}`;
     unitPriceText.className = 'text-success unit-price-text';
   } else {
-    // Fetch from API
+    // Fetch from API - USING CORRECT URL NAME
     try {
-      const response = await fetch(`/api/product/unit-price/${productSelect.value}/${unitSelect.value}/`);
-      const data = await response.json();
-      
-      if (data.success) {
-        const price = data.unit_price.price;
-        unitPriceDisplay.value = price;
-        unitPriceText.textContent = `Price: ${price.toLocaleString()} /unit`;
-        unitPriceText.className = 'text-success unit-price-text';
+      const response = await fetch('{% url "product_unit_price" 0 0 %}'.replace('0/0', `${productSelect.value}/${unitSelect.value}`));
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const price = data.unit_price.price;
+          unitPriceText.textContent = `Price: UGX ${price.toLocaleString()}`;
+          unitPriceText.className = 'text-success unit-price-text';
+        } else {
+          unitPriceText.textContent = 'Price: N/A';
+          unitPriceText.className = 'text-muted unit-price-text';
+        }
       } else {
         unitPriceText.textContent = 'Price: N/A';
         unitPriceText.className = 'text-muted unit-price-text';
@@ -827,14 +930,21 @@ async function handleUnitChange(itemId) {
       unitPriceText.className = 'text-danger unit-price-text';
     }
   }
+  
+  // Update stock calculation with new conversion factor
+  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+  if (quantityInput && quantityInput.value) {
+    await updateStockCalculation(itemId);
+  }
 }
 
-// Update product availability
+// Update product availability with conversion factor support
 async function updateStockAvailability(itemId) {
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const availableSpan = document.getElementById(`available-${itemId}`);
   const availableValueInput = document.getElementById(`available-value-${itemId}`);
   const fromStoreSelect = document.getElementById('from_store');
+  const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
   
   if (!productSelect.value || !fromStoreSelect.value) {
     availableSpan.textContent = '-';
@@ -844,23 +954,46 @@ async function updateStockAvailability(itemId) {
   }
   
   try {
-    const response = await fetch(`/api/product/${productSelect.value}/stock/${fromStoreSelect.value}/`);
+    // Fetch stock info (returns in base units) - USING CORRECT URL NAME
+    const response = await fetch('{% url "product_stock_for_store" 0 0 %}'.replace('0/0', `${productSelect.value}/${fromStoreSelect.value}`));
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
     
     if (data.success) {
-      const available = data.stock.available_stock;
-      availableSpan.textContent = available;
-      availableValueInput.value = available;
+      const availableBaseUnits = data.stock.available_stock; // Already in base units
+      availableValueInput.value = availableBaseUnits;
       
-      if (available === 0) {
-        availableSpan.className = 'available-stock text-danger';
-        availableSpan.innerHTML = `<span class="badge bg-danger">${available}</span>`;
-      } else if (available < 10) {
-        availableSpan.className = 'available-stock text-warning';
-        availableSpan.innerHTML = `<span class="badge bg-warning">${available}</span>`;
+      // Display based on selected unit
+      if (unitSelect && unitSelect.value) {
+        const selectedOption = unitSelect.options[unitSelect.selectedIndex];
+        const conversionFactor = parseFloat(selectedOption.dataset.conversion_factor) || 1.0;
+        const unitAbbreviation = selectedOption.dataset.abbreviation || '';
+        
+        if (conversionFactor > 0) {
+          const displayUnits = Math.floor(availableBaseUnits / conversionFactor);
+          const remainingBaseUnits = availableBaseUnits % conversionFactor;
+          
+          availableSpan.textContent = `${displayUnits} ${unitAbbreviation}`;
+          if (remainingBaseUnits > 0) {
+            availableSpan.textContent += ` + ${remainingBaseUnits} base units`;
+          }
+        } else {
+          availableSpan.textContent = `${availableBaseUnits} base units`;
+        }
       } else {
-        availableSpan.className = 'available-stock text-success';
-        availableSpan.innerHTML = `<span class="badge bg-success">${available}</span>`;
+        availableSpan.textContent = `${availableBaseUnits} base units`;
+      }
+      
+      // Color code based on stock level
+      if (availableBaseUnits === 0) {
+        availableSpan.className = 'available-stock text-danger fw-bold';
+      } else if (availableBaseUnits < 10) {
+        availableSpan.className = 'available-stock text-warning fw-bold';
+      } else {
+        availableSpan.className = 'available-stock text-success fw-bold';
       }
       
       // Validate quantity if already entered
@@ -868,6 +1001,10 @@ async function updateStockAvailability(itemId) {
       if (quantityInput && quantityInput.value) {
         await updateStockCalculation(itemId);
       }
+    } else {
+      availableSpan.textContent = 'Error';
+      availableSpan.className = 'available-stock text-danger';
+      availableValueInput.value = 0;
     }
   } catch (error) {
     console.error('Error fetching stock info:', error);
@@ -877,34 +1014,45 @@ async function updateStockAvailability(itemId) {
   }
 }
 
-// Update stock calculation when quantity changes (INSTANT DEDUCTION)
+// Update stock calculation with conversion factor support
 async function updateStockCalculation(itemId) {
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
   const fromStoreSelect = document.getElementById('from_store');
+  const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
   const availableSpan = document.getElementById(`available-${itemId}`);
   const remainingSpan = document.getElementById(`remaining-${itemId}`);
+  const cfInput = document.getElementById(`conversion-factor-${itemId}`);
   
   if (!productSelect.value || !fromStoreSelect.value || !quantityInput.value) {
     return;
   }
   
-  const requestedQty = parseInt(quantityInput.value) || 0;
+  const displayQuantity = parseInt(quantityInput.value) || 0;
   
-  if (requestedQty <= 0) {
+  if (displayQuantity <= 0) {
     quantityInput.classList.remove('is-invalid');
     remainingSpan.style.display = 'none';
     hideStockAlert();
     return;
   }
   
+  // Get conversion factor
+  const conversionFactor = parseFloat(cfInput.value) || 1.0;
+  
+  // Calculate base quantity needed
+  const baseQuantityNeeded = Math.round(displayQuantity * conversionFactor);
+  
   // Show calculating
   availableSpan.textContent = 'Calculating...';
   availableSpan.className = 'available-stock text-info';
   
   try {
-    // Build URL with parameters
-    let url = `/api/product/${productSelect.value}/stock-calculation/?store_id=${fromStoreSelect.value}&requested_qty=${requestedQty}`;
+    // Use the stock calculation endpoint with conversion factor - USING CORRECT URL NAME
+    let url = '{% url "product_stock_calculation" 0 %}'.replace('0', productSelect.value);
+    url += `?store_id=${fromStoreSelect.value}`;
+    url += `&requested_qty=${displayQuantity}`;
+    url += `&unit_id=${unitSelect ? unitSelect.value : ''}`;
     
     // Include current request ID if editing
     const editId = document.getElementById('editRequestId').value;
@@ -913,41 +1061,77 @@ async function updateStockCalculation(itemId) {
     }
     
     const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
     
     if (data.success) {
-      const availableStock = data.stock_info.available_stock;
-      const remainingStock = data.stock_info.remaining_stock;
+      const availableStockBase = data.stock_info.available_stock_base;
+      const remainingStockBase = data.stock_info.remaining_stock_base;
       const status = data.status;
+      const conversionFactor = data.conversion_factor || 1.0;
       
       // Update available stock display
-      availableSpan.textContent = availableStock;
-      availableSpan.className = 'available-stock text-muted';
+      if (unitSelect && unitSelect.value) {
+        const selectedOption = unitSelect.options[unitSelect.selectedIndex];
+        const unitAbbreviation = selectedOption.dataset.abbreviation || '';
+        
+        if (conversionFactor > 0) {
+          const displayAvailable = Math.floor(availableStockBase / conversionFactor);
+          const remainingBase = availableStockBase % conversionFactor;
+          
+          availableSpan.textContent = `${displayAvailable} ${unitAbbreviation}`;
+          if (remainingBase > 0) {
+            availableSpan.textContent += ` + ${remainingBase} base units`;
+          }
+        } else {
+          availableSpan.textContent = `${availableStockBase} base units`;
+        }
+      } else {
+        availableSpan.textContent = `${availableStockBase} base units`;
+      }
       
-      // Update available value input
-      document.getElementById(`available-value-${itemId}`).value = availableStock;
-      
-      // Show remaining stock
-      remainingSpan.textContent = `After transfer: ${remainingStock}`;
+      // Update remaining stock display
+      if (conversionFactor > 0) {
+        const remainingDisplay = Math.floor(remainingStockBase / conversionFactor);
+        const remainingBase = remainingStockBase % conversionFactor;
+        
+        remainingSpan.textContent = `After: ${remainingDisplay} display units`;
+        if (remainingBase > 0) {
+          remainingSpan.textContent += ` + ${remainingBase} base units`;
+        }
+      } else {
+        remainingSpan.textContent = `After: ${remainingStockBase} base units`;
+      }
       remainingSpan.style.display = 'block';
       
       if (status === 'sufficient') {
         quantityInput.classList.remove('is-invalid');
-        remainingSpan.className = 'text-success';
+        remainingSpan.className = 'text-success remaining-stock';
         hideStockAlert();
       } else {
         quantityInput.classList.add('is-invalid');
-        remainingSpan.className = 'text-danger';
-        showStockAlert(`Insufficient stock for ${data.product.name}. Available: ${availableStock}, Requested: ${requestedQty}`);
+        remainingSpan.className = 'text-danger remaining-stock';
+        showStockAlert(
+          `Insufficient stock! Requested ${displayQuantity} display units = ${baseQuantityNeeded} base units, ` +
+          `but only ${availableStockBase} base units available.`
+        );
       }
       
-      // Update total value if unit price is set
-      const unitPrice = parseFloat(document.getElementById(`unit-price-${itemId}`).value) || 0;
-      if (unitPrice > 0) {
-        const totalValue = unitPrice * requestedQty;
-        const unitPriceText = document.getElementById(`unit-price-text-${itemId}`);
-        unitPriceText.textContent = `Price: ${unitPrice.toLocaleString()} /unit | Total: ${totalValue.toLocaleString()}`;
+      // Color code based on stock level
+      if (availableStockBase === 0) {
+        availableSpan.className = 'available-stock text-danger fw-bold';
+      } else if (availableStockBase < 10) {
+        availableSpan.className = 'available-stock text-warning fw-bold';
+      } else {
+        availableSpan.className = 'available-stock text-success fw-bold';
       }
+    } else {
+      availableSpan.textContent = 'Error';
+      availableSpan.className = 'available-stock text-danger';
+      quantityInput.classList.remove('is-invalid');
     }
   } catch (error) {
     console.error('Error calculating stock:', error);
@@ -955,12 +1139,6 @@ async function updateStockCalculation(itemId) {
     availableSpan.className = 'available-stock text-danger';
     quantityInput.classList.remove('is-invalid');
   }
-}
-
-// Validate quantity against available stock (legacy function)
-function validateQuantity(itemId) {
-  // This is now handled by updateStockCalculation
-  return true;
 }
 
 // Validate form before submission
@@ -1162,7 +1340,7 @@ async function submitNewRequest() {
     items: []
   };
   
-  // Collect items
+  // Collect items with conversion factor info
   const rows = document.querySelectorAll('#requestItemsBody tr');
   rows.forEach((row, index) => {
     const product = row.querySelector('.product-select');
@@ -1188,9 +1366,9 @@ async function submitNewRequest() {
     }
   });
   
-  // Determine URL based on edit mode
-  const url = editId ? `/transfer_requests/${editId}/edit/` : '/transfer_requests/create/';
-  const method = editId ? 'PUT' : 'POST';
+  // Determine URL based on edit mode - USING CORRECT URL NAMES
+  const url = editId ? '{% url "update_transfer_request" 0 %}'.replace('0', editId) : '{% url "create_transfer_request" %}';
+  const method = 'POST'; // Both use POST according to your views
   
   try {
     const response = await fetch(url, {
@@ -1246,7 +1424,12 @@ async function submitNewRequest() {
 // Edit request function
 async function editRequest(requestId) {
   try {
-    const response = await fetch(`/transfer_requests/${requestId}/json/`);
+    // USING CORRECT URL NAME
+    const response = await fetch('{% url "transfer_request_json" 0 %}'.replace('0', requestId));
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
     
     if (!data.success) {
@@ -1278,7 +1461,7 @@ async function editRequest(requestId) {
     document.getElementById('reason').value = r.reason || '';
     
     // Load products first
-    await loadAvailableProducts();
+    await loadProductsFromAPI();
     
     // Fill items
     for (const item of r.items) {
@@ -1302,7 +1485,7 @@ async function editRequest(requestId) {
         unitSelect.value = item.units_id;
         // Wait for unit selection to take effect
         await new Promise(resolve => setTimeout(resolve, 100));
-        // Trigger unit change to load price
+        // Trigger unit change to load price and conversion factor
         await handleUnitChange(idx);
       }
       
@@ -1333,6 +1516,39 @@ async function editRequest(requestId) {
   } catch (error) {
     console.error('Error loading request JSON:', error);
     alert('Error loading request for edit.');
+  }
+}
+
+// Create transfer from approved request
+async function createTransferFromRequest(requestId) {
+  if (!confirm('Create stock transfer from this approved request?')) {
+    return;
+  }
+  
+  try {
+    // USING CORRECT URL NAME
+    const response = await fetch('{% url "create_transfer_from_request" 0 %}'.replace('0', requestId), {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showToast(`Stock transfer #ST${String(data.transfer_id).padStart(4, '0')} created successfully!`, 'success');
+      // Redirect to the new transfer
+      setTimeout(() => {
+        window.location.href = '{% url "stock_transfer_detail" 0 %}'.replace('0', data.transfer_id);
+      }, 1000);
+    } else {
+      showToast(`Error: ${data.error}`, 'danger');
+    }
+  } catch (error) {
+    console.error('Error creating transfer:', error);
+    showToast('An error occurred while creating the transfer.', 'danger');
   }
 }
 
@@ -1378,7 +1594,8 @@ function confirmApprove() {
   formData.append('csrfmiddlewaretoken', csrftoken);
   formData.append('comments', comments);
 
-  fetch(`/transfer_requests/${requestId}/approve/`, {
+  // USING CORRECT URL NAME
+  fetch('{% url "approve_transfer_request" 0 %}'.replace('0', requestId), {
     method: 'POST',
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
@@ -1456,7 +1673,8 @@ function confirmReject() {
   formData.append('csrfmiddlewaretoken', csrftoken);
   formData.append('comments', comments);
 
-  fetch(`/transfer_requests/${requestId}/reject/`, {
+  // USING CORRECT URL NAME
+  fetch('{% url "reject_transfer_request" 0 %}'.replace('0', requestId), {
     method: 'POST',
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
@@ -1531,7 +1749,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // Load products for modal (but don't wait for it)
-  loadAvailableProducts();
+  loadProductsFromAPI();
   
   // Initialize modal validation for reject comments
   const rejectModal = document.getElementById('rejectModal');
@@ -1589,28 +1807,50 @@ document.addEventListener('DOMContentLoaded', function() {
 .available-stock {
   font-weight: bold;
   font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
 }
 
-.available-stock.text-success .badge {
-  background-color: #198754 !important;
+.available-stock.text-success {
+  color: #198754 !important;
 }
 
-.available-stock.text-warning .badge {
-  background-color: #ffc107 !important;
-  color: #000 !important;
+.available-stock.text-warning {
+  color: #ffc107 !important;
 }
 
-.available-stock.text-danger .badge {
-  background-color: #dc3545 !important;
+.available-stock.text-danger {
+  color: #dc3545 !important;
 }
 
-.available-stock.text-muted .badge {
-  background-color: #6c757d !important;
+.available-stock.text-muted {
+  color: #6c757d !important;
+}
+
+.available-stock.text-info {
+  color: #0dcaf0 !important;
 }
 
 .remaining-stock {
   font-size: 0.75rem;
   margin-top: 2px;
+}
+
+/* Conversion factor display */
+.conversion-factor-info {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.2rem;
+  display: inline-block;
+}
+
+.conversion-factor-info.text-success {
+  background-color: rgba(25, 135, 84, 0.1);
+  border: 1px solid rgba(25, 135, 84, 0.2);
+}
+
+.conversion-factor-info.text-info {
+  background-color: rgba(13, 202, 240, 0.1);
+  border: 1px solid rgba(13, 202, 240, 0.2);
 }
 
 /* Unit price display */
@@ -1633,6 +1873,12 @@ document.addEventListener('DOMContentLoaded', function() {
   color: #dc3545;
 }
 
+/* Unit dropdown styling */
+option[data-is_base_unit="true"] {
+  font-weight: bold;
+  background-color: #e8f4f8;
+}
+
 /* Modal styles */
 .modal-body {
   max-height: 70vh;
@@ -1642,6 +1888,13 @@ document.addEventListener('DOMContentLoaded', function() {
 /* Item row hover effect */
 #requestItemsTable tbody tr:hover {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Table foot note */
+#requestItemsTable tfoot td {
+  padding: 0.5rem;
+  background-color: #f8f9fa;
+  border-top: 2px solid #dee2e6;
 }
 
 /* Responsive table in modal */
@@ -1667,6 +1920,10 @@ document.addEventListener('DOMContentLoaded', function() {
   
   .unit-price-text {
     font-size: 0.7rem;
+  }
+  
+  .conversion-factor-info {
+    font-size: 0.65rem;
   }
 }
 
@@ -1756,6 +2013,11 @@ document.addEventListener('DOMContentLoaded', function() {
   filter: invert(1);
 }
 
+/* Toast notifications */
+.toast {
+  margin-bottom: 0.5rem;
+}
+
 @media (max-width: 768px) {
   .table-responsive {
     font-size: 0.875rem;
@@ -1783,6 +2045,18 @@ document.addEventListener('DOMContentLoaded', function() {
   #rejectModal {
     padding: 0.5rem;
   }
+}
+
+/* Info icon for conversion factor note */
+.fa-info-circle {
+  color: #0dcaf0;
+}
+
+/* Base unit highlight in requests table */
+.base-unit-indicator {
+  font-size: 0.7rem;
+  color: #198754;
+  margin-left: 0.25rem;
 }
 </style>
 {% endblock %}

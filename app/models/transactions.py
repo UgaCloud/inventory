@@ -517,6 +517,9 @@ class StockTransfer(models.Model):
         except Exception as e:
             raise ValidationError(f"Error applying inventory changes: {str(e)}")
 
+
+
+
 class StockTransferItem(models.Model):
     stock_transfer = models.ForeignKey(StockTransfer, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
