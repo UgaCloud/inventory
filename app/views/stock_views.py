@@ -1,3 +1,4 @@
+# app/views/stock_transfer_views.py - COMPLETE FIXED VERSION
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
@@ -14,8 +15,9 @@ import logging
 
 from app.models.transactions import *
 from app.forms.transaction_forms import *
-from app.models.products import Product, UnitOfMeasure, Inventory
+from app.models.products import Product, UnitOfMeasure, Inventory, ProductUnitPrice
 from app.selectors.transaction_selectors import *
+from app.utils.utils import convert_to_base_units, convert_from_base_units
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +91,7 @@ def stock_transfer_list(request):
 
 @login_required
 def get_product_stock_transfer_info(request):
-    """JSON endpoint for real-time stock with committed stock calculation"""
+    """JSON endpoint for real-time stock with conversion factor handling"""
     try:
         # Get parameters from GET parameters
         product_id = request.GET.get('product_id')
@@ -116,21 +118,28 @@ def get_product_stock_transfer_info(request):
             # Get product info first
             product = Product.objects.get(id=product_id)
             
-            # Get ALL units available for this product
+            # Get ALL units available for this product with conversion factors
             units_data = []
             for unit_price in product.unit_prices.all():
                 units_data.append({
                     'id': unit_price.unit.id,
                     'name': unit_price.unit.name,
+                    'abbreviation': unit_price.unit.abbreviation,
                     'price': float(unit_price.price),
-                    'conversion_factor': unit_price.conversion_factor,
+                    'conversion_factor': float(unit_price.conversion_factor),
+                    'is_base_unit': unit_price.conversion_factor == Decimal('1.0'),
                 })
             
-            # Get default unit (first one)
+            # Get default unit (base unit should have conversion_factor = 1.0)
             default_unit = None
             default_unit_price = None
             if units_data:
-                default_unit = units_data[0]
+                # Try to find base unit first
+                base_units = [u for u in units_data if u['is_base_unit']]
+                if base_units:
+                    default_unit = base_units[0]
+                else:
+                    default_unit = units_data[0]  # Fallback to first unit
                 default_unit_price = default_unit['price']
             
             # Try to get inventory for product in store
@@ -140,21 +149,26 @@ def get_product_stock_transfer_info(request):
                     store_id=store_id
                 )
                 
-                total_stock = inventory.quantity_in_stock
+                total_stock = inventory.quantity_in_stock  # This should be in base units
                 logger.info(f"Base inventory found: {total_stock}")
                 
-                # Calculate committed stock (stock reserved for pending/in-transit transfers)
-                committed_stock = StockTransferItem.objects.filter(
+                # Calculate committed stock (stock reserved for pending/in-transit transfers) in BASE UNITS
+                committed_stock_base = 0
+                pending_items = StockTransferItem.objects.filter(
                     product_id=product_id,
                     stock_transfer__from_store_id=store_id,
                     stock_transfer__status__in=['pending', 'in_transit']
-                ).aggregate(committed=Sum('quantity'))['committed'] or 0
+                ).select_related('product', 'units')
                 
-                logger.info(f"Committed stock: {committed_stock}")
+                for item in pending_items:
+                    # Use base_quantity field (calculated during save)
+                    committed_stock_base += item.base_quantity
                 
-                # Calculate truly available stock
-                available_stock = max(0, total_stock - committed_stock)
-                logger.info(f"Available stock: {available_stock}")
+                logger.info(f"Committed stock (base units): {committed_stock_base}")
+                
+                # Calculate truly available stock in base units
+                available_stock = max(0, total_stock - committed_stock_base)
+                logger.info(f"Available stock (base units): {available_stock}")
                 
                 # Get unit cost - check InventoryBatch first, then product default price
                 unit_cost = default_unit_price or 0
@@ -174,23 +188,25 @@ def get_product_stock_transfer_info(request):
                 # Get unit information
                 unit_name = default_unit['name'] if default_unit else 'Piece'
                 unit_id = default_unit['id'] if default_unit else None
+                unit_abbreviation = default_unit['abbreviation'] if default_unit else 'pc'
                 reorder_level = inventory.reorder_level or 0
                 
             except Inventory.DoesNotExist:
                 logger.warning(f"No inventory record found for product {product_id} in store {store_id}")
                 total_stock = 0
                 available_stock = 0
-                committed_stock = 0
+                committed_stock_base = 0
                 unit_cost = default_unit_price or 0
                 unit_name = default_unit['name'] if default_unit else 'Piece'
                 unit_id = default_unit['id'] if default_unit else None
+                unit_abbreviation = default_unit['abbreviation'] if default_unit else 'pc'
                 reorder_level = 0
             
             response_data = {
                 'success': True,
-                'available_stock': available_stock,
-                'total_stock': total_stock,
-                'committed_stock': committed_stock,
+                'available_stock': available_stock,  # In base units
+                'total_stock': total_stock,  # In base units
+                'committed_stock': committed_stock_base,  # In base units
                 'reorder_level': reorder_level,
                 'can_fulfill': available_stock > 0,
                 'product_name': product.name,
@@ -199,6 +215,7 @@ def get_product_stock_transfer_info(request):
                 'default_price': default_unit_price or 0,
                 'unit': unit_name,
                 'unit_id': unit_id,
+                'unit_abbreviation': unit_abbreviation,
                 'units': units_data,  
             }
             
@@ -237,11 +254,6 @@ def get_product_stock_transfer_info(request):
             'committed_stock': 0,
             'can_fulfill': False
         }, status=500)
-
-
-
-
-
 
 
 @login_required
@@ -367,11 +379,14 @@ def create_transfer_from_request(request, request_id):
                 )
                 
                 for request_item in transfer_request.items.all():
+                    # Use base_quantity from the transfer request item (already calculated)
                     StockTransferItem.objects.create(
                         stock_transfer=stock_transfer,
                         product=request_item.product,
-                        quantity=request_item.quantity,
+                        quantity=request_item.base_quantity,  # Store as base quantity
                         units=request_item.units,
+                        original_quantity=request_item.quantity,  # Store original for display
+                        base_quantity=request_item.base_quantity,  # Explicitly store base quantity
                         transfer_request_item=request_item
                     )
                 
@@ -430,11 +445,14 @@ def create_bulk_transfers(request):
                     )
                     
                     for request_item in transfer_request.items.all():
+                        # Use base_quantity from the transfer request item
                         StockTransferItem.objects.create(
                             stock_transfer=stock_transfer,
                             product=request_item.product,
-                            quantity=request_item.quantity,
+                            quantity=request_item.base_quantity,  # Store as base quantity
                             units=request_item.units,
+                            original_quantity=request_item.quantity,  # Store original for display
+                            base_quantity=request_item.base_quantity,  # Explicitly store base quantity
                             transfer_request_item=request_item
                         )
                     
@@ -461,6 +479,7 @@ def create_bulk_transfers(request):
 
 @login_required
 def direct_stock_transfer_create(request):
+    """Create a direct stock transfer with conversion factor handling"""
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -501,18 +520,61 @@ def direct_stock_transfer_create(request):
                         try:
                             product = Product.objects.get(id=product_id)
                             unit = UnitOfMeasure.objects.get(id=unit_id)
-                            quantity = int(quantity)
+                            quantity = Decimal(quantity)
                             
-                            if quantity > 0:
+                            # Get conversion factor for this product-unit combination
+                            try:
+                                product_unit = ProductUnitPrice.objects.get(
+                                    product=product,
+                                    unit=unit
+                                )
+                                conversion_factor = Decimal(product_unit.conversion_factor)
+                            except ProductUnitPrice.DoesNotExist:
+                                # No conversion factor defined, assume it's base unit
+                                conversion_factor = Decimal(1.0)
+                                messages.warning(
+                                    request, 
+                                    f"No conversion factor defined for {product.name} with unit {unit.name}. Using 1.0 as default."
+                                )
+                            
+                            # Calculate quantity in base units
+                            base_quantity = int(quantity * conversion_factor)
+                            
+                            if base_quantity > 0:
+                                # Check stock availability in base units
+                                try:
+                                    inventory = Inventory.objects.get(
+                                        product=product,
+                                        store=from_store
+                                    )
+                                    if inventory.quantity_in_stock < base_quantity:
+                                        messages.error(
+                                            request, 
+                                            f"Insufficient stock for {product.name}. "
+                                            f"Available: {inventory.quantity_in_stock} base units, "
+                                            f"Required: {base_quantity} base units ({quantity} {unit.name})"
+                                        )
+                                        continue
+                                except Inventory.DoesNotExist:
+                                    messages.error(
+                                        request, 
+                                        f"No inventory found for {product.name} in {from_store.name}"
+                                    )
+                                    continue
+                                
+                                # Create transfer item with base quantity
                                 StockTransferItem.objects.create(
                                     stock_transfer=transfer,
                                     product=product,
-                                    quantity=quantity,
-                                    units=unit
+                                    quantity=base_quantity,  # Store in base units
+                                    units=unit,
+                                    original_quantity=int(quantity),  # Store original for display
+                                    base_quantity=base_quantity  # Explicitly store base quantity
                                 )
                                 items_created += 1
                                 
                         except (Product.DoesNotExist, UnitOfMeasure.DoesNotExist, ValueError) as e:
+                            logger.error(f"Error processing item {i}: {str(e)}")
                             continue
                 
                 if items_created > 0:
@@ -524,13 +586,14 @@ def direct_stock_transfer_create(request):
                     return redirect('stock_transfer_list')
                     
         except Exception as e:
+            logger.error(f"Error creating direct transfer: {str(e)}", exc_info=True)
             messages.error(request, f'Error creating transfer: {str(e)}')
     
     return redirect('stock_transfer_list')
 
 @login_required
 def start_stock_transfer(request, transfer_id):
-    """Mark a transfer as in transit"""
+    """Mark a transfer as in transit with base unit validation"""
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
     
     if transfer.status != 'pending':
@@ -544,9 +607,12 @@ def start_stock_transfer(request, transfer_id):
                 product=item.product, 
                 store=transfer.from_store
             )
-            if inventory.quantity_in_stock < item.quantity:
+            # Check using base_quantity (already calculated)
+            if inventory.quantity_in_stock < item.base_quantity:
                 stock_issues.append(
-                    f"{item.product.name}: Available {inventory.quantity_in_stock}, Required {item.quantity}"
+                    f"{item.product.name}: Available {inventory.quantity_in_stock} base units, "
+                    f"Required {item.base_quantity} base units "
+                    f"({item.original_quantity} {item.units.name if item.units else 'units'})"
                 )
         except Inventory.DoesNotExist:
             stock_issues.append(f"{item.product.name}: No inventory found")
@@ -563,6 +629,7 @@ def start_stock_transfer(request, transfer_id):
 
 @login_required
 def complete_stock_transfer(request, transfer_id):
+    """Complete stock transfer"""
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
     
     if transfer.status != 'in_transit':
@@ -587,7 +654,7 @@ def transfer_request_list(request):
 
 @login_required
 def create_transfer_request(request):
-    """Create a new transfer request"""
+    """Create a new transfer request with conversion factor handling"""
     if request.method == 'POST':
         form = TransferRequestForm(request.POST)
         formset = TransferRequestItemFormSet(request.POST)
@@ -641,9 +708,11 @@ def transfer_request_json(request, request_id):
             'id': it.id,
             'product_id': it.product.id,
             'product_name': it.product.name,
-            'quantity': it.quantity,
+            'quantity': it.quantity,  # Display quantity
+            'base_quantity': it.base_quantity,  # Base units (calculated)
             'units_id': it.units.id,
             'units_name': it.units.name,
+            'units_abbreviation': it.units.abbreviation,
             'notes': getattr(it, 'notes', '')
         })
 
@@ -705,6 +774,7 @@ def edit_transfer_request(request, request_id):
 
 @login_required
 def update_transfer_request(request, request_id):
+    """Update transfer request"""
     transfer_request = get_object_or_404(TransferRequest, id=request_id)
     
     if request.method == 'POST':
@@ -718,12 +788,14 @@ def update_transfer_request(request, request_id):
 
 @login_required
 def pending_transfer_requests_for_approval(request):
+    """Show pending transfer requests for approval"""
     pending_requests = TransferRequest.objects.filter(status='pending').order_by('-request_date')
     return render(request, 'stock/pending_transfer_requests.html', {'pending_requests': pending_requests})
 
-# Purchase Order Functions (keep your existing ones)
+# Purchase Order Functions
 @login_required
 def purchase_order_list(request):
+    """List purchase orders"""
     orders = get_all_orders()
     form = PurchaseOrderForm()
     context = {
@@ -734,20 +806,26 @@ def purchase_order_list(request):
 
 @login_required
 def purchase_order_detail(request, order_id):
+    """View purchase order details"""
     order = get_order_by_id(order_id)
     return render(request, 'purchase_order_detail.html', {'order': order})
 
 @login_required
 def create_purchase_order(request):
+    """Create a new purchase order"""
     if request.method == 'POST':
         form = PurchaseOrderForm(request.POST)
         if form.is_valid():
             order = form.save()
             messages.success(request, 'Purchase order created successfully.')
             return redirect('purchase_order_item_list', order_id = order.id)
-    
+    else:
+        form = PurchaseOrderForm()
+    return render(request, 'stock/purchase_order_form.html', {'form': form})
+
 @login_required
 def edit_purchase_order(request, order_id):
+    """Edit a purchase order"""
     order = get_object_or_404(PurchaseOrder, id=order_id)
     if request.method == 'POST':
         form = PurchaseOrderForm(request.POST, instance=order)
@@ -761,6 +839,7 @@ def edit_purchase_order(request, order_id):
 
 @login_required
 def delete_purchase_order(request, order_id):
+    """Delete a purchase order"""
     order = get_object_or_404(PurchaseOrder, id=order_id)
     if request.method == 'POST':
         order.delete()
@@ -770,6 +849,7 @@ def delete_purchase_order(request, order_id):
 
 @login_required
 def purchase_order_item_list(request, order_id):
+    """List items for a purchase order"""
     order = get_object_or_404(PurchaseOrder, id=order_id)
     items = get_items_by_order(order)
     form = PurchaseOrderItemForm(initial={'order': order})
@@ -782,18 +862,37 @@ def purchase_order_item_list(request, order_id):
 
 @login_required
 def create_purchase_order_item(request, order_id):
+    """Create a purchase order item with conversion factor handling"""
     order = get_object_or_404(PurchaseOrder, id=order_id)
     if request.method == 'POST':
         form = PurchaseOrderItemForm(request.POST)
         if form.is_valid():
             item = form.save(commit=False)
             item.order = order
+            
+            # Handle conversion factor if needed (purchase orders might need it too)
+            try:
+                # Get conversion factor for this product-unit combination
+                product_unit = ProductUnitPrice.objects.get(
+                    product=item.product,
+                    unit=item.unit
+                )
+                # Note: PurchaseOrderItem doesn't have base_quantity field yet
+                # You might want to add it similar to TransferRequestItem
+            except ProductUnitPrice.DoesNotExist:
+                # No conversion factor defined
+                pass
+            
             item.save()
             messages.success(request, 'Purchase order item added successfully.')
         return redirect('purchase_order_item_list', order_id=order.id)
+    else:
+        form = PurchaseOrderItemForm()
+    return render(request, 'stock/purchase_order_item_form.html', {'form': form, 'order': order})
 
 @login_required
 def edit_purchase_order_item(request, item_id):
+    """Edit a purchase order item"""
     item = get_object_or_404(PurchaseOrderItem, id=item_id)
     order = item.order
     if request.method == 'POST':
@@ -808,6 +907,7 @@ def edit_purchase_order_item(request, item_id):
 
 @login_required
 def delete_purchase_order_item(request, item_id):
+    """Delete a purchase order item"""
     item = get_object_or_404(PurchaseOrderItem, id=item_id)
     order = item.order
     if request.method == 'POST':
@@ -816,9 +916,10 @@ def delete_purchase_order_item(request, item_id):
         return redirect('purchase_order_item_list', order_id=order.id)
     return render(request, 'purchase_order_item_confirm_delete.html', {'item': item, 'order': order})
 
-# Stock Adjustment Functions (keep your existing ones)
+# Stock Adjustment Functions
 @login_required
 def stock_adjustment_list(request):
+    """List stock adjustments"""
     adjustments = StockAdjustment.objects.all().order_by('-created_at')
     form = StockAdjustmentForm()
     context = {
@@ -829,6 +930,7 @@ def stock_adjustment_list(request):
 
 @login_required
 def stock_adjustment_detail(request, adjustment_id):
+    """View stock adjustment details"""
     adjustment = get_object_or_404(
         StockAdjustment.objects.select_related('product', 'store', 'unit', 'created_by'),
         id=adjustment_id
@@ -913,6 +1015,7 @@ def stock_adjustment_detail(request, adjustment_id):
 
 @login_required
 def create_stock_adjustment(request):
+    """Create a stock adjustment"""
     if request.method == 'POST':
         form = StockAdjustmentForm(request.POST)
         if form.is_valid():
@@ -930,6 +1033,7 @@ def create_stock_adjustment(request):
 
 @login_required
 def edit_stock_adjustment(request, adjustment_id):
+    """Edit a stock adjustment"""
     adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
     
     if adjustment.status == 'applied':
@@ -948,6 +1052,7 @@ def edit_stock_adjustment(request, adjustment_id):
 
 @login_required
 def apply_stock_adjustment(request, adjustment_id):
+    """Apply a stock adjustment"""
     adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
     if request.method == 'POST':
         applied = adjustment.apply(applied_by=getattr(request.user, 'username', None))
@@ -960,6 +1065,7 @@ def apply_stock_adjustment(request, adjustment_id):
 
 @login_required
 def delete_stock_adjustment(request, adjustment_id):
+    """Delete a stock adjustment"""
     adjustment = get_object_or_404(StockAdjustment, id=adjustment_id)
     if request.method == 'POST':
         adjustment.delete()

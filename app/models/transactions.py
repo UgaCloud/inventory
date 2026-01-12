@@ -280,18 +280,52 @@ class TransferRequest(models.Model):
         return self.stock_transfers.aggregate(total=models.Sum('items__quantity'))['total'] or 0
 
 
+
 class TransferRequestItem(models.Model):
     transfer_request = models.ForeignKey('TransferRequest', on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
+    quantity = models.PositiveIntegerField()  # User-entered quantity in selected unit
     units = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
     notes = models.TextField(blank=True, null=True)
-
+    # NEW: Store base quantity for internal calculations
+    base_quantity = models.PositiveIntegerField(default=0, editable=False)
+    
     class Meta:
-        unique_together = ("transfer_request", "product")
+        unique_together = ("transfer_request", "product", "units")
 
     def __str__(self):
-        return f"{self.product.name} x {self.quantity} (Request {self.transfer_request.id})"
+        return f"{self.product.name} x {self.quantity} {self.units.name} (Request {self.transfer_request.id})"
+    
+    def clean(self):
+        """Validate conversion factor exists"""
+        from app.utils.utils import validate_conversion_factor_exists
+        if self.product and self.units:
+            validate_conversion_factor_exists(self.product, self.units)
+    
+    def save(self, *args, **kwargs):
+        """Calculate and store base quantity before saving"""
+        from app.utils.utils import convert_to_base_units
+        
+        if self.product and self.units and self.quantity:
+            # Calculate base quantity
+            self.base_quantity = int(convert_to_base_units(
+                self.product, 
+                self.units, 
+                self.quantity
+            ))
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def display_quantity(self):
+        """Get display quantity (user-friendly)"""
+        return f"{self.quantity} {self.units.abbreviation}"
+    
+    @property
+    def base_unit_quantity(self):
+        """Alias for base_quantity for clarity"""
+        return self.base_quantity
+    
 
 
 class StockTransfer(models.Model):
@@ -360,8 +394,8 @@ class StockTransfer(models.Model):
 
     def apply_inventory_changes(self):
         """
-            Apply inventory changes when a transfer is completed using FIFO method.
-            Deducts stock from source store's oldest batches first and creates new batches in destination store.
+        Apply inventory changes when a transfer is completed using FIFO method.
+        Deducts stock from source store's oldest batches first and creates new batches in destination store.
         """  
         if self.status != 'completed':
             raise ValidationError("Can only apply inventory changes for completed transfers")
@@ -373,9 +407,10 @@ class StockTransfer(models.Model):
                 StockTransfer.objects.select_for_update().get(pk=self.pk)
 
                 for transfer_item in self.items.select_related('product').all():
-                    quantity_needed = int(transfer_item.quantity)
+                    # FIXED: Use base_quantity instead of quantity
+                    quantity_needed = int(transfer_item.base_quantity) 
 
-                    # Select source batches excluding expired ones (expiry_date is null or >= today)
+                    # Select source batches excluding expired ones
                     source_batches_qs = InventoryBatch.objects.select_for_update().filter(
                         product=transfer_item.product,
                         store=self.from_store,
@@ -403,10 +438,9 @@ class StockTransfer(models.Model):
                         # Reduce source batch
                         source_batch.remaining_quantity = models.F('remaining_quantity') - take
                         source_batch.save(update_fields=['remaining_quantity'])
-                        # Refresh value
                         source_batch.refresh_from_db()
 
-                        # Create destination batch preserving expiry and unit_cost
+                        # Create destination batch
                         dest_batch = InventoryBatch.objects.create(
                             product=transfer_item.product,
                             store=self.to_store,
@@ -425,7 +459,7 @@ class StockTransfer(models.Model):
 
                         remaining -= take
 
-                    # Update Inventory rows (lock them)
+                    # Update Inventory rows
                     from app.models.products import Inventory as InventoryModel
 
                     # Get inventory records
@@ -440,16 +474,13 @@ class StockTransfer(models.Model):
                         defaults={'quantity_in_stock': 0}
                     )
 
-                    # Note: Source stock was already deducted when transfer was created (via signals)
-                    # We only need to add to destination here
-                    # Refresh to get current values for audit log
+                    # ✅ FIXED: Use base_quantity for inventory updates
+                    # Deduct from source (already happens in save signal, but ensure it's correct)
                     source_inventory.refresh_from_db()
                     
-                    # Add to destination inventory
-                    dest_inventory.quantity_in_stock = models.F('quantity_in_stock') + quantity_needed
+                    # Add to destination inventory using base_quantity
+                    dest_inventory.quantity_in_stock = models.F('quantity_in_stock') + transfer_item.base_quantity
                     dest_inventory.save(update_fields=['quantity_in_stock'])
-                    
-                    # Refresh to get actual integer value for audit log
                     dest_inventory.refresh_from_db()
 
                     # Create StockMovement entries for audit
@@ -484,36 +515,68 @@ class StockTransfer(models.Model):
         except ValidationError:
             raise
         except Exception as e:
-            # Wrap unexpected errors
             raise ValidationError(f"Error applying inventory changes: {str(e)}")
-
 
 class StockTransferItem(models.Model):
     stock_transfer = models.ForeignKey(StockTransfer, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
+    quantity = models.PositiveIntegerField()  # User-entered quantity in selected unit
     units = models.ForeignKey("app.UnitOfMeasure", on_delete=models.SET_NULL, null=True, blank=True)
     transfer_request_item = models.ForeignKey(
         "app.TransferRequestItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="fulfilled_transfer_items"
     )
-
+    # NEW: Store base quantity for inventory operations
+    base_quantity = models.PositiveIntegerField(default=0, editable=False)
+    # NEW: Store original quantity for display
+    original_quantity = models.PositiveIntegerField(default=0, editable=False)
+    
     class Meta:
-        unique_together = ("stock_transfer", "product")
-        
+        unique_together = ("stock_transfer", "product", "units")
         indexes = [
             models.Index(fields=['product', 'stock_transfer']),
             models.Index(fields=['stock_transfer', 'product']),
         ]
 
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity} {self.units.name if self.units else ''} (Transfer {self.stock_transfer.id})"
+    
+    def clean(self):
+        """Validate conversion factor exists"""
+        from app.utils.utils import validate_conversion_factor_exists
+        if self.product and self.units:
+            validate_conversion_factor_exists(self.product, self.units)
+    
+    def save(self, *args, **kwargs):
+        """Calculate and store base quantity before saving"""
+        from app.utils.utils import convert_to_base_units
+        
+        if self.product and self.units and self.quantity:
+            # Store original quantity
+            self.original_quantity = self.quantity
+            
+            # Calculate and store base quantity
+            self.base_quantity = int(convert_to_base_units(
+                self.product, 
+                self.units, 
+                self.quantity
+            ))
+        elif self.quantity and not self.units:
+            # If no unit specified, assume base unit
+            self.original_quantity = self.quantity
+            self.base_quantity = self.quantity
+        
+        super().save(*args, **kwargs)
+    
     @property
-    def total_quantity(self):
-        return self.quantity
+    def display_quantity(self):
+        """Get display quantity with unit"""
+        if self.units:
+            return f"{self.original_quantity} {self.units.abbreviation}"
+        return f"{self.original_quantity} units"
     
     @property
     def total_value(self):
-        """
-        Value of this single transfer item based on FIFO batch cost or product default price.
-        """
+        """Value in base units using FIFO cost"""
         try:
             batch = InventoryBatch.objects.filter(
                 product=self.product,
@@ -521,79 +584,30 @@ class StockTransferItem(models.Model):
             ).order_by('-created_at').first()
 
             if batch:
-                return batch.unit_cost * self.quantity
-
-            # fallback to product default price
-            return (self.product.default_price or 0) * self.quantity
-
+                return batch.unit_cost * self.base_quantity  # Use base_quantity!
+            return (self.product.default_price or 0) * self.base_quantity  # Use base_quantity!
         except:
             return 0
-
-    @property
-    def unit_cost(self):
-        """
-        The cost per unit used to compute total value (FIFO batch cost or default price).
-        """
-
-        # Try FIFO batch cost first
-        batch = InventoryBatch.objects.filter(
-            product=self.product,
-            store=self.stock_transfer.from_store
-        ).order_by('-created_at').first()
-
-        if batch:
-            return batch.unit_cost
-
-        # fallback to product default price
-        return self.product.default_price or 0
-
+    
     @property
     def available_stock(self):
-        """
-        Returns available quantity of this product in the FROM store before/after transfer.
-        Uses Inventory table.
-        """
+        """Available stock in FROM store (in base units)"""
         try:
             from app.models.products import Inventory
-
-            inventory = Inventory.objects.filter(
+            inventory = Inventory.objects.get(
                 store=self.stock_transfer.from_store,
                 product=self.product
-            ).first()
-
-            return inventory.quantity_in_stock if inventory else 0
+            )
+            return inventory.quantity_in_stock  # Already in base units
         except:
             return 0
-
     
-    def apply_fifo_transfer(self):
-        pass
-        # Deduct from source store using FIFO and expiry
-        # batches = InventoryBatch.objects.filter(
-        #     product=self.product,
-        #     store=self.stock_transfer.from_store,
-        #     remaining_quantity__gt=0,
-        #     expiry_date__gte=date.today()
-        # ).order_by('expiry_date', 'received_date')
-        # to_deduct = self.quantity
-        # for batch in batches:
-        #     if batch.remaining_quantity >= to_deduct:
-        #         batch.remaining_quantity -= to_deduct
-        #         batch.save()
-        #         break
-        #     else:
-        #         to_deduct -= batch.remaining_quantity
-        #         batch.remaining_quantity = 0
-        #         batch.save()
-        #     # Add to destination store as new batch (preserve expiry)
-        #     InventoryBatch.objects.create(
-        #         product=self.product,
-        #         store=self.stock_transfer.to_store,
-        #         quantity=self.quantity,
-        #         remaining_quantity=self.quantity,
-        #         expiry_date=batch.expiry_date if batch else None,
-        #         purchase_order_item=None
-        #     )
+    @property
+    def can_fulfill(self):
+        """Check if transfer can be fulfilled (stock check in base units)"""
+        return self.available_stock >= self.base_quantity
+
+
 
 
 class StockAdjustment(models.Model):

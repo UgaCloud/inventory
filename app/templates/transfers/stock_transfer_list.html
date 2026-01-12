@@ -219,7 +219,21 @@
                 <td>
                   <div class="d-flex align-items-center">
                     <span class="badge bg-info me-2">{{ transfer.items.count }}</span>
-                    <small class="text-muted">item{{ transfer.items.count|pluralize }}</small>
+                    <small class="text-muted">
+                      {% for item in transfer.items.all %}
+                        {% if forloop.counter <= 3 %}
+                          {% if item.units %}
+                            {{ item.original_quantity|default:item.quantity }} {{ item.units.abbreviation }}{% if not forloop.last %}, {% endif %}
+                          {% else %}
+                            {{ item.original_quantity|default:item.quantity }} units{% if not forloop.last %}, {% endif %}
+                          {% endif %}
+                        {% elif forloop.counter == 4 %}
+                          ...and {{ transfer.items.count|add:"-3" }} more
+                        {% endif %}
+                      {% empty %}
+                        No items
+                      {% endfor %}
+                    </small>
                   </div>
                 </td>
                 <td>
@@ -513,7 +527,7 @@
                   <thead class="table-light">
                     <tr>
                       <th>Product *</th>
-                      <th>Available</th>
+                      <th>Available Stock</th>
                       <th>Quantity *</th>
                       <th>Units *</th>
                       <th>Unit Cost</th>
@@ -532,7 +546,10 @@
                   </tfoot>
                 </table>
               </div>
-              <small class="text-muted">* Required fields</small>
+              <small class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                Stock is shown in base units. Conversion factors are applied automatically when units are selected.
+              </small>
             </div>
           </div>
         </div>
@@ -549,10 +566,6 @@
   </div>
 </div>
 
-
-
-
-
 <script>
 // Helper: read CSRF token from cookie
 function getCookie(name) {
@@ -561,14 +574,47 @@ function getCookie(name) {
   if (parts.length === 2) return parts.pop().split(';').shift();
 }
 
-// ========== STOCK MANAGER CLASS ==========
+// ========== STOCK MANAGER CLASS (WITH CONVERSION FACTORS) ==========
 class StockManager {
     constructor() {
         this.pendingRequests = new Map();
         this.localCache = new Map();
         this.debounceTimers = new Map();
         this.abortControllers = new Map();
-        this.rowStocks = new Map(); // Track original stock per row
+        this.rowStocks = new Map();
+        this.conversionFactors = new Map(); // Store CF per product-unit
+    }
+
+    // Get conversion factor for product-unit combination
+    getConversionFactor(productId, unitId, unitsData) {
+        const cacheKey = `cf_${productId}_${unitId}`;
+        
+        if (this.conversionFactors.has(cacheKey)) {
+            return this.conversionFactors.get(cacheKey);
+        }
+        
+        // Find in units data
+        if (unitsData) {
+            const unit = unitsData.find(u => u.id == unitId);
+            if (unit && unit.conversion_factor) {
+                this.conversionFactors.set(cacheKey, unit.conversion_factor);
+                return unit.conversion_factor;
+            }
+        }
+        
+        // Default to 1.0 if not found
+        return 1.0;
+    }
+
+    // Calculate base quantity from display quantity
+    calculateBaseQuantity(displayQuantity, conversionFactor) {
+        return Math.round(displayQuantity * conversionFactor);
+    }
+
+    // Calculate display quantity from base quantity
+    calculateDisplayQuantity(baseQuantity, conversionFactor) {
+        if (conversionFactor === 0) return 0;
+        return Math.round(baseQuantity / conversionFactor);
     }
 
     // Debounced stock update
@@ -680,12 +726,13 @@ class StockManager {
             this.rowStocks.set(rowId, {
                 originalStock: data.available_stock,
                 currentStock: data.available_stock,
-                productId: productId
+                productId: productId,
+                unitsData: data.units || []
             });
             
             this.updateStockDisplayFromData(row, data);
             
-            // Populate units dropdown with all available units
+            // Populate units dropdown with all available units and conversion factors
             this.populateUnitsDropdown(row, data);
             
         } catch (error) {
@@ -711,20 +758,24 @@ class StockManager {
         // Clear existing options
         unitsSelect.innerHTML = '<option value="">Select Unit</option>';
         
-        // Add all available units
+        // Add all available units with conversion factors
         data.units.forEach(unit => {
             const option = document.createElement('option');
             option.value = unit.id;
-            option.textContent = `${unit.name} (UGX ${unit.price.toLocaleString()})`;
+            option.textContent = `${unit.name} (CF: ${unit.conversion_factor}) - UGX ${unit.price.toLocaleString()}`;
             option.dataset.price = unit.price;
+            option.dataset.conversion_factor = unit.conversion_factor;
+            option.dataset.abbreviation = unit.abbreviation;
+            option.dataset.is_base_unit = unit.is_base_unit || false;
             unitsSelect.appendChild(option);
         });
         
-        // Auto-select the first unit (or default unit from response)
+        // Auto-select base unit first
         if (data.units.length > 0) {
-            // Try to select the unit from response first
-            if (data.unit_id) {
-                const unitOption = unitsSelect.querySelector(`option[value="${data.unit_id}"]`);
+            // Try to find base unit
+            const baseUnit = data.units.find(u => u.is_base_unit);
+            if (baseUnit) {
+                const unitOption = unitsSelect.querySelector(`option[value="${baseUnit.id}"]`);
                 if (unitOption) {
                     unitOption.selected = true;
                 } else {
@@ -756,7 +807,9 @@ class StockManager {
                 status = 'success';
             }
             
-            availableStock.textContent = stockLevel;
+            // Show both base units and unit abbreviation
+            const unitAbbr = data.unit_abbreviation || 'base units';
+            availableStock.textContent = `${stockLevel} ${unitAbbr}`;
             availableStock.className = 'available-stock';
             if (status === 'success') {
                 availableStock.classList.add('text-success', 'fw-bold');
@@ -769,11 +822,12 @@ class StockManager {
             }
             
             // Add title with more info
-            availableStock.title = `Available: ${data.available_stock}\nTotal: ${data.total_stock}\nCommitted: ${data.committed_stock}`;
+            availableStock.title = `Available: ${data.available_stock} base units\nTotal: ${data.total_stock}\nCommitted: ${data.committed_stock}`;
         }
         
         if (unitCost && data.unit_cost) {
             unitCost.textContent = `UGX ${parseFloat(data.unit_cost).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            unitCost.dataset.baseCost = data.unit_cost;
         }
     }
 
@@ -787,7 +841,8 @@ class StockManager {
         this.rowStocks.set(rowId, {
             originalStock: data.available_stock,
             currentStock: data.available_stock,
-            productId: selectElement.value
+            productId: selectElement.value,
+            unitsData: data.units || []
         });
         
         // Update row total
@@ -795,21 +850,31 @@ class StockManager {
     }
 
     // REAL-TIME STOCK DEDUCTION: Update available stock when quantity changes
-    updateAvailableStock(row, quantity) {
+    updateAvailableStock(row, displayQuantity) {
         const availableStock = row.querySelector('.available-stock');
+        const unitsSelect = row.querySelector('select[name*="units"]');
         const rowId = row.id;
         
-        if (!availableStock || !this.rowStocks.has(rowId)) return;
+        if (!availableStock || !unitsSelect || !this.rowStocks.has(rowId)) return;
         
         const rowData = this.rowStocks.get(rowId);
         const originalStock = rowData.originalStock;
-        const requestedQuantity = parseInt(quantity) || 0;
+        const selectedUnit = unitsSelect.options[unitsSelect.selectedIndex];
+        
+        if (!selectedUnit || !selectedUnit.value) return;
+        
+        const conversionFactor = parseFloat(selectedUnit.dataset.conversion_factor) || 1.0;
+        const baseQuantityNeeded = Math.round(displayQuantity * conversionFactor);
         
         // Calculate remaining stock after this transfer
-        const remainingStock = originalStock - requestedQuantity;
+        const remainingStock = originalStock - baseQuantityNeeded;
+        
+        // Get unit abbreviation for display
+        const unitAbbr = selectedUnit.dataset.abbreviation || 'units';
+        const baseUnitAbbr = rowData.unitsData?.find(u => u.is_base_unit)?.abbreviation || 'base units';
         
         // Update display
-        availableStock.textContent = remainingStock;
+        availableStock.textContent = `${remainingStock} ${baseUnitAbbr}`;
         
         // Update color based on stock level
         availableStock.classList.remove('text-success', 'text-warning', 'text-danger', 'text-muted');
@@ -829,23 +894,24 @@ class StockManager {
         this.rowStocks.set(rowId, rowData);
         
         // Validate quantity
-        this.validateQuantity(row.querySelector('.quantity-input'), originalStock);
+        this.validateQuantity(row.querySelector('.quantity-input'), originalStock, conversionFactor);
     }
 
-    validateQuantity(quantityInput, originalStock) {
+    validateQuantity(quantityInput, originalStock, conversionFactor) {
         const row = quantityInput.closest('tr');
-        const quantity = parseInt(quantityInput.value) || 0;
+        const displayQuantity = parseInt(quantityInput.value) || 0;
+        const baseQuantityNeeded = Math.round(displayQuantity * conversionFactor);
         const available = parseInt(originalStock) || 0;
         
         quantityInput.classList.remove('is-invalid', 'is-valid');
         
-        if (quantity <= 0) {
+        if (displayQuantity <= 0) {
             quantityInput.classList.add('is-invalid');
             this.showStockWarning(row, 'Quantity must be greater than 0');
             return false;
-        } else if (quantity > available) {
+        } else if (baseQuantityNeeded > available) {
             quantityInput.classList.add('is-invalid');
-            this.showStockWarning(row, `Only ${available} available in stock`);
+            this.showStockWarning(row, `Only ${available} base units available (${Math.floor(available/conversionFactor)} display units)`);
             return false;
         } else {
             quantityInput.classList.add('is-valid');
@@ -902,6 +968,7 @@ class StockManager {
     // Force refresh all stocks (bypass cache)
     async forceRefreshAllStocks() {
         this.localCache.clear();
+        this.conversionFactors.clear();
         await this.updateAllStocks();
     }
 
@@ -915,8 +982,8 @@ class StockManager {
         if (productSelect && quantityInput && unitsSelect && rowTotal && unitCost) {
             const selectedUnit = unitsSelect.options[unitsSelect.selectedIndex];
             const unitPrice = selectedUnit ? parseFloat(selectedUnit.dataset.price || 0) : 0;
-            const quantity = parseFloat(quantityInput.value) || 0;
-            const total = unitPrice * quantity;
+            const displayQuantity = parseFloat(quantityInput.value) || 0;
+            const total = unitPrice * displayQuantity;
             
             rowTotal.textContent = `UGX ${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             
@@ -927,14 +994,20 @@ class StockManager {
             
             updateGrandTotal();
             
-            // REAL-TIME: Update available stock display
-            this.updateAvailableStock(row, quantity);
+            // REAL-TIME: Update available stock display with conversion factor
+            const rowId = row.id;
+            if (this.rowStocks.has(rowId)) {
+                const rowData = this.rowStocks.get(rowId);
+                const conversionFactor = parseFloat(selectedUnit.dataset.conversion_factor) || 1.0;
+                this.updateAvailableStock(row, displayQuantity, conversionFactor);
+            }
         }
     }
 
     // Clear cache when modal closes
     clearCache() {
         this.localCache.clear();
+        this.conversionFactors.clear();
         this.debounceTimers.forEach(timeoutId => clearTimeout(timeoutId));
         this.debounceTimers.clear();
         this.abortControllers.forEach(controller => controller.abort());
@@ -1256,16 +1329,35 @@ function setupRealTimeStockListeners() {
             
             if (stockManager.rowStocks.has(rowId)) {
                 const rowData = stockManager.rowStocks.get(rowId);
-                stockManager.validateQuantity(e.target, rowData.originalStock);
+                const unitsSelect = row.querySelector('select[name*="units"]');
+                const selectedUnit = unitsSelect?.options[unitsSelect.selectedIndex];
+                const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
+                
+                stockManager.validateQuantity(e.target, rowData.originalStock, conversionFactor);
             }
         }
     });
 
-    // Unit change - update costs
+    // Unit change - update costs and validation
     modal.addEventListener('change', function(e) {
         if (e.target.matches('select[name*="units"]')) {
             const row = e.target.closest('tr');
+            
+            // Update row total
             stockManager.updateRowTotal(row);
+            
+            // Validate quantity with new conversion factor
+            const quantityInput = row.querySelector('.quantity-input');
+            if (quantityInput && quantityInput.value) {
+                const rowId = row.id;
+                if (stockManager.rowStocks.has(rowId)) {
+                    const rowData = stockManager.rowStocks.get(rowId);
+                    const selectedUnit = e.target.options[e.target.selectedIndex];
+                    const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
+                    
+                    stockManager.validateQuantity(quantityInput, rowData.originalStock, conversionFactor);
+                }
+            }
         }
     });
 }
@@ -1299,7 +1391,7 @@ function addFormsetRow() {
             <div class="invalid-feedback">Please select a product.</div>
         </td>
         <td>
-            <span class="available-stock text-muted">-</span>
+            <span class="available-stock text-muted">Select product first</span>
         </td>
         <td>
             <input type="number" name="items-${currentForms}-quantity" 
@@ -1309,7 +1401,7 @@ function addFormsetRow() {
         </td>
         <td>
             <select name="items-${currentForms}-units"
-                   class="form-select form-select-sm" required>
+                   class="form-select form-select-sm units-select" required>
                 <option value="">Select Unit</option>
                 <!-- Units will be auto-populated when product is selected -->
             </select>
@@ -1356,7 +1448,7 @@ function removeFormsetRow(event) {
             input.value = '';
             input.classList.remove('is-invalid', 'is-valid');
         });
-        row.querySelector('.available-stock').textContent = '-';
+        row.querySelector('.available-stock').textContent = 'Select product first';
         row.querySelector('.available-stock').className = 'available-stock text-muted';
         row.querySelector('.unit-cost').textContent = 'UGX 0.00';
         row.querySelector('.row-total').textContent = 'UGX 0.00';
@@ -1414,7 +1506,28 @@ function initializeRowFeatures(row) {
             const rowId = row.id;
             if (stockManager.rowStocks.has(rowId)) {
                 const rowData = stockManager.rowStocks.get(rowId);
-                stockManager.validateQuantity(this, rowData.originalStock);
+                const unitsSelect = row.querySelector('.units-select');
+                const selectedUnit = unitsSelect?.options[unitsSelect.selectedIndex];
+                const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
+                
+                stockManager.validateQuantity(this, rowData.originalStock, conversionFactor);
+            }
+        });
+    }
+
+    // Unit select
+    const unitsSelect = row.querySelector('.units-select');
+    if (unitsSelect) {
+        unitsSelect.addEventListener('change', function() {
+            const rowId = row.id;
+            const quantityInput = row.querySelector('.quantity-input');
+            
+            if (stockManager.rowStocks.has(rowId) && quantityInput.value) {
+                const rowData = stockManager.rowStocks.get(rowId);
+                const selectedUnit = this.options[this.selectedIndex];
+                const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
+                
+                stockManager.validateQuantity(quantityInput, rowData.originalStock, conversionFactor);
             }
         });
     }
@@ -1484,6 +1597,7 @@ function setupFormSubmission() {
         // Validate all items have product, quantity, and units
         let validItems = 0;
         let hasInvalidStock = false;
+        let stockErrors = [];
         
         for (let i = 0; i < totalForms; i++) {
             const product = document.querySelector(`select[name="items-${i}-product"]`);
@@ -1493,23 +1607,30 @@ function setupFormSubmission() {
             if (product && product.value && quantity && quantity.value && units && units.value) {
                 validItems++;
                 
-                // Check stock availability
+                // Check stock availability with conversion factors
                 const row = product.closest('tr');
                 const rowId = row.id;
                 
                 if (stockManager.rowStocks.has(rowId)) {
                     const rowData = stockManager.rowStocks.get(rowId);
                     const available = rowData.originalStock;
-                    const qty = parseInt(quantity.value) || 0;
+                    const displayQty = parseInt(quantity.value) || 0;
                     
-                    if (qty > available) {
+                    // Get conversion factor
+                    const selectedUnit = units.options[units.selectedIndex];
+                    const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
+                    const baseQtyNeeded = Math.round(displayQty * conversionFactor);
+                    
+                    if (baseQtyNeeded > available) {
                         hasInvalidStock = true;
                         quantity.classList.add('is-invalid');
                         const warning = row.querySelector('.stock-warning') || 
                                         document.createElement('div');
                         warning.className = 'stock-warning text-danger small mt-1';
-                        warning.textContent = `Only ${available} available`;
+                        warning.textContent = `Only ${available} base units available`;
                         quantity.parentElement.appendChild(warning);
+                        
+                        stockErrors.push(`${product.options[product.selectedIndex].text}: Needs ${baseQtyNeeded} base units, only ${available} available`);
                     }
                 }
             }
@@ -1525,7 +1646,7 @@ function setupFormSubmission() {
         
         if (hasInvalidStock) {
             e.preventDefault();
-            alert('Some items have quantities exceeding available stock. Please adjust the quantities.');
+            alert('Some items have quantities exceeding available stock.\n\n' + stockErrors.join('\n'));
             resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
@@ -1644,10 +1765,6 @@ function refreshFeatherIcons() {
 }
 </script>
 
-
-
-
-
 <style>
 .transfer-route {
     font-size: 0.875rem;
@@ -1703,6 +1820,7 @@ function refreshFeatherIcons() {
     font-weight: 600;
     min-height: 24px;
     display: inline-block;
+    font-family: 'Courier New', monospace;
 }
 
 .available-stock.text-success {
@@ -1730,6 +1848,16 @@ function refreshFeatherIcons() {
     font-size: 0.75rem;
     font-weight: 500;
     display: none;
+    background-color: #f8d7da;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.conversion-factor-info {
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-style: italic;
 }
 
 .is-invalid {
@@ -1755,6 +1883,12 @@ function refreshFeatherIcons() {
     font-style: italic;
 }
 
+/* Unit dropdown styling */
+option[data-is_base_unit="true"] {
+    font-weight: bold;
+    background-color: #e8f4f8;
+}
+
 /* Real-time update indicators */
 .product-select:focus + .available-stock::after {
     content: ' ⟳';
@@ -1764,6 +1898,13 @@ function refreshFeatherIcons() {
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* Base unit indicator */
+.base-unit-indicator {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-left: 0.25rem;
 }
 
 /* Responsive adjustments */
