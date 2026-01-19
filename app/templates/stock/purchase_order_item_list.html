@@ -20,7 +20,7 @@
                 <i class="ti ti-upload me-1"></i>
                 Bulk Upload CSV
             </a>
-            <a href="{% url 'download_purchase_order_item_template' %}" class="btn btn-outline-secondary">
+            <a href="#" class="btn btn-outline-secondary">
                 <i class="ti ti-download me-1"></i>
                 Download Template
             </a>
@@ -156,14 +156,14 @@
                             </button>
                         </div>
                         <div class="modal-body">
-                            <form method="post" action="{% url 'purchase_order_items_bulk_upload' order.id %}" enctype="multipart/form-data">
+                            <form method="post" action="#" enctype="multipart/form-data">
                                 {% csrf_token %}
                                 <div class="mb-3">
                                     <label for="csv-file" class="form-label">CSV file</label>
                                     <input class="form-control" type="file" id="csv-file" name="file" accept=".csv" required>
                                 </div>
                                 <div class="mb-2">
-                                    <a href="{% url 'download_purchase_order_item_template' %}" class="btn btn-sm btn-link">Download example template</a>
+                                    <a href="#" class="btn btn-sm btn-link">Download example template</a>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn me-2 btn-secondary" data-bs-dismiss="modal">Cancel</button>

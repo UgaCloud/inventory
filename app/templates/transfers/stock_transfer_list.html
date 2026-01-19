@@ -313,7 +313,7 @@
                       </a>
                       
                       {% if transfer.status == 'pending' %}
-                        <button class="btn btn-sm btn-primary me-1" data-action="startTransfer" data-transfer-id="{{ transfer.id }}" title="Start Transfer">
+                        <button class="btn btn-sm btn-primary me-1" data-action="confirmStartTransfer" data-transfer-id="{{ transfer.id }}" title="Start Transfer">
                           <i data-feather="play" class="feather-14"></i>
                         </button>
                         <a href="{% url 'stock_transfer_update' transfer.id %}" class="btn btn-sm btn-warning me-1" title="Edit">
@@ -322,12 +322,12 @@
                       {% endif %}
                       
                       {% if transfer.status == 'in_transit' %}
-                        <button class="btn btn-sm btn-success me-1" data-action="completeTransfer" data-transfer-id="{{ transfer.id }}" title="Mark Complete">
+                        <button class="btn btn-sm btn-success me-1" data-action="confirmCompleteTransfer" data-transfer-id="{{ transfer.id }}" title="Mark Complete">
                           <i data-feather="check" class="feather-14"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-info me-1" data-action="trackTransfer" data-transfer-id="{{ transfer.id }}" title="Track">
+                        <a href="{% url 'stock_transfer_detail' transfer.id %}?tab=tracking" class="btn btn-sm btn-outline-info me-1" title="Track" target="_blank">
                           <i data-feather="map-pin" class="feather-14"></i>
-                        </button>
+                        </a>
                       {% endif %}
                       
                       <div class="dropdown">
@@ -346,7 +346,7 @@
                           {% endif %}
                           {% if transfer.status != 'completed' and transfer.status != 'cancelled' %}
                           <li><hr class="dropdown-divider"></li>
-                          <li><a class="dropdown-item text-danger" href="#" data-action="cancelTransfer" data-transfer-id="{{ transfer.id }}">
+                          <li><a class="dropdown-item text-danger" href="#" data-action="confirmCancelTransfer" data-transfer-id="{{ transfer.id }}">
                             <i data-feather="x-circle" class="feather-14 me-2"></i>Cancel Transfer
                           </a></li>
                           {% endif %}
@@ -566,6 +566,133 @@
   </div>
 </div>
 
+<!-- Action Modals -->
+<!-- Start Transfer Confirmation Modal -->
+<div class="modal fade" id="startTransferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i data-feather="play" class="feather-16 me-2 text-primary"></i>
+          Start Transfer
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to start this transfer? The items will be marked as in transit.</p>
+        <div class="alert alert-info">
+          <i data-feather="info" class="feather-16 me-2"></i>
+          This action cannot be undone.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmStartTransferBtn">
+          <i data-feather="play" class="feather-16 me-1"></i>
+          Start Transfer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Complete Transfer Confirmation Modal -->
+<div class="modal fade" id="completeTransferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i data-feather="check" class="feather-16 me-2 text-success"></i>
+          Complete Transfer
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to mark this transfer as completed? This will update stock at the destination store.</p>
+        <div class="alert alert-warning">
+          <i data-feather="alert-triangle" class="feather-16 me-2"></i>
+          This action will update inventory records and cannot be undone.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" id="confirmCompleteTransferBtn">
+          <i data-feather="check" class="feather-16 me-1"></i>
+          Mark as Complete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel Transfer Confirmation Modal -->
+<div class="modal fade" id="cancelTransferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i data-feather="x-circle" class="feather-16 me-2 text-danger"></i>
+          Cancel Transfer
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to cancel this transfer?</p>
+        <div class="mb-3">
+          <label for="cancelReason" class="form-label">Reason for cancellation (optional):</label>
+          <textarea class="form-control" id="cancelReason" rows="3" placeholder="Enter reason for cancellation..."></textarea>
+        </div>
+        <div class="alert alert-danger">
+          <i data-feather="alert-circle" class="feather-16 me-2"></i>
+          This action cannot be undone. The transfer will be marked as cancelled.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmCancelTransferBtn">
+          <i data-feather="x-circle" class="feather-16 me-1"></i>
+          Cancel Transfer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Result Modal (for success/error messages) -->
+<div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="resultModalTitle">
+          <i data-feather="info" class="feather-16 me-2"></i>
+          Result
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="resultModalBody">
+        <!-- Content will be set dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 bg-transparent">
+      <div class="modal-body text-center">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+          <span class="visually-hidden">Processing...</span>
+        </div>
+        <p class="mt-3 text-white">Processing your request...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // Helper: read CSRF token from cookie
 function getCookie(name) {
@@ -582,10 +709,9 @@ class StockManager {
         this.debounceTimers = new Map();
         this.abortControllers = new Map();
         this.rowStocks = new Map();
-        this.conversionFactors = new Map(); // Store CF per product-unit
+        this.conversionFactors = new Map();
     }
 
-    // Get conversion factor for product-unit combination
     getConversionFactor(productId, unitId, unitsData) {
         const cacheKey = `cf_${productId}_${unitId}`;
         
@@ -593,7 +719,6 @@ class StockManager {
             return this.conversionFactors.get(cacheKey);
         }
         
-        // Find in units data
         if (unitsData) {
             const unit = unitsData.find(u => u.id == unitId);
             if (unit && unit.conversion_factor) {
@@ -602,32 +727,26 @@ class StockManager {
             }
         }
         
-        // Default to 1.0 if not found
         return 1.0;
     }
 
-    // Calculate base quantity from display quantity
     calculateBaseQuantity(displayQuantity, conversionFactor) {
         return Math.round(displayQuantity * conversionFactor);
     }
 
-    // Calculate display quantity from base quantity
     calculateDisplayQuantity(baseQuantity, conversionFactor) {
         if (conversionFactor === 0) return 0;
         return Math.round(baseQuantity / conversionFactor);
     }
 
-    // Debounced stock update
     async updateProductStock(selectElement, delay = 300) {
         const row = selectElement.closest('tr');
         const cacheKey = this.getCacheKey(selectElement);
         
-        // Clear any pending request for this row
         if (this.debounceTimers.has(cacheKey)) {
             clearTimeout(this.debounceTimers.get(cacheKey));
         }
         
-        // Show loading state immediately
         const availableStock = row.querySelector('.available-stock');
         const unitCost = row.querySelector('.unit-cost');
         const quantityInput = row.querySelector('.quantity-input');
@@ -644,13 +763,11 @@ class StockManager {
             quantityInput.classList.remove('is-invalid', 'is-valid');
         }
         
-        // Clear unit dropdown
         const unitsSelect = row.querySelector('select[name*="units"]');
         if (unitsSelect) {
             unitsSelect.innerHTML = '<option value="">Select Unit</option>';
         }
         
-        // Set new debounced request
         const timeoutId = setTimeout(async () => {
             await this.fetchStockInfo(selectElement);
             this.debounceTimers.delete(cacheKey);
@@ -678,26 +795,21 @@ class StockManager {
             return;
         }
         
-        // Check local cache first (5 second cache)
         const cached = this.localCache.get(cacheKey);
         if (cached && (Date.now() - cached.timestamp) < 5000) {
-            console.log(`Using cached stock for product ${productId}`);
             this.updateFromCache(selectElement, cached.data);
             return;
         }
         
-        // Abort any previous request for this cache key
         if (this.abortControllers.has(cacheKey)) {
             this.abortControllers.get(cacheKey).abort();
         }
         
-        // Create new abort controller
         const controller = new AbortController();
         this.abortControllers.set(cacheKey, controller);
         
         try {
             const url = `{% url "get_product_stock_transfer_info" %}?product_id=${productId}&store_id=${storeId}&t=${Date.now()}`;
-            console.log('Fetching stock from:', url);
             
             const response = await fetch(url, { 
                 signal: controller.signal,
@@ -709,19 +821,16 @@ class StockManager {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const data = await response.json();
-            console.log('Stock data received:', data);
             
             if (data.success === false) {
                 throw new Error(data.error || 'Failed to fetch stock');
             }
             
-            // Cache the successful response
             this.localCache.set(cacheKey, {
                 data: data,
                 timestamp: Date.now()
             });
             
-            // Store original stock for this row
             const rowId = row.id;
             this.rowStocks.set(rowId, {
                 originalStock: data.available_stock,
@@ -731,16 +840,12 @@ class StockManager {
             });
             
             this.updateStockDisplayFromData(row, data);
-            
-            // Populate units dropdown with all available units and conversion factors
             this.populateUnitsDropdown(row, data);
             
         } catch (error) {
             console.error('Stock fetch error:', error);
-            if (error.name === 'AbortError') {
-                console.log('Request was aborted');
-                return;
-            }
+            if (error.name === 'AbortError') return;
+            
             if (availableStock) {
                 availableStock.textContent = 'Error';
                 availableStock.className = 'available-stock text-danger';
@@ -755,10 +860,8 @@ class StockManager {
         const unitsSelect = row.querySelector('select[name*="units"]');
         if (!unitsSelect || !data.units) return;
         
-        // Clear existing options
         unitsSelect.innerHTML = '<option value="">Select Unit</option>';
         
-        // Add all available units with conversion factors
         data.units.forEach(unit => {
             const option = document.createElement('option');
             option.value = unit.id;
@@ -770,23 +873,19 @@ class StockManager {
             unitsSelect.appendChild(option);
         });
         
-        // Auto-select base unit first
         if (data.units.length > 0) {
-            // Try to find base unit
             const baseUnit = data.units.find(u => u.is_base_unit);
             if (baseUnit) {
                 const unitOption = unitsSelect.querySelector(`option[value="${baseUnit.id}"]`);
                 if (unitOption) {
                     unitOption.selected = true;
                 } else {
-                    // Fallback to first unit
                     unitsSelect.selectedIndex = 1;
                 }
             } else {
                 unitsSelect.selectedIndex = 1;
             }
             
-            // Trigger change to update costs
             unitsSelect.dispatchEvent(new Event('change'));
         }
     }
@@ -807,7 +906,6 @@ class StockManager {
                 status = 'success';
             }
             
-            // Show both base units and unit abbreviation
             const unitAbbr = data.unit_abbreviation || 'base units';
             availableStock.textContent = `${stockLevel} ${unitAbbr}`;
             availableStock.className = 'available-stock';
@@ -821,7 +919,6 @@ class StockManager {
                 availableStock.classList.add('text-muted');
             }
             
-            // Add title with more info
             availableStock.title = `Available: ${data.available_stock} base units\nTotal: ${data.total_stock}\nCommitted: ${data.committed_stock}`;
         }
         
@@ -836,7 +933,6 @@ class StockManager {
         this.updateStockDisplayFromData(row, data);
         this.populateUnitsDropdown(row, data);
         
-        // Store original stock for this row
         const rowId = row.id;
         this.rowStocks.set(rowId, {
             originalStock: data.available_stock,
@@ -845,11 +941,9 @@ class StockManager {
             unitsData: data.units || []
         });
         
-        // Update row total
         this.updateRowTotal(row);
     }
 
-    // REAL-TIME STOCK DEDUCTION: Update available stock when quantity changes
     updateAvailableStock(row, displayQuantity) {
         const availableStock = row.querySelector('.available-stock');
         const unitsSelect = row.querySelector('select[name*="units"]');
@@ -865,18 +959,13 @@ class StockManager {
         
         const conversionFactor = parseFloat(selectedUnit.dataset.conversion_factor) || 1.0;
         const baseQuantityNeeded = Math.round(displayQuantity * conversionFactor);
-        
-        // Calculate remaining stock after this transfer
         const remainingStock = originalStock - baseQuantityNeeded;
         
-        // Get unit abbreviation for display
         const unitAbbr = selectedUnit.dataset.abbreviation || 'units';
         const baseUnitAbbr = rowData.unitsData?.find(u => u.is_base_unit)?.abbreviation || 'base units';
         
-        // Update display
         availableStock.textContent = `${remainingStock} ${baseUnitAbbr}`;
         
-        // Update color based on stock level
         availableStock.classList.remove('text-success', 'text-warning', 'text-danger', 'text-muted');
         
         if (remainingStock < 0) {
@@ -889,11 +978,9 @@ class StockManager {
             availableStock.classList.add('text-success', 'fw-bold');
         }
         
-        // Store updated current stock
         rowData.currentStock = remainingStock;
         this.rowStocks.set(rowId, rowData);
         
-        // Validate quantity
         this.validateQuantity(row.querySelector('.quantity-input'), originalStock, conversionFactor);
     }
 
@@ -945,12 +1032,9 @@ class StockManager {
         return `stock_${productId}_${storeId}`;
     }
 
-    // Update all products when store changes
     async updateAllStocks() {
-        console.log('Updating all product stock info...');
         const productSelects = document.querySelectorAll('#directTransferModal .product-select');
         
-        // Clear cache for this store
         const storeId = document.querySelector('#directTransferModal select[name="from_store"]')?.value || '';
         for (const key of this.localCache.keys()) {
             if (key.includes(`_${storeId}`)) {
@@ -965,7 +1049,6 @@ class StockManager {
         await Promise.allSettled(updates);
     }
 
-    // Force refresh all stocks (bypass cache)
     async forceRefreshAllStocks() {
         this.localCache.clear();
         this.conversionFactors.clear();
@@ -987,24 +1070,20 @@ class StockManager {
             
             rowTotal.textContent = `UGX ${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             
-            // Update unit cost display
             if (unitPrice > 0) {
                 unitCost.textContent = `UGX ${unitPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             }
             
             updateGrandTotal();
             
-            // REAL-TIME: Update available stock display with conversion factor
             const rowId = row.id;
             if (this.rowStocks.has(rowId)) {
                 const rowData = this.rowStocks.get(rowId);
-                const conversionFactor = parseFloat(selectedUnit.dataset.conversion_factor) || 1.0;
-                this.updateAvailableStock(row, displayQuantity, conversionFactor);
+                this.updateAvailableStock(row, displayQuantity);
             }
         }
     }
 
-    // Clear cache when modal closes
     clearCache() {
         this.localCache.clear();
         this.conversionFactors.clear();
@@ -1019,6 +1098,168 @@ class StockManager {
 
 // Initialize stock manager globally
 const stockManager = new StockManager();
+
+// ========== ACTION MODAL FUNCTIONS ==========
+let currentTransferId = null;
+
+function confirmStartTransfer(transferId) {
+    currentTransferId = transferId;
+    const modal = new bootstrap.Modal(document.getElementById('startTransferModal'));
+    modal.show();
+}
+
+function confirmCompleteTransfer(transferId) {
+    currentTransferId = transferId;
+    const modal = new bootstrap.Modal(document.getElementById('completeTransferModal'));
+    modal.show();
+}
+
+function confirmCancelTransfer(transferId) {
+    currentTransferId = transferId;
+    const modal = new bootstrap.Modal(document.getElementById('cancelTransferModal'));
+    modal.show();
+}
+
+function showLoadingModal() {
+    const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    modal.show();
+    return modal;
+}
+
+function hideLoadingModal(modal) {
+    if (modal) modal.hide();
+}
+
+function showResultModal(title, message, isSuccess = true) {
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    const modalTitle = document.getElementById('resultModalTitle');
+    const modalBody = document.getElementById('resultModalBody');
+    
+    // Set icon based on success/failure
+    const icon = isSuccess ? 'check-circle' : 'alert-circle';
+    const iconColor = isSuccess ? 'text-success' : 'text-danger';
+    
+    modalTitle.innerHTML = `<i data-feather="${icon}" class="feather-16 me-2 ${iconColor}"></i>${title}`;
+    modalBody.innerHTML = `<p>${message}</p>`;
+    
+    modal.show();
+    
+    // Refresh feather icons in modal
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    // Reload page after successful action
+    if (isSuccess) {
+        modal._element.addEventListener('hidden.bs.modal', function() {
+            window.location.reload();
+        }, { once: true });
+    }
+}
+
+// ========== TRANSFER ACTION FUNCTIONS ==========
+function startTransfer() {
+    if (!currentTransferId) return;
+    
+    const loadingModal = showLoadingModal();
+    const csrftoken = getCookie('csrftoken');
+    
+    // Create and submit a hidden form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `{% url 'start_stock_transfer' 9999 %}`.replace('9999', currentTransferId);
+    form.style.display = 'none';
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrftoken;
+    
+    form.appendChild(csrfInput);
+    document.body.appendChild(form);
+    
+    // Submit the form
+    form.submit();
+    
+    // Hide loading modal after a short delay (in case form submission takes time)
+    setTimeout(() => {
+        hideLoadingModal(loadingModal);
+    }, 2000);
+}
+
+function completeTransfer() {
+    if (!currentTransferId) return;
+    
+    const loadingModal = showLoadingModal();
+    const csrftoken = getCookie('csrftoken');
+    
+    // Create and submit a hidden form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `{% url 'complete_stock_transfer' 9999 %}`.replace('9999', currentTransferId);
+    form.style.display = 'none';
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrftoken;
+    
+    form.appendChild(csrfInput);
+    document.body.appendChild(form);
+    
+    // Submit the form
+    form.submit();
+    
+    // Hide loading modal after a short delay
+    setTimeout(() => {
+        hideLoadingModal(loadingModal);
+    }, 2000);
+}
+
+function cancelTransfer() {
+    if (!currentTransferId) return;
+    
+    const reason = document.getElementById('cancelReason').value;
+    const loadingModal = showLoadingModal();
+    const csrftoken = getCookie('csrftoken');
+    
+    // Create and submit a hidden form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `{% url 'update_transfer_status' 9999 %}`.replace('9999', currentTransferId);
+    form.style.display = 'none';
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrftoken;
+    
+    const statusInput = document.createElement('input');
+    statusInput.type = 'hidden';
+    statusInput.name = 'status';
+    statusInput.value = 'cancelled';
+    
+    form.appendChild(csrfInput);
+    form.appendChild(statusInput);
+    
+    if (reason) {
+        const noteInput = document.createElement('input');
+        noteInput.type = 'hidden';
+        noteInput.name = 'note';
+        noteInput.value = `Cancelled: ${reason}`;
+        form.appendChild(noteInput);
+    }
+    
+    document.body.appendChild(form);
+    
+    // Submit the form
+    form.submit();
+    
+    // Hide loading modal after a short delay
+    setTimeout(() => {
+        hideLoadingModal(loadingModal);
+    }, 2000);
+}
 
 // ========== APPROVED REQUESTS MODAL ==========
 function showApprovedRequestsModal() {
@@ -1133,11 +1374,13 @@ function showApprovedRequestsModal() {
     });
 }
 
-// ========== TRANSFER ACTIONS ==========
 function createSingleTransfer(event) {
-    const requestId = event.target.closest('[data-request-id]').dataset.requestId;
-    if (!confirm('Create stock transfer from this request?')) return;
-
+    const button = event.target.closest('[data-request-id]');
+    if (!button) return;
+    
+    const requestId = button.dataset.requestId;
+    const loadingModal = showLoadingModal();
+    
     const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', requestId);
     const csrftoken = getCookie('csrftoken');
 
@@ -1151,39 +1394,37 @@ function createSingleTransfer(event) {
     }).then(async resp => {
         const modal = bootstrap.Modal.getInstance(document.getElementById('approvedRequestsModal'));
         if (modal) modal.hide();
+        hideLoadingModal(loadingModal);
         
         if (resp.ok) {
             try {
                 const data = await resp.json();
                 if (data.success) {
-                    alert('Transfer created successfully!');
-                    refreshTransfers();
+                    showResultModal('Success', 'Transfer created successfully!', true);
                 } else {
-                    alert('Failed to create transfer');
+                    showResultModal('Error', 'Failed to create transfer: ' + (data.error || 'Unknown error'), false);
                 }
             } catch {
-                // If response is not JSON, assume success
-                alert('Transfer created successfully!');
-                refreshTransfers();
+                showResultModal('Success', 'Transfer created successfully!', true);
             }
         } else {
-            alert('Failed to create transfer');
+            showResultModal('Error', 'Failed to create transfer', false);
         }
     }).catch(err => {
         console.error('Error creating transfer from request:', err);
-        alert('Error creating transfer from request');
+        hideLoadingModal(loadingModal);
+        showResultModal('Error', 'Error creating transfer from request', false);
     });
 }
 
 function createBulkTransfers() {
   const selectedRequests = Array.from(document.querySelectorAll('.request-checkbox:checked')).map(cb => cb.value);
   if (selectedRequests.length === 0) {
-    alert('Please select at least one transfer request.');
+    showResultModal('Warning', 'Please select at least one transfer request.', false);
     return;
   }
 
-  if (!confirm(`Create transfers for ${selectedRequests.length} request(s)?`)) return;
-
+  const loadingModal = showLoadingModal();
   const csrftoken = getCookie('csrftoken');
   const formData = new FormData();
   selectedRequests.forEach(id => formData.append('request_ids', id));
@@ -1197,26 +1438,22 @@ function createBulkTransfers() {
   }).then(async resp => {
     const modal = bootstrap.Modal.getInstance(document.getElementById('approvedRequestsModal'));
     if (modal) modal.hide();
+    hideLoadingModal(loadingModal);
     
     try {
       const data = await resp.json();
       if (data.success) {
-        alert(`Successfully created ${data.created} transfer(s)`);
-        if (data.errors && data.errors.length > 0) {
-          console.warn('Errors:', data.errors);
-        }
-        refreshTransfers();
+        showResultModal('Success', `Successfully created ${data.created} transfer(s)`, true);
       } else {
-        alert('Failed to create bulk transfers');
+        showResultModal('Error', 'Failed to create bulk transfers: ' + (data.error || 'Unknown error'), false);
       }
     } catch {
-      // Assume success if we get here
-      alert('Transfers created successfully!');
-      refreshTransfers();
+      showResultModal('Success', 'Transfers created successfully!', true);
     }
   }).catch(err => {
     console.error('Error creating bulk transfers:', err);
-    alert('Error creating bulk transfers');
+    hideLoadingModal(loadingModal);
+    showResultModal('Error', 'Error creating bulk transfers', false);
   });
 }
 
@@ -1234,7 +1471,6 @@ function showDirectTransferModal() {
     if (form) {
         form.reset();
         form.classList.remove('was-validated');
-        // Remove any existing validation classes
         form.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
             el.classList.remove('is-invalid', 'is-valid');
         });
@@ -1313,11 +1549,7 @@ function setupRealTimeStockListeners() {
     modal.addEventListener('input', function(e) {
         if (e.target.classList.contains('quantity-input')) {
             const row = e.target.closest('tr');
-            
-            // Update row total and available stock in real-time
             stockManager.updateRowTotal(row);
-            
-            // Don't validate here - validation happens on blur
         }
     });
 
@@ -1342,11 +1574,8 @@ function setupRealTimeStockListeners() {
     modal.addEventListener('change', function(e) {
         if (e.target.matches('select[name*="units"]')) {
             const row = e.target.closest('tr');
-            
-            // Update row total
             stockManager.updateRowTotal(row);
             
-            // Validate quantity with new conversion factor
             const quantityInput = row.querySelector('.quantity-input');
             if (quantityInput && quantityInput.value) {
                 const rowId = row.id;
@@ -1589,7 +1818,7 @@ function setupFormSubmission() {
         console.log(`📋 Total forms: ${totalForms}`);
         if (totalForms === 0) {
             e.preventDefault();
-            alert('Please add at least one item to the transfer.');
+            showResultModal('Error', 'Please add at least one item to the transfer.', false);
             resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
@@ -1636,17 +1865,17 @@ function setupFormSubmission() {
             }
         }
         
-        console.log(`✅ Valid items: ${validItems}`);
+        console.log(`Valid items: ${validItems}`);
         if (validItems === 0) {
             e.preventDefault();
-            alert('Please fill in product, quantity, and units for at least one item.');
+            showResultModal('Error', 'Please fill in product, quantity, and units for at least one item.', false);
             resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
         
         if (hasInvalidStock) {
             e.preventDefault();
-            alert('Some items have quantities exceeding available stock.\n\n' + stockErrors.join('\n'));
+            showResultModal('Error', 'Some items have quantities exceeding available stock.\n\n' + stockErrors.join('\n'), false);
             resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
@@ -1657,7 +1886,7 @@ function setupFormSubmission() {
         
         if (fromStore.value === toStore.value) {
             e.preventDefault();
-            alert('From Store and To Store cannot be the same.');
+            showResultModal('Error', 'From Store and To Store cannot be the same.', false);
             resetSubmitButton(submitBtn, spinner, icon);
             return;
         }
@@ -1706,10 +1935,16 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeRowFeatures(row);
     });
 
+    // Setup modal button handlers
+    document.getElementById('confirmStartTransferBtn').addEventListener('click', startTransfer);
+    document.getElementById('confirmCompleteTransferBtn').addEventListener('click', completeTransfer);
+    document.getElementById('confirmCancelTransferBtn').addEventListener('click', cancelTransfer);
+
     // Global event delegation for elements with data-action attribute
     document.body.addEventListener('click', function(e) {
         const el = e.target.closest('[data-action]');
         if (!el) return;
+        
         const action = el.getAttribute('data-action');
         if (!action) return;
 
@@ -1724,14 +1959,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 case 'refreshTransfers':
                     refreshTransfers();
                     break;
-                case 'startTransfer':
-                    // Implement start transfer
+                case 'confirmStartTransfer':
+                    const startTransferId = el.getAttribute('data-transfer-id');
+                    if (startTransferId) confirmStartTransfer(startTransferId);
                     break;
-                case 'completeTransfer':
-                    // Implement complete transfer
+                case 'confirmCompleteTransfer':
+                    const completeTransferId = el.getAttribute('data-transfer-id');
+                    if (completeTransferId) confirmCompleteTransfer(completeTransferId);
                     break;
-                case 'cancelTransfer':
-                    // Implement cancel transfer
+                case 'confirmCancelTransfer':
+                    const cancelTransferId = el.getAttribute('data-transfer-id');
+                    if (cancelTransferId) confirmCancelTransfer(cancelTransferId);
                     break;
                 case 'createBulkTransfers':
                     createBulkTransfers();
@@ -1746,11 +1984,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     removeFormsetRow(e);
                     break;
                 default:
-                    // no-op
+                    console.log('Unhandled action:', action);
                     break;
             }
         } catch (err) {
             console.error('Error handling action', action, err);
+            showResultModal('Error', 'Error executing action: ' + err.message, false);
         }
     });
     
@@ -1905,6 +2144,13 @@ option[data-is_base_unit="true"] {
     font-size: 0.7rem;
     color: #6c757d;
     margin-left: 0.25rem;
+}
+
+/* Loading modal background */
+#loadingModal .modal-content {
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 /* Responsive adjustments */

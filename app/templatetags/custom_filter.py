@@ -2,6 +2,9 @@
 from django import template
 from datetime import timedelta
 from django.template.defaultfilters import stringfilter
+from django.utils.safestring import mark_safe
+from decimal import Decimal, ROUND_DOWN
+
 
 
 
@@ -390,6 +393,186 @@ def get_item(dictionary, key):
     return dictionary.get(key)
 
 
+
+# app/templatetags/transfer_filters.py
+
+
+@register.filter
+def format_conversion_factor(value, product_unit=None):
+    """
+    Format conversion factor for display
+    Example: 10.0000 -> "CF: 10.0000"
+    """
+    if value is None:
+        return "CF: 1.0000"
+    
+    try:
+        cf = Decimal(value)
+        if cf == 1:
+            return mark_safe('<span class="badge bg-success">Base Unit</span>')
+        elif cf.is_integer():
+            return f"CF: {int(cf)}"
+        else:
+            return f"CF: {cf.quantize(Decimal('0.0001'), rounding=ROUND_DOWN)}"
+    except:
+        return "CF: 1.0000"
+
+@register.filter
+def calculate_base_units(quantity, conversion_factor):
+    """
+    Calculate base units from quantity and conversion factor
+    Returns: QTY × CF = Result
+    """
+    if quantity is None or conversion_factor is None:
+        return "0"
+    
+    try:
+        qty = Decimal(str(quantity))
+        cf = Decimal(str(conversion_factor))
+        result = qty * cf
+        
+        if result.is_integer():
+            result_str = str(int(result))
+        else:
+            result_str = str(result.quantize(Decimal('0.0001'), rounding=ROUND_DOWN))
+        
+        return mark_safe(f'<span class="calculation-highlight">{qty} × {cf} = {result_str}</span>')
+    except:
+        return "0"
+
+@register.filter
+def format_quantity_with_unit(quantity, unit):
+    """
+    Format quantity with unit abbreviation
+    """
+    if not quantity:
+        return "0"
+    
+    if hasattr(unit, 'abbreviation'):
+        return f"{quantity} {unit.abbreviation}"
+    elif unit and hasattr(unit, 'name'):
+        return f"{quantity} {unit.name}"
+    else:
+        return f"{quantity} units"
+
+@register.filter
+def get_conversion_explanation(unit, product):
+    """
+    Get conversion explanation for a unit
+    """
+    if not unit or not product:
+        return ""
+    
+    try:
+        # Get base unit for this product
+        base_unit = product.unit_prices.filter(conversion_factor=1).first()
+        if not base_unit:
+            return ""
+        
+        # Get conversion factor for this unit
+        unit_price = product.unit_prices.filter(unit=unit).first()
+        if not unit_price:
+            return ""
+        
+        cf = unit_price.conversion_factor
+        base_unit_name = base_unit.unit.abbreviation or base_unit.unit.name
+        
+        if cf == 1:
+            return f"Base unit ({base_unit_name})"
+        else:
+            return f"1 {unit.abbreviation} = {cf} {base_unit_name}"
+    except:
+        return ""
+
+@register.filter
+def dict_key(dictionary, key):
+    """
+    Get value from dictionary by key in template
+    """
+    if dictionary and key in dictionary:
+        return dictionary[key]
+    return None
+
+@register.filter
+def can_approve_request(request):
+    """
+    Check if a transfer request can be approved
+    """
+    if not hasattr(request, 'can_approve'):
+        return False
+    return request.can_approve
+
+@register.filter
+def get_stock_availability(item, store):
+    """
+    Get stock availability for an item in a store
+    """
+    if not item or not store:
+        return 0
+    
+    try:
+        from app.models.products import Inventory
+        inventory = Inventory.objects.filter(
+            product=item.product,
+            store=store
+        ).first()
+        return inventory.quantity_in_stock if inventory else 0
+    except:
+        return 0
+
+@register.filter
+def calculate_shortage(request_item):
+    """
+    Calculate shortage for a request item
+    """
+    if not hasattr(request_item, 'transfer_request'):
+        return 0
+    
+    try:
+        available = request_item.get_available_stock()
+        shortage = request_item.base_quantity - available
+        return max(0, shortage)
+    except:
+        return 0
+
+@register.filter
+def get_conversion_summary(request):
+    """
+    Get conversion summary for a transfer request
+    """
+    if not hasattr(request, 'conversion_factor_summary'):
+        return ""
+    
+    summary = request.conversion_factor_summary
+    # Truncate for display
+    if len(summary) > 150:
+        return summary[:150] + "..."
+    return summary
+
+@register.filter
+def format_conversion_calculation(item):
+    """
+    Format conversion calculation for an item
+    """
+    if not hasattr(item, 'qty_x_cf_calculation'):
+        return ""
+    return item.qty_x_cf_calculation
+
+@register.filter
+def get_base_unit_name(product):
+    """
+    Get base unit name for a product
+    """
+    if not hasattr(product, 'unit_prices'):
+        return "base units"
+    
+    try:
+        base_unit = product.unit_prices.filter(conversion_factor=1).first()
+        if base_unit and base_unit.unit:
+            return base_unit.unit.name
+        return "base units"
+    except:
+        return "base units"
 
 
 

@@ -3,10 +3,7 @@ import uuid
 from app.models.organization import Branch
 from django.core.exceptions import ValidationError
 import re
-
 from django.db.models import Sum
-
-
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -28,9 +25,6 @@ class UnitOfMeasure(models.Model):
         return self.name
 
 
-
-
-
 class Product(models.Model):
     name = models.CharField(max_length=255)
     sku = models.CharField(max_length=100, unique=True, blank=True)  
@@ -46,49 +40,63 @@ class Product(models.Model):
 
     @property
     def total_stock(self):
-        """Total units across all stores"""
+        """Total units across all stores IN BASE UNITS"""
         return sum(item.quantity_in_stock for item in self.inventories.all())
+
 
     @property
     def available_stock(self):
         from app.models.transactions import StockTransferItem
-        
-        """Real-time available stock across all stores (minus committed stock)"""
         total_physical_stock = self.total_stock
-        
-        # Calculate committed stock from pending/in-transit transfers
         committed_stock = StockTransferItem.objects.filter(
             product=self,
             stock_transfer__status__in=['pending', 'in_transit']
-        ).aggregate(committed=Sum('quantity'))['committed'] or 0
-        
+        ).aggregate(committed=Sum('base_quantity'))['committed'] or 0
         return max(0, total_physical_stock - committed_stock)
+
+
+
+    # @property
+    # def available_stock(self):
+    #     from app.models.transactions import StockTransferItem
+        
+    #     """Real-time available stock across all stores (minus committed stock) IN BASE UNITS"""
+    #     total_physical_stock = self.total_stock
+        
+    #     # Calculate committed stock from pending/in-transit transfers IN BASE UNITS
+    #     committed_stock = StockTransferItem.objects.filter(
+    #         product=self,
+    #         stock_transfer__status__in=['pending', 'in_transit']
+    #     ).aggregate(committed=Sum('base_quantity'))['committed'] or 0  # FIXED: base_quantity
+        
+    #     return total_physical_stock
+    #     # return max(0, total_physical_stock - committed_stock)
 
     @property
     def committed_stock(self):
         from app.models.transactions import StockTransferItem
-        """Stock reserved for pending/in-transit transfers"""
+        """Stock reserved for pending/in-transit transfers IN BASE UNITS"""
         return StockTransferItem.objects.filter(
             product=self,
             stock_transfer__status__in=['pending', 'in_transit']
-        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        ).aggregate(committed=Sum('base_quantity'))['committed'] or 0  # FIXED: base_quantity
 
     @property
     def stock_by_store(self):
         from app.models.transactions import StockTransferItem
-        """Detailed stock breakdown by store with real-time availability"""
+        """Detailed stock breakdown by store with real-time availability IN BASE UNITS"""
         stores_data = []
         for inventory in self.inventories.select_related('store').all():
-            # Calculate committed stock for this specific store
+            # Calculate committed stock for this specific store IN BASE UNITS
             committed_stock = StockTransferItem.objects.filter(
                 product=self,
                 stock_transfer__from_store=inventory.store,
                 stock_transfer__status__in=['pending', 'in_transit']
-            ).aggregate(committed=Sum('quantity'))['committed'] or 0
+            ).aggregate(committed=Sum('base_quantity'))['committed'] or 0  # FIXED: base_quantity
             
             stores_data.append({
                 'store': inventory.store.name,
-                'physical_stock': inventory.quantity_in_stock,
+                'physical_stock': inventory.quantity_in_stock,  # Already base units
                 'committed_stock': committed_stock,
                 'available_stock': max(0, inventory.quantity_in_stock - committed_stock),
                 'reorder_level': inventory.reorder_level,
@@ -98,21 +106,20 @@ class Product(models.Model):
 
     @property
     def low_stock_stores(self):
-        """Stores where this product is below reorder level"""
+        """Stores where this product is below reorder level (BASE UNITS)"""
         low_stock = []
         for store_data in self.stock_by_store:
             if store_data['available_stock'] <= store_data['reorder_level']:
                 low_stock.append(store_data)
         return low_stock
 
-
     @property
     def out_of_stock_stores(self):
-        """Stores where this product is out of stock"""
+        """Stores where this product is out of stock (BASE UNITS)"""
         return [store for store in self.stock_by_store if store['available_stock'] == 0]
 
     def get_stock_for_store(self, store):
-        """Get real-time stock for a specific store"""
+        """Get real-time stock for a specific store IN BASE UNITS"""
         from app.models.transactions import StockTransferItem
         try:
             inventory = self.inventories.get(store=store)
@@ -120,7 +127,7 @@ class Product(models.Model):
                 product=self,
                 stock_transfer__from_store=store,
                 stock_transfer__status__in=['pending', 'in_transit']
-            ).aggregate(committed=Sum('quantity'))['committed'] or 0
+            ).aggregate(committed=Sum('base_quantity'))['committed'] or 0  # FIXED: base_quantity
             
             return {
                 'physical_stock': inventory.quantity_in_stock,
@@ -147,11 +154,29 @@ class Product(models.Model):
 
     @property
     def total_sales_quantity(self):
-        return sum(item.quantity for item in self.salesorderitem_set.all())
+        """Total sales quantity IN BASE UNITS"""
+        return sum(item.base_quantity for item in self.salesorderitem_set.all())  # FIXED: base_quantity
 
     @property
     def total_purchase_quantity(self):
-        return sum(item.quantity for item in self.purchaseorderitem_set.all())
+        """Total purchase quantity IN BASE UNITS"""
+        return sum(item.base_quantity for item in self.purchaseorderitem_set.all())  # FIXED: base_quantity
+    
+    def get_conversion_factors(self):
+        """Get all conversion factors for this product"""
+        factors = {}
+        for unit_price in self.unit_prices.all():
+            factors[unit_price.unit.name] = {
+                'conversion_factor': unit_price.conversion_factor,
+                'price': unit_price.price,
+                'is_base': unit_price.conversion_factor == 1
+            }
+        return factors
+    
+    def get_base_unit(self):
+        """Get the base unit for this product"""
+        base_unit_price = self.unit_prices.filter(conversion_factor=1).first()
+        return base_unit_price.unit if base_unit_price else None
 
     def save(self, *args, **kwargs):
         if not self.sku:
@@ -172,7 +197,7 @@ class Product(models.Model):
 class ProductUnitPrice(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="unit_prices")
     unit = models.ForeignKey(UnitOfMeasure, on_delete=models.CASCADE)
-    conversion_factor = models.DecimalField(max_digits=10, decimal_places=4, default=1.0)  # Changed from FloatField
+    conversion_factor = models.DecimalField(max_digits=10, decimal_places=0, default=1.0)  # Changed from FloatField
     price = models.DecimalField(max_digits=10, decimal_places=0)
     
     class Meta:
@@ -182,11 +207,33 @@ class ProductUnitPrice(models.Model):
     def __str__(self):
         return f"{self.product.name} - {self.unit.name} ({self.price}/-)"
     
+    def clean(self):
+        if self.conversion_factor <= 0:
+            raise ValidationError("Conversion factor must be positive")
+
+        if self.conversion_factor % 1 != 0:
+            raise ValidationError(
+                "Conversion factor must produce whole base units"
+            )
+    
     def save(self, *args, **kwargs):
-        # Ensure conversion_factor is positive
         if self.conversion_factor <= 0:
             raise ValidationError("Conversion factor must be greater than 0")
+        
+        # REMOVED: single base unit enforcement
+        # if self.conversion_factor == 1:
+        #     exists = ProductUnitPrice.objects.filter(
+        #         product=self.product,
+        #         conversion_factor=1
+        #     ).exclude(pk=self.pk).exists()
+
+        #     if exists:
+        #         raise ValidationError(
+        #             "A product can only have one base unit (conversion factor = 1)"
+        #         )
+
         super().save(*args, **kwargs)
+
 
 
 class StoreLocation(models.Model):
@@ -203,28 +250,31 @@ class StoreLocation(models.Model):
     def total_products(self):
         return self.inventory_set.values('product').distinct().count()
 
-
     @property
     def total_stock_items(self):
+        """Total stock items IN BASE UNITS"""
         return sum(inv.quantity_in_stock for inv in self.inventory_set.all())
-
 
 
 class Inventory(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
     store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE)
-    quantity_in_stock = models.PositiveIntegerField(default=0)
-    reorder_level = models.PositiveIntegerField(default=10)
+    quantity_in_stock = models.PositiveIntegerField(default=0)  # ALWAYS BASE UNITS
+    reorder_level = models.PositiveIntegerField(default=10)     # IN BASE UNITS
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('product', 'store')
-      
         indexes = [
             models.Index(fields=['product', 'store']),
             models.Index(fields=['store', 'product']),
             models.Index(fields=['last_updated']),
         ]
+        
+    def save(self, *args, **kwargs):
+        if self.quantity_in_stock < 0:
+            raise ValidationError("Inventory cannot be negative")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.product.name} @ {self.store.name} ({self.store.branch.name if self.store.branch else 'No Branch'})"

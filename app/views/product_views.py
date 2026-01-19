@@ -81,7 +81,8 @@ def manage_product_view(request):
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
         total_physical_stock = sum(inv.quantity_in_stock for inv in product.inventories.all())
-        total_available_stock = max(0, total_physical_stock - total_committed_stock)
+        total_available_stock = total_physical_stock
+        # total_available_stock = max(0, total_physical_stock - total_committed_stock)
         
         enhanced_products.append({
             'product': product,
@@ -323,6 +324,8 @@ def product_details_view(request, _product_id):
             stock_transfer__status__in=['pending', 'in_transit']
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
+        
+        # available_stock = inventory.quantity_in_stock
         available_stock = max(0, inventory.quantity_in_stock - committed_stock)
         
         inventory_data.append({

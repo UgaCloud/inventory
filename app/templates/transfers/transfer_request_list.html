@@ -1,9 +1,9 @@
-
 {# app/templates/transfers/transfer_request_list.html #}
 {% extends 'basic/base.html' %}
 {% load crispy_forms_tags %}
 {% load i18n %}
 {% load static %}
+{% load custom_filter %}
 {% load humanize %}
 
 {% block title %}Transfer Requests{% endblock %}
@@ -19,6 +19,7 @@
           <h6>Manage stock transfer requests across stores</h6>
         </div>
       </div>
+      
       <!-- In the table-top-head section -->
       <ul class="table-top-head">
         <li>
@@ -37,7 +38,6 @@
           </div>
         </li>
         <li>
-          <!-- FIXED: Changed data-action to onclick -->
           <button class="btn btn-primary" onclick="showNewRequestModal()">
             <i data-feather="plus" class="feather-16"></i>
             New Request
@@ -97,6 +97,32 @@
       </div>
     </div>
 
+    <!-- Conversion Factor Info Panel -->
+    <div class="card mb-4 bg-light border-info">
+      <div class="card-body py-3">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <div class="d-flex align-items-center">
+              <i data-feather="info" class="feather-24 text-info me-3"></i>
+              <div>
+                <h6 class="mb-1 text-info">Conversion Factor Logic Applied</h6>
+                <p class="mb-0 text-muted small">
+                  All stock calculations use: <strong>QTY × CF = Base Units</strong>. 
+                  System converts your selected units to base units for accurate inventory tracking.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 text-end">
+            <button class="btn btn-sm btn-outline-info" onclick="showConversionHelp()">
+              <i data-feather="help-circle" class="feather-14 me-1"></i>
+              How it works
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Requests Table -->
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
@@ -118,7 +144,8 @@
               <tr>
                 <th>Request ID</th>
                 <th>Route</th>
-                <th>Items</th>
+                <th>Items (Base Units)</th>
+                <th>Conversion Summary</th>
                 <th>Priority</th>
                 <th>Requested By</th>
                 <th>Request Date</th>
@@ -129,13 +156,19 @@
             </thead>
             <tbody>
               {% for request in requests %}
-              <tr id="transfer-request-row-{{ request.id }}" data-request-id="{{ request.id }}" data-status="{{ request.status }}" class="{% if request.priority == 'urgent' and request.status == 'pending' %}table-warning{% endif %}">
+              {% with summary=request_summaries|dict_key:request.id %}
+              <tr id="transfer-request-row-{{ request.id }}" data-request-id="{{ request.id }}" data-status="{{ request.status }}" 
+                  class="{% if request.priority == 'urgent' and request.status == 'pending' %}table-warning{% endif %}
+                         {% if not request.can_approve and request.status == 'pending' %}table-danger{% endif %}">
                 <td>
                   <a href="{% url 'transfer_request_detail' request.id %}" class="fw-bold text-primary">
                     #TR{{ request.id|stringformat:"04d" }}
                   </a>
                   {% if request.is_overdue %}
                     <span class="badge bg-danger ms-1">Overdue</span>
+                  {% endif %}
+                  {% if not request.can_approve and request.status == 'pending' %}
+                    <span class="badge bg-warning ms-1">Low Stock</span>
                   {% endif %}
                 </td>
                 <td>
@@ -151,21 +184,45 @@
                 <td>
                   <div class="d-flex align-items-center">
                     <span class="badge bg-info me-2">{{ request.items.count }}</span>
-                    <small class="text-muted">
-                      {% for item in request.items.all %}
-                        {% if forloop.counter <= 2 %}
-                          {% if item.units %}
-                            {{ item.quantity }} {{ item.units.abbreviation }}{% if not forloop.last %}, {% endif %}
-                          {% else %}
-                            {{ item.quantity }} units{% if not forloop.last %}, {% endif %}
-                          {% endif %}
-                        {% elif forloop.counter == 3 %}
+                    <div>
+                      <div class="text-primary small fw-bold">
+                        {{ request.total_requested_items }} base units
+                      </div>
+                      <div class="text-muted small">
+                        {% for item in request.items.all|slice:":2" %}
+                          {{ item.quantity }} {{ item.units.abbreviation }}
+                          {% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                        {% if request.items.count > 2 %}
                           ...and {{ request.items.count|add:"-2" }} more
                         {% endif %}
-                      {% empty %}
-                        No items
-                      {% endfor %}
-                    </small>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="conversion-summary">
+                    {% if summary.conversion_details %}
+                      <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-info dropdown-toggle py-0 px-2" type="button" 
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                          <i data-feather="calculator" class="feather-12 me-1"></i>
+                          View CF
+                        </button>
+                        <div class="dropdown-menu p-3" style="max-width: 400px;">
+                          <h6 class="dropdown-header">Conversion Calculations</h6>
+                          {% for detail in summary.conversion_details %}
+                            <div class="mb-2">
+                              <div class="fw-bold small">{{ detail.product }}</div>
+                              <div class="small text-muted">{{ detail.calculation }}</div>
+                              <div class="small text-success">{{ detail.conversion_explanation }}</div>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% else %}
+                      <span class="text-muted small">No conversion data</span>
+                    {% endif %}
                   </div>
                 </td>
                 <td>
@@ -234,9 +291,15 @@
                       </a>
                       
                       {% if request.status == 'pending' and perms.app.approve_transfer_request %}
-                        <button class="btn btn-sm btn-success me-1" onclick="approveRequest({{ request.id }})" title="Approve">
-                          <i data-feather="check" class="feather-14"></i>
-                        </button>
+                        {% if request.can_approve %}
+                          <button class="btn btn-sm btn-success me-1" onclick="approveRequest({{ request.id }})" title="Approve">
+                            <i data-feather="check" class="feather-14"></i>
+                          </button>
+                        {% else %}
+                          <button class="btn btn-sm btn-success me-1 disabled" title="Insufficient Stock">
+                            <i data-feather="x" class="feather-14"></i>
+                          </button>
+                        {% endif %}
                         <button class="btn btn-sm btn-danger me-1" onclick="rejectRequest({{ request.id }})" title="Reject">
                           <i data-feather="x" class="feather-14"></i>
                         </button>
@@ -259,17 +322,31 @@
                           <i data-feather="more-horizontal" class="feather-14"></i>
                         </button>
                         <ul class="dropdown-menu">
-                          <li><a class="dropdown-item" href="#">
-                            <i data-feather="printer" class="feather-14 me-2"></i>Print Request
-                          </a></li>
-                          <li><a class="dropdown-item" href="#">
-                            <i data-feather="copy" class="feather-14 me-2"></i>Duplicate Request
-                          </a></li>
+                          <li>
+                            <a class="dropdown-item" href="{% url 'print_transfer_request' request.id %}" target="_blank">
+                              <i data-feather="printer" class="feather-14 me-2"></i>Print Request
+                            </a>
+                          </li>
+                          <li>
+                            <a class="dropdown-item" href="{% url 'conversion_factor_debug' request.id %}">
+                              <i data-feather="code" class="feather-14 me-2"></i>View CF Calculations
+                            </a>
+                          </li>
+                          <li>
+                            <hr class="dropdown-divider">
+                          </li>
+                          <li>
+                            <a class="dropdown-item" href="#" onclick="duplicateRequest({{ request.id }})">
+                              <i data-feather="copy" class="feather-14 me-2"></i>Duplicate Request
+                            </a>
+                          </li>
                           {% if request.status == 'pending' and request.requested_by == user %}
                           <li><hr class="dropdown-divider"></li>
-                          <li><a class="dropdown-item text-danger" href="#" onclick="cancelRequest({{ request.id }})">
-                            <i data-feather="trash-2" class="feather-14 me-2"></i>Cancel Request
-                          </a></li>
+                          <li>
+                            <a class="dropdown-item text-danger" href="#" onclick="cancelRequest({{ request.id }})">
+                              <i data-feather="trash-2" class="feather-14 me-2"></i>Cancel Request
+                            </a>
+                          </li>
                           {% endif %}
                         </ul>
                       </div>
@@ -277,9 +354,10 @@
                   </div>
                 </td>
               </tr>
+              {% endwith %}
               {% empty %}
               <tr>
-                <td colspan="9" class="text-center py-5">
+                <td colspan="10" class="text-center py-5">
                   <div class="empty-state">
                     <i data-feather="inbox" class="feather-48 text-muted mb-3"></i>
                     <h5 class="text-muted">No transfer requests found</h5>
@@ -356,6 +434,18 @@
           {% csrf_token %}
           <input type="hidden" id="editRequestId" name="edit_request_id" value="">
           
+          <!-- Conversion Factor Info Box -->
+          <div class="alert alert-info mb-4">
+            <div class="d-flex">
+              <i data-feather="info" class="feather-20 me-3"></i>
+              <div>
+                <h6 class="alert-heading">Conversion Factor System</h6>
+                <p class="mb-1 small">The system automatically converts your selected units to base units using: <strong>QTY × CF = Base Units</strong></p>
+                <p class="mb-0 small">Stock checks and calculations are performed using base units for accurate inventory tracking.</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Request Basic Info -->
           <div class="row mb-4">
             <div class="col-md-6">
@@ -427,7 +517,11 @@
           <!-- Request Items Section -->
           <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h6 class="mb-0">Request Items</h6>
+              <h6 class="mb-0">
+                <i data-feather="shopping-cart" class="feather-16 me-2"></i>
+                Request Items
+                <small class="text-muted ms-2" id="totalBaseUnits">Total: 0 base units</small>
+              </h6>
               <button type="button" class="btn btn-sm btn-primary" onclick="addRequestItem()">
                 <i data-feather="plus" class="feather-12 me-1"></i>
                 Add Item
@@ -438,11 +532,12 @@
                 <table class="table table-sm" id="requestItemsTable">
                   <thead class="table-light">
                     <tr>
-                      <th width="25%">Product</th>
+                      <th width="20%">Product</th>
                       <th width="15%">Available Stock</th>
                       <th width="15%">Requested Qty</th>
-                      <th width="25%">Unit</th>
-                      <th width="15%">Notes</th>
+                      <th width="20%">Unit (CF)</th>
+                      <th width="15%">Base Units</th>
+                      <th width="10%">Notes</th>
                       <th width="5%">Actions</th>
                     </tr>
                   </thead>
@@ -451,9 +546,16 @@
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colspan="6" class="text-muted small">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Stock is shown in base units. Conversion factors are applied automatically when units are selected.
+                      <td colspan="7" class="text-muted small">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <div>
+                            <i data-feather="info" class="feather-14 me-1"></i>
+                            <strong>QTY × CF = Base Units</strong> - All calculations use base units for accuracy
+                          </div>
+                          <div class="text-end">
+                            <strong id="footerTotalBaseUnits">Total Base Units: 0</strong>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   </tfoot>
@@ -490,7 +592,10 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="approveModalLabel">Approve Transfer Request</h5>
+        <h5 class="modal-title" id="approveModalLabel">
+          <i data-feather="check-circle" class="feather-16 me-2"></i>
+          Approve Transfer Request
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -504,8 +609,17 @@
           </div>
           
           <div class="alert alert-info">
-            <i data-feather="info" class="feather-16 me-2"></i>
-            <small>Approving this request will make it available for creating actual stock transfers.</small>
+            <div class="d-flex">
+              <i data-feather="info" class="feather-16 me-2"></i>
+              <div>
+                <small>Approving this request will:</small>
+                <ul class="small mb-0 ps-3">
+                  <li>Make it available for creating actual stock transfers</li>
+                  <li>Reserve the stock in base units</li>
+                  <li>Notify the requester of approval</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </form>
       </div>
@@ -525,7 +639,10 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="rejectModalLabel">Reject Transfer Request</h5>
+        <h5 class="modal-title" id="rejectModalLabel">
+          <i data-feather="x-circle" class="feather-16 me-2"></i>
+          Reject Transfer Request
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -540,8 +657,17 @@
           </div>
           
           <div class="alert alert-warning">
-            <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-            <small>Rejecting this request will notify the requester and prevent further actions.</small>
+            <div class="d-flex">
+              <i data-feather="alert-triangle" class="feather-16 me-2"></i>
+              <div>
+                <small>Rejecting this request will:</small>
+                <ul class="small mb-0 ps-3">
+                  <li>Prevent further actions on this request</li>
+                  <li>Notify the requester of rejection</li>
+                  <li>Release any reserved stock</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </form>
       </div>
@@ -556,11 +682,89 @@
   </div>
 </div>
 
+<!-- Conversion Factor Help Modal -->
+<div class="modal fade" id="conversionHelpModal" tabindex="-1" aria-labelledby="conversionHelpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="conversionHelpModalLabel">
+          <i data-feather="help-circle" class="feather-16 me-2"></i>
+          How Conversion Factors Work
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-primary">
+          <h6 class="alert-heading">Core Formula: QTY × CF = Base Units</h6>
+          <p class="mb-0">The system converts all quantities to base units before processing.</p>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-6">
+            <div class="card mb-3">
+              <div class="card-body">
+                <h6><i data-feather="box" class="feather-16 me-2 text-primary"></i>Example: Sugar Sachets</h6>
+                <ul class="mb-0">
+                  <li>Base Unit: <strong>Sachet (CF = 1)</strong></li>
+                  <li>Pack: <strong>1 Pack = 10 sachets</strong></li>
+                  <li>Box: <strong>1 Box = 100 sachets</strong></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card mb-3">
+              <div class="card-body">
+                <h6><i data-feather="calculator" class="feather-16 me-2 text-success"></i>Calculation Examples</h6>
+                <ul class="mb-0">
+                  <li>3 Boxes: <code>3 × 100 = 300</code> sachets</li>
+                  <li>5 Packs: <code>5 × 10 = 50</code> sachets</li>
+                  <li>15 Sachets: <code>15 × 1 = 15</code> sachets</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-body">
+            <h6><i data-feather="database" class="feather-16 me-2 text-info"></i>Why This Matters</h6>
+            <ul>
+              <li><strong>Single Source of Truth:</strong> All inventory is tracked in one base unit</li>
+              <li><strong>Accurate Transfers:</strong> Prevents stock mismatches between stores</li>
+              <li><strong>Clean Audits:</strong> Easy reconciliation during stock takes</li>
+              <li><strong>Consistent Reporting:</strong> All reports use base units for accuracy</li>
+            </ul>
+            
+            <div class="alert alert-light mt-3">
+              <h6 class="alert-heading">Real-World Analogy</h6>
+              <p class="mb-0">
+                Think of money: Base unit = cents. You store $3.50 as <strong>350 cents</strong> in the database, 
+                not as "3 notes + 5 coins". Same principle applies to inventory.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="showNewRequestModal()">
+          <i data-feather="plus" class="feather-16 me-1"></i>
+          Create Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
 <script>
 // Global variables
 let requestItemCounter = 0;
 let availableProducts = [];
 let currentEditRequestId = null;
+let totalBaseUnits = 0;
 
 // CSRF token for AJAX requests
 function getCookie(name) {
@@ -605,6 +809,12 @@ function showToast(message, kind = 'success') {
   }, 3500);
 }
 
+// Show conversion help modal
+function showConversionHelp() {
+  const modal = new bootstrap.Modal(document.getElementById('conversionHelpModal'));
+  modal.show();
+}
+
 // Show new request modal
 function showNewRequestModal() {
   console.log('showNewRequestModal called');
@@ -612,10 +822,15 @@ function showNewRequestModal() {
   // Reset everything
   requestItemCounter = 0;
   currentEditRequestId = null;
+  totalBaseUnits = 0;
   document.getElementById('newRequestForm').reset();
   document.getElementById('requestItemsBody').innerHTML = '';
   document.getElementById('stockAlert').style.display = 'none';
   document.getElementById('formErrorsAlert').style.display = 'none';
+  
+  // Reset totals
+  document.getElementById('totalBaseUnits').textContent = 'Total: 0 base units';
+  document.getElementById('footerTotalBaseUnits').textContent = 'Total Base Units: 0';
   
   // Reset edit mode
   document.getElementById('editRequestId').value = '';
@@ -635,15 +850,12 @@ function showNewRequestModal() {
     
     // Load products and add initial item after modal is shown
     setTimeout(() => {
-      // Use the API products endpoint that you have
       loadProductsFromAPI().then(() => {
         addRequestItem();
-        
-        // Focus on first field
         document.getElementById('from_store').focus();
       }).catch(error => {
         console.error('Error loading products:', error);
-        addRequestItem(); // Still add item even if products fail to load
+        addRequestItem();
       });
     }, 500);
   }
@@ -652,24 +864,53 @@ function showNewRequestModal() {
 // Load products from the API endpoint
 async function loadProductsFromAPI() {
   try {
-    // Use the endpoint from your logs: /api/products/?active_only=true
     const response = await fetch('/api/products/?active_only=true');
     if (response.ok) {
       const data = await response.json();
-      // Adapt based on the actual response structure
       if (data.products || data.results) {
         availableProducts = data.products || data.results || [];
+        console.log('Loaded products:', availableProducts.length);
       } else {
-        // If the structure is different, try to extract products
         availableProducts = data || [];
       }
     } else {
+      console.warn('Failed to load products, status:', response.status);
       availableProducts = [];
     }
   } catch (error) {
     console.error('Error loading products:', error);
     availableProducts = [];
   }
+}
+
+// Update total base units calculation
+function updateTotalBaseUnits() {
+  totalBaseUnits = 0;
+  const rows = document.querySelectorAll('#requestItemsBody tr');
+  
+  rows.forEach(row => {
+    const quantityInput = row.querySelector('.requested-qty');
+    const cfInput = row.querySelector('.conversion-factor');
+    const baseUnitsCell = row.querySelector('.base-units-display');
+    
+    if (quantityInput && cfInput && quantityInput.value) {
+      const quantity = parseInt(quantityInput.value) || 0;
+      const cf = parseFloat(cfInput.value) || 1;
+      const baseUnits = Math.round(quantity * cf);
+      
+      if (baseUnitsCell) {
+        baseUnitsCell.textContent = baseUnits;
+      }
+      
+      totalBaseUnits += baseUnits;
+    }
+  });
+  
+  // Update totals display
+  document.getElementById('totalBaseUnits').textContent = `Total: ${totalBaseUnits} base units`;
+  document.getElementById('footerTotalBaseUnits').textContent = `Total Base Units: ${totalBaseUnits}`;
+  
+  return totalBaseUnits;
 }
 
 // Add request item row with conversion factor support
@@ -686,7 +927,6 @@ function addRequestItem() {
               data-item-id="${idx}" required
               onchange="handleProductChange(${idx})">
         <option value="">Select product...</option>
-        <!-- Products will be loaded dynamically -->
       </select>
       <div class="conversion-factor-info small text-muted mt-1" id="cf-info-${idx}" style="display: none;"></div>
     </td>
@@ -702,8 +942,8 @@ function addRequestItem() {
       <input type="number" name="items-${idx}-quantity" 
              class="form-control form-control-sm requested-qty" 
              min="1" step="1" placeholder="0" required
-             onchange="updateStockCalculation(${idx})"
-             oninput="updateStockCalculation(${idx})">
+             onchange="handleQuantityChange(${idx})"
+             oninput="handleQuantityChange(${idx})">
       <div class="invalid-feedback">Quantity exceeds available stock</div>
     </td>
     <td>
@@ -712,9 +952,12 @@ function addRequestItem() {
               onchange="handleUnitChange(${idx})">
         <option value="">Select unit...</option>
       </select>
-      <div class="unit-price-info mt-1">
-        <small class="unit-price-text" id="unit-price-text-${idx}"></small>
+      <div class="unit-info mt-1">
+        <small class="cf-display-text" id="cf-display-${idx}"></small>
       </div>
+    </td>
+    <td>
+      <div class="base-units-display text-center fw-bold" id="base-units-${idx}">0</div>
     </td>
     <td>
       <input type="text" name="items-${idx}-notes" 
@@ -730,10 +973,8 @@ function addRequestItem() {
 
   tbody.appendChild(row);
   
-  // Load products into dropdown
   loadProductsIntoDropdown(idx);
   
-  // Re-initialize feather icons
   if (typeof feather !== 'undefined') {
     feather.replace();
   }
@@ -745,48 +986,63 @@ function addRequestItem() {
 async function loadProductsIntoDropdown(itemId) {
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   
-  // Clear existing options except the first one
+  // Clear existing options except first one
   while (productSelect.options.length > 1) {
     productSelect.remove(1);
   }
   
-  // Add products from availableProducts array
+  // If no products loaded yet, load them
+  if (!availableProducts || availableProducts.length === 0) {
+    try {
+      await loadProductsFromAPI();
+    } catch (error) {
+      console.error('Error loading products in dropdown:', error);
+    }
+  }
+  
+  // Populate dropdown
   if (availableProducts && availableProducts.length > 0) {
     availableProducts.forEach(product => {
       const option = document.createElement('option');
       option.value = product.id;
-      option.textContent = `${product.name} (${product.sku || product.code || ''})`;
+      
+      // Create display text with available information
+      let displayText = product.name || 'Unnamed Product';
+      if (product.sku) {
+        displayText += ` (${product.sku})`;
+      } else if (product.code) {
+        displayText += ` (${product.code})`;
+      } else if (product.barcode) {
+        displayText += ` [${product.barcode}]`;
+      }
+      
+      option.textContent = displayText;
       productSelect.appendChild(option);
     });
   } else {
-    // Fallback: try to fetch products from the API endpoint
-    try {
-      const response = await fetch('/api/products/?active_only=true');
-      if (response.ok) {
-        const data = await response.json();
-        const products = data.products || data.results || data;
-        
-        if (products && Array.isArray(products)) {
-          products.forEach(product => {
-            const option = document.createElement('option');
-            option.value = product.id;
-            option.textContent = `${product.name} (${product.sku || product.code || ''})`;
-            productSelect.appendChild(option);
-          });
-        } else {
-          productSelect.innerHTML += '<option value="" disabled>No products available</option>';
-        }
-      } else {
-        productSelect.innerHTML += '<option value="" disabled>Error loading products</option>';
-      }
-    } catch (error) {
-      console.error('Error loading products:', error);
-      productSelect.innerHTML += '<option value="" disabled>Error loading products</option>';
-    }
+    // Add a fallback option
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No products available';
+    option.disabled = true;
+    productSelect.appendChild(option);
   }
 }
 
-// Handle product selection with conversion factor support
+// DEBUG: Log API response
+async function debugProductUnits(productId) {
+  try {
+    const response = await fetch(`{% url "product_units" 0 %}`.replace('0', productId));
+    const data = await response.json();
+    console.log('DEBUG Product Units Response:', data);
+    return data;
+  } catch (error) {
+    console.error('DEBUG Error:', error);
+    return null;
+  }
+}
+
+// Handle product selection with conversion factor support - FIXED VERSION
 async function handleProductChange(itemId) {
   console.log(`Product changed for item ${itemId}`);
   
@@ -796,7 +1052,6 @@ async function handleProductChange(itemId) {
   const cfInfo = document.getElementById(`cf-info-${itemId}`);
   
   if (!productSelect.value) {
-    // Reset if no product selected
     unitSelect.innerHTML = '<option value="">Select unit...</option>';
     cfInfo.style.display = 'none';
     return;
@@ -808,46 +1063,68 @@ async function handleProductChange(itemId) {
     return;
   }
   
-  // Show loading state for units
   unitSelect.innerHTML = '<option value="">Loading units...</option>';
   unitSelect.disabled = true;
   cfInfo.style.display = 'none';
   
   try {
-    // Fetch product units with conversion factors - USING CORRECT URL NAME
-    const response = await fetch('{% url "product_units" 0 %}'.replace('0', productSelect.value));
+    // First, debug the API response
+    const debugData = await debugProductUnits(productSelect.value);
+    
+    const response = await fetch(`{% url "product_units" 0 %}`.replace('0', productSelect.value));
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
     
     const data = await response.json();
+    console.log('Product units API response:', data);
     
     if (data.success && data.units && data.units.length > 0) {
-      // Populate unit dropdown with conversion factors
       unitSelect.innerHTML = '<option value="">Select unit...</option>';
+      
       data.units.forEach(unit => {
         const option = document.createElement('option');
-        option.value = unit.id;
         
-        // Display conversion factor in dropdown
-        const cfText = unit.conversion_factor === 1 ? 'Base Unit' : `CF: ${unit.conversion_factor}`;
-        const baseUnitIndicator = unit.is_base_unit ? ' (Base Unit)' : '';
+        // Use the correct field names based on your API response
+        // Check what fields are actually available
+        console.log('Unit object structure:', unit);
         
-        option.textContent = `${unit.name} ${baseUnitIndicator} - ${cfText}`;
-        option.dataset.price = unit.price;
-        option.dataset.conversion_factor = unit.conversion_factor;
-        option.dataset.is_base_unit = unit.is_base_unit;
-        option.dataset.abbreviation = unit.abbreviation;
+        // IMPORTANT: Use the correct ID field (ProductUnitPrice ID, not UnitOfMeasure ID)
+        option.value = unit.id || unit.unit_price_id; // This should be ProductUnitPrice ID
+        
+        // Get the correct field names
+        const unitName = unit.unit_name || unit.name || unit.unit?.name || 'Unit';
+        const abbreviation = unit.abbreviation || unit.unit?.abbreviation || '';
+        const conversionFactor = unit.conversion_factor || unit.conversionFactor || 1;
+        const isBaseUnit = unit.is_base_unit || (conversionFactor === 1);
+        const price = unit.price || 0;
+        
+        const cfText = conversionFactor === 1 ? 'Base Unit' : `CF: ${conversionFactor}`;
+        const baseUnitIndicator = isBaseUnit ? ' (Base Unit)' : '';
+        
+        option.textContent = `${unitName}${baseUnitIndicator} - ${cfText}`;
+        
+        // Store data as attributes for later use
+        option.dataset.price = price;
+        option.dataset.conversion_factor = conversionFactor;
+        option.dataset.is_base_unit = isBaseUnit;
+        option.dataset.abbreviation = abbreviation;
+        option.dataset.unit_name = unitName;
         
         unitSelect.appendChild(option);
       });
+      
       unitSelect.disabled = false;
       
       // Auto-select base unit if available
-      const baseUnit = Array.from(unitSelect.options).find(opt => opt.dataset.is_base_unit === 'true');
+      const baseUnit = Array.from(unitSelect.options).find(opt => 
+        opt.dataset.is_base_unit === 'true' || opt.dataset.conversion_factor === '1'
+      );
+      
       if (baseUnit) {
         unitSelect.value = baseUnit.value;
       } else if (data.units.length > 0) {
+        // Select first unit if no base unit found
         unitSelect.value = data.units[0].id;
       }
       
@@ -856,86 +1133,105 @@ async function handleProductChange(itemId) {
     } else {
       unitSelect.innerHTML = '<option value="">No units available</option>';
       unitSelect.disabled = false;
+      console.warn('No units found for product:', data);
+      showToast('No units configured for this product', 'warning');
     }
     
-    // Update stock availability
     await updateStockAvailability(itemId);
     
   } catch (error) {
     console.error('Error fetching product units:', error);
     unitSelect.innerHTML = '<option value="">Error loading units</option>';
     unitSelect.disabled = false;
+    
+    // Show more detailed error
+    showToast(`Error loading units: ${error.message}`, 'danger');
   }
 }
 
-// Handle unit selection with conversion factor
+// Handle unit selection with conversion factor - FIXED VERSION
 async function handleUnitChange(itemId) {
+  console.log(`Unit changed for item ${itemId}`);
+  
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
-  const unitPriceText = document.getElementById(`unit-price-text-${itemId}`);
+  const cfDisplay = document.getElementById(`cf-display-${itemId}`);
   const cfInput = document.getElementById(`conversion-factor-${itemId}`);
   const cfInfo = document.getElementById(`cf-info-${itemId}`);
   
   if (!productSelect.value || !unitSelect.value) {
-    unitPriceText.textContent = '';
+    cfDisplay.textContent = '';
     cfInfo.style.display = 'none';
     return;
   }
   
-  // Get selected option's data
   const selectedOption = unitSelect.options[unitSelect.selectedIndex];
+  
+  // Debug selected option
+  console.log('Selected option data:', {
+    value: selectedOption.value,
+    text: selectedOption.textContent,
+    dataset: selectedOption.dataset
+  });
+  
   const conversionFactor = parseFloat(selectedOption.dataset.conversion_factor) || 1.0;
   const isBaseUnit = selectedOption.dataset.is_base_unit === 'true';
-  const unitAbbreviation = selectedOption.dataset.abbreviation || '';
+  const unitAbbreviation = selectedOption.dataset.abbreviation || selectedOption.dataset.unit_name || '';
+  const unitName = selectedOption.dataset.unit_name || '';
   
-  // Store conversion factor for calculations
   cfInput.value = conversionFactor;
   
-  // Show conversion factor info
   if (conversionFactor === 1) {
+    cfDisplay.textContent = 'Base Unit (CF=1)';
+    cfDisplay.className = 'cf-display-text small text-success fw-bold';
     cfInfo.textContent = 'Base unit';
     cfInfo.className = 'conversion-factor-info small text-success';
   } else {
+    cfDisplay.textContent = `1 ${unitAbbreviation} = ${conversionFactor} base units`;
+    cfDisplay.className = 'cf-display-text small text-info';
     cfInfo.textContent = `1 ${unitAbbreviation} = ${conversionFactor} base units`;
     cfInfo.className = 'conversion-factor-info small text-info';
   }
   cfInfo.style.display = 'block';
   
-  // Get price from dataset or fetch from API
-  if (selectedOption.dataset.price) {
-    const price = parseFloat(selectedOption.dataset.price);
-    unitPriceText.textContent = `Price: UGX ${price.toLocaleString()}`;
-    unitPriceText.className = 'text-success unit-price-text';
-  } else {
-    // Fetch from API - USING CORRECT URL NAME
-    try {
-      const response = await fetch('{% url "product_unit_price" 0 0 %}'.replace('0/0', `${productSelect.value}/${unitSelect.value}`));
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const price = data.unit_price.price;
-          unitPriceText.textContent = `Price: UGX ${price.toLocaleString()}`;
-          unitPriceText.className = 'text-success unit-price-text';
-        } else {
-          unitPriceText.textContent = 'Price: N/A';
-          unitPriceText.className = 'text-muted unit-price-text';
-        }
-      } else {
-        unitPriceText.textContent = 'Price: N/A';
-        unitPriceText.className = 'text-muted unit-price-text';
-      }
-    } catch (error) {
-      console.error('Error fetching unit price:', error);
-      unitPriceText.textContent = 'Price: Error loading';
-      unitPriceText.className = 'text-danger unit-price-text';
+  // Update base units calculation if quantity exists
+  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+  if (quantityInput && quantityInput.value) {
+    await handleQuantityChange(itemId);
+  }
+  
+  // Also update stock availability display
+  await updateStockAvailability(itemId);
+}
+
+// Handle quantity change with conversion calculation
+async function handleQuantityChange(itemId) {
+  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+  const cfInput = document.getElementById(`conversion-factor-${itemId}`);
+  const baseUnitsDisplay = document.getElementById(`base-units-${itemId}`);
+  const availableStockBase = parseInt(document.getElementById(`available-value-${itemId}`).value) || 0;
+  
+  const quantity = parseInt(quantityInput.value) || 0;
+  const cf = parseFloat(cfInput.value) || 1;
+  const baseUnits = Math.round(quantity * cf);
+  
+  // Update base units display
+  baseUnitsDisplay.textContent = baseUnits;
+  baseUnitsDisplay.className = `base-units-display text-center fw-bold ${baseUnits > 0 ? 'text-primary' : 'text-muted'}`;
+  
+  // Validate stock
+  if (quantity > 0 && availableStockBase > 0) {
+    if (baseUnits > availableStockBase) {
+      quantityInput.classList.add('is-invalid');
+      baseUnitsDisplay.classList.add('text-danger');
+    } else {
+      quantityInput.classList.remove('is-invalid');
+      baseUnitsDisplay.classList.remove('text-danger');
     }
   }
   
-  // Update stock calculation with new conversion factor
-  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
-  if (quantityInput && quantityInput.value) {
-    await updateStockCalculation(itemId);
-  }
+  // Update total
+  updateTotalBaseUnits();
 }
 
 // Update product availability with conversion factor support
@@ -953,200 +1249,132 @@ async function updateStockAvailability(itemId) {
     return;
   }
   
+  const productId = productSelect.value;
+  const storeId = fromStoreSelect.value;
+  
   try {
-    // Fetch stock info (returns in base units) - USING CORRECT URL NAME
-    const response = await fetch('{% url "product_stock_for_store" 0 0 %}'.replace('0/0', `${productSelect.value}/${fromStoreSelect.value}`));
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    // FIRST: Try the exact URL pattern that matches your Django URL
+    const url = `/api/product/${productId}/store/${storeId}/stock/`;
+    console.log('Fetching stock from URL:', url);
     
-    const data = await response.json();
+    const response = await fetch(url);
     
-    if (data.success) {
-      const availableBaseUnits = data.stock.available_stock; // Already in base units
-      availableValueInput.value = availableBaseUnits;
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Stock API response:', data);
       
-      // Display based on selected unit
-      if (unitSelect && unitSelect.value) {
-        const selectedOption = unitSelect.options[unitSelect.selectedIndex];
-        const conversionFactor = parseFloat(selectedOption.dataset.conversion_factor) || 1.0;
-        const unitAbbreviation = selectedOption.dataset.abbreviation || '';
+      if (data.success) {
+        // Handle the response based on your view's return structure
+        const availableBaseUnits = data.stock.available_stock || 0;
+        availableValueInput.value = availableBaseUnits;
         
-        if (conversionFactor > 0) {
-          const displayUnits = Math.floor(availableBaseUnits / conversionFactor);
-          const remainingBaseUnits = availableBaseUnits % conversionFactor;
+        // Display based on selected unit
+        if (unitSelect && unitSelect.value) {
+          const selectedOption = unitSelect.options[unitSelect.selectedIndex];
+          const conversionFactor = parseFloat(selectedOption.dataset.conversion_factor) || 1.0;
+          const unitAbbreviation = selectedOption.dataset.abbreviation || selectedOption.dataset.unit_name || '';
           
-          availableSpan.textContent = `${displayUnits} ${unitAbbreviation}`;
-          if (remainingBaseUnits > 0) {
-            availableSpan.textContent += ` + ${remainingBaseUnits} base units`;
+          if (conversionFactor > 0 && conversionFactor !== 1) {
+            const displayUnits = Math.floor(availableBaseUnits / conversionFactor);
+            const remainingBaseUnits = availableBaseUnits % conversionFactor;
+            
+            availableSpan.textContent = `${displayUnits} ${unitAbbreviation}`;
+            if (remainingBaseUnits > 0) {
+              availableSpan.textContent += ` + ${remainingBaseUnits} base units`;
+            }
+          } else {
+            availableSpan.textContent = `${availableBaseUnits} base units`;
           }
         } else {
           availableSpan.textContent = `${availableBaseUnits} base units`;
         }
+        
+        // Color code based on stock level
+        if (availableBaseUnits === 0) {
+          availableSpan.className = 'available-stock text-danger fw-bold';
+        } else if (availableBaseUnits < 10) {
+          availableSpan.className = 'available-stock text-warning fw-bold';
+        } else {
+          availableSpan.className = 'available-stock text-success fw-bold';
+        }
+        
+        // Validate quantity if already entered
+        const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
+        if (quantityInput && quantityInput.value) {
+          await handleQuantityChange(itemId);
+        }
       } else {
-        availableSpan.textContent = `${availableBaseUnits} base units`;
-      }
-      
-      // Color code based on stock level
-      if (availableBaseUnits === 0) {
-        availableSpan.className = 'available-stock text-danger fw-bold';
-      } else if (availableBaseUnits < 10) {
-        availableSpan.className = 'available-stock text-warning fw-bold';
-      } else {
-        availableSpan.className = 'available-stock text-success fw-bold';
-      }
-      
-      // Validate quantity if already entered
-      const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
-      if (quantityInput && quantityInput.value) {
-        await updateStockCalculation(itemId);
+        availableSpan.textContent = 'No stock data';
+        availableSpan.className = 'available-stock text-warning';
+        availableValueInput.value = 0;
+        console.warn('Stock API returned error:', data.error);
       }
     } else {
-      availableSpan.textContent = 'Error';
-      availableSpan.className = 'available-stock text-danger';
-      availableValueInput.value = 0;
+      console.warn(`Stock API returned ${response.status}: ${response.statusText}`);
+      
+      // Try alternative URL patterns
+      const alternativeUrls = [
+        `/api/product/${productId}/stock/${storeId}/`,
+        `/api/products/${productId}/stores/${storeId}/stock/`,
+        `/api/stock/product/${productId}/store/${storeId}/`,
+        `/api/inventory/product/${productId}/store/${storeId}/`
+      ];
+      
+      let success = false;
+      
+      for (const altUrl of alternativeUrls) {
+        try {
+          console.log('Trying alternative URL:', altUrl);
+          const altResponse = await fetch(altUrl);
+          if (altResponse.ok) {
+            const altData = await altResponse.json();
+            console.log('Alternative API response:', altData);
+            
+            if (altData.success) {
+              const availableBaseUnits = altData.stock?.available_stock || altData.available_stock || 0;
+              availableValueInput.value = availableBaseUnits;
+              availableSpan.textContent = `${availableBaseUnits} units`;
+              availableSpan.className = 'available-stock text-info fw-bold';
+              success = true;
+              console.log('Success with alternative URL:', altUrl);
+              break;
+            }
+          }
+        } catch (altError) {
+          console.log(`Alternative URL ${altUrl} failed:`, altError.message);
+        }
+      }
+      
+      if (!success) {
+        availableSpan.textContent = 'Stock API Error';
+        availableSpan.className = 'available-stock text-muted';
+        availableValueInput.value = 0;
+        console.warn('All stock API attempts failed');
+        
+        // Show help message
+        showToast('Stock API endpoint not found. Check URL configuration.', 'warning');
+      }
     }
   } catch (error) {
     console.error('Error fetching stock info:', error);
-    availableSpan.textContent = 'Error';
-    availableSpan.className = 'available-stock text-danger';
+    availableSpan.textContent = 'Network Error';
+    availableSpan.className = 'available-stock text-muted';
     availableValueInput.value = 0;
+    
+    // Show error details
+    showToast(`Network error: ${error.message}`, 'danger');
   }
 }
 
-// Update stock calculation with conversion factor support
-async function updateStockCalculation(itemId) {
-  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
-  const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
-  const fromStoreSelect = document.getElementById('from_store');
-  const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
-  const availableSpan = document.getElementById(`available-${itemId}`);
-  const remainingSpan = document.getElementById(`remaining-${itemId}`);
-  const cfInput = document.getElementById(`conversion-factor-${itemId}`);
-  
-  if (!productSelect.value || !fromStoreSelect.value || !quantityInput.value) {
-    return;
-  }
-  
-  const displayQuantity = parseInt(quantityInput.value) || 0;
-  
-  if (displayQuantity <= 0) {
-    quantityInput.classList.remove('is-invalid');
-    remainingSpan.style.display = 'none';
-    hideStockAlert();
-    return;
-  }
-  
-  // Get conversion factor
-  const conversionFactor = parseFloat(cfInput.value) || 1.0;
-  
-  // Calculate base quantity needed
-  const baseQuantityNeeded = Math.round(displayQuantity * conversionFactor);
-  
-  // Show calculating
-  availableSpan.textContent = 'Calculating...';
-  availableSpan.className = 'available-stock text-info';
-  
-  try {
-    // Use the stock calculation endpoint with conversion factor - USING CORRECT URL NAME
-    let url = '{% url "product_stock_calculation" 0 %}'.replace('0', productSelect.value);
-    url += `?store_id=${fromStoreSelect.value}`;
-    url += `&requested_qty=${displayQuantity}`;
-    url += `&unit_id=${unitSelect ? unitSelect.value : ''}`;
-    
-    // Include current request ID if editing
-    const editId = document.getElementById('editRequestId').value;
-    if (editId) {
-      url += `&current_request_id=${editId}`;
-    }
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      const availableStockBase = data.stock_info.available_stock_base;
-      const remainingStockBase = data.stock_info.remaining_stock_base;
-      const status = data.status;
-      const conversionFactor = data.conversion_factor || 1.0;
-      
-      // Update available stock display
-      if (unitSelect && unitSelect.value) {
-        const selectedOption = unitSelect.options[unitSelect.selectedIndex];
-        const unitAbbreviation = selectedOption.dataset.abbreviation || '';
-        
-        if (conversionFactor > 0) {
-          const displayAvailable = Math.floor(availableStockBase / conversionFactor);
-          const remainingBase = availableStockBase % conversionFactor;
-          
-          availableSpan.textContent = `${displayAvailable} ${unitAbbreviation}`;
-          if (remainingBase > 0) {
-            availableSpan.textContent += ` + ${remainingBase} base units`;
-          }
-        } else {
-          availableSpan.textContent = `${availableStockBase} base units`;
-        }
-      } else {
-        availableSpan.textContent = `${availableStockBase} base units`;
-      }
-      
-      // Update remaining stock display
-      if (conversionFactor > 0) {
-        const remainingDisplay = Math.floor(remainingStockBase / conversionFactor);
-        const remainingBase = remainingStockBase % conversionFactor;
-        
-        remainingSpan.textContent = `After: ${remainingDisplay} display units`;
-        if (remainingBase > 0) {
-          remainingSpan.textContent += ` + ${remainingBase} base units`;
-        }
-      } else {
-        remainingSpan.textContent = `After: ${remainingStockBase} base units`;
-      }
-      remainingSpan.style.display = 'block';
-      
-      if (status === 'sufficient') {
-        quantityInput.classList.remove('is-invalid');
-        remainingSpan.className = 'text-success remaining-stock';
-        hideStockAlert();
-      } else {
-        quantityInput.classList.add('is-invalid');
-        remainingSpan.className = 'text-danger remaining-stock';
-        showStockAlert(
-          `Insufficient stock! Requested ${displayQuantity} display units = ${baseQuantityNeeded} base units, ` +
-          `but only ${availableStockBase} base units available.`
-        );
-      }
-      
-      // Color code based on stock level
-      if (availableStockBase === 0) {
-        availableSpan.className = 'available-stock text-danger fw-bold';
-      } else if (availableStockBase < 10) {
-        availableSpan.className = 'available-stock text-warning fw-bold';
-      } else {
-        availableSpan.className = 'available-stock text-success fw-bold';
-      }
-    } else {
-      availableSpan.textContent = 'Error';
-      availableSpan.className = 'available-stock text-danger';
-      quantityInput.classList.remove('is-invalid');
-    }
-  } catch (error) {
-    console.error('Error calculating stock:', error);
-    availableSpan.textContent = 'Error';
-    availableSpan.className = 'available-stock text-danger';
-    quantityInput.classList.remove('is-invalid');
-  }
-}
+
+
+
 
 // Validate form before submission
 function validateForm() {
   let isValid = true;
   let errors = [];
   
-  // Check if from_store and to_store are the same
   const fromStore = document.getElementById('from_store').value;
   const toStore = document.getElementById('to_store').value;
   
@@ -1160,7 +1388,6 @@ function validateForm() {
     document.getElementById('to_store').classList.remove('is-invalid');
   }
   
-  // Check required fields
   if (!fromStore) {
     errors.push('Source store is required');
     document.getElementById('from_store').classList.add('is-invalid');
@@ -1181,14 +1408,12 @@ function validateForm() {
     document.getElementById('reason').classList.remove('is-invalid');
   }
   
-  // Check at least one item is added
   const tbody = document.getElementById('requestItemsBody');
   if (tbody.children.length === 0) {
     errors.push('Please add at least one item to request.');
     isValid = false;
   }
   
-  // Validate each item
   const productSelects = document.querySelectorAll('.product-select');
   let hasValidItems = false;
   
@@ -1200,7 +1425,6 @@ function validateForm() {
       hasValidItems = true;
     }
     
-    // Validate quantity
     const quantityInput = document.querySelector(`input[name="items-${index}-quantity"]`);
     if (select.value && (!quantityInput.value || parseInt(quantityInput.value) <= 0)) {
       errors.push(`Item ${index + 1}: Valid quantity is required`);
@@ -1208,13 +1432,11 @@ function validateForm() {
       quantityInput.classList.add('is-invalid');
     }
     
-    // Check for insufficient stock (has is-invalid class from updateStockCalculation)
     if (quantityInput.classList.contains('is-invalid')) {
       errors.push(`Item ${index + 1}: Insufficient stock available`);
       isValid = false;
     }
     
-    // Validate unit selection
     const unitSelect = document.querySelector(`.unit-select[data-item-id="${index}"]`);
     if (select.value && (!unitSelect.value || unitSelect.value === '')) {
       errors.push(`Item ${index + 1}: Unit selection is required`);
@@ -1227,14 +1449,12 @@ function validateForm() {
     isValid = false;
   }
   
-  // Display errors
   if (errors.length > 0) {
     const errorContainer = document.getElementById('formErrorsAlert');
     const errorMessage = document.getElementById('formErrorsMessage');
     errorMessage.innerHTML = errors.map(error => `<div>• ${error}</div>`).join('');
     errorContainer.style.display = 'block';
     
-    // Scroll to errors
     setTimeout(() => {
       errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
@@ -1251,7 +1471,6 @@ document.getElementById('from_store')?.addEventListener('change', async function
   
   const toStoreSelect = document.getElementById('to_store');
   
-  // Clear to_store selection if same as from_store
   if (toStoreSelect.value === this.value) {
     toStoreSelect.value = '';
     toStoreSelect.classList.add('is-invalid');
@@ -1261,7 +1480,6 @@ document.getElementById('from_store')?.addEventListener('change', async function
     hideStockAlert();
   }
   
-  // Update all product availabilities
   const productSelects = document.querySelectorAll('.product-select');
   for (const select of productSelects) {
     if (select.value) {
@@ -1290,7 +1508,9 @@ function removeRequestItem(itemId) {
     row.remove();
   }
   
-  // Ensure at least one row exists
+  // Update totals
+  updateTotalBaseUnits();
+  
   const tbody = document.getElementById('requestItemsBody');
   if (tbody.children.length === 0) {
     addRequestItem();
@@ -1304,7 +1524,6 @@ function showStockAlert(message) {
   messageSpan.textContent = message;
   alert.style.display = 'block';
   
-  // Auto-hide after 5 seconds
   setTimeout(() => {
     hideStockAlert();
   }, 5000);
@@ -1315,7 +1534,7 @@ function hideStockAlert() {
   document.getElementById('stockAlert').style.display = 'none';
 }
 
-// Enhanced submit function
+// Enhanced submit function with conversion factor data
 async function submitNewRequest() {
   if (!validateForm()) {
     return;
@@ -1325,11 +1544,9 @@ async function submitNewRequest() {
   const spinner = submitBtn.querySelector('.spinner-border');
   const editId = document.getElementById('editRequestId').value;
   
-  // Show loading state
   submitBtn.disabled = true;
   spinner.classList.remove('d-none');
   
-  // Collect form data
   const formData = {
     from_store: document.getElementById('from_store').value,
     to_store: document.getElementById('to_store').value,
@@ -1340,24 +1557,24 @@ async function submitNewRequest() {
     items: []
   };
   
-  // Collect items with conversion factor info
   const rows = document.querySelectorAll('#requestItemsBody tr');
   rows.forEach((row, index) => {
     const product = row.querySelector('.product-select');
     const quantity = row.querySelector('.requested-qty');
     const units = row.querySelector('.unit-select');
     const notes = row.querySelector('input[name$="-notes"]');
-    const itemId = row.querySelector('input[name$="-id"]'); // For editing
+    const itemId = row.querySelector('input[name$="-id"]');
+    const conversionFactor = row.querySelector('.conversion-factor');
     
     if (product.value && quantity.value && units.value) {
       const itemData = {
         product_id: product.value,
         quantity: quantity.value,
-        units_id: units.value,
+        units_id: units.value, // This should be ProductUnitPrice ID
+        conversion_factor: conversionFactor ? conversionFactor.value : 1,
         notes: notes?.value || ''
       };
       
-      // Include item ID for editing
       if (itemId && itemId.value) {
         itemData.id = itemId.value;
       }
@@ -1366,9 +1583,8 @@ async function submitNewRequest() {
     }
   });
   
-  // Determine URL based on edit mode - USING CORRECT URL NAMES
-  const url = editId ? '{% url "update_transfer_request" 0 %}'.replace('0', editId) : '{% url "create_transfer_request" %}';
-  const method = 'POST'; // Both use POST according to your views
+  const url = editId ? `{% url "update_transfer_request" 0 %}`.replace('0', editId) : `{% url "create_transfer_request" %}`;
+  const method = 'POST';
   
   try {
     const response = await fetch(url, {
@@ -1384,19 +1600,21 @@ async function submitNewRequest() {
     const data = await response.json();
     
     if (data.success) {
-      // Close modal and show success message
       const modal = bootstrap.Modal.getInstance(document.getElementById('newRequestModal'));
       if (modal) modal.hide();
       
       const action = editId ? 'updated' : 'created';
       showToast(`Transfer request #TR${String(data.request_id).padStart(4, '0')} ${action} successfully!`, 'success');
       
-      // Reload page after a short delay
+      // Show conversion summary if available
+      if (data.conversion_summary) {
+        console.log('Conversion Summary:', data.conversion_summary);
+      }
+      
       setTimeout(() => {
         location.reload();
       }, 1500);
     } else {
-      // Display errors
       const errorContainer = document.getElementById('formErrorsAlert');
       const errorMessage = document.getElementById('formErrorsMessage');
       
@@ -1408,14 +1626,12 @@ async function submitNewRequest() {
       errorMessage.innerHTML = errorHtml;
       errorContainer.style.display = 'block';
       
-      // Scroll to errors
       errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   } catch (error) {
     console.error('Error:', error);
     showToast('An error occurred while processing the request.', 'danger');
   } finally {
-    // Reset button state
     submitBtn.disabled = false;
     spinner.classList.add('d-none');
   }
@@ -1424,8 +1640,7 @@ async function submitNewRequest() {
 // Edit request function
 async function editRequest(requestId) {
   try {
-    // USING CORRECT URL NAME
-    const response = await fetch('{% url "transfer_request_json" 0 %}'.replace('0', requestId));
+    const response = await fetch(`{% url "transfer_request_json" 0 %}`.replace('0', requestId));
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -1440,19 +1655,17 @@ async function editRequest(requestId) {
     const r = data.request;
     currentEditRequestId = r.id;
     
-    // Reset modal
     requestItemCounter = 0;
+    totalBaseUnits = 0;
     document.getElementById('newRequestForm').reset();
     document.getElementById('requestItemsBody').innerHTML = '';
     document.getElementById('stockAlert').style.display = 'none';
     document.getElementById('formErrorsAlert').style.display = 'none';
     
-    // Set edit mode
     document.getElementById('editRequestId').value = r.id;
     document.getElementById('modalTitle').textContent = 'Edit Transfer Request';
     document.getElementById('submitBtnText').textContent = 'Update Request';
     
-    // Fill basic fields
     document.getElementById('from_store').value = r.from_store || '';
     document.getElementById('to_store').value = r.to_store || '';
     document.getElementById('priority').value = r.priority || 'normal';
@@ -1460,56 +1673,35 @@ async function editRequest(requestId) {
     document.getElementById('department').value = r.department || '';
     document.getElementById('reason').value = r.reason || '';
     
-    // Load products first
     await loadProductsFromAPI();
     
-    // Fill items
     for (const item of r.items) {
       const idx = addRequestItem();
-      const row = document.getElementById(`request-item-row-${idx}`);
       
-      // Set product (triggers unit load)
       const productSelect = document.querySelector(`.product-select[data-item-id="${idx}"]`);
       productSelect.value = item.product_id;
       
-      // Wait for units to load
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Set quantity
-      const qtyInput = document.querySelector(`input[name="items-${idx}-quantity"]`);
-      qtyInput.value = item.quantity;
-      
-      // Set unit
       const unitSelect = document.querySelector(`.unit-select[data-item-id="${idx}"]`);
       if (item.units_id) {
         unitSelect.value = item.units_id;
-        // Wait for unit selection to take effect
         await new Promise(resolve => setTimeout(resolve, 100));
-        // Trigger unit change to load price and conversion factor
         await handleUnitChange(idx);
       }
       
-      // Set notes
+      const qtyInput = document.querySelector(`input[name="items-${idx}-quantity"]`);
+      qtyInput.value = item.quantity;
+      
       const notesInput = document.querySelector(`input[name="items-${idx}-notes"]`);
       if (notesInput && item.notes) {
         notesInput.value = item.notes;
       }
       
-      // Add hidden id field for editing
-      if (item.id) {
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = `items-${idx}-id`;
-        hidden.value = item.id;
-        row.appendChild(hidden);
-      }
-      
-      // Update availability and calculate stock
       await updateStockAvailability(idx);
-      await updateStockCalculation(idx);
+      await handleQuantityChange(idx);
     }
     
-    // Show modal
     const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
     modal.show();
     
@@ -1519,36 +1711,79 @@ async function editRequest(requestId) {
   }
 }
 
-// Create transfer from approved request
+// Create transfer from approved request - DEBUG VERSION
 async function createTransferFromRequest(requestId) {
+  console.log('🔵 START createTransferFromRequest:', {
+    requestId: requestId,
+    csrfToken: csrftoken ? 'Present' : 'Missing',
+    url: `{% url "create_transfer_from_request" 0 %}`.replace('0', requestId)
+  });
+  
   if (!confirm('Create stock transfer from this approved request?')) {
+    console.log('❌ User cancelled');
     return;
   }
   
   try {
-    // USING CORRECT URL NAME
-    const response = await fetch('{% url "create_transfer_from_request" 0 %}'.replace('0', requestId), {
+    console.log('📡 Sending POST request to create transfer...');
+    
+    const response = await fetch(`{% url "create_transfer_from_request" 0 %}`.replace('0', requestId), {
       method: 'POST',
       headers: {
         'X-CSRFToken': csrftoken,
-        'X-Requested-With': 'XMLHttpRequest'
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/json'
       }
     });
     
-    const data = await response.json();
+    console.log('📥 Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
+    // Get response text first to debug
+    const responseText = await response.text();
+    console.log('📝 Raw response text:', responseText);
+    
+    // Try to parse as JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log('📊 Parsed JSON data:', data);
+    } catch (jsonError) {
+      console.error('❌ Failed to parse JSON:', jsonError);
+      console.error('Raw response:', responseText);
+      showToast('Server returned invalid response. Check console for details.', 'danger');
+      return;
+    }
     
     if (data.success) {
+      console.log('✅ Transfer created successfully:', {
+        transfer_id: data.transfer_id,
+        message: data.message,
+        total_base_units: data.total_base_units
+      });
+      
       showToast(`Stock transfer #ST${String(data.transfer_id).padStart(4, '0')} created successfully!`, 'success');
-      // Redirect to the new transfer
+      
+      // Refresh page to show updated status
+      console.log('🔄 Refreshing page in 2 seconds...');
       setTimeout(() => {
-        window.location.href = '{% url "stock_transfer_detail" 0 %}'.replace('0', data.transfer_id);
-      }, 1000);
+        location.reload();
+      }, 2000);
     } else {
-      showToast(`Error: ${data.error}`, 'danger');
+      console.error('❌ Server returned error:', data);
+      showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
+      
+      // If there's a transfer_id in error, it might already exist
+      if (data.transfer_id) {
+        console.log('ℹ️ Transfer already exists with ID:', data.transfer_id);
+      }
     }
   } catch (error) {
-    console.error('Error creating transfer:', error);
-    showToast('An error occurred while creating the transfer.', 'danger');
+    console.error('❌ Network error creating transfer:', error);
+    showToast('Network error while creating transfer. Check console for details.', 'danger');
   }
 }
 
@@ -1556,8 +1791,6 @@ async function createTransferFromRequest(requestId) {
 function approveRequest(requestId) {
   document.getElementById('approveRequestId').value = requestId;
   document.getElementById('approveComments').value = '';
-  
-  // Clear validation
   document.getElementById('approveComments').classList.remove('is-invalid');
   
   const modal = new bootstrap.Modal(document.getElementById('approveModal'));
@@ -1568,16 +1801,14 @@ function approveRequest(requestId) {
 function rejectRequest(requestId) {
   document.getElementById('rejectRequestId').value = requestId;
   document.getElementById('rejectComments').value = '';
-  
-  // Clear validation
   document.getElementById('rejectComments').classList.remove('is-invalid');
   
   const modal = new bootstrap.Modal(document.getElementById('rejectModal'));
   modal.show();
 }
 
-// Confirm approve action
-function confirmApprove() {
+// Updated confirmApprove function
+async function confirmApprove() {
   const requestId = document.getElementById('approveRequestId').value;
   const comments = document.getElementById('approveComments').value;
   
@@ -1589,70 +1820,64 @@ function confirmApprove() {
   spinner.classList.remove('d-none');
   btnText.textContent = 'Approving...';
 
-  // Create form data
-  const formData = new FormData();
-  formData.append('csrfmiddlewaretoken', csrftoken);
-  formData.append('comments', comments);
+  try {
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', csrftoken);
+    formData.append('approve', 'true');
+    if (comments) formData.append('comments', comments);
 
-  // USING CORRECT URL NAME
-  fetch('{% url "approve_transfer_request" 0 %}'.replace('0', requestId), {
-    method: 'POST',
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    body: formData
-  })
-  .then(async response => {
+    const response = await fetch(`{% url "approve_transfer_request" 0 %}`.replace('0', requestId), {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData
+    });
+
     const contentType = response.headers.get('content-type') || '';
-    let data = null;
     
-    if (contentType.includes('application/json')) {
-      try {
-        data = await response.json();
-      } catch (e) {
-        console.error('Failed to parse JSON from server:', e);
-        throw new Error('Invalid JSON response from server');
+    if (response.ok) {
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        if (data.success) {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('approveModal'));
+          if (modal) modal.hide();
+          
+          showToast(`Request #TR${String(requestId).padStart(4, '0')} approved successfully!`, 'success');
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
+        }
+      } else {
+        // Handle HTML response (server-side validation error)
+        const html = await response.text();
+        console.log('Server returned HTML for validation errors');
+        
+        // Close modal and reload to see server-side messages
+        const modal = bootstrap.Modal.getInstance(document.getElementById('approveModal'));
+        if (modal) modal.hide();
+        
+        // Reload page to show Django messages
+        setTimeout(() => location.reload(), 500);
       }
     } else {
-      const text = await response.text();
-      console.error('Server returned non-JSON response for approve:', text);
-      throw new Error('Server returned HTML (possible session expiry or server error).');
+      showToast(`Server error: ${response.status}`, 'danger');
     }
-
-    if (data && data.success) {
-      // Close modal
-      const modal = bootstrap.Modal.getInstance(document.getElementById('approveModal'));
-      if (modal) modal.hide();
-
-      // Show success message
-      showToast(`Request #TR${String(requestId).padStart(4, '0')} approved successfully!`, 'success');
-      
-      // Reload page after a short delay
-      setTimeout(() => {
-        location.reload();
-      }, 1000);
-    } else {
-      const errorMsg = data && data.error ? data.error : 'Unknown error occurred';
-      showToast('Error: ' + errorMsg, 'danger');
-    }
-  })
-  .catch(error => {
+  } catch (error) {
     console.error('Error:', error);
     showToast('An error occurred while approving the request.', 'danger');
-  })
-  .finally(() => {
+  } finally {
     submitBtn.disabled = false;
     spinner.classList.add('d-none');
     btnText.textContent = 'Approve Request';
-  });
+  }
 }
 
-// Confirm reject action
-function confirmReject() {
+// Updated confirmReject function
+async function confirmReject() {
   const requestId = document.getElementById('rejectRequestId').value;
   const comments = document.getElementById('rejectComments').value;
   
-  // Validate reject comments
   if (!comments.trim()) {
     document.getElementById('rejectComments').classList.add('is-invalid');
     return;
@@ -1668,68 +1893,133 @@ function confirmReject() {
   spinner.classList.remove('d-none');
   btnText.textContent = 'Rejecting...';
 
-  // Create form data
-  const formData = new FormData();
-  formData.append('csrfmiddlewaretoken', csrftoken);
-  formData.append('comments', comments);
+  try {
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', csrftoken);
+    formData.append('approve', 'false');
+    formData.append('comments', comments);
 
-  // USING CORRECT URL NAME
-  fetch('{% url "reject_transfer_request" 0 %}'.replace('0', requestId), {
-    method: 'POST',
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    body: formData
-  })
-  .then(async response => {
+    const response = await fetch(`{% url "approve_transfer_request" 0 %}`.replace('0', requestId), {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData
+    });
+
     const contentType = response.headers.get('content-type') || '';
-    let data = null;
     
-    if (contentType.includes('application/json')) {
-      try {
-        data = await response.json();
-      } catch (e) {
-        console.error('Failed to parse JSON from server:', e);
-        throw new Error('Invalid JSON response from server');
+    if (response.ok) {
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        if (data.success) {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('rejectModal'));
+          if (modal) modal.hide();
+          
+          showToast(`Request #TR${String(requestId).padStart(4, '0')} rejected successfully!`, 'success');
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
+        }
+      } else {
+        // Handle HTML response
+        const modal = bootstrap.Modal.getInstance(document.getElementById('rejectModal'));
+        if (modal) modal.hide();
+        
+        setTimeout(() => location.reload(), 500);
       }
     } else {
-      const text = await response.text();
-      console.error('Server returned non-JSON response for reject:', text);
-      throw new Error('Server returned HTML (possible session expiry or server error).');
+      showToast(`Server error: ${response.status}`, 'danger');
     }
-
-    if (data && data.success) {
-      // Close modal
-      const modal = bootstrap.Modal.getInstance(document.getElementById('rejectModal'));
-      if (modal) modal.hide();
-
-      // Show success message
-      showToast(`Request #TR${String(requestId).padStart(4, '0')} rejected successfully!`, 'success');
-      
-      // Reload page after a short delay
-      setTimeout(() => {
-        location.reload();
-      }, 1000);
-    } else {
-      const errorMsg = data && data.error ? data.error : 'Unknown error occurred';
-      showToast('Error: ' + errorMsg, 'danger');
-    }
-  })
-  .catch(error => {
+  } catch (error) {
     console.error('Error:', error);
     showToast('An error occurred while rejecting the request.', 'danger');
-  })
-  .finally(() => {
+  } finally {
     submitBtn.disabled = false;
     spinner.classList.add('d-none');
     btnText.textContent = 'Reject Request';
-  });
+  }
+}
+
+
+
+// Duplicate request function
+async function duplicateRequest(requestId) {
+  try {
+    const response = await fetch(`{% url "transfer_request_json" 0 %}`.replace('0', requestId));
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      alert('Failed to load request data for duplication');
+      return;
+    }
+    
+    const r = data.request;
+    
+    // Show new request modal with copied data
+    requestItemCounter = 0;
+    totalBaseUnits = 0;
+    document.getElementById('newRequestForm').reset();
+    document.getElementById('requestItemsBody').innerHTML = '';
+    document.getElementById('stockAlert').style.display = 'none';
+    document.getElementById('formErrorsAlert').style.display = 'none';
+    
+    document.getElementById('editRequestId').value = '';
+    document.getElementById('modalTitle').textContent = 'Duplicate Transfer Request';
+    document.getElementById('submitBtnText').textContent = 'Create Duplicate';
+    
+    document.getElementById('from_store').value = r.from_store || '';
+    document.getElementById('to_store').value = r.to_store || '';
+    document.getElementById('priority').value = r.priority || 'normal';
+    document.getElementById('required_date').value = r.required_date || '';
+    document.getElementById('department').value = r.department || '';
+    document.getElementById('reason').value = r.reason ? `${r.reason} (Duplicate of #TR${r.id})` : '';
+    
+    await loadProductsFromAPI();
+    
+    for (const item of r.items) {
+      const idx = addRequestItem();
+      
+      const productSelect = document.querySelector(`.product-select[data-item-id="${idx}"]`);
+      productSelect.value = item.product_id;
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const unitSelect = document.querySelector(`.unit-select[data-item-id="${idx}"]`);
+      if (item.units_id) {
+        unitSelect.value = item.units_id;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await handleUnitChange(idx);
+      }
+      
+      const qtyInput = document.querySelector(`input[name="items-${idx}-quantity"]`);
+      qtyInput.value = item.quantity;
+      
+      const notesInput = document.querySelector(`input[name="items-${idx}-notes"]`);
+      if (notesInput && item.notes) {
+        notesInput.value = item.notes;
+      }
+      
+      await updateStockAvailability(idx);
+      await handleQuantityChange(idx);
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
+    modal.show();
+    
+  } catch (error) {
+    console.error('Error duplicating request:', error);
+    showToast('Error duplicating request', 'danger');
+  }
 }
 
 // Other functions
 function cancelRequest(requestId) {
   if (confirm('Are you sure you want to cancel this transfer request?')) {
-    // Implementation for canceling request
     console.log('Cancel request:', requestId);
     showToast('Cancel functionality not yet implemented', 'warning');
   }
@@ -1743,39 +2033,46 @@ function refreshRequests() {
 document.addEventListener('DOMContentLoaded', function() {
   console.log('DOM loaded');
   
-  // Initialize feather icons
   if (typeof feather !== 'undefined') {
     feather.replace();
   }
   
-  // Load products for modal (but don't wait for it)
+  // Load products on page load
   loadProductsFromAPI();
   
-  // Initialize modal validation for reject comments
   const rejectModal = document.getElementById('rejectModal');
   if (rejectModal) {
     rejectModal.addEventListener('hidden.bs.modal', function () {
-      // Clear validation when modal is closed
       document.getElementById('rejectComments').classList.remove('is-invalid');
     });
   }
   
-  // Initialize modal for approve
   const approveModal = document.getElementById('approveModal');
   if (approveModal) {
     approveModal.addEventListener('hidden.bs.modal', function () {
-      // Reset button state
       const approveBtn = document.getElementById('confirmApproveBtn');
       approveBtn.disabled = false;
       approveBtn.querySelector('.spinner-border').classList.add('d-none');
       document.getElementById('approveBtnText').textContent = 'Approve Request';
     });
   }
+  
+  // Initialize conversion factor help
+  document.querySelectorAll('.conversion-factor-info').forEach(el => {
+    el.addEventListener('mouseenter', function() {
+      this.style.cursor = 'help';
+    });
+  });
+  
+  // Debug: Check if URLs are resolving correctly
+  console.log('Product units URL template:', '{% url "product_units" 0 %}');
+  console.log('Create transfer request URL:', '{% url "create_transfer_request" %}');
 });
 </script>
 
+
+
 <style>
-/* Validation styles */
 .is-invalid {
   border-color: #dc3545 !important;
 }
@@ -1796,7 +2093,6 @@ document.addEventListener('DOMContentLoaded', function() {
   display: block;
 }
 
-/* Stock info display */
 .stock-info {
   min-height: 40px;
   display: flex;
@@ -1835,7 +2131,6 @@ document.addEventListener('DOMContentLoaded', function() {
   margin-top: 2px;
 }
 
-/* Conversion factor display */
 .conversion-factor-info {
   font-size: 0.7rem;
   padding: 0.1rem 0.3rem;
@@ -1853,9 +2148,41 @@ document.addEventListener('DOMContentLoaded', function() {
   border: 1px solid rgba(13, 202, 240, 0.2);
 }
 
-/* Unit price display */
-.unit-price-info {
+.unit-info {
   min-height: 30px;
+}
+
+.cf-display-text {
+  font-size: 0.75rem;
+  display: block;
+  margin-top: 2px;
+}
+
+.cf-display-text.text-success {
+  color: #198754;
+  font-weight: 500;
+}
+
+.cf-display-text.text-info {
+  color: #0dcaf0;
+}
+
+.base-units-display {
+  font-size: 0.9rem;
+  padding: 0.3rem;
+  border-radius: 0.25rem;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+}
+
+.base-units-display.text-primary {
+  background-color: rgba(13, 110, 253, 0.1);
+  border-color: rgba(13, 110, 253, 0.2);
+}
+
+.base-units-display.text-danger {
+  background-color: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.2);
 }
 
 .unit-price-text {
@@ -1873,31 +2200,34 @@ document.addEventListener('DOMContentLoaded', function() {
   color: #dc3545;
 }
 
-/* Unit dropdown styling */
 option[data-is_base_unit="true"] {
   font-weight: bold;
   background-color: #e8f4f8;
 }
 
-/* Modal styles */
 .modal-body {
   max-height: 70vh;
   overflow-y: auto;
 }
 
-/* Item row hover effect */
 #requestItemsTable tbody tr:hover {
   background-color: rgba(0, 0, 0, 0.02);
 }
 
-/* Table foot note */
 #requestItemsTable tfoot td {
   padding: 0.5rem;
   background-color: #f8f9fa;
   border-top: 2px solid #dee2e6;
 }
 
-/* Responsive table in modal */
+.conversion-summary .dropdown-menu {
+  max-width: 500px !important;
+}
+
+.conversion-summary .dropdown-item {
+  white-space: normal !important;
+}
+
 @media (max-width: 768px) {
   #requestItemsTable {
     font-size: 0.75rem;
@@ -1918,16 +2248,25 @@ option[data-is_base_unit="true"] {
     font-size: 0.8rem;
   }
   
-  .unit-price-text {
+  .cf-display-text {
     font-size: 0.7rem;
   }
   
   .conversion-factor-info {
     font-size: 0.65rem;
   }
+  
+  .base-units-display {
+    font-size: 0.8rem;
+    padding: 0.2rem;
+  }
+  
+  .conversion-summary .btn-sm {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.7rem;
+  }
 }
 
-/* Transfer route styling */
 .transfer-route {
   font-size: 0.875rem;
   margin-bottom: 2px;
@@ -1939,6 +2278,10 @@ option[data-is_base_unit="true"] {
 
 .table-warning {
   --bs-table-bg: rgba(255, 193, 7, 0.1);
+}
+
+.table-danger {
+  --bs-table-bg: rgba(220, 53, 69, 0.1);
 }
 
 .action-table-data .btn {
@@ -1960,7 +2303,6 @@ option[data-is_base_unit="true"] {
   height: 12px;
 }
 
-/* Loading states */
 .loading {
   opacity: 0.6;
   pointer-events: none;
@@ -1971,7 +2313,6 @@ option[data-is_base_unit="true"] {
   height: 1rem;
 }
 
-/* Priority badge animations */
 .badge {
   transition: all 0.3s ease;
 }
@@ -1980,7 +2321,6 @@ option[data-is_base_unit="true"] {
   transform: scale(1.05);
 }
 
-/* Card hover effects */
 .card {
   transition: box-shadow 0.3s ease;
 }
@@ -1989,7 +2329,6 @@ option[data-is_base_unit="true"] {
   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-/* Approve/Reject Modal Specific Styles */
 #approveModal .modal-content,
 #rejectModal .modal-content {
   border: none;
@@ -2013,7 +2352,17 @@ option[data-is_base_unit="true"] {
   filter: invert(1);
 }
 
-/* Toast notifications */
+#conversionHelpModal .modal-content {
+  border: none;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+
+#conversionHelpModal .modal-header {
+  background-color: #0d6efd;
+  color: white;
+  border-bottom: none;
+}
+
 .toast {
   margin-bottom: 0.5rem;
 }
@@ -2042,21 +2391,59 @@ option[data-is_base_unit="true"] {
   }
   
   #approveModal,
-  #rejectModal {
+  #rejectModal,
+  #conversionHelpModal {
     padding: 0.5rem;
   }
 }
 
-/* Info icon for conversion factor note */
 .fa-info-circle {
   color: #0dcaf0;
 }
 
-/* Base unit highlight in requests table */
 .base-unit-indicator {
   font-size: 0.7rem;
   color: #198754;
   margin-left: 0.25rem;
+}
+
+/* Custom scrollbar for modals */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Highlight for conversion calculations */
+.calculation-highlight {
+  background-color: #fff3cd;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-weight: bold;
+  color: #856404;
+}
+
+/* Animation for conversion updates */
+@keyframes highlightUpdate {
+  0% { background-color: #d1ecf1; }
+  100% { background-color: transparent; }
+}
+
+.highlight-update {
+  animation: highlightUpdate 1s ease-out;
 }
 </style>
 {% endblock %}

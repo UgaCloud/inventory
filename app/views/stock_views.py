@@ -593,11 +593,14 @@ def direct_stock_transfer_create(request):
 
 @login_required
 def start_stock_transfer(request, transfer_id):
-    """Mark a transfer as in transit with base unit validation"""
+    """Mark a transfer as in transit with base unit validation - handles both regular and AJAX requests"""
     transfer = get_object_or_404(StockTransfer, id=transfer_id)
     
     if transfer.status != 'pending':
-        messages.error(request, 'Only pending transfers can be started.')
+        message = 'Only pending transfers can be started.'
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': message})
+        messages.error(request, message)
         return redirect('stock_transfer_detail', transfer_id=transfer.id)
     
     stock_issues = []
@@ -618,14 +621,22 @@ def start_stock_transfer(request, transfer_id):
             stock_issues.append(f"{item.product.name}: No inventory found")
     
     if stock_issues:
-        messages.error(request, f'Insufficient stock: {", ".join(stock_issues)}')
+        message = f'Insufficient stock: {", ".join(stock_issues)}'
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': message})
+        messages.error(request, message)
         return redirect('stock_transfer_detail', transfer_id=transfer.id)
     
     transfer.status = 'in_transit'
     transfer.save()
     
-    messages.success(request, f'Stock transfer #{transfer.id} marked as in transit.')
+    message = f'Stock transfer #{transfer.id} marked as in transit.'
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'message': message})
+    
+    messages.success(request, message)
     return redirect('stock_transfer_detail', transfer_id=transfer.id)
+
 
 @login_required
 def complete_stock_transfer(request, transfer_id):
@@ -637,14 +648,35 @@ def complete_stock_transfer(request, transfer_id):
         return redirect('stock_transfer_detail', transfer_id=transfer.id)
     
     try:
-        transfer.apply_inventory_changes()
-        messages.success(request, f'Stock transfer #{transfer.id} completed successfully.')
+        with transaction.atomic():
+            # First set status to completed
+            transfer.status = 'completed'
+            transfer.completed_by = str(request.user) if request.user else None
+            transfer.save(update_fields=['status', 'completed_by'])
+            
+            # Then apply inventory changes
+            transfer.apply_inventory_changes()
+            
+            messages.success(request, f'Stock transfer #{transfer.id} completed successfully.')
+            
     except ValidationError as e:
+        # If inventory change fails, revert status
+        transfer.status = 'in_transit'
+        transfer.completed_by = None
+        transfer.save(update_fields=['status', 'completed_by'])
         messages.error(request, f'Error completing transfer: {str(e)}')
+        
     except Exception as e:
+        # If any other error occurs, revert status
+        transfer.status = 'in_transit'
+        transfer.completed_by = None
+        transfer.save(update_fields=['status', 'completed_by'])
         messages.error(request, f'Unexpected error: {str(e)}')
     
     return redirect('stock_transfer_detail', transfer_id=transfer.id)
+
+
+
 
 @login_required
 def transfer_request_list(request):
@@ -1020,16 +1052,21 @@ def create_stock_adjustment(request):
         form = StockAdjustmentForm(request.POST)
         if form.is_valid():
             adj = form.save(commit=False)
-            try:
-                adj.created_by = request.user.username
-            except Exception:
-                pass
+            
+            # Correctly assign the user object
+            adj.created_by = request.user
+
+            adj.status = 'pending' 
             adj.save()
             messages.success(request, 'Stock adjustment created successfully.')
             return redirect('stock_adjustment_list')
+        else:
+            messages.error(request, f'Form errors: {form.errors}')
     else:
         form = StockAdjustmentForm()
+    
     return render(request, 'stock/stock_adjustment_form.html', {'form': form})
+
 
 @login_required
 def edit_stock_adjustment(request, adjustment_id):
