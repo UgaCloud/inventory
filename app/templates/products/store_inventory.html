@@ -17,19 +17,19 @@
       </div>
       <ul class="table-top-head">
         <li>
-          <a href="{% url 'store_inventory_aging' store.id %}" class="btn btn-outline-warning">
+          <a href="{% url 'store_inventory_aging' store.id %}" style="width: 200px; border: 0;" class="btn btn-outline-warning">
             <i data-feather="clock" class="feather-16"></i>
             Aging Report
           </a>
         </li>
         <li>
-          <a href="{% url 'store_inventory_export' store.id %}" class="btn btn-outline-primary">
+          <a href="{% url 'store_inventory_export' store.id %}" style="width: 200px; border: 0;" class="btn btn-outline-primary">
             <i data-feather="download" class="feather-16"></i>
             Export CSV
           </a>
         </li>
         <li>
-          <a href="{% url 'transfer_request_list' %}" class="btn btn-primary">
+          <a href="{% url 'transfer_request_list' %}" style="width: 200px; border: 0;" class="btn btn-primary">
             <i data-feather="plus" class="feather-16"></i>
             Request Stock
           </a>

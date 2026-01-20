@@ -17,20 +17,20 @@
       </div>
       <ul class="table-top-head">
         <li>
-          <a href="{% url 'store_inventory' store.id %}" class="btn btn-outline-secondary">
+          <a href="{% url 'store_inventory' store.id %}" style="width: 200px; border: 0;" class="btn btn-outline-secondary">
             <i data-feather="arrow-left" class="feather-16"></i>
             Back to Inventory
           </a>
         </li>
         <li>
           {% comment %} {% url 'create_stock_adjustment' %}?product={{ product.id }} {% endcomment %}
-          <a href="#" class="btn btn-outline-warning">
+          <a href="#" style="width: 200px; border: 0;" class="btn btn-outline-warning">
             <i data-feather="edit" class="feather-16"></i>
             Adjust Stock
           </a>
         </li>
         <li>
-          <a href="{% url 'transfer_request_list' %}" class="btn btn-primary">
+          <a href="{% url 'transfer_request_list' %}" style="width: 200px; border: 0;" class="btn btn-primary">
             <i data-feather="plus" class="feather-16"></i>
             Request Stock
           </a>

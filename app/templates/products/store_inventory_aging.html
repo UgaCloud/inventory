@@ -17,7 +17,7 @@
       </div>
       <ul class="table-top-head">
         <li>
-          <a href="{% url 'store_inventory' store.id %}" class="btn btn-outline-secondary">
+          <a href="{% url 'store_inventory' store.id %}" style="width: 200px; border: 0;" class="btn btn-outline-secondary">
             <i data-feather="arrow-left" class="feather-16"></i>
             Back to Inventory
           </a>
@@ -41,11 +41,11 @@
               Quick Actions
             </button>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="#" onclick="markForClearance()">Mark for Clearance</a></li>
-              <li><a class="dropdown-item" href="#" onclick="createPromotion()">Create Promotion</a></li>
-              <li><a class="dropdown-item" href="#" onclick="adjustPricing()">Adjust Pricing</a></li>
+              <li><a class="dropdown-item" href="#" style="width: 200px; border: 0;" onclick="markForClearance()">Mark for Clearance</a></li>
+              <li><a class="dropdown-item" href="#" style="width: 200px; border: 0;" onclick="createPromotion()">Create Promotion</a></li>
+              <li><a class="dropdown-item" href="#" style="width: 200px; border: 0;" onclick="adjustPricing()">Adjust Pricing</a></li>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="{% url 'create_stock_adjustment' %}">Stock Adjustment</a></li>
+              <li><a class="dropdown-item" style="width: 200px; border: 0;" href="{% url 'create_stock_adjustment' %}">Stock Adjustment</a></li>
             </ul>
           </div>
         </li>

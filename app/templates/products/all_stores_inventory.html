@@ -23,9 +23,9 @@
               Export Reports
             </button>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="#" onclick="exportAllStoresData()">All Stores Summary</a></li>
-              <li><a class="dropdown-item" href="#" onclick="exportLowStockReport()">Low Stock Report</a></li>
-              <li><a class="dropdown-item" href="#" onclick="exportValueReport()">Inventory Value Report</a></li>
+              <li><a class="dropdown-item" href="#" style="width: 200px; border: 0;" onclick="exportAllStoresData()">All Stores Summary</a></li>
+              <li><a class="dropdown-item" href="#" style="width: 200px; border: 0;" onclick="exportLowStockReport()">Low Stock Report</a></li>
+              <li><a class="dropdown-item" href="#" style="width: 200px; border: 0;" onclick="exportValueReport()">Inventory Value Report</a></li>
             </ul>
           </div>
         </li>
@@ -36,13 +36,13 @@
           </button>
         </li>
         <li>
-          <a href="{% url 'store_page' %}" class="btn btn-primary">
+          <a href="{% url 'store_page' %}" style="width: 200px; border: 0;" class="btn btn-primary">
             <i data-feather="truck" class="feather-16"></i>
             Add New Store
           </a>
         </li>
         <li>
-          <a href="{% url 'transfer_request_list' %}" class="btn btn-primary">
+          <a href="{% url 'transfer_request_list' %}" style="width: 200px; border: 0;" class="btn btn-primary">
             <i data-feather="truck" class="feather-16"></i>
             Create Transfer
           </a>
