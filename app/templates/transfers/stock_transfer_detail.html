@@ -429,11 +429,11 @@
           </div>
           <div class="card-body text-center">
             {% if transfer.status == 'pending' %}
-              <div class="progress-circle mb-3">
-                <div class="circle-progress" data-percentage="25">
-                  <svg class="progress-svg" width="100" height="100">
-                    <circle cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
-                    <circle cx="50" cy="50" r="40" stroke="#ffc107" stroke-width="8" fill="none" 
+              <div class="progress-circle-wrapper">
+                <div class="progress-circle mb-3">
+                  <svg class="progress-svg" viewBox="0 0 100 100">
+                    <circle class="progress-background" cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
+                    <circle class="progress-bar" cx="50" cy="50" r="40" stroke="#ffc107" stroke-width="8" fill="none" 
                             stroke-dasharray="251.2" stroke-dashoffset="188.4" stroke-linecap="round"/>
                   </svg>
                   <div class="percentage">25%</div>
@@ -441,11 +441,11 @@
               </div>
               <p class="text-muted">Transfer Created</p>
             {% elif transfer.status == 'in_transit' %}
-              <div class="progress-circle mb-3">
-                <div class="circle-progress" data-percentage="75">
-                  <svg class="progress-svg" width="100" height="100">
-                    <circle cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
-                    <circle cx="50" cy="50" r="40" stroke="#17a2b8" stroke-width="8" fill="none" 
+              <div class="progress-circle-wrapper">
+                <div class="progress-circle mb-3">
+                  <svg class="progress-svg" viewBox="0 0 100 100">
+                    <circle class="progress-background" cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
+                    <circle class="progress-bar" cx="50" cy="50" r="40" stroke="#17a2b8" stroke-width="8" fill="none" 
                             stroke-dasharray="251.2" stroke-dashoffset="62.8" stroke-linecap="round"/>
                   </svg>
                   <div class="percentage">75%</div>
@@ -453,11 +453,11 @@
               </div>
               <p class="text-muted">In Transit</p>
             {% elif transfer.status == 'completed' %}
-              <div class="progress-circle mb-3">
-                <div class="circle-progress" data-percentage="100">
-                  <svg class="progress-svg" width="100" height="100">
-                    <circle cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
-                    <circle cx="50" cy="50" r="40" stroke="#28a745" stroke-width="8" fill="none" 
+              <div class="progress-circle-wrapper">
+                <div class="progress-circle mb-3">
+                  <svg class="progress-svg" viewBox="0 0 100 100">
+                    <circle class="progress-background" cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
+                    <circle class="progress-bar" cx="50" cy="50" r="40" stroke="#28a745" stroke-width="8" fill="none" 
                             stroke-dasharray="251.2" stroke-dashoffset="0" stroke-linecap="round"/>
                   </svg>
                   <div class="percentage">100%</div>
@@ -465,10 +465,10 @@
               </div>
               <p class="text-success">Completed</p>
             {% else %}
-              <div class="progress-circle mb-3">
-                <div class="circle-progress" data-percentage="0">
-                  <svg class="progress-svg" width="100" height="100">
-                    <circle cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
+              <div class="progress-circle-wrapper">
+                <div class="progress-circle mb-3">
+                  <svg class="progress-svg" viewBox="0 0 100 100">
+                    <circle class="progress-background" cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="8" fill="none"/>
                   </svg>
                   <div class="percentage">0%</div>
                 </div>
@@ -856,12 +856,23 @@ document.addEventListener('DOMContentLoaded', function() {
   font-size: 0.95rem;
 }
 
+/* Fixed Progress Circle Styles */
+.progress-circle-wrapper {
+  display: inline-block;
+  position: relative;
+  margin: 0 auto 1rem;
+}
+
 .progress-circle {
   position: relative;
-  display: inline-block;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
 }
 
 .progress-svg {
+  width: 100%;
+  height: 100%;
   transform: rotate(-90deg);
 }
 
@@ -872,6 +883,9 @@ document.addEventListener('DOMContentLoaded', function() {
   transform: translate(-50%, -50%);
   font-size: 1.25rem;
   font-weight: bold;
+  text-align: center;
+  line-height: 1;
+  z-index: 10;
 }
 
 .stat-item {
@@ -939,7 +953,12 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   .progress-circle {
-    transform: scale(0.8);
+    width: 80px;
+    height: 80px;
+  }
+  
+  .percentage {
+    font-size: 1rem;
   }
 }
 </style>
