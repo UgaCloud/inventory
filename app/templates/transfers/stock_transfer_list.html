@@ -169,7 +169,7 @@
                 <th>Items</th>
                 <th>Total Value</th>
                 <th>Created Date</th>
-                <th>Expected Delivery</th>
+                
                 <th>Status</th>
                 <th>Progress</th>
                 <th>Actions</th>
@@ -250,20 +250,7 @@
                     <small class="text-muted">{{ transfer.transfer_date|time:"g:i A" }}</small>
                   </div>
                 </td>
-                <td>
-                  <div class="d-flex flex-column">
-                    {% if transfer.expected_delivery_date %}
-                      <span class="{% if transfer.is_overdue %}text-danger{% endif %}">
-                        {{ transfer.expected_delivery_date|date:"M d, Y" }}
-                      </span>
-                      {% if transfer.is_overdue %}
-                        <small class="text-danger">Overdue</small>
-                      {% endif %}
-                    {% else %}
-                      <span class="text-muted">Not set</span>
-                    {% endif %}
-                  </div>
-                </td>
+              
                 <td>
                   {% if transfer.status == 'pending' %}
                     <span class="badge bg-warning">
