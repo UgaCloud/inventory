@@ -641,42 +641,40 @@ def start_stock_transfer(request, transfer_id):
 @login_required
 def complete_stock_transfer(request, transfer_id):
     """Complete stock transfer"""
-    transfer = get_object_or_404(StockTransfer, id=transfer_id)
-    
-    if transfer.status != 'in_transit':
-        messages.error(request, 'Only transfers in transit can be completed.')
-        return redirect('stock_transfer_detail', transfer_id=transfer.id)
-    
     try:
         with transaction.atomic():
-            # First set status to completed
+            transfer = StockTransfer.objects.select_for_update().get(id=transfer_id)
+            
+            if transfer.status != 'in_transit':
+                messages.error(request, 'Only transfers in transit can be completed.')
+                return redirect('stock_transfer_detail', transfer_id=transfer.id)
+            
+            if transfer.status == 'completed':
+                messages.info(request, f'Transfer #{transfer.id} is already completed.')
+                return redirect('stock_transfer_detail', transfer_id=transfer.id)
+            
+            # Apply inventory changes
+            if not transfer.inventory_changes_applied:
+                transfer.apply_inventory_changes()
+            
+            # Update status
             transfer.status = 'completed'
             transfer.completed_by = str(request.user) if request.user else None
-            transfer.save(update_fields=['status', 'completed_by'])
+            transfer.inventory_changes_applied = True
             
-            # Then apply inventory changes
-            transfer.apply_inventory_changes()
+            # Save WITHOUT triggering the old auto-logic
+            super(StockTransfer, transfer).save(update_fields=[
+                'status', 
+                'completed_by', 
+                'inventory_changes_applied'
+            ])
             
             messages.success(request, f'Stock transfer #{transfer.id} completed successfully.')
             
-    except ValidationError as e:
-        # If inventory change fails, revert status
-        transfer.status = 'in_transit'
-        transfer.completed_by = None
-        transfer.save(update_fields=['status', 'completed_by'])
-        messages.error(request, f'Error completing transfer: {str(e)}')
-        
     except Exception as e:
-        # If any other error occurs, revert status
-        transfer.status = 'in_transit'
-        transfer.completed_by = None
-        transfer.save(update_fields=['status', 'completed_by'])
-        messages.error(request, f'Unexpected error: {str(e)}')
+        messages.error(request, f'Error: {str(e)}')
     
-    return redirect('stock_transfer_detail', transfer_id=transfer.id)
-
-
-
+    return redirect('stock_transfer_detail', transfer_id=transfer_id)
 
 @login_required
 def transfer_request_list(request):

@@ -82,6 +82,15 @@ def get_rank_badge(rank):
     else:
         return 'secondary'
     
+@register.filter
+def dict_lookup(dict_list, index):
+    """Get item from list of dictionaries by index"""
+    try:
+        return dict_list[index]
+    except (IndexError, TypeError):
+        return {}
+
+
 
 
 @register.filter

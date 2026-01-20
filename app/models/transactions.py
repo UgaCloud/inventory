@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 from app.models.products import *
+from app.utils.utils import *
 
 
 class PurchaseOrder(models.Model):
@@ -318,6 +319,13 @@ class TransferRequest(models.Model):
     approved_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_transfer_requests')
     approved_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     note = models.TextField(blank=True, null=True)
+    fulfilled_date = models.DateTimeField(null=True, blank=True)
+    
+    def mark_as_fulfilled(self):
+        self.status = 'fulfilled'
+        self.fulfilled_date = timezone.now()
+        self.save()
+    
 
     def __str__(self):
         return f"Request {self.id}: {self.from_store.name} → {self.to_store.name}"
@@ -457,7 +465,7 @@ class TransferRequest(models.Model):
         summary.append(f"Total Items: {item_count}")
         summary.append(f"Total Units Requested: {self.total_requested_units}")
         summary.append(f"Total Base Units: {total_base_units}")
-        summary.append(f"Estimated Value: ₦{self.total_estimated_value:,.0f}")
+        summary.append(f"Estimated Value: UGX {self.total_estimated_value:,.0f}")
         summary.append("")
         
         # Overall availability
@@ -521,7 +529,7 @@ class TransferRequest(models.Model):
         print("="*80)
         print(self.conversion_factor_summary)
         print("="*80)
-    
+
     def approve(self, approved_by_user):
         """Approve the transfer request if stock is available"""
         if not self.can_approve:
@@ -531,9 +539,10 @@ class TransferRequest(models.Model):
             raise ValidationError("Transfer request is already approved")
         
         with transaction.atomic():
+            # Only set approved_date when actually approving
             self.status = 'approved'
             self.approved_by = approved_by_user
-            self.approved_date = timezone.now()
+            self.approved_date = timezone.now()  # This will be current time, not request time
             self.save()
             
             # Create a StockTransfer from this request
@@ -559,8 +568,10 @@ class TransferRequest(models.Model):
                     original_quantity=request_item.quantity
                 )
             
-            return stock_transfer
-    
+            return stock_transfer    
+
+
+
     class Meta:
         ordering = ['-request_date']
         indexes = [
@@ -764,56 +775,86 @@ class TransferRequestItem(models.Model):
                 raise ValidationError(f"Invalid conversion: {str(e)}")
 
 
-
 class StockTransfer(models.Model):
-    TRANSFER_STATUS_CHOICES=[
-        ("pending","Pending"),
-        ("in_transit","In Transit"),
-        ("completed","Completed"),
-        ("cancelled","Cancelled"),
+    TRANSFER_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("in_transit", "In Transit"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
     ]
 
-    transfer_request=models.ForeignKey(
+    transfer_request = models.ForeignKey(
         "app.TransferRequest",
         on_delete=models.CASCADE,
         related_name="stock_transfers",
         null=True,
         blank=True
     )
-    transfer_date=models.DateField(auto_now_add=True)
-    from_store=models.ForeignKey("app.StoreLocation",on_delete=models.CASCADE,related_name="transfers_out")
-    to_store=models.ForeignKey("app.StoreLocation",on_delete=models.CASCADE,related_name="transfers_in")
-    completed_by=models.CharField(max_length=100,blank=True,null=True)
-    note=models.TextField(blank=True,null=True)
-    status=models.CharField(max_length=20,choices=TRANSFER_STATUS_CHOICES,default="pending")
-    created_at=models.DateTimeField(auto_now_add=True)
-    created_by=models.ForeignKey("auth.User",on_delete=models.SET_NULL,null=True,blank=True)
+    transfer_date = models.DateField(auto_now_add=True)
+    from_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfers_out")
+    to_store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE, related_name="transfers_in")
+    completed_by = models.CharField(max_length=100, blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=TRANSFER_STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True)
+    
+    inventory_changes_applied = models.BooleanField(default=False)
 
-    def save(self,*args,**kwargs):
-        old_status=None
-        if self.pk:
-            old_status=StockTransfer.objects.get(pk=self.pk).status
-        super().save(*args,**kwargs)
-        if old_status!="completed" and self.status=="completed":
-            self.apply_inventory_changes()
+    def __str__(self):
+        return f"ST{self.id:04d}: {self.from_store.name} → {self.to_store.name}"
+    
+    @property
+    def total_quantity(self):
+        return sum(item.base_quantity for item in self.items.all())
+
+    @property
+    def total_value(self):
+        return sum(item.total_value for item in self.items.all())
+
+    def save(self, *args, **kwargs):
+        """Save the transfer - NO AUTO-TRIGGER"""
+        super().save(*args, **kwargs)
+        # REMOVED: auto-apply_inventory_changes()
 
     def apply_inventory_changes(self):
-        if self.status != "completed":
-            raise ValidationError("Only completed transfers affect inventory")
-
+        if self.inventory_changes_applied:
+            raise ValidationError("Inventory changes have already been applied for this transfer")
+        
         with transaction.atomic():
             transfer = StockTransfer.objects.select_for_update().get(pk=self.pk)
-
+            
+            if transfer.inventory_changes_applied:
+                raise ValidationError("Inventory changes have already been applied for this transfer")
+            
             for item in self.items.select_related("product").all():
                 qty = int(item.base_quantity)
-                total_transferred = 0
-
+                
                 batches = InventoryBatch.objects.select_for_update().filter(
                     product=item.product,
                     store=self.from_store,
                     remaining_quantity__gt=0
                 ).order_by("expiry_date", "received_date")
-
+                
+                total_available_in_batches = sum(batch.remaining_quantity for batch in batches)
+                
+                if total_available_in_batches < qty:
+                    try:
+                        inventory = Inventory.objects.get(
+                            product=item.product,
+                            store=self.from_store
+                        )
+                        physical_stock = inventory.quantity_in_stock
+                    except Inventory.DoesNotExist:
+                        physical_stock = 0
+                    
+                    raise ValidationError(
+                        f"Insufficient stock for {item.product.name} in batches. "
+                        f"Needed {qty}, only {total_available_in_batches} available in batches. "
+                        f"Physical stock: {physical_stock}"
+                    )
+                
+                total_transferred = 0
                 remaining = qty
                 source_batches_taken = []
 
@@ -828,22 +869,21 @@ class StockTransfer(models.Model):
                     total_transferred += take
                     source_batches_taken.append((batch.unit_cost, take, batch.expiry_date))
 
-                if remaining > 0:
-                    raise ValidationError(f"Insufficient stock for {item.product.name}. Needed {qty}, only {total_transferred} available")
-
-                # Create **destination batch once per item**, sum quantities from all source batches
                 total_qty_for_destination = sum(take for _, take, _ in source_batches_taken)
-                avg_unit_cost = sum(cost * take for cost, take, _ in source_batches_taken) / total_qty_for_destination
-
-                InventoryBatch.objects.create(
-                    product=item.product,
-                    store=self.to_store,
-                    quantity=total_qty_for_destination,
-                    remaining_quantity=total_qty_for_destination,
-                    unit_cost=avg_unit_cost,
-                    expiry_date=min(expiry for _, _, expiry in source_batches_taken),
-                    created_at=timezone.now()
-                )
+                
+                if total_qty_for_destination > 0:
+                    avg_unit_cost = sum(cost * take for cost, take, _ in source_batches_taken) / total_qty_for_destination
+                    expiry_dates = [expiry for _, _, expiry in source_batches_taken if expiry]
+                    
+                    InventoryBatch.objects.create(
+                        product=item.product,
+                        store=self.to_store,
+                        quantity=total_qty_for_destination,
+                        remaining_quantity=total_qty_for_destination,
+                        unit_cost=avg_unit_cost,
+                        expiry_date=min(expiry_dates) if expiry_dates else None,
+                        created_at=timezone.now()
+                    )
 
                 src_inv, _ = Inventory.objects.select_for_update().get_or_create(
                     product=item.product,
@@ -882,8 +922,23 @@ class StockTransfer(models.Model):
                     user=str(self.created_by) if self.created_by else "system"
                 )
 
+            StockTransfer.objects.filter(pk=self.pk).update(
+                completed_by=str(self.created_by) if self.created_by else None,
+                inventory_changes_applied=True
+            )
+            
             self.completed_by = str(self.created_by) if self.created_by else None
-            StockTransfer.objects.filter(pk=self.pk).update(completed_by=self.completed_by)
+            self.inventory_changes_applied = True
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'from_store']),
+            models.Index(fields=['status', 'to_store']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['inventory_changes_applied']),
+        ]
+
 
 
 class StockTransferItem(models.Model):
@@ -918,6 +973,17 @@ class StockTransferItem(models.Model):
             return inv.quantity_in_stock
         except Inventory.DoesNotExist:
             return 0
+        
+    @property
+    def unit_cost(self):
+        # Price per requested unit (carton)
+        return get_unit_price(self.product, self.units)
+
+    @property
+    def total_value(self):
+        # UI quantity × derived unit price
+        return self.quantity * self.unit_cost
+
 
 
 

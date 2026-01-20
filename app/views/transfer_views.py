@@ -15,6 +15,7 @@ from django.db.models import Sum, Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.paginator import Paginator as BasePaginator
+from django.db.models import Prefetch
 
 from app.models.products import Product, ProductUnitPrice, Inventory, StoreLocation, UnitOfMeasure
 from app.models.transactions import (
@@ -809,19 +810,73 @@ def update_transfer_request(request, request_id):
 @login_required
 def transfer_request_detail(request, request_id):
     tr = get_object_or_404(TransferRequest.objects.select_related(
-        'from_store', 'to_store', 'requested_by', 'approved_by'
-    ).prefetch_related('items__product'), pk=request_id)
+        'from_store', 'to_store', 'requested_by', 'approved_by', 'department'
+    ).prefetch_related(
+        Prefetch('items__product', queryset=Product.objects.select_related('category')),
+        'items__units'
+    ), pk=request_id)
     
     items_with_conversion = []
     for item in tr.items.all():
         item_detail = item.get_display_info()
+        
+        # Get available stock in source store
+        try:
+            inventory = Inventory.objects.get(
+                product=item.product,
+                store=tr.from_store
+            )
+            available_stock = inventory.quantity_in_stock
+        except Inventory.DoesNotExist:
+            available_stock = 0
+        
+        # Check for committed stock
+        from app.models.transactions import StockTransferItem
+        committed_stock = StockTransferItem.objects.filter(
+            product=item.product,
+            stock_transfer__from_store=tr.from_store,
+            stock_transfer__status__in=['pending', 'in_transit']
+        ).aggregate(committed=Sum('base_quantity'))['committed'] or 0
+        
+        item_detail['available_in_source'] = max(0, available_stock - committed_stock)
+        item_detail['physical_stock'] = available_stock
+        item_detail['committed_stock'] = committed_stock
+        item_detail['status'] = 'Available' if item.can_be_fulfilled else 'Unavailable'
+        
         items_with_conversion.append(item_detail)
     
     stock_report = tr.get_stock_availability_report()
     
+    # ADD SKU TO STOCK REPORT ITEMS
+    for i, report_item in enumerate(stock_report['items']):
+        if i < len(items_with_conversion):
+            report_item['sku'] = items_with_conversion[i].get('sku', 'N/A')
+        else:
+            # Try to get SKU from the actual product
+            try:
+                transfer_item = tr.items.all()[i]
+                report_item['sku'] = transfer_item.product.sku
+            except (IndexError, AttributeError):
+                report_item['sku'] = 'N/A'
+    
+    # Get status timeline properly
+    status_timeline = [
+        {
+            'status': 'Request Created',
+            'timestamp': tr.request_date,
+            'user': tr.requested_by.get_full_name() or tr.requested_by.username
+        }
+    ]
+    
+    if tr.status == 'approved' and tr.approved_date:
+        status_timeline.append({
+            'status': 'Request Approved',
+            'timestamp': tr.approved_date,
+            'user': tr.approved_by.get_full_name() if tr.approved_by else 'System'
+        })
+    
     context = {
-        'request': tr,
-        'form': TransferRequestForm(instance=tr),
+        'request_obj': tr,
         'items': tr.items.all(),
         'items_with_conversion': items_with_conversion,
         'conversion_summary': tr.conversion_factor_summary,
@@ -830,9 +885,12 @@ def transfer_request_detail(request, request_id):
         'can_approve': tr.can_approve,
         'total_base_units': tr.total_requested_items,
         'total_estimated_value': tr.total_estimated_value,
+        'status_timeline': status_timeline,
     }
     
     return render(request, 'transfers/transfer_request_details.html', context)
+
+
 
 
 @login_required

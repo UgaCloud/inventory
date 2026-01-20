@@ -17,14 +17,14 @@
       </div>
       <ul class="table-top-head">
         <li>
-          <a href="{% url 'stock_transfer_list' %}" class="btn btn-outline-secondary">
+          <a href="{% url 'stock_transfer_list' %}" style="width: 200px;" class="btn btn-outline-secondary">
             <i data-feather="arrow-left" class="feather-16"></i>
             Back to Transfers
           </a>
         </li>
         {% if transfer.transfer_request %}
         <li>
-          <a href="{% url 'transfer_request_detail' transfer.transfer_request.id %}" class="btn btn-outline-info">
+          <a href="{% url 'transfer_request_detail' transfer.transfer_request.id %}" style="width: 200px;"  class="btn btn-outline-info">
             <i data-feather="file-text" class="feather-16"></i>
             View Original Request
           </a>
@@ -246,7 +246,7 @@
                   <tr>
                     <td class="fw-bold">Total Value:</td>
                     <td>
-                      <span class="fw-bold text-primary">UGX {{ transfer.total_value|intcomma }}</span>
+                      <span class="fw-bold text-primary">UGX {{ transfer.total_value|intcomma }}<span>
                     </td>
                   </tr>
                   {% if transfer.notes %}
@@ -310,10 +310,8 @@
                       <span class="badge bg-light text-dark">{{ item.product.sku }}</span>
                     </td>
                     <td>
-                      <span class="fw-bold">{{ item.quantity }}</span>
-                      {% if item.units %}
-                        <small class="text-muted d-block">{{ item.units }}</small>
-                      {% endif %}
+                      <span class="fw-bold">{{ item.quantity }} {{ item.units.name }}</span>
+                      <small class="text-muted"> = {{ item.base_quantity }} items</small>
                     </td>
                     <td>UGX {{ item.unit_cost|intcomma }}</td>
                     <td>
@@ -499,7 +497,10 @@
               <div>
                 <span class="text-muted">Total Quantity</span>
               </div>
-              <span class="fw-bold">{{ transfer.total_quantity|default:0 }}</span>
+              <span class="fw-bold">
+                {{ transfer.total_quantity }} items
+                ({{ transfer.items.count }} line item{{ transfer.items.count|pluralize }})
+              </span>
             </div>
             <div class="stat-item d-flex justify-content-between align-items-center mb-3">
               <div>

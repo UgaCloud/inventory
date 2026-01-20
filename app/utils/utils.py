@@ -49,3 +49,24 @@ def validate_conversion_factor_exists(product, unit):
             f"No conversion factor defined for {product.name} with unit {unit.name}. "
             f"Please define it in product settings first."
         )
+
+
+
+def get_base_unit_price(product):
+    base = product.unit_prices.filter(conversion_factor=1).first()
+    if not base:
+        raise ValueError(f"No base price defined for {product}")
+    return base.price
+
+
+def get_unit_price(product, unit):
+    """
+    ALWAYS derived from base unit price
+    """
+    base_price = get_base_unit_price(product)
+
+    unit_price = product.unit_prices.filter(unit=unit).first()
+    if not unit_price:
+        raise ValueError(f"No conversion factor for {product} / {unit}")
+
+    return base_price * unit_price.conversion_factor

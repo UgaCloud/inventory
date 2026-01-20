@@ -215,6 +215,12 @@ class ProductUnitPrice(models.Model):
             raise ValidationError(
                 "Conversion factor must produce whole base units"
             )
+            
+        if self.conversion_factor != 1 and self.price is not None:
+            raise ValidationError(
+                "Only the base unit (conversion_factor = 1) may have a stored price. "
+                "All other unit prices are derived."
+            )
     
     def save(self, *args, **kwargs):
         if self.conversion_factor <= 0:
