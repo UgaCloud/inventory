@@ -145,7 +145,6 @@
                 <th>Request ID</th>
                 <th>Route</th>
                 <th>Items (Base Units)</th>
-                <th>Conversion Summary</th>
                 <th>Priority</th>
                 <th>Requested By</th>
                 <th>Request Date</th>
@@ -198,31 +197,6 @@
                         {% endif %}
                       </div>
                     </div>
-                  </div>
-                </td>
-                <td>
-                  <div class="conversion-summary">
-                    {% if summary.conversion_details %}
-                      <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-info dropdown-toggle py-0 px-2" type="button" 
-                                data-bs-toggle="dropdown" aria-expanded="false">
-                          <i data-feather="calculator" class="feather-12 me-1"></i>
-                          View CF
-                        </button>
-                        <div class="dropdown-menu p-3" style="max-width: 400px;">
-                          <h6 class="dropdown-header">Conversion Calculations</h6>
-                          {% for detail in summary.conversion_details %}
-                            <div class="mb-2">
-                              <div class="fw-bold small">{{ detail.product }}</div>
-                              <div class="small text-muted">{{ detail.calculation }}</div>
-                              <div class="small text-success">{{ detail.conversion_explanation }}</div>
-                            </div>
-                          {% endfor %}
-                        </div>
-                      </div>
-                    {% else %}
-                      <span class="text-muted small">No conversion data</span>
-                    {% endif %}
                   </div>
                 </td>
                 <td>
