@@ -19,7 +19,7 @@
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Excel"><img src="{% static 'assets/img/icons/excel.svg' %}" alt="img"></a>
             </li>
             <li>
-                <a data-bs-toggle="tooltip" data-bs-placement="top" title="Refresh"><i class="ti ti-refresh"></i></a>
+                <a data-bs-toggle="tooltip" data-bs-placement="top" title="Refresh" onclick="window.location.reload()"><i class="ti ti-refresh"></i></a>
             </li>
             <li>
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Collapse" id="collapse-header"><i class="ti ti-chevron-up"></i></a>
@@ -44,27 +44,52 @@
     </div>
 
     <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-            <form method="get" action="{% url 'products_page' %}" class="d-flex gap-2 align-items-center flex-wrap flex-grow-1">
-                    <select name="category" class="form-select" style="min-width: 150px;" onchange="this.form.submit()">
-                        <option value="">All Categories</option>
-                        {% for category in categories %}
-                        <option value="{{ category.id }}" {% if selected_category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <select name="brand" class="form-select" style="min-width: 150px;" onchange="this.form.submit()">
-                        <option value="">All Brands</option>
-                        {% for brand in brands %}
-                        <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
-                        {% endfor %}
-                    </select>
-                    <select name="status" class="form-select" style="min-width: 120px;" onchange="this.form.submit()">
-                        <option value="">All Status</option>
-                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
-                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
-                    </select>
+        <div class="card-header">
+            <form method="get" action="{% url 'products_page' %}" class="d-flex align-items-center flex-wrap gap-2">
+                <!-- Search Input -->
+                <div class="input-group input-group-sm" style="max-width: 200px;">
+                    <input type="text" 
+                           name="search" 
+                           class="form-control" 
+                           placeholder="Search products..." 
+                           value="{{ search_query|default:'' }}"
+                           aria-label="Search products">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="ti ti-search"></i>
+                    </button>
+                </div>
+                
+                <!-- Category Filter -->
+                <select name="category" class="form-select form-select-sm" style="max-width: 200px;">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if selected_category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+                
+                <!-- Brand Filter -->
+                <select name="brand" class="form-select form-select-sm" style="max-width: 200px;">
+                    <option value="">All Brands</option>
+                    {% for brand in brands %}
+                    <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                    {% endfor %}
+                </select>
+                
+                <!-- Status Filter -->
+                <select name="status" class="form-select form-select-sm" style="max-width: 200px;">
+                    <option value="">All Status</option>
+                    <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+                
+                <!-- Apply Filter Button -->
+                <button type="submit" class="btn btn-primary btn-sm d-flex align-items-center">
+                    <i class="ti ti-filter me-1"></i>Apply
+                </button>
+                
+                <!-- Clear Filters Button -->
                 {% if search_query or selected_category or selected_brand or selected_status %}
-                <a href="{% url 'products_page' %}" class="btn btn-outline-secondary btn-sm">
+                <a href="{% url 'products_page' %}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
                     <i class="ti ti-x me-1"></i>Clear Filters
                 </a>
                 {% endif %}
@@ -72,7 +97,7 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table datatable" id="productsTable">
+                <table class="table" id="productsTable">
                     <thead class="thead-light">
                         <tr>
                             <th class="no-sort">
@@ -85,7 +110,7 @@
                             <th>Product Name</th>
                             <th>Category</th>
                             <th>Brand</th>
-                            <th>Qty</th>
+                            <th>Available Stock</th>
                             <th>Base Price (Unit)</th>
                             <th>Status</th>
                             <th class="no-sort">Action</th>
@@ -105,6 +130,11 @@
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <a href="{% url 'product_details_page' product_data.product.id %}">{{ product_data.product.name }}</a>
+                                        {% if product_data.unit_count > 0 %}
+                                        <span class="badge bg-info ms-2" title="{{ product_data.unit_count }} unit{{ product_data.unit_count|pluralize }}">
+                                            {{ product_data.unit_count }}U
+                                        </span>
+                                        {% endif %}
                                     </div>												
                                 </td>							
                                 <td>
@@ -115,10 +145,28 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ product_data.product.brand|default:"-" }}</td>
-                                <td>{{ product_data.total_available_stock }}</td>
+                                <td>
+                                    <span class="fw-bold {% if product_data.total_available_stock == 0 %}text-danger{% elif product_data.total_available_stock <= 10 %}text-warning{% else %}text-success{% endif %}">
+                                        {{ product_data.total_available_stock }}
+                                    </span>
+                                </td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <a href="javascript:void(0);">{{ product_data.product.default_price|intcomma }}/- ({{ product_data.product.default_unit }})</a>
+                                        <a href="javascript:void(0);" 
+                                           class="view-units-link text-primary fw-bold" 
+                                           data-bs-toggle="modal" 
+                                           data-bs-target="#viewUnitsModal"
+                                           data-product-id="{{ product_data.product.id }}"
+                                           data-product-name="{{ product_data.product.name }}"
+                                           data-sku="{{ product_data.product.sku }}">
+                                            UGX {{ product_data.product.default_price|intcomma }}/- 
+                                            <small class="text-muted ms-1">({{ product_data.product.default_unit }})</small>
+                                            {% if product_data.unit_count > 1 %}
+                                            <span class="badge bg-light text-dark ms-1">
+                                                +{{ product_data.unit_count|add:"-1" }} more
+                                            </span>
+                                            {% endif %}
+                                        </a>
                                     </div>
                                 </td>
                                 <td>
@@ -133,7 +181,7 @@
                                     {% endif %}
                                 </td>
                                 <td class="action-table-data">
-                                    {% if is_admin or is_superuser %}
+                                    {% if user.is_superuser or is_admin %}
                                         <div class="edit-delete-action">
                                             <a class="me-2 edit-icon p-2" href="{% url 'product_details_page' product_data.product.id %}" title="View Details">
                                                 <i data-feather="eye" class="feather-eye"></i>
@@ -144,9 +192,6 @@
                                                data-bs-toggle="modal" 
                                                data-bs-target="#edit-product-modal-{{ product_data.product.id }}">
                                                 <i data-feather="edit" class="feather-edit"></i>
-                                            </a>
-                                            <a data-bs-toggle="modal" data-bs-target="#delete-modal" class="p-2 delete-product" href="javascript:void(0);" data-product-id="{{ product_data.product.id }}" title="Delete">
-                                                <i data-feather="trash-2" class="feather-trash-2"></i>
                                             </a>
                                         </div>
                                     {% endif %}
@@ -171,26 +216,97 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination -->
+            {% if paginated_products.paginator.num_pages > 1 %}
+            <div class="d-flex justify-content-between align-items-center mt-4 px-3 pb-3">
+                <div class="datatable-info">
+                    <span>Showing {{ paginated_products.start_index }} to {{ paginated_products.end_index }} of {{ paginated_products.paginator.count }} products</span>
+                </div>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm justify-content-end mb-0">
+                        {% if paginated_products.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ paginated_products.previous_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
+                                <i class="ti ti-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in paginated_products.paginator.page_range %}
+                            {% if page_num == paginated_products.number %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% elif page_num > paginated_products.number|add:'-3' and page_num < paginated_products.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_num }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">{{ page_num }}</a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if paginated_products.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ paginated_products.next_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
+                                <i class="ti ti-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Delete Modal -->
-    <div class="modal fade" id="delete-modal">
-        <div class="modal-dialog modal-dialog-centered">
+    <!-- View Units Modal (View Only) -->
+    <div class="modal fade" id="viewUnitsModal" tabindex="-1" aria-labelledby="viewUnitsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="page-wrapper-new p-0">
-                    <div class="content p-5 px-3 text-center">
-                        <span class="rounded-circle d-inline-flex p-2 bg-danger-transparent mb-2"><i class="ti ti-trash fs-24 text-danger"></i></span>
-                        <h4 class="fs-20 text-gray-9 fw-bold mb-2 mt-1">Delete Product</h4>
-                        <p class="text-gray-6 mb-0 fs-16">Are you sure you want to delete this product?</p>
-                        <form id="delete-form" method="post" action="">
-                            {% csrf_token %}
-                            <div class="modal-footer-btn mt-3 d-flex justify-content-center">
-                                <button type="button" class="btn me-2 btn-secondary fs-13 fw-medium p-2 px-3 shadow-none" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-danger fs-13 fw-medium p-2 px-3">Yes, Delete</button>
-                            </div>
-                        </form>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewUnitsModalLabel">
+                        <i data-feather="package" class="feather-16 me-2"></i>
+                        <span id="modalProductName">Product Units</span>
+                        <small class="text-muted ms-2" id="modalProductSku"></small>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="unitsLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading units...</p>
                     </div>
+                    <div id="unitsContent" style="display: none;">
+                       
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Unit Name</th>
+                                        <th>Abbreviation</th>
+                                        <th>Conversion Factor</th>
+                                        <th>Price (UGX)</th>
+                                        <th>Price per Base Unit (UGX)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="unitsTableBody">
+                                    <!-- Units will be loaded here -->
+                                </tbody>
+                                
+                            </table>
+                        </div>
+                    </div>
+                    <div id="unitsError" class="text-center py-4" style="display: none;">
+                        <i data-feather="alert-circle" class="feather-48 text-danger mb-3"></i>
+                        <h5 class="text-muted">Error loading units</h5>
+                        <p class="text-muted" id="errorMessage">Unable to load product units at this time.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -206,9 +322,7 @@
                             <div class="page-title">
                                 <h4>Add Product</h4>
                             </div>
-                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <form method="post" action="{% url 'add_products_page' %}" id="add-product-form">
                             {% csrf_token %}
@@ -237,9 +351,7 @@
                             <div class="page-title">
                                 <h4>Edit Product - {{ product_data.product.name }}</h4>
                             </div>
-                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <form method="post" action="{% url 'edit_product_page' product_data.product.id %}">
                             {% csrf_token %}
@@ -268,9 +380,7 @@
                             <div class="page-title">
                                 <h4>Bulk Upload Products</h4>
                             </div>
-                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <form method="post" action="{% url 'bulk_add_products' %}" enctype="multipart/form-data" id="bulk-upload-form">
                             {% csrf_token %}
@@ -294,118 +404,399 @@
         </div>
     </div>
 
-{% endblock %}
 
-{% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Delete modal handler
-    const deleteModal = document.getElementById('delete-modal');
-    const deleteForm = document.getElementById('delete-form');
+// Updated showUnitsModal function
+function showUnitsModal(productId, productName, productSku) {
+    console.log('Opening units modal for:', productId, productName);
     
-    if (deleteModal) {
-        deleteModal.addEventListener('show.bs.modal', function(event) {
-            const button = event.relatedTarget;
-            const productId = button.getAttribute('data-product-id');
-            if (productId) {
-                deleteForm.action = "{% url 'delete_category' 0 %}".replace('0', productId);
+    // Get modal element
+    const modalElement = document.getElementById('viewUnitsModal');
+    if (!modalElement) {
+        console.error('Modal not found!');
+        return;
+    }
+    
+    // Get or create modal instance
+    let modal = bootstrap.Modal.getInstance(modalElement);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalElement);
+    }
+    
+    // Set product info in modal
+    document.getElementById('modalProductName').textContent = productName;
+    document.getElementById('modalProductSku').textContent = productSku ? `(${productSku})` : '';
+    
+    // Show loading spinner
+    document.getElementById('unitsLoading').style.display = 'block';
+    document.getElementById('unitsContent').style.display = 'none';
+    document.getElementById('unitsError').style.display = 'none';
+    
+    // Clear previous data
+    document.getElementById('unitsTableBody').innerHTML = '';
+    
+    // Fetch data from API
+    fetch(`/api/products/${productId}/units/`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch: ${response.status}`);
             }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Got data:', data);
+            
+            // Hide loading
+            document.getElementById('unitsLoading').style.display = 'none';
+            
+            if (data.success && data.units && data.units.length > 0) {
+                // Build table rows
+                const tableBody = document.getElementById('unitsTableBody');
+                tableBody.innerHTML = '';
+                
+                data.units.forEach((unit, index) => {
+                    const row = document.createElement('tr');
+                    const isBase = unit.is_base_unit || unit.conversion_factor === 1;
+                    const pricePerBase = unit.conversion_factor > 0 ? 
+                        (unit.price / unit.conversion_factor).toFixed(2) : 
+                        unit.price;
+                    
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                ${unit.unit_name || 'N/A'}
+                                ${isBase ? '<span class="badge bg-primary ms-2">Base Unit</span>' : ''}
+                            </div>
+                        </td>
+                        <td>${unit.abbreviation || 'N/A'}</td>
+                        <td>${unit.conversion_factor}</td>
+                        <td class="fw-bold text-success">UGX ${parseFloat(unit.price).toLocaleString()}</td>
+                        <td class="text-muted">UGX ${parseFloat(pricePerBase).toLocaleString()}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                // Show content
+                document.getElementById('unitsContent').style.display = 'block';
+            } else {
+                // No units
+                document.getElementById('unitsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="empty-state">
+                                <i data-feather="package" class="feather-24 text-muted mb-2"></i>
+                                <p class="text-muted mb-0">No units found for this product</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('unitsContent').style.display = 'block';
+            }
+            
+            // Refresh icons if feather exists
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('unitsLoading').style.display = 'none';
+            document.getElementById('unitsError').style.display = 'block';
+            document.getElementById('errorMessage').textContent = 
+                `Error loading units: ${error.message}`;
+        });
+    
+    // Show the modal
+    modal.show();
+}
+
+// Add modal cleanup event listener
+document.addEventListener('DOMContentLoaded', function() {
+    const viewUnitsModal = document.getElementById('viewUnitsModal');
+    if (viewUnitsModal) {
+        viewUnitsModal.addEventListener('hidden.bs.modal', function() {
+            // Reset modal content when hidden
+            document.getElementById('unitsLoading').style.display = 'none';
+            document.getElementById('unitsContent').style.display = 'none';
+            document.getElementById('unitsError').style.display = 'none';
+            document.getElementById('unitsTableBody').innerHTML = '';
+            document.getElementById('modalProductName').textContent = 'Product Units';
+            document.getElementById('modalProductSku').textContent = '';
         });
     }
+});
 
-    // Search functionality
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        let searchTimeout;
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const searchTerm = this.value.trim();
-                if (searchTerm.length >= 2 || searchTerm.length === 0) {
-                    const url = new URL(window.location.href);
-                    if (searchTerm) {
-                        url.searchParams.set('search', searchTerm);
-                    } else {
-                        url.searchParams.delete('search');
-                    }
-                    window.location.href = url.toString();
-                }
-            }, 500);
-        });
-    }
-
+// Event Listeners
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, setting up event listeners');
+    
+    // Handle clicks on view units links
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.view-units-link');
+        if (link) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const productId = link.getAttribute('data-product-id');
+            const productName = link.getAttribute('data-product-name');
+            const productSku = link.getAttribute('data-sku');
+            
+            if (productId && productName) {
+                console.log('Opening modal for product:', productId, productName);
+                showUnitsModal(productId, productName, productSku);
+            } else {
+                console.error('Missing product data on link');
+            }
+        }
+    });
+    
     // Select all checkbox
     const selectAll = document.getElementById('select-all');
-    const productCheckboxes = document.querySelectorAll('.product-checkbox');
-    
     if (selectAll) {
         selectAll.addEventListener('change', function() {
-            productCheckboxes.forEach(checkbox => {
+            document.querySelectorAll('.product-checkbox').forEach(checkbox => {
                 checkbox.checked = this.checked;
             });
         });
     }
-
-    // Initialize DataTable with explicit configuration
-    setTimeout(function() {
-        if (typeof jQuery !== 'undefined') {
-            const $table = jQuery('#productsTable');
+    
+    // Auto-submit filters when select changes
+    document.querySelectorAll('select[name="category"], select[name="brand"], select[name="status"]').forEach(select => {
+        select.addEventListener('change', function() {
+            // Add search parameter if search input exists
+            const searchInput = document.querySelector('input[name="search"]');
+            const searchValue = searchInput ? searchInput.value : '';
             
-            if ($table.length > 0) {
-                try {
-                    // Destroy existing DataTable if it was already initialized
-                    if (jQuery.fn.DataTable.isDataTable('#productsTable')) {
-                        $table.DataTable().destroy();
-                    }
-                    
-                    // Initialize DataTable
-                    $table.DataTable({
-                        "processing": false,
-                        "serverSide": false,
-                        "paging": true,
-                        "pageLength": 10,
-                        "lengthMenu": [[10, 25, 50, 100], [10, 25, 50, 100]],
-                        "ordering": true,
-                        "searching": true,
-                        "columnDefs": [
-                            { "orderable": false, "targets": 0 },  // Checkbox
-                            { "orderable": false, "targets": 8 }   // Action
-                        ],
-                        "order": [[1, 'asc']], // Sort by SKU by default
-                        "dom": 'fBtlpi',
-                        "language": {
-                            "search": '',
-                            "searchPlaceholder": "Search products...",
-                            "lengthMenu": "Show _MENU_ entries",
-                            "info": "Showing _START_ to _END_ of _TOTAL_ products",
-                            "infoEmpty": "No products to display",
-                            "paginate": {
-                                "first": "First",
-                                "last": "Last",
-                                "next": '<i class="fa fa-angle-right"></i>',
-                                "previous": '<i class="fa fa-angle-left"></i>'
-                            }
-                        },
-                        "initComplete": function(settings, json) {
-                            // Move search box to custom location
-                            const $search = jQuery('.dataTables_filter');
-                            if ($search.length > 0) {
-                                $search.appendTo('.search-input');
-                            }
-                        }
-                    });
-                    
-                    console.log('✓ Products table initialized successfully');
-                } catch (error) {
-                    console.error('✗ Error initializing products table:', error);
-                }
+            // Build URL with all parameters
+            let url = new URL(window.location.href);
+            url.searchParams.set('page', '1');
+            
+            // Set category if selected
+            const category = document.querySelector('select[name="category"]').value;
+            if (category) {
+                url.searchParams.set('category', category);
             } else {
-                console.warn('Products table (#productsTable) not found');
+                url.searchParams.delete('category');
             }
-        } else {
-            console.error('jQuery not loaded');
-        }
-    }, 500); // Delay to ensure all libraries are loaded
+            
+            // Set brand if selected
+            const brand = document.querySelector('select[name="brand"]').value;
+            if (brand) {
+                url.searchParams.set('brand', brand);
+            } else {
+                url.searchParams.delete('brand');
+            }
+            
+            // Set status if selected
+            const status = document.querySelector('select[name="status"]').value;
+            if (status) {
+                url.searchParams.set('status', status);
+            } else {
+                url.searchParams.delete('status');
+            }
+            
+            // Set search if exists
+            if (searchValue) {
+                url.searchParams.set('search', searchValue);
+            } else {
+                url.searchParams.delete('search');
+            }
+            
+            // Submit the form by redirecting
+            window.location.href = url.toString();
+        });
+    });
+    
+    // Search input submit on Enter key
+    const searchInput = document.querySelector('input[name="search"]');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                // Trigger form submit
+                const form = this.closest('form');
+                if (form) {
+                    // Reset to page 1 when searching
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('page', '1');
+                    url.searchParams.set('search', this.value);
+                    window.location.href = url.toString();
+                }
+            }
+        });
+    }
+    
+    // Initialize feather icons if available
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    console.log('Event listeners set up');
 });
 </script>
+
+<style>
+/* Filter Styling */
+.card-header form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Pagination styling */
+.pagination {
+    margin-bottom: 0;
+}
+
+.page-link {
+    border-radius: 0.25rem;
+    margin: 0 2px;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.page-link:hover {
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.datatable-info {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* View Units Link Styling */
+.view-units-link {
+    color: #0d6efd;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.view-units-link:hover {
+    color: #0a58ca;
+    text-decoration: underline;
+}
+
+/* Units Table Styling */
+#unitsTableBody tr {
+    transition: background-color 0.2s;
+}
+
+#unitsTableBody tr:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Base unit badge */
+.badge.bg-primary {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+}
+
+/* Table styling */
+.table {
+    margin-bottom: 0;
+}
+
+.table thead th {
+    border-bottom: 2px solid #dee2e6;
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Stock status colors */
+.text-danger { color: #dc3545 !important; }
+.text-warning { color: #ffc107 !important; }
+.text-success { color: #198754 !important; }
+
+/* Unit count badge */
+.badge.bg-info {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-header form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .card-header form .input-group,
+    .card-header form select,
+    .card-header form button,
+    .card-header form a {
+        width: 100%;
+        min-width: auto !important;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+        overflow-x: auto;
+    }
+    
+    .pagination {
+        flex-wrap: wrap;
+        justify-content: center !important;
+        margin-top: 1rem;
+    }
+    
+    .datatable-info {
+        text-align: center;
+        margin-bottom: 0.5rem;
+        width: 100%;
+    }
+    
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: center !important;
+        gap: 1rem;
+    }
+    
+    /* Modal adjustments */
+    .modal-lg {
+        max-width: 95%;
+    }
+    
+    .view-units-link {
+        font-size: 0.875rem;
+        word-break: break-word;
+    }
+    
+    .view-units-link .badge {
+        font-size: 0.6rem;
+        padding: 0.1rem 0.3rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .action-table-data .edit-delete-action {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .action-table-data .edit-delete-action a {
+        display: inline-block;
+        text-align: center;
+    }
+}
+</style>
 {% endblock %}

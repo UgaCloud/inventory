@@ -197,7 +197,7 @@ class Product(models.Model):
 class ProductUnitPrice(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="unit_prices")
     unit = models.ForeignKey(UnitOfMeasure, on_delete=models.CASCADE)
-    conversion_factor = models.DecimalField(max_digits=10, decimal_places=0, default=1.0)  # Changed from FloatField
+    conversion_factor = models.DecimalField(max_digits=10, decimal_places=0, default=1)
     price = models.DecimalField(max_digits=10, decimal_places=0)
     
     class Meta:
@@ -207,20 +207,20 @@ class ProductUnitPrice(models.Model):
     def __str__(self):
         return f"{self.product.name} - {self.unit.name} ({self.price}/-)"
     
-    def clean(self):
-        if self.conversion_factor <= 0:
-            raise ValidationError("Conversion factor must be positive")
+    # def clean(self):
+    #     if self.conversion_factor <= 0:
+    #         raise ValidationError("Conversion factor must be positive")
 
-        if self.conversion_factor % 1 != 0:
-            raise ValidationError(
-                "Conversion factor must produce whole base units"
-            )
+    #     if self.conversion_factor % 1 != 0:
+    #         raise ValidationError(
+    #             "Conversion factor must produce whole base units"
+    #         )
             
-        if self.conversion_factor != 1 and self.price is not None:
-            raise ValidationError(
-                "Only the base unit (conversion_factor = 1) may have a stored price. "
-                "All other unit prices are derived."
-            )
+    #     if self.conversion_factor != 1 and self.price is not None:
+    #         raise ValidationError(
+    #             "Only the base unit (conversion_factor = 1) may have a stored price. "
+    #             "All other unit prices are derived."
+    #         )
     
     def save(self, *args, **kwargs):
         if self.conversion_factor <= 0:

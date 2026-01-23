@@ -165,6 +165,7 @@ urlpatterns = [
     path('api/units/list/', get_units_list, name='get_units_list'),
     path('api/sales/validate-stock/', validate_sale_stock, name='validate_sale_stock'),
     path('api/products/<int:product_id>/details/', get_product_details, name='get_product_details'),    
+    path('api/products/<int:product_id>/units/', get_product_units_json, name='get_product_units'),
 
 
     #human resource
@@ -242,6 +243,9 @@ urlpatterns = [
     path('api/products/category/<int:category_id>/', products_by_category_api, name='products_by_category_api'),
     path('api/products/suggestions/', product_suggestions_api, name='product_suggestions_api'),
 
+
+
+    
     # Sales Report URLs
     path('reports/branch-sales/', sales_report_views.branch_sales_report, name='branch_sales_report'),
     path('reports/branch-sales/api/', sales_report_views.branch_sales_report_api, name='branch_sales_report_api'),

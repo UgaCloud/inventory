@@ -14,20 +14,23 @@ from app.forms.transaction_forms import StockAdjustmentForm
 from app.selectors.product_selectors import *
 from app.models.products import *
 
-from django.core.paginator import Paginator
 from django.db.models import Q
 import csv
 from django.utils import timezone
 from app.models.products import Inventory
 from app.models.transactions import StockTransferItem
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.views.decorators.csrf import csrf_exempt
+import json
+
 
 
 @login_required
 def manage_product_view(request):
     product_form = ProductForm()
 
-    # Get all products with filtering support
-    products = Product.objects.select_related('category').all()
+    # Get all products with filtering support - ADD ORDERING
+    products = Product.objects.select_related('category').all().order_by('id')  # Added order_by
     
     # Apply filters from query parameters
     category_id = request.GET.get('category')
@@ -55,7 +58,7 @@ def manage_product_view(request):
         products = products.filter(is_active=False)
     
     # Get all categories for dropdown
-    categories = get_all_categories()
+    categories = Category.objects.all()
     
     # Get all unique brands for dropdown (excluding empty/null brands)
     brands = Product.objects.exclude(
@@ -64,17 +67,24 @@ def manage_product_view(request):
         brand=''
     ).values_list('brand', flat=True).distinct().order_by('brand')
     
-    
-    products = get_all_products()
-    categories = get_all_categories()
-    
-    # Create edit forms for each product
+    # Create edit forms for each product (only for current page)
     edit_forms = {}
-    for product in products:
-        edit_forms[product.id] = ProductForm(instance=product)
     
+    # Pagination - 10 items per page
+    items_per_page = 25
+    paginator = Paginator(products, items_per_page)  # Now products has ordering
+    page = request.GET.get('page', 1)
+    
+    try:
+        paginated_products = paginator.page(page)
+    except PageNotAnInteger:
+        paginated_products = paginator.page(1)
+    except EmptyPage:
+        paginated_products = paginator.page(paginator.num_pages)
+    
+    # Enhanced products for current page only
     enhanced_products = []
-    for product in products:
+    for product in paginated_products:
         total_committed_stock = StockTransferItem.objects.filter(
             product=product,
             stock_transfer__status__in=['pending', 'in_transit']
@@ -82,16 +92,18 @@ def manage_product_view(request):
         
         total_physical_stock = sum(inv.quantity_in_stock for inv in product.inventories.all())
         total_available_stock = total_physical_stock
-        # total_available_stock = max(0, total_physical_stock - total_committed_stock)
+        
+        # Create edit form for each product
+        edit_forms[product.id] = ProductForm(instance=product)
         
         enhanced_products.append({
             'product': product,
             'total_physical_stock': total_physical_stock,
             'total_committed_stock': total_committed_stock,
             'total_available_stock': total_available_stock,
-            'edit_form': edit_forms[product.id],  # Add edit form to each product
+            'edit_form': edit_forms[product.id],
         })
-
+    
     context = {
         'form': product_form,
         'products': enhanced_products,
@@ -101,6 +113,7 @@ def manage_product_view(request):
         'selected_brand': brand_filter,
         'search_query': search_query,
         'selected_status': status_filter,
+        'paginated_products': paginated_products,  # For pagination controls
     }
     return render(request, 'products/products.html', context)
 
@@ -280,6 +293,50 @@ def edit_unit_of_measure_view(request, unit_id):
         form = CategoryForm(instance=unit)
     return redirect(unit_of_measure_view)
 
+
+@login_required
+def get_product_units_json(request, product_id):
+    """API endpoint to get product units for modal display"""
+    try:
+        product = get_product_by_id(product_id=product_id)
+        units = product.unit_prices.all().order_by('conversion_factor')
+        
+        units_data = []
+        for unit in units:
+            # Determine if this is the base unit (conversion_factor == 1)
+            is_base_unit = unit.conversion_factor == 1
+            
+            units_data.append({
+                'id': unit.id,
+                'unit_name': unit.unit.name if unit.unit else 'N/A',
+                'abbreviation': unit.unit.abbreviation if unit.unit else 'N/A',
+                'conversion_factor': float(unit.conversion_factor),  # Convert to float for JSON
+                'price': float(unit.price),  # Convert to float
+                'is_base_unit': is_base_unit,  # Calculated based on conversion_factor
+                'unit': {
+                    'name': unit.unit.name if unit.unit else '',
+                    'abbreviation': unit.unit.abbreviation if unit.unit else ''
+                }
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'sku': product.sku
+            },
+            'units': units_data,
+            'total_units': len(units_data)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()  # This will print the full traceback to console
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 @login_required
 def product_details_view(request, _product_id):
@@ -1346,3 +1403,20 @@ def product_suggestions_api(request):
         'products': results,
         'count': len(results)
     })
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
