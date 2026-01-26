@@ -59,18 +59,8 @@ def record_sale_and_payment(receipt_no, store, customer, total_amount, amount_pa
                 db_customer.balance = (db_customer.balance or Decimal('0')) + delta
                 db_customer.save(update_fields=['balance'])
 
-        # Ledger: record debit for balance (if any) — keep for audit
-        if new_balance > 0:
-            CustomerLedger.objects.create(
-                customer=db_customer,
-                transaction_type='SALE',
-                description=f'Sale (Receipt: {getattr(sale, "receipt_no", "-")})',
-                debit=new_balance,
-                credit=0,
-                note=note or ''
-            )
-
         # Ledger: record credit for payment (if any); create Payment record
+        # The signal will automatically create the ledger entry when Payment is created
         if amount_paid > 0:
             payment = Payment.objects.create(
                 customer=db_customer,
@@ -78,14 +68,7 @@ def record_sale_and_payment(receipt_no, store, customer, total_amount, amount_pa
                 payment_method=payment_method,
                 note=note or ''
             )
-            CustomerLedger.objects.create(
-                customer=db_customer,
-                transaction_type='PAYMENT',
-                description=f'Payment for sale (Receipt: {getattr(sale, "receipt_no", "-")})',
-                debit=0,
-                credit=amount_paid,
-                note=note or ''
-            )
+            # Signal will automatically create ledger entry - NO MANUAL CREATION
 
         return sale
 
@@ -139,14 +122,8 @@ def allocate_bulk_payment_to_sales(customer, payment_amount, payment_method, ref
                 reference=reference,
                 note=note,
             )
-        CustomerLedger.objects.create(
-            customer=db_customer,
-            transaction_type='PAYMENT',
-            description=f'Bulk payment allocation',
-            debit=0,
-            credit=payment_amount,
-            note=note,
-        )
+        # Signal will automatically create ledger entry - NO MANUAL CREATION
+        
         # Reduce customer outstanding balance by the payment amount
         db_customer.balance = (db_customer.balance or Decimal('0')) - Decimal(payment_amount)
         db_customer.save(update_fields=['balance'])

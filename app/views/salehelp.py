@@ -5,56 +5,51 @@ from django.db import transaction
 
 def return_stock_to_inventory(sale):
     """
-    Return stock to inventory after sale cancellation
+    Return stock to inventory after sale cancellation (Simplified)
     """
     try:
         with transaction.atomic():
-            # Get all items in the sale
-            sale_items = sale.items.all()
-            
-            for item in sale_items:
-                product = item.product
-                quantity = item.quantity
-                store = sale.store
-                
-                # Get or create inventory record
-                inventory, created = Inventory.objects.get_or_create(
-                    product=product,
-                    store=store,
-                    defaults={'quantity_in_stock': 0}
+            for item in sale.items.all():
+                # Get with lock
+                inventory = Inventory.objects.select_for_update().get(
+                    product=item.product,
+                    store=sale.store
                 )
                 
-                # Add quantity back to inventory
-                old_stock = inventory.quantity_in_stock
-                inventory.quantity_in_stock = F('quantity_in_stock') + quantity
+                # Simple arithmetic - no F() expressions
+                new_quantity = inventory.quantity_in_stock + item.base_quantity
+                inventory.quantity_in_stock = new_quantity
                 inventory.save()
-                inventory.refresh_from_db()
                 
-                # Create stock movement record for cancellation
+                # Create stock movement
                 StockMovement.objects.create(
-                    product=product,
-                    store=store,
+                    product=item.product,
+                    store=sale.store,
                     transaction_type='CANCELLATION',
-                    quantity=quantity,  # Positive for addition
+                    quantity=item.base_quantity,
                     transaction_id=sale.id,
-                    note=f"Sale #{sale.receipt_no} cancellation: {sale.cancellation_reason}",
-                    units_in_stock=inventory.quantity_in_stock,
+                    note=f"Cancelled sale {sale.receipt_no}",
+                    units_in_stock=new_quantity,
                     user=str(sale.cancelled_by or sale.recorded_by)
                 )
                 
-                # Return stock to inventory batches
-                return_stock_to_batches(product, store, quantity, sale)
+                # Simple batch return
+                InventoryBatch.objects.create(
+                    product=item.product,
+                    store=sale.store,
+                    quantity=item.base_quantity,
+                    remaining_quantity=item.base_quantity,
+                    unit_cost=0,  # Unknown cost for returns
+                    expiry_date=None,
+                    purchase_order_item=None
+                )
                 
-                # Mark sale item as cancelled
                 item.is_cancelled = True
-                item.save(update_fields=['is_cancelled'])
-            
+                item.save()
+                
+        return True
     except Exception as e:
         raise Exception(f"Failed to return stock to inventory: {str(e)}")
-
-
-
-
 
 
 def return_stock_to_batches(product, store, quantity_returned, sale):
