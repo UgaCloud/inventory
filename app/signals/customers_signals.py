@@ -39,28 +39,38 @@ def delete_ledger_on_payment_delete(sender, instance, **kwargs):
     ).delete()
     update_customer_balance(instance.customer)
 
+
+
 # Create ledger entry when a Sale is created 
 @receiver(post_save, sender=Sales)
 def create_ledger_on_sale(sender, instance, created, **kwargs):
-    if created and instance.customer:
+    if created and instance.customer and not instance.is_cancelled:
+        # Only create on initial creation
         CustomerLedger.objects.create(
             customer=instance.customer,
             transaction_type='SALE',
             description=f'Sale (Receipt: {instance.receipt_no})',
-            debit=instance.balance,  # Or instance.total_amount if you want full sale
+            debit=instance.total_amount,
             credit=0,
             note=instance.note or '',
-            # Optionally, you can add payment_method info to description or extend CustomerLedger if needed
         )
-    update_customer_balance(instance.customer)
+    
+    # Always update balance (even on updates)
+    if instance.customer:
+        update_customer_balance(instance.customer)
+        
+        
+        
+        
 
 # Delete ledger entry if Sale is deleted
 @receiver(post_delete, sender=Sales)
 def delete_ledger_on_sale_delete(sender, instance, **kwargs):
-    CustomerLedger.objects.filter(
-        customer=instance.customer,
-        transaction_type='SALE',
-        debit=instance.balance,  
-        note=instance.note or ''
-    ).delete()
-    update_customer_balance(instance.customer)
+    if instance.customer:
+        # Delete by receipt number, not by balance (which changes!)
+        CustomerLedger.objects.filter(
+            customer=instance.customer,
+            transaction_type='SALE',
+            description__contains=instance.receipt_no
+        ).delete()
+        update_customer_balance(instance.customer)

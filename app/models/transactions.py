@@ -282,8 +282,7 @@ class SalesItem(models.Model):
         super().save(*args, **kwargs)
 
     def amount(self):
-        """Amount calculation using BASE UNITS"""
-        return self.base_quantity * self.sale_price  # FIXED: base_quantity
+        return self.quantity * self.sale_price  # Use UI quantity, not base_quantity
 
     def __str__(self):
         return f"{self.product.name} x {self.base_quantity} base units ({self.quantity} {self.unit}) @ {self.sale_price}"

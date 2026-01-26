@@ -12,6 +12,7 @@ from app.forms.transaction_forms import SalesForm, SalesItemFormSet
 from app.selectors.sales_selectors import get_all_sales, get_sale_by_id, get_sales_items_for_sale
 from app.models.transactions import *
 from app.models.products import *
+from app.models.customers import *
 
 @login_required
 def sales_list_view(request):
@@ -109,7 +110,6 @@ def record_sales_view(request):
             try:
                 with transaction.atomic():
                     # ---- create sale ----
-                    # DON'T set status manually - let the model's save() method handle it
                     sale = Sales(
                         receipt_no=sale_data.receipt_no,
                         store=sale_data.store,
@@ -130,6 +130,18 @@ def record_sales_view(request):
                     for item in sale_items:
                         item.order = sale
                         item.save()
+                    
+                    # ---- CRITICAL FIX: Create Payment record if amount_paid > 0 ----
+                    if amount_paid > 0 and sale.payment_method and sale.customer:
+                        Payment.objects.create(
+                            customer=sale.customer,
+                            amount=amount_paid,
+                            payment_method=sale.payment_method,
+                            reference=sale.receipt_no,
+                            note=f"Payment for sale {sale.receipt_no}",
+                            payment_date=timezone.now()
+                        )
+                        # Signal will automatically create ledger entry for this payment
 
             except Exception as e:
                 messages.error(request, f"Failed to save sale: {e}")
@@ -170,7 +182,6 @@ def record_sales_view(request):
         'products': Product.objects.filter(is_active=True).order_by('name'),
         'units': UnitOfMeasure.objects.all().order_by('name'),
     })
-
 
 
 # def update_inventory_after_sale(sale, sale_items):
