@@ -828,9 +828,19 @@ def purchase_order_list(request):
     """List purchase orders"""
     orders = get_all_orders()
     form = PurchaseOrderForm()
+    
+    # Add these lines to get suppliers and stores
+    from app.models.suppliers import Supplier
+    from app.models.products import StoreLocation
+    
+    suppliers = Supplier.objects.filter(is_active=True).order_by('name')
+    stores = StoreLocation.objects.filter(is_active=True).order_by('name')
+    
     context = {
         'purchase_orders': orders,
         'form': form,
+        'suppliers': suppliers,  # Add this
+        'stores': stores,        # Add this
     }
     return render(request, 'stock/purchase_order_list.html', context)
 
@@ -842,30 +852,283 @@ def purchase_order_detail(request, order_id):
 
 @login_required
 def create_purchase_order(request):
-    """Create a new purchase order"""
+    """Create a new purchase order with formset"""
+    # Get all necessary data for dropdowns
+    from app.models.suppliers import Supplier
+    from app.models.products import StoreLocation
+    from app.models.organization import Branch
+    
+    suppliers = Supplier.objects.filter(is_active=True).order_by('name')
+    stores = StoreLocation.objects.filter(is_active=True).order_by('name')
+    branches = Branch.objects.filter(is_active=True).order_by('name')
+    products = Product.objects.filter(is_active=True).order_by('name')[:100]
+    
+    PurchaseOrderItemFormSet = inlineformset_factory(
+        PurchaseOrder,
+        PurchaseOrderItem,
+        form=PurchaseOrderItemForm,
+        extra=1,
+        can_delete=True,
+        fields='__all__'
+    )
+    
     if request.method == 'POST':
-        form = PurchaseOrderForm(request.POST)
-        if form.is_valid():
-            order = form.save()
-            messages.success(request, 'Purchase order created successfully.')
-            return redirect('purchase_order_item_list', order_id = order.id)
+        # Create a mutable copy of POST data
+        post_data = request.POST.copy()
+        
+        # Set default status to PENDING
+        post_data['status'] = 'PENDING'
+        post_data['total_cost'] = '0.00'
+        
+        form = PurchaseOrderForm(post_data)
+        formset = PurchaseOrderItemFormSet(post_data)
+        
+        if form.is_valid() and formset.is_valid():
+            try:
+                with transaction.atomic():
+                    # Save purchase order
+                    order = form.save(commit=False)
+                    order.recorded_by = request.user.username
+                    order.status = 'PENDING'  # Explicitly set to PENDING
+                    order.total_cost = 0.00
+                    order.save()
+                    
+                    # Calculate total from items
+                    total_cost = 0
+                    
+                    # Save formset items
+                    instances = formset.save(commit=False)
+                    for instance in instances:
+                        instance.order = order
+                        instance.save()
+                        total_cost += instance.quantity * instance.unit_cost
+                    
+                    # Update order total cost
+                    order.total_cost = total_cost
+                    order.save(update_fields=['total_cost'])
+                    
+                    # Delete any marked items
+                    for obj in formset.deleted_objects:
+                        obj.delete()
+                    
+                    messages.success(request, f'Purchase order #{order.id} created successfully.')
+                    return redirect('purchase_order_item_list', order_id=order.id)
+                    
+            except Exception as e:
+                messages.error(request, f'Error creating purchase order: {str(e)}')
+        else:
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = PurchaseOrderForm()
-    return render(request, 'stock/purchase_order_form.html', {'form': form})
+        formset = PurchaseOrderItemFormSet()
+    
+    # Get all purchase orders for the table
+    purchase_orders = PurchaseOrder.objects.all().order_by('-purchase_date')
+    
+    return render(request, 'stock/purchase_order_list.html', {
+        'form': form,
+        'items_formset': formset,
+        'purchase_orders': purchase_orders,
+        'suppliers': suppliers,
+        'stores': stores,
+        'branches': branches,
+        'products': products,
+    })
+
+
+
+@login_required
+def get_purchase_order_api(request, order_id):
+    """API endpoint to get purchase order data for editing"""
+    try:
+        # Get the purchase order
+        order = PurchaseOrder.objects.get(pk=order_id)
+        
+        # Get items with related product and unit
+        items = PurchaseOrderItem.objects.filter(order=order).select_related('product', 'unit')
+        
+        # Prepare order data - matching your actual model fields (NO BRANCH)
+        order_data = {
+            'id': order.id,
+            'supplier_id': order.supplier_id,
+            'store_id': order.store_id,
+            'purchase_date': order.purchase_date.strftime('%Y-%m-%d') if order.purchase_date else None,
+            'expected_date': order.expected_date.strftime('%Y-%m-%d') if order.expected_date else None,
+            'status': order.status,
+            'recorded_by': order.recorded_by,
+            'note': order.note,
+            'total_cost': float(order.total_cost) if order.total_cost else 0,
+        }
+        
+        # Prepare items data
+        items_data = []
+        for item in items:
+            # Get product unit information for this product
+            product_units = []
+            if item.product:
+                try:
+                    # Get all units available for this product through unit_prices
+                    for unit_price in item.product.unit_prices.select_related('unit').all():
+                        product_units.append({
+                            'unit_id': unit_price.unit.id,
+                            'unit_name': unit_price.unit.name,
+                            'abbreviation': unit_price.unit.abbreviation,
+                            'conversion_factor': float(unit_price.conversion_factor) if unit_price.conversion_factor else 1,
+                            'is_base_unit': unit_price.conversion_factor == 1,
+                            'price': float(unit_price.price) if unit_price.price else 0,
+                        })
+                except Exception as e:
+                    logger.error(f"Error getting product units for item {item.id}: {e}")
+            
+            items_data.append({
+                'id': item.id,
+                'product_id': item.product_id,
+                'product_name': item.product.name if item.product else '',
+                'product_sku': item.product.sku if item.product else '',
+                'unit_id': item.unit_id,
+                'unit_name': item.unit.name if item.unit else '',
+                'unit_abbreviation': item.unit.abbreviation if item.unit else '',
+                'quantity': float(item.quantity) if item.quantity else 0,
+                'base_quantity': float(item.base_quantity) if item.base_quantity else 0,
+                'unit_cost': float(item.unit_cost) if item.unit_cost else 0,
+                'expiry_date': item.expiry_date.strftime('%Y-%m-%d') if item.expiry_date else None,
+                'product_units': product_units,
+            })
+        
+        response_data = {
+            'success': True,
+            'order': order_data,
+            'items': items_data
+        }
+        
+        logger.info(f"Successfully fetched purchase order {order_id} with {len(items_data)} items")
+        return JsonResponse(response_data)
+        
+    except PurchaseOrder.DoesNotExist:
+        logger.error(f"Purchase order {order_id} not found")
+        return JsonResponse({
+            'success': False, 
+            'error': f'Purchase order {order_id} not found'
+        }, status=404)
+        
+    except Exception as e:
+        logger.error(f"Error fetching purchase order {order_id}: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False, 
+            'error': str(e)
+        }, status=500)
+
 
 @login_required
 def edit_purchase_order(request, order_id):
-    """Edit a purchase order"""
-    order = get_object_or_404(PurchaseOrder, id=order_id)
+    """Edit an existing purchase order"""
+    order = get_object_or_404(PurchaseOrder, pk=order_id)
+    
+    # Get all necessary data for dropdowns
+    from app.models.suppliers import Supplier
+    from app.models.products import StoreLocation
+    from app.models.organization import Branch
+    
+    suppliers = Supplier.objects.filter(is_active=True).order_by('name')
+    stores = StoreLocation.objects.filter(is_active=True).order_by('name')
+    branches = Branch.objects.filter(is_active=True).order_by('name')
+    products = Product.objects.filter(is_active=True).order_by('name')[:100]
+    
+    PurchaseOrderItemFormSet = inlineformset_factory(
+        PurchaseOrder,
+        PurchaseOrderItem,
+        form=PurchaseOrderItemForm,
+        extra=0,
+        can_delete=True,
+        fields='__all__'
+    )
+    
     if request.method == 'POST':
+        print("=" * 50)
+        print("EDIT POST DATA:")
+        print(request.POST)
+        print("=" * 50)
+        
         form = PurchaseOrderForm(request.POST, instance=order)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Purchase order updated successfully.')
-            return redirect('purchase_order_list')
+        formset = PurchaseOrderItemFormSet(request.POST, instance=order)
+        
+        if form.is_valid() and formset.is_valid():
+            try:
+                with transaction.atomic():
+                    # Save purchase order
+                    order = form.save(commit=False)
+                    order.save()  # Save without update_fields
+                    
+                    # Calculate total from items
+                    total_cost = 0
+                    
+                    # Save formset items
+                    instances = formset.save(commit=False)
+                    for instance in instances:
+                        instance.order = order
+                        instance.save()
+                        total_cost += instance.quantity * instance.unit_cost
+                    
+                    # Handle deleted items
+                    for obj in formset.deleted_objects:
+                        obj.delete()
+                    
+                    # Update order total cost and save the entire model
+                    order.total_cost = total_cost
+                    order.save()  # Save without update_fields
+                    
+                    messages.success(request, f'Purchase order #{order.id} updated successfully.')
+                    return redirect('purchase_order_item_list', order_id=order.id)
+                    
+            except Exception as e:
+                messages.error(request, f'Error updating purchase order: {str(e)}')
+                import traceback
+                traceback.print_exc()
+        else:
+            # Collect error messages
+            error_messages = []
+            for field, errors in form.errors.items():
+                error_messages.append(f"{field}: {', '.join(errors)}")
+            
+            for i, form_errors in enumerate(formset.errors):
+                if form_errors:
+                    for field, errors in form_errors.items():
+                        if field == '__all__':
+                            error_messages.append(f"Item {i+1}: {', '.join(errors)}")
+                        else:
+                            error_messages.append(f"Item {i+1} - {field}: {', '.join(errors)}")
+            
+            messages.error(request, 'Please correct the errors below: ' + ' | '.join(error_messages))
+            
+            return render(request, 'stock/purchase_order_list.html', {
+                'form': form,
+                'items_formset': formset,
+                'purchase_orders': PurchaseOrder.objects.all().order_by('-purchase_date'),
+                'suppliers': suppliers,
+                'stores': stores,
+                'branches': branches,
+                'products': products,
+                'editing_order': order,
+            })
     else:
         form = PurchaseOrderForm(instance=order)
-    return render(request, 'purchase_order_form.html', {'form': form, 'order': order})
+        formset = PurchaseOrderItemFormSet(instance=order)
+    
+    # Get all purchase orders for the table
+    purchase_orders = PurchaseOrder.objects.all().order_by('-purchase_date')
+    
+    return render(request, 'stock/purchase_order_list.html', {
+        'form': form,
+        'items_formset': formset,
+        'purchase_orders': purchase_orders,
+        'suppliers': suppliers,
+        'stores': stores,
+        'branches': branches,
+        'products': products,
+        'editing_order': order
+    })
+
+
 
 @login_required
 def delete_purchase_order(request, order_id):
@@ -934,6 +1197,7 @@ def edit_purchase_order_item(request, item_id):
     else:
         form = PurchaseOrderItemForm(instance=item)
     return render(request, 'purchase_order_item_form.html', {'form': form, 'order': order, 'item': item})
+
 
 @login_required
 def delete_purchase_order_item(request, item_id):

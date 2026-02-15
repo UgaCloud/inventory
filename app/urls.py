@@ -79,7 +79,8 @@ urlpatterns = [
     path('purchase_order/create/', create_purchase_order, name='create_purchase_order'),
     path('purchase_order/<int:order_id>/edit/', edit_purchase_order, name='edit_purchase_order'),
     path('purchase_order/<int:order_id>/delete/', delete_purchase_order, name='delete_purchase_order'),
-
+    path('api/purchase-order/<int:order_id>/', get_purchase_order_api, name='purchase_order_api'),
+    
     # Purchase Order Items
     path('purchase_order/<int:order_id>/items/', purchase_order_item_list, name='purchase_order_item_list'),
     path('purchase_order/<int:order_id>/items/create/', create_purchase_order_item, name='create_purchase_order_item'),

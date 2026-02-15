@@ -12,7 +12,11 @@
             </div>
         </div>
         <div class="page-btn d-flex gap-2">
-            <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-stock-item"> 
+             <a href="{% url 'purchase_order_list' %}" class="btn btn-outline-secondary">
+                <i class="ti ti-chevron-left"></i>
+                Back to Purchase Orders
+            </a>
+            <!-- <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-stock-item"> 
                 <i class="ti ti-circle-plus me-1"></i>
                 Add Stock Item
             </a>
@@ -23,7 +27,7 @@
             <a href="#" class="btn btn-outline-secondary">
                 <i class="ti ti-download me-1"></i>
                 Download Template
-            </a>
+            </a> -->
         </div>	
     </div>
 
@@ -51,7 +55,7 @@
                             <th>Quantity</th>
                             <th>Unit Cost</th>
                             <th>Total Cost</th>
-                            <th class="no-sort"></th>
+                            <!-- <th class="no-sort"></th> -->
                         </tr>
                     </thead>
                     <tbody>
@@ -70,7 +74,7 @@
                                 <td>{{item.quantity}} ({{item.unit}})</td>
                                 <td>{{item.unit_cost|intcomma}}/-</td>
                                 <td>{{item.cost|intcomma}}/-</td>
-                                <td class="action-table-data">
+                                <!-- <td class="action-table-data">
                                     <div class="edit-delete-action">
                                         <a class="me-2 edit-icon  p-2" href="#">
                                             <i data-feather="edit" class="feather-edit"></i>
@@ -79,7 +83,7 @@
                                             <i data-feather="trash-2" class="feather-trash-2"></i>
                                         </a>
                                     </div>
-                                </td>
+                                </td> -->
                             </tr>
                             {% endfor %}
                         {% endif %}

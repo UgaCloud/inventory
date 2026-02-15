@@ -20,12 +20,14 @@ class PurchaseOrderForm(forms.ModelForm):
             'purchase_date': forms.DateInput(attrs={'type': 'date'}),
             'expected_date': forms.DateInput(attrs={'type': 'date'}),
         }
-        labels = {
-            'recorded_by': 'Recorded By (User)',
-        }
-        help_texts = {
-            'branch': 'Select the branch for this order.',
-        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make status field use the correct choices
+        self.fields['status'].choices = [('PENDING', 'Pending'), ('RECEIVED', 'Received')]
+        # Set initial status to PENDING for new orders
+        if not self.instance.pk:
+            self.fields['status'].initial = 'PENDING'
 
     def clean(self):
         cleaned_data = super().clean()
@@ -35,7 +37,7 @@ class PurchaseOrderForm(forms.ModelForm):
             raise forms.ValidationError("Expected date cannot be before purchase date.")
         return cleaned_data
 
-class PurchaseOrderItemForm(ModelForm):
+class PurchaseOrderItemForm(forms.ModelForm):
     class Meta:
         model = PurchaseOrderItem
         fields = "__all__"
@@ -43,23 +45,60 @@ class PurchaseOrderItemForm(ModelForm):
         widgets = {
             'order': forms.HiddenInput(),
             'expiry_date': forms.DateInput(attrs={'type': 'date'}),  
-            'product': forms.Select(attrs={
-                'class': 'select2',})
+            'product': forms.Select(attrs={'class': 'select2'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+        # Store original values for duplicate checking
+        if self.instance and self.instance.pk:
+            self.original_product_id = self.instance.product_id
+            self.original_unit_id = self.instance.unit_id
 
     def clean(self):
         cleaned_data = super().clean()
         quantity = cleaned_data.get('quantity')
         unit_cost = cleaned_data.get('unit_cost')
+        product = cleaned_data.get('product')
+        unit = cleaned_data.get('unit')
+        order = cleaned_data.get('order')
+        
+        # Safely create order representation without calling __str__
+        order_repr = "No order"
+        if order:
+            if order.pk:
+                order_repr = f"PO-{order.pk}"
+            else:
+                order_repr = "New Order"
+        
+        print(f"Cleaning item: product={product}, unit={unit}, order={order_repr}")
+        
         if quantity is not None and quantity <= 0:
             raise forms.ValidationError("Quantity must be greater than zero.")
         if unit_cost is not None and unit_cost < 0:
             raise forms.ValidationError("Unit cost cannot be negative.")
+        
+        # Skip duplicate validation for existing items
+        if self.instance and self.instance.pk:
+            print(f"This is an existing item (ID: {self.instance.pk}) - skipping duplicate check")
+            return cleaned_data
+        
+        # Only check for duplicates for NEW items
+        if order and order.pk and product and unit:
+            print(f"Checking for duplicates: order={order.pk}, product={product}, unit={unit}")
+            # Check if this combination already exists in the order
+            duplicate_qs = PurchaseOrderItem.objects.filter(
+                order=order,
+                product=product,
+                unit=unit
+            )
+            if duplicate_qs.exists():
+                raise forms.ValidationError(
+                    f"An item with product '{product}' and unit '{unit}' already exists in this order."
+                )
+        
         return cleaned_data
+
 
 class SalesForm(forms.ModelForm):
     class Meta:
@@ -498,7 +537,12 @@ class StockAdjustmentForm2(forms.ModelForm):
         return cleaned_data
 
 PurchaseOrderItemFormSet = inlineformset_factory(
-    PurchaseOrder, PurchaseOrderItem, fields='__all__', extra=1
+    PurchaseOrder, 
+    PurchaseOrderItem, 
+    form=PurchaseOrderItemForm,  # Use your custom form
+    extra=1, 
+    can_delete=True,
+    fields='__all__'
 )
 
 StockTransferItemFormSet = inlineformset_factory(
