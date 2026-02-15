@@ -19,7 +19,7 @@
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Excel"><img src="{% static 'assets/img/icons/excel.svg' %}" alt="img"></a>
             </li>
             <li>
-                <a data-bs-toggle="tooltip" data-bs-placement="top" title="Refresh" onclick="window.location.reload()"><i class="ti ti-refresh"></i></a>
+                <a data-bs-toggle="tooltip" data-bs-placement="top" title="Refresh" onclick="location.reload()"><i class="ti ti-refresh"></i></a>
             </li>
             <li>
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Collapse" id="collapse-header"><i class="ti ti-chevron-up"></i></a>
@@ -45,57 +45,65 @@
 
     <div class="card">
         <div class="card-header">
-            <form method="get" action="{% url 'products_page' %}" class="d-flex align-items-center flex-wrap gap-2">
-                <!-- Search Input -->
-                <div class="input-group input-group-sm" style="max-width: 200px;">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <!-- Search Input with Real-time -->
+                <div class="position-relative" style="max-width: 250px;">
                     <input type="text" 
-                           name="search" 
-                           class="form-control" 
+                           id="searchInput"
+                           class="form-control form-control-sm" 
                            placeholder="Search products..." 
-                           value="{{ search_query|default:'' }}"
-                           aria-label="Search products">
-                    <button class="btn btn-outline-secondary" type="submit">
-                        <i class="ti ti-search"></i>
-                    </button>
+                           value="{{ search_query }}"
+                           autocomplete="off">
+                    <span class="position-absolute top-50 end-0 translate-middle-y me-2" id="searchSpinner" style="display: none;">
+                        <!-- <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div> -->
+                    </span>
                 </div>
                 
-                <!-- Category Filter -->
-                <select name="category" class="form-select form-select-sm" style="max-width: 200px;">
+                <!-- Category Filter with Real-time -->
+                <select id="categoryFilter" class="form-select form-select-sm" style="max-width: 180px;">
                     <option value="">All Categories</option>
                     {% for category in categories %}
                     <option value="{{ category.id }}" {% if selected_category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
                     {% endfor %}
                 </select>
                 
-                <!-- Brand Filter -->
-                <select name="brand" class="form-select form-select-sm" style="max-width: 200px;">
+                <!-- Brand Filter with Real-time -->
+                <select id="brandFilter" class="form-select form-select-sm" style="max-width: 150px;">
                     <option value="">All Brands</option>
                     {% for brand in brands %}
                     <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
                     {% endfor %}
                 </select>
                 
-                <!-- Status Filter -->
-                <select name="status" class="form-select form-select-sm" style="max-width: 200px;">
+                <!-- Status Filter with Real-time -->
+                <select id="statusFilter" class="form-select form-select-sm" style="max-width: 130px;">
                     <option value="">All Status</option>
                     <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
                     <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
                 </select>
                 
-                <!-- Apply Filter Button -->
-                <button type="submit" class="btn btn-primary btn-sm d-flex align-items-center">
-                    <i class="ti ti-filter me-1"></i>Apply
-                </button>
+                <!-- Items per page -->
+                <select id="itemsPerPage" class="form-select form-select-sm" style="max-width: 80px;">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                
+                <!-- Results Count -->
+                <!-- <span id="resultCount" class="badge bg-light text-dark ms-2"></span> -->
                 
                 <!-- Clear Filters Button -->
-                {% if search_query or selected_category or selected_brand or selected_status %}
-                <a href="{% url 'products_page' %}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
-                    <i class="ti ti-x me-1"></i>Clear Filters
-                </a>
-                {% endif %}
-            </form>
+                <button id="clearFiltersBtn" class="btn btn-outline-secondary btn-sm d-flex align-items-center" onclick="clearAllFilters()" style="display: none;">
+                    <i class="ti ti-x me-1"></i>
+                    Clear Filters
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
+            <!-- Main Table -->
             <div class="table-responsive">
                 <table class="table" id="productsTable">
                     <thead class="thead-light">
@@ -116,153 +124,21 @@
                             <th class="no-sort">Action</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% if products %}
-                            {% for product_data in products %}
-                            <tr>
-                                <td>
-                                    <label class="checkboxs">
-                                        <input type="checkbox" class="product-checkbox" value="{{ product_data.product.id }}">
-                                        <span class="checkmarks"></span>
-                                    </label>
-                                </td>
-                                <td>{{ product_data.product.sku }}</td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <a href="{% url 'product_details_page' product_data.product.id %}">{{ product_data.product.name }}</a>
-                                        {% if product_data.unit_count > 0 %}
-                                        <span class="badge bg-info ms-2" title="{{ product_data.unit_count }} unit{{ product_data.unit_count|pluralize }}">
-                                            {{ product_data.unit_count }}U
-                                        </span>
-                                        {% endif %}
-                                    </div>												
-                                </td>							
-                                <td>
-                                    {% if product_data.product.category %}
-                                        {{ product_data.product.category.name }}
-                                    {% else %}
-                                        <span class="text-muted">No Category</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ product_data.product.brand|default:"-" }}</td>
-                                <td>
-                                    <a href="javascript:void(0);" 
-                                       class="view-stock-link fw-bold text-decoration-none {% if product_data.total_available_stock == 0 %}text-danger{% elif product_data.total_available_stock <= 10 %}text-warning{% else %}text-success{% endif %}"
-                                       data-bs-toggle="modal" 
-                                       data-bs-target="#viewStockModal"
-                                       data-product-id="{{ product_data.product.id }}"
-                                       data-product-name="{{ product_data.product.name }}"
-                                       data-sku="{{ product_data.product.sku }}">
-                                        {{ product_data.total_available_stock }}
-                                        <i data-feather="chevron-right" class="feather-12"></i>
-                                    </a>
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <a href="javascript:void(0);" 
-                                           class="view-units-link text-primary fw-bold" 
-                                           data-bs-toggle="modal" 
-                                           data-bs-target="#viewUnitsModal"
-                                           data-product-id="{{ product_data.product.id }}"
-                                           data-product-name="{{ product_data.product.name }}"
-                                           data-sku="{{ product_data.product.sku }}">
-                                            UGX {{ product_data.product.default_price|intcomma }}/- 
-                                            <small class="text-muted ms-1">({{ product_data.product.default_unit }})</small>
-                                            {% if product_data.unit_count > 1 %}
-                                            <span class="badge bg-light text-dark ms-1">
-                                                +{{ product_data.unit_count|add:"-1" }} more
-                                            </span>
-                                            {% endif %}
-                                        </a>
-                                    </div>
-                                </td>
-                                <td>
-                                    {% if product_data.product.is_active %}
-                                        <span class="badge table-badge bg-success fw-medium fs-10">
-                                            Active
-                                        </span>
-                                    {% else %}
-                                        <span class="badge table-badge bg-danger fw-medium fs-10">
-                                            Inactive
-                                        </span>
-                                    {% endif %}
-                                </td>
-                                <td class="action-table-data">
-                                    {% if user.is_superuser or is_admin %}
-                                        <div class="edit-delete-action">
-                                            <a class="me-2 edit-icon p-2" href="{% url 'product_details_page' product_data.product.id %}" title="View Details">
-                                                <i data-feather="eye" class="feather-eye"></i>
-                                            </a>
-                                            <a class="me-2 edit-icon p-2" 
-                                               href="#" 
-                                               title="Edit"
-                                               data-bs-toggle="modal" 
-                                               data-bs-target="#edit-product-modal-{{ product_data.product.id }}">
-                                                <i data-feather="edit" class="feather-edit"></i>
-                                            </a>
-                                        </div>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="9" class="text-center py-4">
-                                    <div class="empty-state">
-                                        <i class="ti ti-package fs-48 text-muted mb-3"></i>
-                                        <h5 class="text-muted">No products found</h5>
-                                        <p class="text-muted">Get started by adding your first product.</p>
-                                        <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-product">
-                                            <i class="ti ti-circle-plus me-1"></i>
-                                            Add Product
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endif %}
+                    <tbody id="tableBody">
+                        <!-- Data will be populated by JavaScript -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- Pagination -->
-            {% if paginated_products.paginator.num_pages > 1 %}
-            <div class="d-flex justify-content-between align-items-center mt-4 px-3 pb-3">
-                <div class="datatable-info">
-                    <span>Showing {{ paginated_products.start_index }} to {{ paginated_products.end_index }} of {{ paginated_products.paginator.count }} products</span>
-                </div>
+            <!-- Pagination Controls -->
+            <div id="paginationContainer" class="d-flex justify-content-between align-items-center mt-4 px-3 pb-3">
+                <div class="datatable-info" id="paginationInfo"></div>
                 <nav aria-label="Page navigation">
-                    <ul class="pagination pagination-sm justify-content-end mb-0">
-                        {% if paginated_products.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ paginated_products.previous_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
-                                <i class="ti ti-chevron-left"></i>
-                            </a>
-                        </li>
-                        {% endif %}
-                        
-                        {% for page_num in paginated_products.paginator.page_range %}
-                            {% if page_num == paginated_products.number %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
-                            </li>
-                            {% elif page_num > paginated_products.number|add:'-3' and page_num < paginated_products.number|add:'3' %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_num }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">{{ page_num }}</a>
-                            </li>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if paginated_products.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ paginated_products.next_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_brand %}&brand={{ selected_brand }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
-                                <i class="ti ti-chevron-right"></i>
-                            </a>
-                        </li>
-                        {% endif %}
+                    <ul class="pagination pagination-sm justify-content-end mb-0" id="pagination">
+                        <!-- Pagination will be generated by JavaScript -->
                     </ul>
                 </nav>
             </div>
-            {% endif %}
         </div>
     </div>
 
@@ -298,16 +174,14 @@
                                         <th>Price per Base Unit (UGX)</th>
                                     </tr>
                                 </thead>
-                                <tbody id="unitsTableBody">
-                                    <!-- Units will be loaded here -->
-                                </tbody>
+                                <tbody id="unitsTableBody"></tbody>
                             </table>
                         </div>
                     </div>
                     <div id="unitsError" class="text-center py-4" style="display: none;">
                         <i data-feather="alert-circle" class="feather-48 text-danger mb-3"></i>
                         <h5 class="text-muted">Error loading units</h5>
-                        <p class="text-muted" id="errorMessage">Unable to load product units at this time.</p>
+                        <p class="text-muted" id="errorMessage"></p>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -330,17 +204,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- Loading Spinner -->
                     <div id="stockLoading" class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
                         <p class="mt-2">Loading stock information...</p>
                     </div>
-                    
-                    <!-- Stock Content -->
                     <div id="stockContent" style="display: none;">
-                        <!-- Summary Cards -->
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <div class="card bg-light">
@@ -362,7 +232,6 @@
                             </div>
                         </div>
                         
-                        <!-- Stock by Store Table -->
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead class="table-light">
@@ -375,18 +244,14 @@
                                         <th class="text-center">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody id="stockTableBody">
-                                    <!-- Stock data will be loaded here -->
-                                </tbody>
+                                <tbody id="stockTableBody"></tbody>
                             </table>
                         </div>
                     </div>
-                    
-                    <!-- Error State -->
                     <div id="stockError" class="text-center py-4" style="display: none;">
                         <i data-feather="alert-circle" class="feather-48 text-danger mb-3"></i>
                         <h5 class="text-muted">Error loading stock</h5>
-                        <p class="text-muted" id="stockErrorMessage">Unable to load stock information at this time.</p>
+                        <p class="text-muted" id="stockErrorMessage"></p>
                         <button class="btn btn-outline-primary btn-sm mt-2" onclick="retryLoadStock()">
                             <i data-feather="refresh-cw" class="feather-14 me-1"></i>
                             Retry
@@ -470,7 +335,7 @@
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post" action="{% url 'bulk_add_products' %}" enctype="multipart/form-data" id="bulk-upload-form">
+                        <form method="post" action="{% url 'bulk_add_products' %}" enctype="multipart/form-data">
                             {% csrf_token %}
                             <div class="modal-body">
                                 <div class="mb-3">
@@ -493,497 +358,573 @@
     </div>
 
 <script>
-// Store current product ID for retry functionality
-let currentStockProductId = null;
-let currentStockProductName = null;
-let currentStockProductSku = null;
+// Global variables
+let allProducts = {{ products_json|safe }};
+let currentPage = 1;
+let itemsPerPage = 25;
+let filteredProducts = [];
 
-// Function to show stock modal
-function showStockModal(productId, productName, productSku) {
-    console.log('Opening stock modal for:', productId, productName);
+// Debounce function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Initialize products
+function initializeProducts() {
+    document.getElementById('searchSpinner').style.display = 'block';
+    setTimeout(() => {
+        filterProducts();
+        document.getElementById('searchSpinner').style.display = 'none';
+    }, 100);
+}
+
+// Filter products based on search and filters
+function filterProducts() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+    const category = document.getElementById('categoryFilter').value;
+    const brand = document.getElementById('brandFilter').value;
+    const status = document.getElementById('statusFilter').value;
     
-    // Store current product info for retry
-    currentStockProductId = productId;
-    currentStockProductName = productName;
-    currentStockProductSku = productSku;
+    filteredProducts = allProducts.filter(product => {
+        // Search filter
+        const matchesSearch = searchTerm === '' || 
+            (product.name && product.name.toLowerCase().includes(searchTerm)) ||
+            (product.sku && product.sku.toLowerCase().includes(searchTerm)) ||
+            (product.brand && product.brand.toLowerCase().includes(searchTerm));
+        
+        // Category filter
+        const matchesCategory = category === '' || 
+            (product.category_id && product.category_id.toString() === category);
+        
+        // Brand filter
+        const matchesBrand = brand === '' || product.brand === brand;
+        
+        // Status filter
+        const matchesStatus = status === '' || 
+            (status === 'active' ? product.is_active : !product.is_active);
+        
+        return matchesSearch && matchesCategory && matchesBrand && matchesStatus;
+    });
     
-    // Get modal element
-    const modalElement = document.getElementById('viewStockModal');
-    if (!modalElement) {
-        console.error('Stock modal not found!');
+    // Reset to first page
+    currentPage = 1;
+    
+    // Update table
+    displayCurrentPage();
+    
+    // Update clear filters button visibility
+    toggleClearFiltersButton();
+}
+
+// Display current page of filtered products
+function displayCurrentPage() {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const pageProducts = filteredProducts.slice(start, end);
+    
+    // Render table rows
+    renderTableRows(pageProducts);
+    
+    // Update pagination
+    updatePagination();
+    
+    // Update result count
+    const startIndex = filteredProducts.length > 0 ? start + 1 : 0;
+    const endIndex = Math.min(end, filteredProducts.length);
+    document.getElementById('resultCount').textContent = 
+        `Showing ${startIndex} to ${endIndex} of ${filteredProducts.length} products`;
+    document.getElementById('paginationInfo').innerHTML = 
+        `Showing ${startIndex} to ${endIndex} of ${filteredProducts.length} products`;
+}
+
+// Render table rows
+function renderTableRows(products) {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    
+    if (products.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center py-4">
+                    <div class="empty-state">
+                        <i class="ti ti-package fs-48 text-muted mb-3"></i>
+                        <h5 class="text-muted">No products found</h5>
+                    </div>
+                </td>
+            </tr>
+        `;
         return;
     }
     
-    // Get or create modal instance
-    let modal = bootstrap.Modal.getInstance(modalElement);
-    if (!modal) {
-        modal = new bootstrap.Modal(modalElement);
+    products.forEach((product) => {
+        const row = tbody.insertRow();
+        
+        // Determine stock color class
+        let stockColorClass = 'text-success';
+        if (product.total_available_stock === 0) stockColorClass = 'text-danger';
+        else if (product.total_available_stock <= 10) stockColorClass = 'text-warning';
+        
+        // Status badge
+        const statusBadge = product.is_active ? 
+            '<span class="badge table-badge bg-success fw-medium fs-10">Active</span>' : 
+            '<span class="badge table-badge bg-danger fw-medium fs-10">Inactive</span>';
+        
+        // Category display
+        const categoryDisplay = product.category_name || '<span class="text-muted">No Category</span>';
+        
+        row.innerHTML = `
+            <td>
+                <label class="checkboxs">
+                    <input type="checkbox" class="product-checkbox" value="${product.id}">
+                    <span class="checkmarks"></span>
+                </label>
+            </td>
+            <td>${product.sku || ''}</td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <a href="/product_details/${product.id}/">${product.name}</a>
+                    ${product.unit_count > 0 ? 
+                        `<span class="badge bg-info ms-2" title="${product.unit_count} unit${product.unit_count > 1 ? 's' : ''}">
+                            ${product.unit_count}U
+                        </span>` : ''}
+                </div>
+            </td>
+            <td>${categoryDisplay}</td>
+            <td>${product.brand || '-'}</td>
+            <td>
+                <a href="javascript:void(0);" 
+                   class="view-stock-link fw-bold text-decoration-none ${stockColorClass}"
+                   data-bs-toggle="modal" 
+                   data-bs-target="#viewStockModal"
+                   data-product-id="${product.id}"
+                   data-product-name="${product.name}"
+                   data-sku="${product.sku || ''}">
+                    ${product.total_available_stock}
+                    <i data-feather="chevron-right" class="feather-12"></i>
+                </a>
+            </td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <a href="javascript:void(0);" 
+                       class="view-units-link text-primary fw-bold" 
+                       data-bs-toggle="modal" 
+                       data-bs-target="#viewUnitsModal"
+                       data-product-id="${product.id}"
+                       data-product-name="${product.name}"
+                       data-sku="${product.sku || ''}">
+                        UGX ${parseFloat(product.default_price || 0).toLocaleString()}/- 
+                        
+                    </a>
+                </div>
+            </td>
+            <td>${statusBadge}</td>
+            <td class="action-table-data">
+                {% if user.is_superuser or is_admin %}
+                <div class="edit-delete-action">
+                    <a class="me-2 edit-icon p-2" href="/product_details/${product.id}/" title="View Details">
+                        <i data-feather="eye" class="feather-eye"></i>
+                    </a>
+                    <a class="me-2 edit-icon p-2" 
+                       href="#" 
+                       title="Edit"
+                       data-bs-toggle="modal" 
+                       data-bs-target="#edit-product-modal-${product.id}">
+                        <i data-feather="edit" class="feather-edit"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </td>
+        `;
+    });
+    
+    // Reinitialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+}
+
+// Update pagination controls
+function updatePagination() {
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+    
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;"><i class="ti ti-chevron-left"></i></a>`;
+    pagination.appendChild(prevLi);
+    
+    // Page numbers
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+    
+    if (startPage > 1) {
+        pagination.appendChild(createPageItem(1));
+        if (startPage > 2) {
+            pagination.appendChild(createEllipsis());
+        }
     }
     
-    // Set product info in modal
+    for (let i = startPage; i <= endPage; i++) {
+        pagination.appendChild(createPageItem(i));
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            pagination.appendChild(createEllipsis());
+        }
+        pagination.appendChild(createPageItem(totalPages));
+    }
+    
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;"><i class="ti ti-chevron-right"></i></a>`;
+    pagination.appendChild(nextLi);
+}
+
+// Create page item
+function createPageItem(pageNum) {
+    const li = document.createElement('li');
+    li.className = `page-item ${pageNum === currentPage ? 'active' : ''}`;
+    li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${pageNum}); return false;">${pageNum}</a>`;
+    return li;
+}
+
+// Create ellipsis
+function createEllipsis() {
+    const li = document.createElement('li');
+    li.className = 'page-item disabled';
+    li.innerHTML = '<span class="page-link">...</span>';
+    return li;
+}
+
+// Change page
+function changePage(page) {
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    if (page < 1 || page > totalPages) return;
+    
+    currentPage = page;
+    displayCurrentPage();
+    
+    // Scroll to top of table
+    document.querySelector('.card-body').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Handle items per page change
+function handleItemsPerPageChange() {
+    itemsPerPage = parseInt(document.getElementById('itemsPerPage').value);
+    currentPage = 1;
+    displayCurrentPage();
+}
+
+// Clear all filters
+function clearAllFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('brandFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    filterProducts();
+}
+
+// Toggle clear filters button
+function toggleClearFiltersButton() {
+    const search = document.getElementById('searchInput').value;
+    const category = document.getElementById('categoryFilter').value;
+    const brand = document.getElementById('brandFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    
+    const clearBtn = document.getElementById('clearFiltersBtn');
+    clearBtn.style.display = search || category || brand || status ? 'flex' : 'none';
+}
+
+// Debounced filter function
+const debouncedFilter = debounce(filterProducts, 300);
+
+// Stock modal function
+function showStockModal(productId, productName, productSku) {
+    window.currentStockProductId = productId;
+    window.currentStockProductName = productName;
+    window.currentStockProductSku = productSku;
+    
+    const modalElement = document.getElementById('viewStockModal');
+    let modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+    
     document.getElementById('modalStockProductName').textContent = productName;
     document.getElementById('modalStockProductSku').textContent = productSku ? `(${productSku})` : '';
     
-    // Show loading spinner
     document.getElementById('stockLoading').style.display = 'block';
     document.getElementById('stockContent').style.display = 'none';
     document.getElementById('stockError').style.display = 'none';
     
-    // Clear previous data
     document.getElementById('stockTableBody').innerHTML = '';
     document.getElementById('totalStock').textContent = '0';
     document.getElementById('storeCount').textContent = '0';
     document.getElementById('baseUnitInfo').textContent = '';
     
-    // Fetch stock data from API
     fetch(`/api/products/${productId}/stock/`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Got stock data:', data);
-            
-            // Hide loading
             document.getElementById('stockLoading').style.display = 'none';
             
             if (data.success) {
                 displayStockData(data);
             } else {
-                throw new Error(data.error || 'Unknown error occurred');
+                throw new Error(data.error || 'Unknown error');
             }
         })
         .catch(error => {
             console.error('Error:', error);
             document.getElementById('stockLoading').style.display = 'none';
             document.getElementById('stockError').style.display = 'block';
-            document.getElementById('stockErrorMessage').textContent = 
-                `Error loading stock: ${error.message}`;
+            document.getElementById('stockErrorMessage').textContent = error.message;
         });
     
-    // Show the modal
     modal.show();
 }
 
-// Function to display stock data from product_stock_api
-function displayStockData(data) {
-    const tableBody = document.getElementById('stockTableBody');
-    tableBody.innerHTML = '';
-    
-    let totalAvailableStock = 0;
-    let storeWithStock = 0;
-    
-    // Check if we have stores data (multi-store response)
-    if (data.stock && data.stock.stores && Array.isArray(data.stock.stores)) {
-        // Multi-store response
-        const stores = data.stock.stores;
-        
-        stores.forEach((store, index) => {
-            const availableStock = store.available_stock || 0;
-            totalAvailableStock += availableStock;
-            
-            if (availableStock > 0) storeWithStock++;
-            
-            // Determine stock status
-            let statusBadge = '';
-            let statusClass = '';
-            
-            if (availableStock <= 0) {
-                statusBadge = 'Out of Stock';
-                statusClass = 'bg-danger';
-            } else if (store.status === 'low_stock' || (store.reorder_level && availableStock <= store.reorder_level)) {
-                statusBadge = 'Low Stock';
-                statusClass = 'bg-warning text-dark';
-            } else {
-                statusBadge = 'In Stock';
-                statusClass = 'bg-success';
-            }
-            
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>
-                    <div class="fw-semibold">${store.store_name || 'N/A'}</div>
-                    <small class="text-muted">ID: ${store.store_id || ''}</small>
-                </td>
-                <td class="text-center">${store.physical_stock || 0}</td>
-                <td class="text-center">${store.committed_stock || 0}</td>
-                <td class="text-end fw-bold ${availableStock <= 0 ? 'text-danger' : (store.status === 'low_stock' ? 'text-warning' : 'text-success')}">
-                    ${availableStock.toLocaleString()}
-                </td>
-                <td class="text-center">
-                    <span class="badge ${statusClass}">${statusBadge}</span>
-                    ${store.reorder_level ? `<br><small class="text-muted">Reorder: ${store.reorder_level}</small>` : ''}
-                </td>
-            `;
-            tableBody.appendChild(row);
-        });
-        
-        // Update summary with total available stock
-        document.getElementById('totalStock').textContent = totalAvailableStock.toLocaleString();
-        document.getElementById('storeCount').textContent = storeWithStock;
-        document.getElementById('baseUnitInfo').textContent = 'units available';
-        
-    } 
-    // Single store response
-    else if (data.stock && data.stock.store_id) {
-        const store = data.stock;
-        const availableStock = store.available_stock || 0;
-        
-        if (availableStock > 0) storeWithStock++;
-        totalAvailableStock = availableStock;
-        
-        // Determine stock status
-        let statusBadge = '';
-        let statusClass = '';
-        
-        if (availableStock <= 0) {
-            statusBadge = 'Out of Stock';
-            statusClass = 'bg-danger';
-        } else if (store.status === 'low_stock' || (store.reorder_level && availableStock <= store.reorder_level)) {
-            statusBadge = 'Low Stock';
-            statusClass = 'bg-warning text-dark';
-        } else {
-            statusBadge = 'In Stock';
-            statusClass = 'bg-success';
-        }
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>1</td>
-            <td>
-                <div class="fw-semibold">${store.store_name || 'N/A'}</div>
-                <small class="text-muted">ID: ${store.store_id || ''}</small>
-            </td>
-            <td class="text-center">${store.physical_stock || 0}</td>
-            <td class="text-center">${store.committed_stock || 0}</td>
-            <td class="text-end fw-bold ${availableStock <= 0 ? 'text-danger' : (store.status === 'low_stock' ? 'text-warning' : 'text-success')}">
-                ${availableStock.toLocaleString()}
-            </td>
-            <td class="text-center">
-                <span class="badge ${statusClass}">${statusBadge}</span>
-                ${store.reorder_level ? `<br><small class="text-muted">Reorder: ${store.reorder_level}</small>` : ''}
-            </td>
-        `;
-        tableBody.appendChild(row);
-        
-        document.getElementById('totalStock').textContent = totalAvailableStock.toLocaleString();
-        document.getElementById('storeCount').textContent = storeWithStock;
-        document.getElementById('baseUnitInfo').textContent = 'units available';
-    }
-    else {
-        // No stock data available
-        showEmptyStockState();
-    }
-    
-    // Show the content
-    document.getElementById('stockContent').style.display = 'block';
-    
-    // Refresh feather icons
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
-}
-
-// Function to show empty stock state
-function showEmptyStockState() {
-    document.getElementById('stockTableBody').innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center py-4">
-                <div class="empty-state">
-                    <i data-feather="package" class="feather-24 text-muted mb-2"></i>
-                    <p class="text-muted mb-0">No stock available in any store</p>
-                </div>
-            </td>
-        </tr>
-    `;
-    document.getElementById('totalStock').textContent = '0';
-    document.getElementById('storeCount').textContent = '0';
-}
-
-// Function to show units modal
+// Units modal function
 function showUnitsModal(productId, productName, productSku) {
-    console.log('Opening units modal for:', productId, productName);
-    
-    // Get modal element
     const modalElement = document.getElementById('viewUnitsModal');
-    if (!modalElement) {
-        console.error('Modal not found!');
-        return;
-    }
+    let modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
     
-    // Get or create modal instance
-    let modal = bootstrap.Modal.getInstance(modalElement);
-    if (!modal) {
-        modal = new bootstrap.Modal(modalElement);
-    }
-    
-    // Set product info in modal
     document.getElementById('modalProductName').textContent = productName;
     document.getElementById('modalProductSku').textContent = productSku ? `(${productSku})` : '';
     
-    // Show loading spinner
     document.getElementById('unitsLoading').style.display = 'block';
     document.getElementById('unitsContent').style.display = 'none';
     document.getElementById('unitsError').style.display = 'none';
     
-    // Clear previous data
     document.getElementById('unitsTableBody').innerHTML = '';
     
-    // Fetch data from API
     fetch(`/api/products/${productId}/units/`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Got units data:', data);
-            
-            // Hide loading
             document.getElementById('unitsLoading').style.display = 'none';
             
-            if (data.success && data.units && data.units.length > 0) {
-                // Build table rows
-                const tableBody = document.getElementById('unitsTableBody');
-                tableBody.innerHTML = '';
-                
+            if (data.success && data.units?.length > 0) {
+                const tbody = document.getElementById('unitsTableBody');
+                tbody.innerHTML = '';
                 data.units.forEach((unit, index) => {
-                    const row = document.createElement('tr');
+                    const row = tbody.insertRow();
                     const isBase = unit.is_base_unit || unit.conversion_factor === 1;
                     const pricePerBase = unit.conversion_factor > 0 ? 
-                        (unit.price / unit.conversion_factor).toFixed(2) : 
-                        unit.price;
+                        (unit.price / unit.conversion_factor).toFixed(2) : unit.price;
                     
                     row.innerHTML = `
                         <td>${index + 1}</td>
                         <td>
-                            <div class="d-flex align-items-center">
-                                ${unit.unit_name || 'N/A'}
-                                ${isBase ? '<span class="badge bg-primary ms-2">Base Unit</span>' : ''}
-                            </div>
+                            ${unit.unit_name}
+                            ${isBase ? '<span class="badge bg-primary ms-2">Base Unit</span>' : ''}
                         </td>
-                        <td>${unit.abbreviation || 'N/A'}</td>
+                        <td>${unit.abbreviation}</td>
                         <td>${unit.conversion_factor}</td>
                         <td class="fw-bold text-success">UGX ${parseFloat(unit.price).toLocaleString()}</td>
                         <td class="text-muted">UGX ${parseFloat(pricePerBase).toLocaleString()}</td>
                     `;
-                    tableBody.appendChild(row);
                 });
-                
-                // Show content
                 document.getElementById('unitsContent').style.display = 'block';
             } else {
-                // No units
                 document.getElementById('unitsTableBody').innerHTML = `
-                    <tr>
-                        <td colspan="6" class="text-center py-4">
-                            <div class="empty-state">
-                                <i data-feather="package" class="feather-24 text-muted mb-2"></i>
-                                <p class="text-muted mb-0">No units found for this product</p>
-                            </div>
-                        </td>
-                    </tr>
+                    <tr><td colspan="6" class="text-center py-4">No units found</td></tr>
                 `;
                 document.getElementById('unitsContent').style.display = 'block';
             }
             
-            // Refresh icons if feather exists
-            if (typeof feather !== 'undefined') {
-                feather.replace();
-            }
+            if (typeof feather !== 'undefined') feather.replace();
         })
         .catch(error => {
             console.error('Error:', error);
             document.getElementById('unitsLoading').style.display = 'none';
             document.getElementById('unitsError').style.display = 'block';
-            document.getElementById('errorMessage').textContent = 
-                `Error loading units: ${error.message}`;
+            document.getElementById('errorMessage').textContent = error.message;
         });
     
-    // Show the modal
     modal.show();
+}
+
+// Display stock data
+function displayStockData(data) {
+    const tbody = document.getElementById('stockTableBody');
+    tbody.innerHTML = '';
+    
+    let totalAvailable = 0;
+    let storeCount = 0;
+    
+    if (data.stock?.stores) {
+        data.stock.stores.forEach((store, index) => {
+            const available = store.available_stock || 0;
+            totalAvailable += available;
+            if (available > 0) storeCount++;
+            
+            let statusClass = available <= 0 ? 'bg-danger' : 
+                            (store.status === 'low_stock' ? 'bg-warning text-dark' : 'bg-success');
+            let statusText = available <= 0 ? 'Out of Stock' :
+                            (store.status === 'low_stock' ? 'Low Stock' : 'In Stock');
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>
+                        <div class="fw-semibold">${store.store_name}</div>
+                        <small class="text-muted">ID: ${store.store_id}</small>
+                    </td>
+                    <td class="text-center">${store.physical_stock || 0}</td>
+                    <td class="text-center">${store.committed_stock || 0}</td>
+                    <td class="text-end fw-bold ${available <= 0 ? 'text-danger' : (store.status === 'low_stock' ? 'text-warning' : 'text-success')}">
+                        ${available.toLocaleString()}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge ${statusClass}">${statusText}</span>
+                        ${store.reorder_level ? `<br><small class="text-muted">Reorder: ${store.reorder_level}</small>` : ''}
+                    </td>
+                </tr>
+            `;
+        });
+    } else if (data.stock?.store_id) {
+        const available = data.stock.available_stock || 0;
+        totalAvailable = available;
+        storeCount = available > 0 ? 1 : 0;
+        
+        let statusClass = available <= 0 ? 'bg-danger' : 
+                         (data.stock.status === 'low_stock' ? 'bg-warning text-dark' : 'bg-success');
+        let statusText = available <= 0 ? 'Out of Stock' :
+                        (data.stock.status === 'low_stock' ? 'Low Stock' : 'In Stock');
+        
+        tbody.innerHTML = `
+            <tr>
+                <td>1</td>
+                <td>
+                    <div class="fw-semibold">${data.stock.store_name}</div>
+                    <small class="text-muted">ID: ${data.stock.store_id}</small>
+                </td>
+                <td class="text-center">${data.stock.physical_stock || 0}</td>
+                <td class="text-center">${data.stock.committed_stock || 0}</td>
+                <td class="text-end fw-bold ${available <= 0 ? 'text-danger' : (data.stock.status === 'low_stock' ? 'text-warning' : 'text-success')}">
+                    ${available.toLocaleString()}
+                </td>
+                <td class="text-center">
+                    <span class="badge ${statusClass}">${statusText}</span>
+                    ${data.stock.reorder_level ? `<br><small class="text-muted">Reorder: ${data.stock.reorder_level}</small>` : ''}
+                </td>
+            </tr>
+        `;
+    } else {
+        tbody.innerHTML = `
+            <tr><td colspan="6" class="text-center py-4">No stock available</td></tr>
+        `;
+    }
+    
+    document.getElementById('totalStock').textContent = totalAvailable.toLocaleString();
+    document.getElementById('storeCount').textContent = storeCount;
+    document.getElementById('baseUnitInfo').textContent = 'units available';
+    document.getElementById('stockContent').style.display = 'block';
+    
+    if (typeof feather !== 'undefined') feather.replace();
 }
 
 // Retry function
 function retryLoadStock() {
-    if (currentStockProductId) {
-        showStockModal(currentStockProductId, currentStockProductName, currentStockProductSku);
+    if (window.currentStockProductId) {
+        showStockModal(
+            window.currentStockProductId,
+            window.currentStockProductName,
+            window.currentStockProductSku
+        );
     }
 }
 
-// Modal cleanup for stock modal
-function setupStockModalCleanup() {
-    const stockModal = document.getElementById('viewStockModal');
-    if (stockModal) {
-        stockModal.addEventListener('hidden.bs.modal', function() {
-            // Reset modal content when hidden
-            document.getElementById('stockLoading').style.display = 'none';
-            document.getElementById('stockContent').style.display = 'none';
-            document.getElementById('stockError').style.display = 'none';
-            document.getElementById('stockTableBody').innerHTML = '';
-            document.getElementById('modalStockProductName').textContent = 'Available Stock';
-            document.getElementById('modalStockProductSku').textContent = '';
-            document.getElementById('totalStock').textContent = '0';
-            document.getElementById('storeCount').textContent = '0';
-            
-            // Reset current product ID
-            currentStockProductId = null;
-        });
-    }
-}
-
-// Modal cleanup for units modal
-function setupUnitsModalCleanup() {
-    const unitsModal = document.getElementById('viewUnitsModal');
-    if (unitsModal) {
-        unitsModal.addEventListener('hidden.bs.modal', function() {
-            // Reset modal content when hidden
-            document.getElementById('unitsLoading').style.display = 'none';
-            document.getElementById('unitsContent').style.display = 'none';
-            document.getElementById('unitsError').style.display = 'none';
-            document.getElementById('unitsTableBody').innerHTML = '';
-            document.getElementById('modalProductName').textContent = 'Product Units';
-            document.getElementById('modalProductSku').textContent = '';
-        });
-    }
-}
-
-// Event Listeners
+// Initialize everything
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, setting up event listeners');
+    // Initialize products
+    initializeProducts();
     
-    // Setup modal cleanup
-    setupStockModalCleanup();
-    setupUnitsModalCleanup();
-    
-    // Handle clicks on view stock links
-    document.addEventListener('click', function(e) {
-        const link = e.target.closest('.view-stock-link');
-        if (link) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const productId = link.getAttribute('data-product-id');
-            const productName = link.getAttribute('data-product-name');
-            const productSku = link.getAttribute('data-sku');
-            
-            if (productId && productName) {
-                console.log('Opening stock modal for product:', productId, productName);
-                showStockModal(productId, productName, productSku);
-            } else {
-                console.error('Missing product data on stock link');
-            }
-        }
-    });
-    
-    // Handle clicks on view units links
-    document.addEventListener('click', function(e) {
-        const link = e.target.closest('.view-units-link');
-        if (link) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const productId = link.getAttribute('data-product-id');
-            const productName = link.getAttribute('data-product-name');
-            const productSku = link.getAttribute('data-sku');
-            
-            if (productId && productName) {
-                console.log('Opening units modal for product:', productId, productName);
-                showUnitsModal(productId, productName, productSku);
-            } else {
-                console.error('Missing product data on units link');
-            }
-        }
-    });
+    // Event listeners
+    document.getElementById('searchInput').addEventListener('input', debouncedFilter);
+    document.getElementById('categoryFilter').addEventListener('change', filterProducts);
+    document.getElementById('brandFilter').addEventListener('change', filterProducts);
+    document.getElementById('statusFilter').addEventListener('change', filterProducts);
+    document.getElementById('itemsPerPage').addEventListener('change', handleItemsPerPageChange);
     
     // Select all checkbox
-    const selectAll = document.getElementById('select-all');
-    if (selectAll) {
-        selectAll.addEventListener('change', function() {
-            document.querySelectorAll('.product-checkbox').forEach(checkbox => {
-                checkbox.checked = this.checked;
-            });
-        });
-    }
-    
-    // Auto-submit filters when select changes
-    document.querySelectorAll('select[name="category"], select[name="brand"], select[name="status"]').forEach(select => {
-        select.addEventListener('change', function() {
-            const form = this.closest('form');
-            if (form) {
-                form.submit();
-            }
+    document.getElementById('select-all').addEventListener('change', function(e) {
+        document.querySelectorAll('.product-checkbox').forEach(cb => {
+            cb.checked = e.target.checked;
         });
     });
     
-    // Initialize feather icons if available
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
+    // Modal cleanup
+    document.getElementById('viewStockModal')?.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('stockLoading').style.display = 'none';
+        document.getElementById('stockContent').style.display = 'none';
+        document.getElementById('stockError').style.display = 'none';
+        document.getElementById('stockTableBody').innerHTML = '';
+    });
     
-    console.log('Event listeners set up');
+    document.getElementById('viewUnitsModal')?.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('unitsLoading').style.display = 'none';
+        document.getElementById('unitsContent').style.display = 'none';
+        document.getElementById('unitsError').style.display = 'none';
+        document.getElementById('unitsTableBody').innerHTML = '';
+    });
+    
+    // Stock modal click handler
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.view-stock-link')) {
+            e.preventDefault();
+            const link = e.target.closest('.view-stock-link');
+            showStockModal(
+                link.dataset.productId,
+                link.dataset.productName,
+                link.dataset.sku
+            );
+        }
+    });
+    
+    // Units modal click handler
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.view-units-link')) {
+            e.preventDefault();
+            const link = e.target.closest('.view-units-link');
+            showUnitsModal(
+                link.dataset.productId,
+                link.dataset.productName,
+                link.dataset.sku
+            );
+        }
+    });
+    
+    // Initialize feather
+    if (typeof feather !== 'undefined') feather.replace();
 });
 </script>
 
 <style>
-/* Filter Styling */
-.card-header form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
+.position-relative {
+    position: relative;
 }
 
-/* Pagination styling */
-.pagination {
-    margin-bottom: 0;
+#searchSpinner {
+    z-index: 10;
+    pointer-events: none;
 }
 
-.page-link {
-    border-radius: 0.25rem;
-    margin: 0 2px;
-    color: #495057;
+.badge.bg-light {
+    background-color: #f8f9fa !important;
     border: 1px solid #dee2e6;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
 }
 
-.page-item.active .page-link {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-    color: white;
-}
-
-.page-link:hover {
-    background-color: #e9ecef;
-    border-color: #dee2e6;
-}
-
-.datatable-info {
-    font-size: 0.875rem;
-    color: #6c757d;
-}
-
-/* View Units Link Styling */
-.view-units-link {
-    color: #0d6efd;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-weight: 500;
-    display: inline-block;
-}
-
-.view-units-link:hover {
-    color: #0a58ca;
-    text-decoration: underline;
-}
-
-/* View Stock Link Styling */
 .view-stock-link {
     cursor: pointer;
     transition: all 0.2s;
@@ -1002,184 +943,63 @@ document.addEventListener('DOMContentLoaded', function() {
     height: 12px;
 }
 
-/* Units Table Styling */
-#unitsTableBody tr {
-    transition: background-color 0.2s;
+.view-units-link {
+    color: #0d6efd;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    display: inline-block;
 }
 
-#unitsTableBody tr:hover {
-    background-color: rgba(0, 0, 0, 0.03);
+.view-units-link:hover {
+    color: #0a58ca;
+    text-decoration: underline;
 }
 
-/* Stock Table Styling */
-#stockTableBody tr {
-    transition: background-color 0.2s;
-}
-
-#stockTableBody tr:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-}
-
-/* Base unit badge */
-.badge.bg-primary {
-    font-size: 0.65rem;
-    padding: 0.15rem 0.4rem;
-}
-
-/* Table styling */
-.table {
+/* Pagination styling */
+.pagination {
     margin-bottom: 0;
 }
 
-.table thead th {
-    border-bottom: 2px solid #dee2e6;
-    background-color: #f8f9fa;
-    font-weight: 600;
+.page-link {
+    border-radius: 0.25rem;
+    margin: 0 2px;
     color: #495057;
-}
-
-.table tbody tr:hover {
-    background-color: rgba(0, 0, 0, 0.02);
-}
-
-/* Stock status colors */
-.text-danger { color: #dc3545 !important; }
-.text-warning { color: #ffc107 !important; }
-.text-success { color: #198754 !important; }
-
-/* Unit count badge */
-.badge.bg-info {
-    font-size: 0.7rem;
-    padding: 0.15rem 0.4rem;
-}
-
-/* Stock status badges */
-.badge.bg-success {
-    background-color: #198754 !important;
-    color: white;
-}
-
-.badge.bg-warning {
-    background-color: #ffc107 !important;
-    color: #212529;
-}
-
-.badge.bg-danger {
-    background-color: #dc3545 !important;
-    color: white;
-}
-
-/* Empty state styling */
-.empty-state {
-    padding: 2rem;
-    text-align: center;
-}
-
-.empty-state i {
-    opacity: 0.5;
-}
-
-/* Card styling for summary */
-.card.bg-light {
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 0.5rem;
-}
-
-.card.bg-light .card-title {
+    border: 1px solid #dee2e6;
+    padding: 0.375rem 0.75rem;
     font-size: 0.875rem;
-    letter-spacing: 0.5px;
+    cursor: pointer;
 }
 
-/* Loading spinner */
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
+.page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
 }
 
-/* Error state */
-#stockError .feather-48,
-#unitsError .feather-48 {
-    width: 48px;
-    height: 48px;
-    stroke-width: 1.5;
+.page-link:hover {
+    background-color: #e9ecef;
+    border-color: #dee2e6;
 }
 
-/* Responsive adjustments */
+.datatable-info {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
-    .card-header form {
+    .card-header .d-flex {
         flex-direction: column;
-        align-items: stretch;
+        align-items: stretch !important;
     }
     
-    .card-header form .input-group,
-    .card-header form select,
-    .card-header form button,
-    .card-header form a {
+    .card-header .input-group,
+    .card-header select,
+    .card-header button {
         width: 100%;
-        min-width: auto !important;
-    }
-    
-    .table-responsive {
-        font-size: 0.875rem;
-        overflow-x: auto;
-    }
-    
-    .pagination {
-        flex-wrap: wrap;
-        justify-content: center !important;
-        margin-top: 1rem;
-    }
-    
-    .datatable-info {
-        text-align: center;
-        margin-bottom: 0.5rem;
-        width: 100%;
-    }
-    
-    .d-flex.justify-content-between {
-        flex-direction: column;
-        align-items: center !important;
-        gap: 1rem;
-    }
-    
-    /* Modal adjustments */
-    .modal-lg {
-        max-width: 95%;
-    }
-    
-    .view-units-link,
-    .view-stock-link {
-        font-size: 0.875rem;
-        word-break: break-word;
-    }
-    
-    .view-units-link .badge,
-    .view-stock-link .badge {
-        font-size: 0.6rem;
-        padding: 0.1rem 0.3rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .action-table-data .edit-delete-action {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-    }
-    
-    .action-table-data .edit-delete-action a {
-        display: inline-block;
-        text-align: center;
-    }
-    
-    /* Stack summary cards on mobile */
-    .row.mb-4 {
-        margin-bottom: 1rem !important;
-    }
-    
-    .row.mb-4 .col-md-6:first-child {
-        margin-bottom: 0.5rem;
+        max-width: none !important;
     }
 }
 </style>

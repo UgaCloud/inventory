@@ -29,8 +29,8 @@ import json
 def manage_product_view(request):
     product_form = ProductForm()
 
-    # Get all products with filtering support - ADD ORDERING
-    products = Product.objects.select_related('category').all().order_by('id')  # Added order_by
+    # Get all products with filtering support
+    products = Product.objects.select_related('category').all().order_by('id')
     
     # Apply filters from query parameters
     category_id = request.GET.get('category')
@@ -60,38 +60,28 @@ def manage_product_view(request):
     # Get all categories for dropdown
     categories = Category.objects.all()
     
-    # Get all unique brands for dropdown (excluding empty/null brands)
+    # Get all unique brands for dropdown
     brands = Product.objects.exclude(
         brand__isnull=True
     ).exclude(
         brand=''
     ).values_list('brand', flat=True).distinct().order_by('brand')
     
-    # Create edit forms for each product (only for current page)
+    # Create edit forms for each product
     edit_forms = {}
     
-    # Pagination - 10 items per page
-    items_per_page = 25
-    paginator = Paginator(products, items_per_page)  # Now products has ordering
-    page = request.GET.get('page', 1)
-    
-    try:
-        paginated_products = paginator.page(page)
-    except PageNotAnInteger:
-        paginated_products = paginator.page(1)
-    except EmptyPage:
-        paginated_products = paginator.page(paginator.num_pages)
-    
-    # Enhanced products for current page only
+    # Process ALL products (no pagination - we'll do client-side pagination)
     enhanced_products = []
-    for product in paginated_products:
+    products_list = list(products)  # Convert to list for processing
+    
+    for product in products_list:
         total_committed_stock = StockTransferItem.objects.filter(
             product=product,
             stock_transfer__status__in=['pending', 'in_transit']
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
         total_physical_stock = sum(inv.quantity_in_stock for inv in product.inventories.all())
-        total_available_stock = total_physical_stock
+        total_available_stock = total_physical_stock - total_committed_stock
         
         # Create edit form for each product
         edit_forms[product.id] = ProductForm(instance=product)
@@ -100,23 +90,42 @@ def manage_product_view(request):
             'product': product,
             'total_physical_stock': total_physical_stock,
             'total_committed_stock': total_committed_stock,
-            'total_available_stock': total_available_stock,
+            'total_available_stock': max(0, total_available_stock),
             'edit_form': edit_forms[product.id],
+        })
+    
+    # Convert to JSON for client-side
+    products_json = []
+    for item in enhanced_products:
+        product = item['product']
+        products_json.append({
+            'id': product.id,
+            'name': product.name,
+            'sku': product.sku or '',
+            'brand': product.brand or '',
+            'is_active': product.is_active,
+            'default_price': float(product.default_price) if product.default_price else 0,
+            'default_unit': str(product.default_unit) if product.default_unit else '',
+            'category_name': product.category.name if product.category else None,
+            'category_id': product.category.id if product.category else None,
+            'total_available_stock': item['total_available_stock'],
+            'unit_count': 0,  # You can calculate this if needed
+            'total_physical_stock': item['total_physical_stock'],
+            'total_committed_stock': item['total_committed_stock']
         })
     
     context = {
         'form': product_form,
-        'products': enhanced_products,
+        'products': enhanced_products,  # For edit modals
+        'products_json': json.dumps(products_json),  # For client-side pagination
         'categories': categories,
         'brands': brands,
         'selected_category': category_id,
         'selected_brand': brand_filter,
         'search_query': search_query,
         'selected_status': status_filter,
-        'paginated_products': paginated_products,  # For pagination controls
     }
     return render(request, 'products/products.html', context)
-
 
 @login_required
 def add_product_view(request):
