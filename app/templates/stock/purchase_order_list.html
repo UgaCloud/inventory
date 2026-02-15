@@ -29,7 +29,7 @@
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Excel"><img src="{% static 'assets/img/icons/excel.svg' %}" alt="img"></a>
             </li>
             <li>
-                <a data-bs-toggle="tooltip" data-bs-placement="top" title="Refresh" onclick="window.location.reload()"><i class="ti ti-refresh"></i></a>
+                <a data-bs-toggle="tooltip" data-bs-placement="top" title="Refresh" onclick="location.reload()"><i class="ti ti-refresh"></i></a>
             </li>
             <li>
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Collapse" id="collapse-header"><i class="ti ti-chevron-up"></i></a>
@@ -46,36 +46,36 @@
     <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
             <div class="search-set">
-                <div class="search-input">
-                    <input type="text" placeholder="Search..." class="form-control">
-                    <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
+                <div class="search-input position-relative">
+                    <input type="text" id="searchInput" placeholder="Search by ID, Supplier, Store, Status..." class="form-control" autocomplete="off" value="">
+                    <span class="btn-searchset position-absolute top-50 end-0 translate-middle-y me-3">
+                        <i class="ti ti-search fs-14 feather-search"></i>
+                    </span>
+                    <span id="searchSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3" style="display: none;">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </span>
                 </div>
             </div>
             <div class="d-flex table-dropdown my-xl-auto right-content align-items-center flex-wrap row-gap-3">
-                <div class="dropdown me-2">
-                    <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-                        Supplier
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end p-3">
-                        {% for supplier in suppliers|slice:":5" %}
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">{{ supplier.name }}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                <div class="dropdown">
-                    <a href="javascript:void(0);" class="dropdown-toggle btn btn-white btn-md d-inline-flex align-items-center" data-bs-toggle="dropdown">
-                        Store
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end p-3">
-                        {% for store in stores|slice:":5" %}
-                        <li>
-                            <a href="javascript:void(0);" class="dropdown-item rounded-1">{{ store.name }}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
+                <!-- Items per page selector -->
+                <select id="itemsPerPage" class="form-select form-select-sm me-2" style="width: auto; min-width: 70px;">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                
+                <!-- Result count badge -->
+                <span id="resultCount" class="badge bg-light text-dark me-2"></span>
+                
+                <!-- Clear search button -->
+                <button id="clearSearchBtn" class="btn btn-outline-secondary btn-sm d-flex align-items-center me-2" onclick="clearSearch()" style="display: none;">
+                    <i class="ti ti-x me-1"></i>
+                    Clear
+                </button>
+               
             </div>
         </div>
         <div class="card-body p-0">
@@ -98,21 +98,21 @@
                             <th class="no-sort">Action</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="tableBody">
                         {% if purchase_orders %}
                             {% for purchase in purchase_orders %}
-                            <tr>
+                            <tr class="order-row" data-order-id="{{ purchase.id }}" data-supplier="{{ purchase.supplier.name|default:'No Supplier' }}" data-store="{{ purchase.store.name|default:'No Store' }}" data-status="{{ purchase.status }}">
                                 <td>
                                     <label class="checkboxs">
                                         <input type="checkbox" class="order-checkbox" value="{{ purchase.id }}">
                                         <span class="checkmarks"></span>
                                     </label>
                                 </td>
-                                <td>{{ purchase.id }}</td>
-                                <td>{{ purchase.purchase_date|date:"Y-m-d" }}</td>							
-                                <td>{{ purchase.supplier.name|default:"No Supplier" }}</td>
-                                <td>{{ purchase.store.name|default:"No Store" }}</td>
-                                <td>
+                                <td class="order-id">{{ purchase.id }}</td>
+                                <td class="order-date">{{ purchase.purchase_date|date:"Y-m-d" }}</td>							
+                                <td class="order-supplier">{{ purchase.supplier.name|default:"No Supplier" }}</td>
+                                <td class="order-store">{{ purchase.store.name|default:"No Store" }}</td>
+                                <td class="order-status">
                                     {% if purchase.status == 'RECEIVED' %}
                                         <span class="badge table-badge bg-success fw-medium fs-10">
                                             Received
@@ -127,7 +127,7 @@
                                         </span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td class="order-recorded-by">
                                     <div class="d-flex align-items-center">
                                         <a href="javascript:void(0);" class="avatar avatar-sm me-2">
                                             <img src="{% static 'assets/img/users/user-30.jpg' %}" alt="user">
@@ -155,7 +155,7 @@
                             </tr>
                             {% endfor %}
                         {% else %}
-                            <tr>
+                            <tr id="no-data-row">
                                 <td colspan="8" class="text-center py-4">
                                     <div class="empty-state">
                                         <i class="ti ti-package fs-48 text-muted mb-3"></i>
@@ -171,6 +171,16 @@
                         {% endif %}
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div id="paginationContainer" class="d-flex justify-content-between align-items-center mt-4 px-3 pb-3">
+                <div class="datatable-info" id="paginationInfo"></div>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm justify-content-end mb-0" id="pagination">
+                        <!-- Pagination will be generated by JavaScript -->
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>
@@ -328,6 +338,271 @@
     </div>
 
 <script>
+// ==================== REAL-TIME SEARCH AND PAGINATION ====================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Search and pagination initialized');
+    
+    // Get elements
+    const searchInput = document.getElementById('searchInput');
+    const itemsPerPageSelect = document.getElementById('itemsPerPage');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const searchSpinner = document.getElementById('searchSpinner');
+    const tableBody = document.getElementById('tableBody');
+    const noDataRow = document.getElementById('no-data-row');
+    
+    // State variables
+    let currentPage = 1;
+    let itemsPerPage = 25;
+    let searchTerm = '';
+    let allRows = [];
+    
+    // Initialize - get all rows
+    function initializeRows() {
+        allRows = Array.from(document.querySelectorAll('#tableBody .order-row'));
+        console.log('Found', allRows.length, 'rows');
+        
+        // Initially show all rows
+        allRows.forEach(row => {
+            row.style.display = '';
+        });
+        
+        // Update display
+        updateDisplay();
+    }
+    
+    // Debounce function
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+    
+    // Filter rows based on search
+    function filterRows() {
+        searchTerm = searchInput.value.toLowerCase().trim();
+        
+        if (allRows.length === 0) return;
+        
+        // Filter rows
+        const visibleRows = allRows.filter(row => {
+            const id = row.querySelector('.order-id')?.textContent.toLowerCase() || '';
+            const supplier = row.querySelector('.order-supplier')?.textContent.toLowerCase() || '';
+            const store = row.querySelector('.order-store')?.textContent.toLowerCase() || '';
+            const status = row.querySelector('.order-status')?.textContent.toLowerCase() || '';
+            
+            return searchTerm === '' || 
+                id.includes(searchTerm) ||
+                supplier.includes(searchTerm) ||
+                store.includes(searchTerm) ||
+                status.includes(searchTerm);
+        });
+        
+        // Hide all rows first
+        allRows.forEach(row => {
+            row.style.display = 'none';
+        });
+        
+        // Show/hide no data row
+        if (visibleRows.length === 0) {
+            if (noDataRow) {
+                noDataRow.style.display = '';
+                const messageEl = noDataRow.querySelector('h5');
+                if (messageEl) messageEl.textContent = 'No matching orders found';
+                const subMessageEl = noDataRow.querySelector('p');
+                if (subMessageEl) subMessageEl.textContent = 'Try adjusting your search criteria.';
+            }
+        } else {
+            if (noDataRow) {
+                noDataRow.style.display = 'none';
+            }
+        }
+        
+        return visibleRows;
+    }
+    
+    // Update display with pagination
+    function updateDisplay() {
+        const visibleRows = filterRows();
+        
+        if (visibleRows.length === 0) {
+            document.getElementById('resultCount').textContent = '0 results';
+            document.getElementById('paginationInfo').innerHTML = 'Showing 0 entries';
+            document.getElementById('paginationContainer').style.display = 'none';
+            return;
+        }
+        
+        // Calculate pagination
+        const totalItems = visibleRows.length;
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = Math.min(start + itemsPerPage, totalItems);
+        
+        // Hide all visible rows first
+        visibleRows.forEach(row => {
+            row.style.display = 'none';
+        });
+        
+        // Show only current page rows
+        visibleRows.slice(start, end).forEach(row => {
+            row.style.display = '';
+        });
+        
+        // Update result count
+        document.getElementById('resultCount').textContent = 
+            totalItems > 0 ? `${start + 1}-${end} of ${totalItems}` : '0 results';
+        document.getElementById('paginationInfo').innerHTML = 
+            totalItems > 0 ? `Showing ${start + 1} to ${end} of ${totalItems} entries` : 'Showing 0 entries';
+        
+        // Update pagination controls
+        updatePaginationControls(totalItems);
+        
+        // Show/hide clear button
+        clearSearchBtn.style.display = searchTerm ? 'flex' : 'none';
+        
+        // Hide spinner
+        searchSpinner.style.display = 'none';
+    }
+    
+    // Update pagination controls
+    function updatePaginationControls(totalItems) {
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        const paginationContainer = document.getElementById('paginationContainer');
+        const pagination = document.getElementById('pagination');
+        
+        if (totalPages <= 1) {
+            paginationContainer.style.display = 'none';
+            return;
+        }
+        
+        paginationContainer.style.display = 'flex';
+        pagination.innerHTML = '';
+        
+        // Previous button
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;"><i class="ti ti-chevron-left"></i></a>`;
+        pagination.appendChild(prevLi);
+        
+        // Page numbers
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, currentPage + 2);
+        
+        if (startPage > 1) {
+            pagination.appendChild(createPageItem(1));
+            if (startPage > 2) {
+                pagination.appendChild(createEllipsis());
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            pagination.appendChild(createPageItem(i));
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                pagination.appendChild(createEllipsis());
+            }
+            pagination.appendChild(createPageItem(totalPages));
+        }
+        
+        // Next button
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;"><i class="ti ti-chevron-right"></i></a>`;
+        pagination.appendChild(nextLi);
+    }
+    
+    // Create page item
+    function createPageItem(pageNum) {
+        const li = document.createElement('li');
+        li.className = `page-item ${pageNum === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${pageNum}); return false;">${pageNum}</a>`;
+        return li;
+    }
+    
+    // Create ellipsis
+    function createEllipsis() {
+        const li = document.createElement('li');
+        li.className = 'page-item disabled';
+        li.innerHTML = '<span class="page-link">...</span>';
+        return li;
+    }
+    
+    // Change page function - make it global
+    window.changePage = function(page) {
+        const visibleRows = allRows.filter(row => {
+            const id = row.querySelector('.order-id')?.textContent.toLowerCase() || '';
+            const supplier = row.querySelector('.order-supplier')?.textContent.toLowerCase() || '';
+            const store = row.querySelector('.order-store')?.textContent.toLowerCase() || '';
+            const status = row.querySelector('.order-status')?.textContent.toLowerCase() || '';
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            
+            return searchTerm === '' || 
+                id.includes(searchTerm) ||
+                supplier.includes(searchTerm) ||
+                store.includes(searchTerm) ||
+                status.includes(searchTerm);
+        });
+        
+        const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
+        
+        if (page < 1 || page > totalPages) return;
+        
+        currentPage = page;
+        updateDisplay();
+        
+        // Scroll to top of table
+        document.querySelector('.card-body').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    
+    // Handle search input
+    function handleSearchInput() {
+        searchSpinner.style.display = 'block';
+        currentPage = 1;
+        debouncedUpdate();
+    }
+    
+    // Debounced update
+    const debouncedUpdate = debounce(() => {
+        updateDisplay();
+    }, 300);
+    
+    // Handle items per page change
+    function handleItemsPerPageChange() {
+        itemsPerPage = parseInt(itemsPerPageSelect.value);
+        currentPage = 1;
+        updateDisplay();
+    }
+    
+    // Clear search
+    window.clearSearch = function() {
+        searchInput.value = '';
+        searchTerm = '';
+        currentPage = 1;
+        searchSpinner.style.display = 'block';
+        setTimeout(() => {
+            updateDisplay();
+        }, 100);
+    };
+    
+    // Add event listeners
+    searchInput.addEventListener('input', handleSearchInput);
+    itemsPerPageSelect.addEventListener('change', handleItemsPerPageChange);
+    
+    // Initialize
+    initializeRows();
+    
+    // Re-initialize after any modal actions (in case rows are modified)
+    const modal = document.getElementById('purchase-order-modal');
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', function() {
+            setTimeout(initializeRows, 500);
+        });
+    }
+});
+
+// ==================== YOUR ORIGINAL PURCHASE ORDER FORM CODE - COMPLETELY UNTOUCHED ====================
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Purchase Order Form Initialized');
     
@@ -531,7 +806,6 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
     
-
     // Function to fetch purchase order data for editing
     function fetchPurchaseOrderData(orderId) {
         fetch(`/api/purchase-order/${orderId}/`, {
@@ -626,7 +900,7 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Error loading purchase order data. Please try again.');
         });
     }
-
+    
     // Handle edit button click
     document.querySelectorAll('.edit-order-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
@@ -656,7 +930,6 @@ document.addEventListener('DOMContentLoaded', function() {
         resetFormToCreateMode();
     });
     
-
     // Function to reset form to create mode
     function resetFormToCreateMode() {
         isEditMode = false;
@@ -697,8 +970,7 @@ document.addEventListener('DOMContentLoaded', function() {
         unitsCache = {};
         console.log('Reset to create mode: TOTAL_FORMS=1, INITIAL_FORMS=0');
     }
-
-
+    
     // Add new item form
     if (addItemBtn) {
         addItemBtn.addEventListener('click', function() {
@@ -926,6 +1198,56 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+.search-input {
+    position: relative;
+    min-width: 250px;
+}
+
+.search-input input {
+    padding-right: 40px;
+}
+
+#searchSpinner {
+    z-index: 10;
+    pointer-events: none;
+}
+
+.pagination {
+    margin-bottom: 0;
+}
+
+.page-link {
+    border-radius: 0.25rem;
+    margin: 0 2px;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.page-link:hover {
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.datatable-info {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.badge.bg-light {
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6;
+}
+
+/* Your original modal styles */
 .item-form {
     transition: all 0.3s ease;
     border-left: 3px solid #0d6efd;
