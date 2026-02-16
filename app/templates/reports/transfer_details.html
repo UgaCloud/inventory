@@ -374,21 +374,73 @@ function refreshReport() {
 }
 
 function exportReport(format) {
-    const dateRange = $('#dateRangePicker').val();
-    let exportUrl;
-    const baseUrl = window.location.pathname;
+    const filename = `Stock Transfer-report-{{ period|slugify }}-${new Date().toISOString().split('T')[0]}`;
+    
+    // Build URL with current parameters
+    let baseUrl = '';
     
     if (format === 'csv') {
-        exportUrl = `${baseUrl}export/csv/?date_range=${encodeURIComponent(dateRange)}`;
+        baseUrl = "{% url 'export_purchase_csv' %}";
     } else if (format === 'pdf') {
-        exportUrl = `${baseUrl}export/pdf/?date_range=${encodeURIComponent(dateRange)}`;
+        baseUrl = "{% url 'export_transfer_pdf' %}";
+    } else if (format === 'excel') {
+        baseUrl = "{% url 'export_purchase_excel' %}";
+    } else {
+        showToast(`Invalid export format: ${format}`, 'error');
+        return;
     }
     
-    // Open in new tab for download
-    window.open(exportUrl, '_blank');
+    // Get date range from the report
+    const dateRange = "{{ date_range }}";
+    let dateFrom = '', dateTo = '';
     
-    showToast(`Exporting ${format.toUpperCase()} report...`, 'info');
+    if (dateRange && dateRange.includes(' - ')) {
+        const dates = dateRange.split(' - ');
+        dateFrom = dates[0].trim();
+        dateTo = dates[1].trim();
+    }
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'period': "{{ period }}"
+    });
+    
+    // Add store filter if present
+    const storeSelect = document.getElementById('storeFilter');
+    if (storeSelect && storeSelect.value) {
+        params.append('store', storeSelect.value);
+    }
+    
+    // Add supplier filter if present
+    const supplierSelect = document.getElementById('supplierFilter');
+    if (supplierSelect && supplierSelect.value) {
+        params.append('supplier', supplierSelect.value);
+    }
+    
+    // Create export URL
+    const exportUrl = `${baseUrl}?${params.toString()}`;
+    
+    // Show loading toast
+    showToast(`${format.toUpperCase()} export started...`, 'info');
+    
+    // SIMPLE APPROACH: Create and click download link
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = `${filename}.${format}`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    setTimeout(() => {
+        document.body.removeChild(link);
+        showToast(`${format.toUpperCase()} export completed`, 'success');
+    }, 1000);
 }
+
+
 
 function applyDateFilter() {
     const dateRange = $('#dateRangePicker').val();

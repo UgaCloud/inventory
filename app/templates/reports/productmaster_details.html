@@ -148,7 +148,7 @@
                             <li><a class="dropdown-item" href="#" onclick="exportProductReport('csv')">
                                 <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
                             </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportProductReport('pdf')">
+                            <li><a class="dropdown-item" href="#" onclick="exportReport('pdf')">
                                 <i data-feather="file" class="feather-14 me-2"></i>Export PDF
                             </a></li>
                             <li><a class="dropdown-item" href="#" onclick="exportProductReport('excel')">
@@ -1047,11 +1047,73 @@ function refreshProductReports() {
     showToast('Refreshing product reports...', 'info');
 }
 
-function exportProductReport(format) {
-    // This would trigger a server-side export
-    window.open(`/reports/export-products/${format}/`, '_blank');
-    showToast(`${format.toUpperCase()} export started!`, 'info');
+function exportReport(format) {
+    const filename = `Stock Transfer-report-{{ period|slugify }}-${new Date().toISOString().split('T')[0]}`;
+    
+    // Build URL with current parameters
+    let baseUrl = '';
+    
+    if (format === 'csv') {
+        baseUrl = "{% url 'export_purchase_csv' %}";
+    } else if (format === 'pdf') {
+        baseUrl = "{% url 'export_productmaster_pdf' %}";
+    } else if (format === 'excel') {
+        baseUrl = "{% url 'export_purchase_excel' %}";
+    } else {
+        showToast(`Invalid export format: ${format}`, 'error');
+        return;
+    }
+    
+    // Get date range from the report
+    const dateRange = "{{ date_range }}";
+    let dateFrom = '', dateTo = '';
+    
+    if (dateRange && dateRange.includes(' - ')) {
+        const dates = dateRange.split(' - ');
+        dateFrom = dates[0].trim();
+        dateTo = dates[1].trim();
+    }
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'period': "{{ period }}"
+    });
+    
+    // Add store filter if present
+    const storeSelect = document.getElementById('storeFilter');
+    if (storeSelect && storeSelect.value) {
+        params.append('store', storeSelect.value);
+    }
+    
+    // Add supplier filter if present
+    const supplierSelect = document.getElementById('supplierFilter');
+    if (supplierSelect && supplierSelect.value) {
+        params.append('supplier', supplierSelect.value);
+    }
+    
+    // Create export URL
+    const exportUrl = `${baseUrl}?${params.toString()}`;
+    
+    // Show loading toast
+    showToast(`${format.toUpperCase()} export started...`, 'info');
+    
+    // SIMPLE APPROACH: Create and click download link
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = `${filename}.${format}`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    setTimeout(() => {
+        document.body.removeChild(link);
+        showToast(`${format.toUpperCase()} export completed`, 'success');
+    }, 1000);
 }
+
 
 function showToast(message, type = 'info') {
     // Simple toast implementation

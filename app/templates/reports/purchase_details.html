@@ -34,13 +34,13 @@
                             Export
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="exportReport('csv')">
+                            <li><a class="dropdown-item" href="#" style="width: 200px;" onclick="exportReport('csv')">
                                 <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
                             </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportReport('pdf')">
+                            <li><a class="dropdown-item" style="width: 200px;" href="#" onclick="exportReport('pdf')">
                                 <i data-feather="file" class="feather-14 me-2"></i>Export PDF
                             </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportReport('excel')">
+                            <li><a class="dropdown-item" href="#" style="width: 200px;" onclick="exportReport('excel')">
                                 <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
                             </a></li>
                         </ul>
@@ -392,7 +392,7 @@
                         </div>
                     </div>
 
-                    <!-- Purchase Order Status Tab - FIXED -->
+                    <!-- Purchase Order Status Tab -->
                     <div class="tab-pane fade" id="po-status" role="tabpanel" aria-labelledby="po-status-tab">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
@@ -403,8 +403,8 @@
                                 <div class="btn-group" role="group">
                                     <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterPOs('all')">All</button>
                                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterPOs('pending')">Pending</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterPOs('in_progress')">In Progress</button>
                                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterPOs('completed')">Completed</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterPOs('overdue')">Overdue</button>
                                 </div>
                             </div>
                             <div class="card-body">
@@ -447,7 +447,6 @@
                                     </div>
                                 </div>
                                 
-                                <!-- FIXED: Use po_status_data.total_amount instead of calculating -->
                                 <div class="row mb-3">
                                     <div class="col-12">
                                         <div class="card bg-light">
@@ -617,7 +616,7 @@
                         </div>
                     </div>
 
-                    <!-- Expiry Tracking Report Tab - FIXED -->
+                    <!-- Expiry Tracking Report Tab -->
                     <div class="tab-pane fade" id="expiry-tracking" role="tabpanel" aria-labelledby="expiry-tracking-tab">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
@@ -795,22 +794,57 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
+    
+    // Initialize filter buttons event listeners
+    initializeFilterButtons();
 });
 
+function initializeFilterButtons() {
+    // Purchase order filter buttons
+    document.querySelectorAll('#po-status .btn-group .btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            filterPOs(this.getAttribute('data-status'));
+        });
+    });
+    
+    // Expiry filter buttons
+    document.querySelectorAll('#expiry-tracking .btn-group .btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            filterExpiry(this.getAttribute('data-status'));
+        });
+    });
+}
+
 function initializePurchaseTrendChart() {
-    const ctx = document.getElementById('purchaseTrendChart').getContext('2d');
-    const trendData = JSON.parse('{{ trend_chart_data|escapejs }}');
+    const canvas = document.getElementById('purchaseTrendChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Safely parse JSON data with fallback
+    let trendData = { labels: [], data: [] };
+    try {
+        trendData = JSON.parse('{{ trend_chart_data|escapejs }}' || '{"labels":[],"data":[]}');
+    } catch (e) {
+        console.error('Error parsing trend chart data:', e);
+    }
+    
+    if (purchaseTrendChart) {
+        purchaseTrendChart.destroy();
+    }
     
     purchaseTrendChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: trendData.labels,
+            labels: trendData.labels || [],
             datasets: [{
                 label: 'Purchase Amount (UGX)',
-                data: trendData.data,
-                borderColor: '#4A90E2',
-                backgroundColor: 'rgba(74, 144, 226, 0.1)',
-                borderWidth: 3,
+                data: trendData.data || [],
+                borderColor: '#000000',
+                backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                borderWidth: 2,
                 fill: true,
                 tension: 0.4
             }]
@@ -822,20 +856,32 @@ function initializePurchaseTrendChart() {
                 legend: {
                     display: true,
                     position: 'top',
+                    labels: {
+                        color: '#000000'
+                    }
                 },
                 tooltip: {
+                    backgroundColor: '#ffffff',
+                    titleColor: '#000000',
+                    bodyColor: '#000000',
+                    borderColor: '#000000',
+                    borderWidth: 1,
                     callbacks: {
                         label: function(context) {
                             const value = context.raw || 0;
-                            return `UGX ${(value / 1000000).toFixed(2)}M`;
+                            return `UGX ${value.toLocaleString()}`;
                         }
                     }
                 }
             },
             scales: {
                 y: {
-                    beginAtZero: false,
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
                     ticks: {
+                        color: '#000000',
                         callback: function(value) {
                             if (value >= 1000000) {
                                 return 'UGX ' + (value / 1000000).toFixed(1) + 'M';
@@ -847,13 +893,21 @@ function initializePurchaseTrendChart() {
                     },
                     title: {
                         display: true,
-                        text: 'Purchase Amount (UGX)'
+                        text: 'Purchase Amount (UGX)',
+                        color: '#000000'
                     }
                 },
                 x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
+                    ticks: {
+                        color: '#000000'
+                    },
                     title: {
                         display: true,
-                        text: 'Month'
+                        text: 'Month',
+                        color: '#000000'
                     }
                 }
             }
@@ -862,32 +916,32 @@ function initializePurchaseTrendChart() {
 }
 
 function initializeItemPurchaseChart() {
-    const ctx = document.getElementById('itemPurchaseChart').getContext('2d');
-    const itemData = JSON.parse('{{ item_chart_data|escapejs }}');
+    const canvas = document.getElementById('itemPurchaseChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Safely parse JSON data with fallback
+    let itemData = { labels: [], data: [] };
+    try {
+        itemData = JSON.parse('{{ item_chart_data|escapejs }}' || '{"labels":[],"data":[]}');
+    } catch (e) {
+        console.error('Error parsing item chart data:', e);
+    }
+    
+    if (itemPurchaseChart) {
+        itemPurchaseChart.destroy();
+    }
     
     itemPurchaseChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: itemData.labels,
+            labels: itemData.labels || [],
             datasets: [{
                 label: 'Purchase Cost (UGX)',
-                data: itemData.data,
-                backgroundColor: [
-                    '#4A90E2',
-                    '#36B9CC',
-                    '#1CC88A',
-                    '#F6C23E',
-                    '#E74A3B',
-                    '#6F42C1'
-                ],
-                borderColor: [
-                    '#357ABD',
-                    '#2A9CA5',
-                    '#17A673',
-                    '#F4B619',
-                    '#E02D1B',
-                    '#5A3696'
-                ],
+                data: itemData.data || [],
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                borderColor: '#000000',
                 borderWidth: 1
             }]
         },
@@ -899,10 +953,15 @@ function initializeItemPurchaseChart() {
                     display: false
                 },
                 tooltip: {
+                    backgroundColor: '#ffffff',
+                    titleColor: '#000000',
+                    bodyColor: '#000000',
+                    borderColor: '#000000',
+                    borderWidth: 1,
                     callbacks: {
                         label: function(context) {
                             const value = context.raw || 0;
-                            return `Cost: UGX ${(value / 1000000).toFixed(2)}M`;
+                            return `Cost: UGX ${value.toLocaleString()}`;
                         }
                     }
                 }
@@ -910,7 +969,11 @@ function initializeItemPurchaseChart() {
             scales: {
                 y: {
                     beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
                     ticks: {
+                        color: '#000000',
                         callback: function(value) {
                             if (value >= 1000000) {
                                 return 'UGX ' + (value / 1000000).toFixed(1) + 'M';
@@ -922,13 +985,21 @@ function initializeItemPurchaseChart() {
                     },
                     title: {
                         display: true,
-                        text: 'Purchase Cost (UGX)'
+                        text: 'Purchase Cost (UGX)',
+                        color: '#000000'
                     }
                 },
                 x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
+                    ticks: {
+                        color: '#000000'
+                    },
                     title: {
                         display: true,
-                        text: 'Item Category'
+                        text: 'Item Category',
+                        color: '#000000'
                     }
                 }
             }
@@ -953,23 +1024,18 @@ function filterPOs(status) {
     // Update button active state
     document.querySelectorAll('#po-status .btn-group .btn').forEach(btn => {
         btn.classList.remove('active');
+        if (btn.getAttribute('data-status') === status) {
+            btn.classList.add('active');
+        }
     });
-    event.target.classList.add('active');
     
     // Show message if no results
     const tableBody = document.getElementById('poTableBody');
+    removeNoResultsRow(tableBody);
+    
     if (visibleCount === 0) {
-        if (!tableBody.querySelector('.no-results-row')) {
-            const noResults = document.createElement('tr');
-            noResults.className = 'no-results-row';
-            noResults.innerHTML = `<td colspan="9" class="text-center">No purchase orders found with status: ${status}</td>`;
-            tableBody.appendChild(noResults);
-        }
-    } else {
-        const noResults = tableBody.querySelector('.no-results-row');
-        if (noResults) {
-            noResults.remove();
-        }
+        const statusText = status === 'all' ? '' : ` with status: ${status}`;
+        addNoResultsRow(tableBody, 9, `No purchase orders found${statusText}`);
     }
 }
 
@@ -996,70 +1062,139 @@ function filterExpiry(status) {
     // Update button active state
     document.querySelectorAll('#expiry-tracking .btn-group .btn').forEach(btn => {
         btn.classList.remove('active');
+        if (btn.getAttribute('data-status') === status) {
+            btn.classList.add('active');
+        }
     });
-    event.target.classList.add('active');
     
     // Show message if no results
     const tableBody = document.getElementById('expiryTableBody');
+    removeNoResultsRow(tableBody);
+    
     if (visibleCount === 0) {
-        if (!tableBody.querySelector('.no-results-row')) {
-            const noResults = document.createElement('tr');
-            noResults.className = 'no-results-row';
-            noResults.innerHTML = `<td colspan="11" class="text-center">No expiry items found</td>`;
-            tableBody.appendChild(noResults);
-        }
-    } else {
-        const noResults = tableBody.querySelector('.no-results-row');
-        if (noResults) {
-            noResults.remove();
-        }
+        addNoResultsRow(tableBody, 11, 'No expiry items found');
     }
 }
 
+function removeNoResultsRow(tableBody) {
+    if (!tableBody) return;
+    const noResults = tableBody.querySelector('.no-results-row');
+    if (noResults) {
+        noResults.remove();
+    }
+}
+
+function addNoResultsRow(tableBody, colspan, message) {
+    if (!tableBody) return;
+    const noResults = document.createElement('tr');
+    noResults.className = 'no-results-row';
+    noResults.innerHTML = `<td colspan="${colspan}" class="text-center py-4 text-muted">${message}</td>`;
+    tableBody.appendChild(noResults);
+}
+
 function viewPO(poNumber) {
+    if (!poNumber) return;
     const poId = poNumber.split('-')[1];
-    window.location.href = `/purchase-orders/${poId}/`;
+    if (poId) {
+        window.location.href = `/purchase-orders/${poId}/`;
+    }
 }
 
 function disposeItem(batchNumber) {
+    if (!batchNumber) return;
+    
     if (confirm(`Are you sure you want to dispose of ${batchNumber}? This action cannot be undone.`)) {
-        showToast(`Disposing ${batchNumber}...`, 'info');
+        showToast(`Disposing ${batchNumber}...`, 'warning');
         // Add your API call here
     }
 }
 
 function prioritizeItem(batchNumber) {
+    if (!batchNumber) return;
     showToast(`Prioritizing ${batchNumber} for immediate sales`, 'info');
 }
 
 function reviewItem(batchNumber) {
+    if (!batchNumber) return;
     window.location.href = `/inventory/batches/${batchNumber}/`;
 }
 
 function normalAction(batchNumber) {
+    if (!batchNumber) return;
     showToast(`Normal monitoring for ${batchNumber}`, 'info');
 }
 
 function refreshReport() {
     showLoading();
-    setTimeout(() => {
-        window.location.reload();
-    }, 500);
+    window.location.reload();
 }
 
+// FIXED EXPORT FUNCTION - SIMPLE AND RELIABLE
 function exportReport(format) {
-    const reportType = '{{ report_type }}';
-    const period = '{{ period }}';
-    const exportUrl = `/reports/purchase/export/${format}/?report_type=${reportType}&period=${period}`;
+    const filename = `Purchase-report-{{ period|slugify }}-${new Date().toISOString().split('T')[0]}`;
     
+    // Build URL with current parameters
+    let baseUrl = '';
+    
+    if (format === 'csv') {
+        baseUrl = "{% url 'export_purchase_csv' %}";
+    } else if (format === 'pdf') {
+        baseUrl = "{% url 'export_purchase_pdf' %}";
+    } else if (format === 'excel') {
+        baseUrl = "{% url 'export_purchase_excel' %}";
+    } else {
+        showToast(`Invalid export format: ${format}`, 'error');
+        return;
+    }
+    
+    // Get date range from the report
+    const dateRange = "{{ date_range }}";
+    let dateFrom = '', dateTo = '';
+    
+    if (dateRange && dateRange.includes(' - ')) {
+        const dates = dateRange.split(' - ');
+        dateFrom = dates[0].trim();
+        dateTo = dates[1].trim();
+    }
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'period': "{{ period }}"
+    });
+    
+    // Add store filter if present
+    const storeSelect = document.getElementById('storeFilter');
+    if (storeSelect && storeSelect.value) {
+        params.append('store', storeSelect.value);
+    }
+    
+    // Add supplier filter if present
+    const supplierSelect = document.getElementById('supplierFilter');
+    if (supplierSelect && supplierSelect.value) {
+        params.append('supplier', supplierSelect.value);
+    }
+    
+    // Create export URL
+    const exportUrl = `${baseUrl}?${params.toString()}`;
+    
+    // Show loading toast
+    showToast(`${format.toUpperCase()} export started...`, 'info');
+    
+    // SIMPLE APPROACH: Create and click download link
     const link = document.createElement('a');
     link.href = exportUrl;
-    link.target = '_blank';
+    link.download = `${filename}.${format}`;
+    link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
     
-    showToast(`${format.toUpperCase()} export started!`, 'info');
+    // Clean up
+    setTimeout(() => {
+        document.body.removeChild(link);
+        showToast(`${format.toUpperCase()} export completed`, 'success');
+    }, 1000);
 }
 
 function goBack() {
@@ -1067,14 +1202,20 @@ function goBack() {
 }
 
 function showLoading() {
+    // Remove existing overlay if any
+    const existingOverlay = document.getElementById('loading-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+    
     const loadingHTML = `
         <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
-             style="background: rgba(255,255,255,0.8); z-index: 9999;">
+             style="background: rgba(255,255,255,0.9); z-index: 9999;">
             <div class="text-center">
-                <div class="spinner-border text-primary" role="status">
+                <div class="spinner-border text-dark" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <p class="mt-2">Loading purchase report data...</p>
+                <p class="mt-2 text-dark">Loading purchase report data...</p>
             </div>
         </div>
     `;
@@ -1083,14 +1224,15 @@ function showLoading() {
 
 function showToast(message, type = 'info') {
     const typeClass = {
-        'success': 'text-bg-success',
-        'error': 'text-bg-danger',
-        'warning': 'text-bg-warning',
-        'info': 'text-bg-info'
-    }[type] || 'text-bg-info';
+        'success': 'bg-success text-white',
+        'error': 'bg-danger text-white',
+        'warning': 'bg-warning text-dark',
+        'info': 'bg-info text-white'
+    }[type] || 'bg-info text-white';
     
+    const toastId = 'toast-' + Date.now();
     const toastHTML = `
-        <div class="toast align-items-center ${typeClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div id="${toastId}" class="toast align-items-center ${typeClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body">
                     ${message}
@@ -1110,9 +1252,16 @@ function showToast(message, type = 'info') {
     
     toastContainer.insertAdjacentHTML('beforeend', toastHTML);
     
-    const toastEl = toastContainer.querySelector('.toast:last-child');
-    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-    toast.show();
+    const toastEl = document.getElementById(toastId);
+    if (toastEl && typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+        const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+        toast.show();
+        
+        // Remove toast after hidden
+        toastEl.addEventListener('hidden.bs.toast', function() {
+            this.remove();
+        });
+    }
 }
 
 // Auto-hide loading overlay on page load
@@ -1121,6 +1270,22 @@ window.addEventListener('load', function() {
     if (loadingOverlay) {
         loadingOverlay.remove();
     }
+});
+
+// Handle window resize for charts
+let resizeTimeout;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(function() {
+        if (purchaseTrendChart) purchaseTrendChart.update();
+        if (itemPurchaseChart) itemPurchaseChart.update();
+    }, 250);
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+    if (purchaseTrendChart) purchaseTrendChart.destroy();
+    if (itemPurchaseChart) itemPurchaseChart.destroy();
 });
 </script>
 
