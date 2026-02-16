@@ -1130,6 +1130,7 @@ function refreshReport() {
 }
 
 // FIXED EXPORT FUNCTION - SIMPLE AND RELIABLE
+
 function exportReport(format) {
     const filename = `Purchase-report-{{ period|slugify }}-${new Date().toISOString().split('T')[0]}`;
     
