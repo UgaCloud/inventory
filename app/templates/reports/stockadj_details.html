@@ -5,965 +5,840 @@
 
 {% block title %}Stock Adjustment Reports{% endblock %}
 
-{% block extra_css %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
-<style>
-    /* Custom styles will be added at the end */
-</style>
-{% endblock %}
-
 {% block content %}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    /* Modern Dashboard Styles */
+    .metric-card {
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        transition: transform 0.2s;
+    }
+    .metric-card:hover { transform: translateY(-3px); }
+    .metric-card.total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .metric-card.increase { background: linear-gradient(135deg, #1cc88a 0%, #169b6b 100%); }
+    .metric-card.decrease { background: linear-gradient(135deg, #e74a3b 0%, #c0392b 100%); }
+    .metric-card.net { background: linear-gradient(135deg, #f6c23e 0%, #d4ac0d 100%); }
+    .metric-value { font-size: 28px; font-weight: bold; margin: 8px 0; }
+    .metric-label { font-size: 14px; opacity: 0.9; }
+    
+    .filter-section {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    
+    .badge-impact-positive {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+    .badge-impact-negative {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .status-pending { background-color: #fff3cd; color: #856404; }
+    .status-approved { background-color: #d4edda; color: #155724; }
+    .status-applied { background-color: #cce5ff; color: #004085; }
+    .status-cancelled { background-color: #f8d7da; color: #721c24; }
+    
+    .value-positive { color: #28a745; font-weight: 600; }
+    .value-negative { color: #dc3545; font-weight: 600; }
+    
+    .dataTables_filter input {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 8px 16px;
+        margin-left: 10px;
+    }
+    .dataTables_length select {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 8px 16px;
+        margin: 0 10px;
+    }
+    
+    .btn-export {
+        margin: 0 4px;
+        border-radius: 8px;
+    }
+    
+    .quick-stat {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+    }
+    .quick-stat-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: #4A90E2;
+    }
+    .quick-stat-label {
+        font-size: 12px;
+        color: #6c757d;
+    }
+
+    /* Searchable Dropdown Styles */
+    .dropdown-search-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .dropdown-search-input {
+        width: 100%;
+        height: 40px;
+        padding: 0.375rem 2rem 0.375rem 0.75rem;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.2s;
+    }
+
+    .dropdown-search-input:hover {
+        background-color: #f8f9fa;
+        border-color: #c1c9d0;
+    }
+
+    .dropdown-search-input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+        outline: 0;
+    }
+
+    .dropdown-selected-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dropdown-arrow {
+        transition: transform 0.2s;
+        color: #6c757d;
+    }
+
+    .dropdown-search-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        min-width: 200px;
+        margin-top: 4px;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-height: 300px;
+        overflow: hidden;
+    }
+
+    .dropdown-search-header {
+        padding: 0.5rem;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background-color: #f8f9fa;
+    }
+
+    .dropdown-search-header i {
+        color: #6c757d;
+        font-size: 1rem;
+    }
+
+    .dropdown-search-field {
+        width: 100%;
+        padding: 0.25rem;
+        border: none;
+        outline: none;
+        font-size: 0.875rem;
+        background: transparent;
+    }
+
+    .dropdown-search-field:focus {
+        outline: none;
+    }
+
+    .dropdown-search-options {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    .dropdown-search-option {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: background-color 0.2s;
+        color: #495057;
+    }
+
+    .dropdown-search-option:hover {
+        background-color: #f8f9fa;
+        color: #4361ee;
+    }
+
+    .dropdown-search-option[data-selected="true"] {
+        background-color: #e7f1ff;
+        color: #0c63e4;
+        font-weight: 500;
+    }
+
+    .custom-dropdown-btn {
+        width: 100%;
+        height: 40px;
+        padding: 0.375rem 0.75rem;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.2s;
+    }
+
+    .custom-dropdown-btn:hover {
+        background-color: #f8f9fa;
+        border-color: #c1c9d0;
+    }
+
+    .custom-dropdown-btn .caret {
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 4px solid #6c757d;
+        display: inline-block;
+        margin-left: 5px;
+    }
+
+    /* Date Range Modal */
+    .modal-content {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    
+    .modal-header {
+        border-bottom: 1px solid #e9ecef;
+        padding: 16px 20px;
+    }
+    
+    .modal-title {
+        font-weight: 600;
+        color: #2b2f32;
+    }
+    
+    .modal-body {
+        padding: 20px;
+    }
+    
+    .modal-footer {
+        border-top: 1px solid #e9ecef;
+        padding: 16px 20px;
+    }
+    
+    .date-range-input-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .date-range-input-group input {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    
+    .date-range-input-group input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+        outline: 0;
+    }
+    
+    .preset-ranges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 15px;
+    }
+    
+    .preset-range {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .preset-range:hover {
+        background: #e9ecef;
+        border-color: #ced4da;
+    }
+    
+    .preset-range.active {
+        background: #4361ee;
+        color: white;
+        border-color: #4361ee;
+    }
+
+    .feather-16 {
+        width: 16px;
+        height: 16px;
+    }
+    .feather-14 {
+        width: 14px;
+        height: 14px;
+    }
+    .feather-12 {
+        width: 12px;
+        height: 12px;
+    }
+</style>
+
 <div class="page-wrapper">
     <div class="content">
-        <!-- Page Header -->
-        <div class="page-header">
-            <div class="add-item d-flex">
-                <div class="page-title">
-                    <h4>Stock Adjustment Reports</h4>
-                    <h6>Detailed view of stock adjustments and corrections</h6>
-                </div>
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="mb-1">Stock Adjustment Reports</h4>
+                <p class="text-muted mb-0">Complete audit trail of all stock adjustments and corrections</p>
             </div>
-            <ul class="table-top-head">
-                <li>
-                    <button class="btn btn-outline-primary" onclick="refreshReport()">
-                        <i data-feather="refresh-cw" class="feather-16 me-1"></i>
-                        Refresh
+            <div>
+                <button class="btn btn-outline-primary me-2" onclick="refreshData()">
+                    <i data-feather="refresh-cw" class="feather-16 me-1"></i>
+                    Refresh
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i data-feather="download" class="feather-16 me-1"></i>
+                        Export
                     </button>
-                </li>
-                <li>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                            <i data-feather="download" class="feather-16 me-1"></i>
-                            Export
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="exportReport('csv')">
-                                <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportReport('pdf')">
-                                <i data-feather="file" class="feather-14 me-2"></i>Export PDF
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportReport('excel')">
-                                <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
-                            </a></li>
-                        </ul>
-                    </div>
-                </li>
-                <li>
-                    <a href="" class="btn btn-primary">
-                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
-                        Back to Dashboard
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Report Header Info -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5 class="card-title mb-3">Stock Adjustment Report - {{ report_period }}</h5>
-                                <div class="row">
-                                    <div class="col-6">
-                                        <p class="mb-1"><strong>Report ID:</strong> {{ report_id }}</p>
-                                        <p class="mb-1"><strong>Category:</strong> Adjustment Reports</p>
-                                        <p class="mb-1"><strong>Generated By:</strong> {{ request.user.get_full_name|default:request.user.username }}</p>
-                                    </div>
-                                    <div class="col-6">
-                                        <p class="mb-1"><strong>Date Range:</strong> {{ start_date }} - {{ end_date }}</p>
-                                        <p class="mb-1"><strong>Status:</strong> <span class="badge bg-success">Live</span></p>
-                                        <p class="mb-1"><strong>Last Updated:</strong> {% now "Y-m-d H:i" %}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3">
-                                                <h6 class="card-subtitle mb-2 text-muted">Total Adjustments</h6>
-                                                <h4 class="card-title text-primary">{{ total_adjustments|intcomma }}</h4>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3">
-                                                <h6 class="card-subtitle mb-2 text-muted">Net Value Impact</h6>
-                                                <h4 class="card-title {% if net_value_impact < 0 %}text-danger{% else %}text-success{% endif %}">
-                                                    UGX {{ net_value_impact|abs|floatformat:0|intcomma }}
-                                                </h4>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="exportData('csv')">CSV</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportData('excel')">Excel</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportData('pdf')">PDF</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
 
-        <!-- Filter Form -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Filter Options</h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="get" id="filterForm">
-                            <input type="hidden" name="start_date" id="hidden_start_date" value="{{ start_date }}">
-                            <input type="hidden" name="end_date" id="hidden_end_date" value="{{ end_date }}">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label class="form-label">Date Range</label>
-                                        <input type="text" class="form-control" name="date_range" 
-                                               value="{{ start_date }} - {{ end_date }}" 
-                                               id="dateRangePicker">
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="mb-3">
-                                        <label class="form-label">Store</label>
-                                        <select class="form-select" name="store_id">
-                                            <option value="all">All Stores</option>
-                                            {% for store in stores %}
-                                            <option value="{{ store.id }}" 
-                                                    {% if selected_store == store.id|stringformat:"s" %}selected{% endif %}>
-                                                {{ store.name }}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="mb-3">
-                                        <label class="form-label">Status</label>
-                                        <select class="form-select" name="status">
-                                            <option value="all">All Status</option>
-                                            <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
-                                            <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>Approved</option>
-                                            <option value="applied" {% if selected_status == 'applied' %}selected{% endif %}>Applied</option>
-                                            <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="mb-3">
-                                        <label class="form-label">Adjustment Type</label>
-                                        <select class="form-select" name="type">
-                                            <option value="all">All Types</option>
-                                            <option value="increase" {% if selected_type == 'increase' %}selected{% endif %}>Increase</option>
-                                            <option value="decrease" {% if selected_type == 'decrease' %}selected{% endif %}>Decrease</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label class="form-label">User</label>
-                                        <select class="form-select" name="user_id">
-                                            <option value="all">All Users</option>
-                                            {% for user in users %}
-                                            <option value="{{ user.id }}" 
-                                                    {% if selected_user == user.id|stringformat:"s" %}selected{% endif %}>
-                                                {{ user.get_full_name|default:user.username }}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Reason (contains)</label>
-                                        <input type="text" class="form-control" name="reason" 
-                                               value="{{ selected_reason }}" 
-                                               placeholder="Enter reason keyword...">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label class="form-label">&nbsp;</label>
-                                        <button type="submit" class="btn btn-primary w-100">
-                                            <i data-feather="filter" class="feather-16 me-1"></i>
-                                            Apply Filters
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label class="form-label">&nbsp;</label>
-                                        <a href="{% url 'stock_adjustment_details' %}" class="btn btn-outline-secondary w-100">
-                                            <i data-feather="x" class="feather-16 me-1"></i>
-                                            Clear Filters
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tabbed Interface -->
+        <!-- Key Metrics Cards -->
         <div class="row">
-            <!-- Side Tabs -->
-            <div class="col-lg-3 col-md-4">
-                <div class="card side-tabs-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i data-feather="grid" class="feather-16 me-2"></i>
-                            Adjustment Report Sections
-                        </h5>
+            <div class="col-md-3">
+                <div class="metric-card total">
+                    <div class="metric-label">Total Adjustments</div>
+                    <div class="metric-value">{{ total_adjustments|default:0|intcomma }}</div>
+                    <div class="metric-label">
+                        <i data-feather="calendar" class="feather-12 me-1"></i>
+                        {{ start_date|default:"-" }} to {{ end_date|default:"-" }}
                     </div>
-                    <div class="card-body p-0">
-                        <div class="side-tabs-container">
-                            <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
-                                <button class="nav-link side-tab active" id="adjustment-history-tab" data-bs-toggle="pill" data-bs-target="#adjustment-history" type="button" role="tab" aria-controls="adjustment-history" aria-selected="true">
-                                    <i data-feather="database" class="feather-16 me-2"></i>
-                                    Adjustment History
-                                </button>
-                                <button class="nav-link side-tab" id="reason-wise-tab" data-bs-toggle="pill" data-bs-target="#reason-wise" type="button" role="tab" aria-controls="reason-wise" aria-selected="false">
-                                    <i data-feather="alert-circle" class="feather-16 me-2"></i>
-                                    Reason-wise Adjustments
-                                </button>
-                                <button class="nav-link side-tab" id="user-wise-tab" data-bs-toggle="pill" data-bs-target="#user-wise" type="button" role="tab" aria-controls="user-wise" aria-selected="false">
-                                    <i data-feather="users" class="feather-16 me-2"></i>
-                                    User-wise Adjustments
-                                </button>
-                                <button class="nav-link side-tab" id="batch-summary-tab" data-bs-toggle="pill" data-bs-target="#batch-summary" type="button" role="tab" aria-controls="batch-summary" aria-selected="false">
-                                    <i data-feather="package" class="feather-16 me-2"></i>
-                                    Batch Adjustment Summary
-                                </button>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card increase">
+                    <div class="metric-label">Stock Increases</div>
+                    <div class="metric-value">{{ total_increases|default:0|intcomma }}</div>
+                    <div class="metric-label">
+                        <i data-feather="trending-up" class="feather-12 me-1"></i>
+                        +{{ total_positive_quantity|default:0|intcomma }} units
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card decrease">
+                    <div class="metric-label">Stock Decreases</div>
+                    <div class="metric-value">{{ total_decreases|default:0|intcomma }}</div>
+                    <div class="metric-label">
+                        <i data-feather="trending-down" class="feather-12 me-1"></i>
+                        {{ total_negative_quantity|default:0|intcomma }} units
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card net">
+                    <div class="metric-label">Net Value Impact</div>
+                    <div class="metric-value {% if net_value_impact < 0 %}value-negative{% else %}value-positive{% endif %}">
+                        UGX {{ net_value_impact|abs|default:0|floatformat:0|intcomma }}
+                    </div>
+                    <div class="metric-label">
+                        <i data-feather="dollar-sign" class="feather-12 me-1"></i>
+                        {% if net_value_impact < 0 %}Loss{% else %}Gain{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section with Searchable Dropdowns -->
+        <div class="filter-section">
+            <form method="get" id="filterForm">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Date Range</label>
+                        <button type="button" class="custom-dropdown-btn" id="dateRangeButton" onclick="openDateRangeModal()">
+                            <span id="selectedDateRange">{% if start_date and end_date %}{{ start_date }} - {{ end_date }}{% else %}Select Date Range{% endif %}</span>
+                            <span class="caret"></span>
+                        </button>
+                        <input type="hidden" name="start_date" id="startDate" value="{{ start_date|default:'' }}">
+                        <input type="hidden" name="end_date" id="endDate" value="{{ end_date|default:'' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Store</label>
+                        <div class="dropdown-search-container">
+                            <div class="dropdown-search-input" data-filter="store" onclick="toggleDropdown(this, event)">
+                                <span class="dropdown-selected-value" id="selectedStoreText">
+                                    {% if selected_store %}
+                                        {% for store in stores %}{% if store.id|stringformat:"s" == selected_store %}{{ store.name }}{% endif %}{% endfor %}
+                                    {% else %}
+                                        All Stores
+                                    {% endif %}
+                                </span>
+                                <i class="fas fa-chevron-down dropdown-arrow"></i>
                             </div>
+                            <div class="dropdown-search-menu" id="storeDropdown" style="display: none;">
+                                <div class="dropdown-search-header">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" class="dropdown-search-field" placeholder="Search store..." onkeyup="filterDropdownOptions(this, 'store', event)" onclick="event.stopPropagation()">
+                                </div>
+                                <div class="dropdown-search-options">
+                                    <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'store', event)" {% if not selected_store %}data-selected="true"{% endif %}>All Stores</div>
+                                    {% for store in stores %}
+                                    <div class="dropdown-search-option" data-value="{{ store.id }}" onclick="selectDropdownOption(this, 'store', event)" {% if selected_store == store.id|stringformat:"s" %}data-selected="true"{% endif %}>{{ store.name }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <select name="store_id" id="id_store" class="form-select" style="display: none;">
+                                <option value="">All Stores</option>
+                                {% for store in stores %}
+                                <option value="{{ store.id }}" {% if selected_store == store.id|stringformat:"s" %}selected{% endif %}>{{ store.name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
-                    <div class="card-footer">
-                        <small class="text-muted">
-                            <i data-feather="info" class="feather-12 me-1"></i>
-                            Click on any section to view details
-                        </small>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Status</label>
+                        <div class="dropdown-search-container">
+                            <div class="dropdown-search-input" data-filter="status" onclick="toggleDropdown(this, event)">
+                                <span class="dropdown-selected-value" id="selectedStatusText">
+                                    {% if selected_status == 'pending' %}Pending
+                                    {% elif selected_status == 'approved' %}Approved
+                                    {% elif selected_status == 'applied' %}Applied
+                                    {% elif selected_status == 'cancelled' %}Cancelled
+                                    {% else %}All Status{% endif %}
+                                </span>
+                                <i class="fas fa-chevron-down dropdown-arrow"></i>
+                            </div>
+                            <div class="dropdown-search-menu" id="statusDropdown" style="display: none;">
+                                <div class="dropdown-search-header">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" class="dropdown-search-field" placeholder="Search status..." onkeyup="filterDropdownOptions(this, 'status', event)" onclick="event.stopPropagation()">
+                                </div>
+                                <div class="dropdown-search-options">
+                                    <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'status', event)" {% if not selected_status %}data-selected="true"{% endif %}>All Status</div>
+                                    <div class="dropdown-search-option" data-value="pending" onclick="selectDropdownOption(this, 'status', event)" {% if selected_status == 'pending' %}data-selected="true"{% endif %}>Pending</div>
+                                    <div class="dropdown-search-option" data-value="approved" onclick="selectDropdownOption(this, 'status', event)" {% if selected_status == 'approved' %}data-selected="true"{% endif %}>Approved</div>
+                                    <div class="dropdown-search-option" data-value="applied" onclick="selectDropdownOption(this, 'status', event)" {% if selected_status == 'applied' %}data-selected="true"{% endif %}>Applied</div>
+                                    <div class="dropdown-search-option" data-value="cancelled" onclick="selectDropdownOption(this, 'status', event)" {% if selected_status == 'cancelled' %}data-selected="true"{% endif %}>Cancelled</div>
+                                </div>
+                            </div>
+                            <select name="status" id="id_status" class="form-select" style="display: none;">
+                                <option value="">All Status</option>
+                                <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>Approved</option>
+                                <option value="applied" {% if selected_status == 'applied' %}selected{% endif %}>Applied</option>
+                                <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Type</label>
+                        <div class="dropdown-search-container">
+                            <div class="dropdown-search-input" data-filter="type" onclick="toggleDropdown(this, event)">
+                                <span class="dropdown-selected-value" id="selectedTypeText">
+                                    {% if selected_type == 'increase' %}Increase
+                                    {% elif selected_type == 'decrease' %}Decrease
+                                    {% else %}All Types{% endif %}
+                                </span>
+                                <i class="fas fa-chevron-down dropdown-arrow"></i>
+                            </div>
+                            <div class="dropdown-search-menu" id="typeDropdown" style="display: none;">
+                                <div class="dropdown-search-header">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" class="dropdown-search-field" placeholder="Search type..." onkeyup="filterDropdownOptions(this, 'type', event)" onclick="event.stopPropagation()">
+                                </div>
+                                <div class="dropdown-search-options">
+                                    <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'type', event)" {% if not selected_type %}data-selected="true"{% endif %}>All Types</div>
+                                    <div class="dropdown-search-option" data-value="increase" onclick="selectDropdownOption(this, 'type', event)" {% if selected_type == 'increase' %}data-selected="true"{% endif %}>Increase</div>
+                                    <div class="dropdown-search-option" data-value="decrease" onclick="selectDropdownOption(this, 'type', event)" {% if selected_type == 'decrease' %}data-selected="true"{% endif %}>Decrease</div>
+                                </div>
+                            </div>
+                            <select name="type" id="id_type" class="form-select" style="display: none;">
+                                <option value="">All Types</option>
+                                <option value="increase" {% if selected_type == 'increase' %}selected{% endif %}>Increase</option>
+                                <option value="decrease" {% if selected_type == 'decrease' %}selected{% endif %}>Decrease</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Reason Contains</label>
+                        <input type="text" class="form-control" name="reason" value="{{ selected_reason }}" 
+                               placeholder="Search reason...">
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <button type="button" class="btn btn-primary" onclick="applyFilters()">
+                            <i data-feather="filter" class="feather-16 me-1"></i>
+                            Apply Filters
+                        </button>
+                        <a href="?" class="btn btn-outline-secondary ms-2">
+                            <i data-feather="x" class="feather-16 me-1"></i>
+                            Clear Filters
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Date Range Modal -->
+        <div class="modal fade" id="dateRangeModal" tabindex="-1" aria-labelledby="dateRangeModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="dateRangeModalLabel">Select Date Range</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="date-range-input-group">
+                            <input type="date" id="startDateInput" class="form-control" placeholder="Start Date" value="{{ start_date|default:'' }}">
+                            <input type="date" id="endDateInput" class="form-control" placeholder="End Date" value="{{ end_date|default:'' }}">
+                        </div>
+                        
+                        <div class="preset-ranges">
+                            <span class="preset-range" onclick="setPresetRange('today')">Today</span>
+                            <span class="preset-range" onclick="setPresetRange('yesterday')">Yesterday</span>
+                            <span class="preset-range" onclick="setPresetRange('last7days')">Last 7 Days</span>
+                            <span class="preset-range" onclick="setPresetRange('last30days')">Last 30 Days</span>
+                            <span class="preset-range" onclick="setPresetRange('thisMonth')">This Month</span>
+                            <span class="preset-range" onclick="setPresetRange('lastMonth')">Last Month</span>
+                            <span class="preset-range" onclick="setPresetRange('thisYear')">This Year</span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearDateRange()">Clear</button>
+                        <button type="button" class="btn btn-primary" onclick="applyDateRange()">Apply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats Row -->
+        <div class="row mb-4">
+            <div class="col-md-2">
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{{ active_users|default:0 }}</div>
+                    <div class="quick-stat-label">Active Users</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{{ unique_products|default:0 }}</div>
+                    <div class="quick-stat-label">Products Adjusted</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{{ total_batches|default:0 }}</div>
+                    <div class="quick-stat-label">Batch Adjustments</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{{ approval_rate|default:0|floatformat:1 }}%</div>
+                    <div class="quick-stat-label">Approval Rate</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{{ avg_adjustment_value|default:0|floatformat:0|intcomma }}</div>
+                    <div class="quick-stat-label">Avg Value/Adj</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{{ affected_stores|default:0 }}</div>
+                    <div class="quick-stat-label">Stores Affected</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Adjustments Table - FIXED: Removed tfoot section that was causing column count mismatch -->
+        <div class="table-container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    <i data-feather="database" class="feather-16 me-2"></i>
+                    Adjustment Transactions
+                </h5>
+                <span class="badge bg-light text-dark">
+                    <i data-feather="clock" class="feather-12 me-1"></i>
+                    Last Updated: {% now "Y-m-d H:i" %}
+                </span>
+            </div>
+
+            <table class="table table-hover" id="adjustmentsTable">
+                <thead>
+                    <tr>
+                        <th>ID/Reference</th>
+                        <th>Date & Time</th>
+                        <th>Store</th>
+                        <th>Product</th>
+                        <th>SKU</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Unit Cost</th>
+                        <th>Value Impact</th>
+                        <th>Reason</th>
+                        <th>User</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for adj in adjustments %}
+                    <tr>
+                        <td>
+                            <strong>
+                                {% if adj.reference %}
+                                    {{ adj.reference }}
+                                {% else %}
+                                    ADJ-{{ adj.id|stringformat:"06d" }}
+                                {% endif %}
+                            </strong>
+                        </td>
+                        <td>
+                            {{ adj.created_at|date:"Y-m-d" }}<br>
+                            <small class="text-muted">{{ adj.created_at|date:"H:i" }}</small>
+                        </td>
+                        <td>
+                            <span class="fw-semibold">{{ adj.store.name|default:"-" }}</span>
+                        </td>
+                        <td>
+                            <span class="fw-semibold">{{ adj.product.name|truncatechars:30 }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark">{{ adj.product.sku|default:"-" }}</span>
+                        </td>
+                        <td>
+                            {% if adj.quantity_change > 0 %}
+                                <span class="badge-impact-positive">Increase</span>
+                            {% elif adj.quantity_change < 0 %}
+                                <span class="badge-impact-negative">Decrease</span>
+                            {% else %}
+                                <span class="badge bg-secondary">No Change</span>
+                            {% endif %}
+                        </td>
+                        <td class="{% if adj.quantity_change > 0 %}value-positive{% elif adj.quantity_change < 0 %}value-negative{% endif %}">
+                            {{ adj.quantity_change|stringformat:"+d" }}
+                        </td>
+                        <td>
+                            UGX {{ adj.unit_cost|default:0|intcomma }}
+                        </td>
+                        <td class="{% if adj.quantity_change > 0 %}value-positive{% else %}value-negative{% endif %}">
+                            UGX {{ adj.value_impact|default:0|floatformat:0|intcomma }}
+                        </td>
+                        <td>
+                            <span data-bs-toggle="tooltip" title="{{ adj.reason }}">
+                                {{ adj.reason|default:"N/A"|truncatechars:20 }}
+                            </span>
+                        </td>
+                        <td>
+                            {{ adj.created_by.get_full_name|default:adj.created_by.username }}
+                        </td>
+                        <td>
+                            {% if adj.status == 'approved' %}
+                                <span class="status-badge status-approved">Approved</span>
+                            {% elif adj.status == 'pending' %}
+                                <span class="status-badge status-pending">Pending</span>
+                            {% elif adj.status == 'applied' %}
+                                <span class="status-badge status-applied">Applied</span>
+                            {% else %}
+                                <span class="status-badge status-cancelled">Cancelled</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewDetails({{ adj.id }})">
+                                <i data-feather="eye" class="feather-12"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if not adjustments %}
+            <div class="text-center py-5">
+                <i data-feather="inbox" class="feather-48 text-muted mb-3"></i>
+                <h6 class="text-muted">No adjustments found</h6>
+                <p class="text-muted small">Try adjusting your filters or date range</p>
+            </div>
+            {% endif %}
+            
+            <!-- Added summary below table instead of in tfoot -->
+            {% if adjustments %}
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="alert alert-info d-flex justify-content-between align-items-center mb-0">
+                        <span><strong>Summary:</strong> Net Quantity Change</span>
+                        <span class="fw-bold {% if net_quantity > 0 %}text-success{% elif net_quantity < 0 %}text-danger{% endif %}">
+                            {{ net_quantity|default:0|stringformat:"+d" }} units
+                        </span>
+                        <span><strong>Net Value Impact:</strong></span>
+                        <span class="fw-bold {% if net_value_impact > 0 %}text-success{% elif net_value_impact < 0 %}text-danger{% endif %}">
+                            UGX {{ net_value_impact|abs|default:0|floatformat:0|intcomma }}
+                            {% if net_value_impact < 0 %}(Loss){% else %}(Gain){% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row mt-4">
+            <!-- Reason Summary -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i data-feather="alert-circle" class="feather-14 me-2"></i>
+                            Top Adjustment Reasons
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for reason in reason_summary|slice:":5" %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <span class="fw-semibold">{{ reason.reason|default:"Unknown"|truncatechars:25 }}</span>
+                                <small class="d-block text-muted">{{ reason.count }} adjustments</small>
+                            </div>
+                            <span class="badge {% if reason.net_quantity > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ reason.net_quantity|stringformat:"+d" }}
+                            </span>
+                        </div>
+                        <div class="progress mb-3" style="height: 4px;">
+                            <div class="progress-bar {% if reason.net_quantity > 0 %}bg-success{% else %}bg-danger{% endif %}" 
+                                 style="width: {% widthratio reason.count total_adjustments 100 %}%"></div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted text-center">No reason data available</p>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
 
-            <!-- Tab Content -->
-            <div class="col-lg-9 col-md-8">
-                <div class="tab-content" id="sideTabContent">
-                    <!-- Adjustment History Tab -->
-                    <div class="tab-pane fade show active" id="adjustment-history" role="tabpanel" aria-labelledby="adjustment-history-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="database" class="feather-16 me-2"></i>
-                                    Adjustment History
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <a href="?start_date={{ start_date }}&end_date={{ end_date }}" 
-                                       class="btn btn-sm btn-outline-primary {% if not selected_type %}active{% endif %}">
-                                        All
-                                    </a>
-                                    <a href="?start_date={{ start_date }}&end_date={{ end_date }}&type=increase{% if selected_store %}&store_id={{ selected_store }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_reason %}&reason={{ selected_reason }}{% endif %}{% if selected_user %}&user_id={{ selected_user }}{% endif %}" 
-                                       class="btn btn-sm btn-outline-primary {% if selected_type == 'increase' %}active{% endif %}">
-                                        Increases
-                                    </a>
-                                    <a href="?start_date={{ start_date }}&end_date={{ end_date }}&type=decrease{% if selected_store %}&store_id={{ selected_store }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_reason %}&reason={{ selected_reason }}{% endif %}{% if selected_user %}&user_id={{ selected_user }}{% endif %}" 
-                                       class="btn btn-sm btn-outline-primary {% if selected_type == 'decrease' %}active{% endif %}">
-                                        Decreases
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Adj. ID</th>
-                                                <th>Date & Time</th>
-                                                <th>Store</th>
-                                                <th>SKU</th>
-                                                <th>Product Name</th>
-                                                <th>Type</th>
-                                                <th>Quantity</th>
-                                                <th>Unit Cost (UGX)</th>
-                                                <th>Value Impact (UGX)</th>
-                                                <th>Reason</th>
-                                                <th>User</th>
-                                                <th>Status</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for adj in adjustments %}
-                                            <tr class="{% if adj.quantity_change > 0 %}table-success{% elif adj.quantity_change < 0 %}table-danger{% else %}table-warning{% endif %}">
-                                                <td>
-                                                    <strong>
-                                                        {% if adj.reference %}
-                                                            {{ adj.reference|truncatechars:15 }}
-                                                        {% else %}
-                                                            ADJ-{{ adj.id|stringformat:"06d" }}
-                                                        {% endif %}
-                                                    </strong>
-                                                </td>
-                                                <td>{{ adj.created_at|date:"Y-m-d H:i" }}</td>
-                                                <td>{{ adj.store.name|truncatechars:15 }}</td>
-                                                <td>{{ adj.product.sku }}</td>
-                                                <td>{{ adj.product.name|truncatechars:25 }}</td>
-                                                <td>
-                                                    {% if adj.quantity_change > 0 %}
-                                                        <span class="badge bg-success">Increase</span>
-                                                    {% elif adj.quantity_change < 0 %}
-                                                        <span class="badge bg-danger">Decrease</span>
-                                                    {% else %}
-                                                        <span class="badge bg-warning">No Change</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ adj.quantity_change|stringformat:"+d" }}</td>
-                                                <td>UGX {{ adj.unit_cost|default:0|intcomma }}</td>
-                                                <td>
-                                                    UGX {% widthratio adj.quantity_change 1 adj.unit_cost|default:0 as value %}
-                                                    {{ value|intcomma }}
-                                                </td>
-                                                <td>{{ adj.reason|default:"N/A"|truncatechars:30 }}</td>
-                                                <td>{{ adj.created_by.get_full_name|default:adj.created_by.username }}</td>
-                                                <td>
-                                                    {% if adj.status == 'approved' %}
-                                                        <span class="badge bg-success">Approved</span>
-                                                    {% elif adj.status == 'pending' %}
-                                                        <span class="badge bg-warning">Pending</span>
-                                                    {% elif adj.status == 'applied' %}
-                                                        <span class="badge bg-info">Applied</span>
-                                                    {% else %}
-                                                        <span class="badge bg-danger">Cancelled</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-primary" 
-                                                            onclick="viewAdjustmentDetails({{ adj.id }})"
-                                                            data-bs-toggle="tooltip" title="View Details">
-                                                        <i data-feather="eye" class="feather-12"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="13" class="text-center py-4">
-                                                    <div class="text-muted">
-                                                        <i data-feather="inbox" class="feather-48 mb-2"></i>
-                                                        <h5>No adjustments found</h5>
-                                                        <p>Try adjusting your filters or date range</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                <!-- Pagination -->
-                                {% if adjustments.has_other_pages %}
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <nav aria-label="Adjustment pagination">
-                                            <ul class="pagination justify-content-center">
-                                                {% if adjustments.has_previous %}
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page={{ adjustments.previous_page_number }}{% if selected_store %}&store_id={{ selected_store }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_reason %}&reason={{ selected_reason }}{% endif %}{% if selected_user %}&user_id={{ selected_user }}{% endif %}&start_date={{ start_date }}&end_date={{ end_date }}">
-                                                        <i data-feather="chevron-left" class="feather-14"></i>
-                                                    </a>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% for num in adjustments.paginator.page_range %}
-                                                    {% if adjustments.number == num %}
-                                                    <li class="page-item active">
-                                                        <span class="page-link">{{ num }}</span>
-                                                    </li>
-                                                    {% elif num > adjustments.number|add:'-3' and num < adjustments.number|add:'3' %}
-                                                    <li class="page-item">
-                                                        <a class="page-link" href="?page={{ num }}{% if selected_store %}&store_id={{ selected_store }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_reason %}&reason={{ selected_reason }}{% endif %}{% if selected_user %}&user_id={{ selected_user }}{% endif %}&start_date={{ start_date }}&end_date={{ end_date }}">{{ num }}</a>
-                                                    </li>
-                                                    {% endif %}
-                                                {% endfor %}
-                                                
-                                                {% if adjustments.has_next %}
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page={{ adjustments.next_page_number }}{% if selected_store %}&store_id={{ selected_store }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_reason %}&reason={{ selected_reason }}{% endif %}{% if selected_user %}&user_id={{ selected_user }}{% endif %}&start_date={{ start_date }}&end_date={{ end_date }}">
-                                                        <i data-feather="chevron-right" class="feather-14"></i>
-                                                    </a>
-                                                </li>
-                                                {% endif %}
-                                            </ul>
-                                        </nav>
-                                        <div class="text-center text-muted mt-2">
-                                            Showing {{ adjustments.start_index }} to {{ adjustments.end_index }} of {{ total_adjustments }} adjustments
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endif %}
-                                
-                                <!-- Summary Stats -->
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Adjustment Summary ({{ start_date }} to {{ end_date }})</h6>
-                                                <div class="row">
-                                                    <div class="col-md-3">
-                                                        <p class="mb-1"><strong>Total Adjustments:</strong> {{ total_adjustments }}</p>
-                                                        <p class="mb-1"><strong>Increases:</strong> {{ total_increases }} 
-                                                            {% if total_adjustments > 0 %}
-                                                                ({{ total_increases|divide:total_adjustments|multiply:100|floatformat:1 }}%)
-                                                            {% else %}
-                                                                (0%)
-                                                            {% endif %}
-                                                        </p>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <p class="mb-1"><strong>Decreases:</strong> {{ total_decreases }}
-                                                            {% if total_adjustments > 0 %}
-                                                                ({{ total_decreases|divide:total_adjustments|multiply:100|floatformat:1 }}%)
-                                                            {% else %}
-                                                                (0%)
-                                                            {% endif %}
-                                                        </p>
-                                                        {% comment %} Write-offs would need separate detection {% endcomment %}
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <p class="mb-1"><strong>Net Quantity Impact:</strong> {{ net_quantity|stringformat:"+d" }} units</p>
-                                                        <p class="mb-1"><strong>Net Value Impact:</strong> UGX {{ net_value_impact|floatformat:0|intcomma }}</p>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <p class="mb-1"><strong>Approval Rate:</strong> {{ approval_rate|floatformat:1 }}%</p>
-                                                        {% comment %} Avg processing time would need completed_at field {% endcomment %}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            <!-- Store Summary -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i data-feather="shopping-bag" class="feather-14 me-2"></i>
+                            Store-wise Summary
+                        </h6>
                     </div>
-
-                    <!-- Reason-wise Adjustments Tab -->
-                    <div class="tab-pane fade" id="reason-wise" role="tabpanel" aria-labelledby="reason-wise-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="alert-circle" class="feather-16 me-2"></i>
-                                    Reason-wise Adjustments
-                                </h5>
-                                <span class="badge bg-primary">Trend Analysis</span>
+                    <div class="card-body">
+                        {% for store in store_summary|slice:":5" %}
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>
+                                <span class="fw-semibold">{{ store.store__name|default:"Unknown" }}</span>
+                                <small class="d-block text-muted">{{ store.count }} adjustments</small>
                             </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-8">
-                                        <canvas id="reasonWiseChart" height="120"></canvas>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card bg-light h-100">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-3 text-muted">Top Reasons Analysis</h6>
-                                                <div class="reason-analysis">
-                                                    {% for stat in reason_stats|slice:":5" %}
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>{{ stat.reason|default:"Unknown Reason"|truncatechars:20 }}</span>
-                                                        <span>
-                                                            {% if total_adjustments > 0 %}
-                                                                {{ stat.count|divide:total_adjustments|multiply:100|floatformat:1 }}%
-                                                            {% else %}
-                                                                0%
-                                                            {% endif %}
-                                                        </span>
-                                                    </div>
-                                                    <div class="progress mb-3" style="height: 8px;">
-                                                        <div class="progress-bar" 
-                                                             style="width: {% if total_adjustments > 0 %}{{ stat.count|divide:total_adjustments|multiply:100 }}%{% else %}0%{% endif %}; 
-                                                             background-color: {% cycle '#E74A3B' '#F6C23E' '#1CC88A' '#36B9CC' '#4A90E2' as colors %}"></div>
-                                                    </div>
-                                                    {% empty %}
-                                                    <p class="text-muted text-center">No reason data available</p>
-                                                    {% endfor %}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Reason Category</th>
-                                                <th>Adjustments</th>
-                                                <th>% of Total</th>
-                                                <th>Net Quantity</th>
-                                                <th>Avg. per Adjustment</th>
-                                                <th>Recommendations</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for stat in reason_stats %}
-                                            <tr class="{% cycle '' 'table-light' %}">
-                                                <td><strong>{{ stat.reason|default:"Unknown"|truncatechars:30 }}</strong></td>
-                                                <td>{{ stat.count }}</td>
-                                                <td>
-                                                    {% if total_adjustments > 0 %}
-                                                        {{ stat.count|divide:total_adjustments|multiply:100|floatformat:1 }}%
-                                                    {% else %}
-                                                        0%
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ stat.total_quantity|stringformat:"+d" }}</td>
-                                                <td>{{ stat.avg_quantity|floatformat:1 }}</td>
-                                                <td>
-                                                    {% if stat.reason %}
-                                                        {% if "damage" in stat.reason|lower %}
-                                                            Improve handling procedures
-                                                        {% elif "theft" in stat.reason|lower %}
-                                                            Enhance security measures
-                                                        {% elif "found" in stat.reason|lower or "discovered" in stat.reason|lower %}
-                                                            Improve stock organization
-                                                        {% elif "quality" in stat.reason|lower %}
-                                                            Better QC at receiving
-                                                        {% elif "system" in stat.reason|lower or "error" in stat.reason|lower %}
-                                                            System reconciliation
-                                                        {% elif "expired" in stat.reason|lower or "obsolete" in stat.reason|lower %}
-                                                            Better inventory rotation
-                                                        {% else %}
-                                                            Review case-by-case
-                                                        {% endif %}
-                                                    {% else %}
-                                                        No recommendation
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="6" class="text-center py-4">
-                                                    <div class="text-muted">
-                                                        <i data-feather="alert-circle" class="feather-48 mb-2"></i>
-                                                        <h5>No reason data available</h5>
-                                                        <p>Adjustments don't have reason information</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                            {% if reason_stats %}
-                                            <tr class="table-primary">
-                                                <td><strong>Total</strong></td>
-                                                <td><strong>{{ total_adjustments }}</strong></td>
-                                                <td><strong>100%</strong></td>
-                                                <td><strong>{{ net_quantity|stringformat:"+d" }}</strong></td>
-                                                <td><strong>
-                                                    {% if total_adjustments > 0 %}
-                                                        {{ net_quantity|divide:total_adjustments|floatformat:1 }}
-                                                    {% else %}
-                                                        0
-                                                    {% endif %}
-                                                </strong></td>
-                                                <td><strong>-</strong></td>
-                                            </tr>
-                                            {% endif %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="row mt-4">
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Key Insights</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    {% if reason_stats.0 %}
-                                                    <li>
-                                                        <i data-feather="alert-triangle" class="feather-12 text-danger me-2"></i> 
-                                                        <strong>Top Reason:</strong> {{ reason_stats.0.reason|default:"Unknown"|truncatechars:30 }} 
-                                                        ({{ reason_stats.0.count }} adjustments)
-                                                    </li>
-                                                    {% endif %}
-                                                    {% if total_decreases > total_increases %}
-                                                    <li>
-                                                        <i data-feather="trending-down" class="feather-12 text-danger me-2"></i> 
-                                                        <strong>Net Impact:</strong> More decreases than increases
-                                                    </li>
-                                                    {% else %}
-                                                    <li>
-                                                        <i data-feather="trending-up" class="feather-12 text-success me-2"></i> 
-                                                        <strong>Net Impact:</strong> More increases than decreases
-                                                    </li>
-                                                    {% endif %}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Action Plan</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    {% if reason_stats.0 and "damage" in reason_stats.0.reason|lower %}
-                                                    <li><i data-feather="package" class="feather-12 text-warning me-2"></i> Review packaging for fragile items</li>
-                                                    {% endif %}
-                                                    {% if reason_stats.0 and "theft" in reason_stats.0.reason|lower %}
-                                                    <li><i data-feather="shield" class="feather-12 text-primary me-2"></i> Enhance security for high-risk items</li>
-                                                    {% endif %}
-                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Improve documentation and recording</li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <span class="text-primary fw-semibold">
+                                UGX {{ store.total_value|default:0|floatformat:0|intcomma }}
+                            </span>
                         </div>
+                        {% empty %}
+                        <p class="text-muted text-center">No store data available</p>
+                        {% endfor %}
                     </div>
+                </div>
+            </div>
 
-                    <!-- User-wise Adjustments Tab -->
-                    <div class="tab-pane fade" id="user-wise" role="tabpanel" aria-labelledby="user-wise-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="users" class="feather-16 me-2"></i>
-                                    User-wise Adjustments
-                                </h5>
-                                <span class="badge bg-info">User Performance</span>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Active Users</h6>
-                                                <h4 class="card-title text-primary">{{ user_stats|length }}</h4>
-                                                <small class="text-muted">Making adjustments</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Avg. Adjustments/User</h6>
-                                                <h4 class="card-title text-info">
-                                                    {% if user_stats|length > 0 %}
-                                                        {{ total_adjustments|divide:user_stats|length|floatformat:1 }}
-                                                    {% else %}0{% endif %}
-                                                </h4>
-                                                <small class="text-muted">Per period</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Most Active User</h6>
-                                                <h4 class="card-title text-success">
-                                                    {% if user_stats.0 %}
-                                                        {{ user_stats.0.total_adjustments }}
-                                                    {% else %}0{% endif %}
-                                                </h4>
-                                                <small class="text-muted">
-                                                    {% if user_stats.0 %}
-                                                        {% if user_stats.0.created_by__first_name or user_stats.0.created_by__last_name %}
-                                                            {{ user_stats.0.created_by__first_name }} {{ user_stats.0.created_by__last_name }}
-                                                        {% else %}
-                                                            {{ user_stats.0.created_by__username }}
-                                                        {% endif %}
-                                                    {% endif %}
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Avg. Value Impact</h6>
-                                                <h4 class="card-title text-warning">
-                                                    UGX {% if total_adjustments > 0 %}
-                                                        {{ net_value_impact|divide:total_adjustments|floatformat:0|intcomma }}
-                                                    {% else %}0{% endif %}
-                                                </h4>
-                                                <small class="text-muted">Per adjustment</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>User</th>
-                                                <th>Adjustments</th>
-                                                <th>Increases</th>
-                                                <th>Decreases</th>
-                                                <th>Net Quantity</th>
-                                                <th>Approval Rate</th>
-                                                <th>Performance</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for stat in user_stats %}
-                                            <tr>
-                                                <td>
-                                                    <strong>
-                                                        {% if stat.created_by__first_name or stat.created_by__last_name %}
-                                                            {{ stat.created_by__first_name }} {{ stat.created_by__last_name }}
-                                                        {% else %}
-                                                            {{ stat.created_by__username }}
-                                                        {% endif %}
-                                                    </strong>
-                                                </td>
-                                                <td>{{ stat.total_adjustments }}</td>
-                                                <td>{{ stat.total_increases }}</td>
-                                                <td>{{ stat.total_decreases }}</td>
-                                                <td>{{ stat.net_quantity|stringformat:"+d" }}</td>
-                                                <td>
-                                                    {% if stat.total_adjustments > 0 %}
-                                                        {% with total_non_decreases=stat.total_adjustments|subtract:stat.total_decreases %}
-                                                        {% with rate=total_non_decreases|divide:stat.total_adjustments|multiply:100 %}
-                                                        <span class="badge 
-                                                            {% if rate >= 90 %}bg-success
-                                                            {% elif rate >= 75 %}bg-info
-                                                            {% elif rate >= 60 %}bg-warning
-                                                            {% else %}bg-danger{% endif %}">
-                                                            {{ rate|floatformat:1 }}%
-                                                        </span>
-                                                        {% endwith %}
-                                                        {% endwith %}
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">N/A</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if stat.total_adjustments > 0 %}
-                                                        {% with total_non_decreases=stat.total_adjustments|subtract:stat.total_decreases %}
-                                                        {% with rate=total_non_decreases|divide:stat.total_adjustments|multiply:100 %}
-                                                        <span class="badge 
-                                                            {% if rate >= 90 %}bg-success
-                                                            {% elif rate >= 75 %}bg-info
-                                                            {% elif rate >= 60 %}bg-warning
-                                                            {% else %}bg-danger{% endif %}">
-                                                            {% if rate >= 90 %}Excellent
-                                                            {% elif rate >= 75 %}Good
-                                                            {% elif rate >= 60 %}Average
-                                                            {% else %}Needs Training{% endif %}
-                                                        </span>
-                                                        {% endwith %}
-                                                        {% endwith %}
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">No Data</span>
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="7" class="text-center py-4">
-                                                    <div class="text-muted">
-                                                        <i data-feather="users" class="feather-48 mb-2"></i>
-                                                        <h5>No user data available</h5>
-                                                        <p>Adjustments not assigned to users</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                            {% if user_stats %}
-                                            <tr class="table-primary">
-                                                <td><strong>Total/Average</strong></td>
-                                                <td><strong>{{ total_adjustments }}</strong></td>
-                                                <td><strong>{{ total_increases }}</strong></td>
-                                                <td><strong>{{ total_decreases }}</strong></td>
-                                                <td><strong>{{ net_quantity|stringformat:"+d" }}</strong></td>
-                                                <td><strong>{{ approval_rate|floatformat:1 }}%</strong></td>
-                                                <td><strong>-</strong></td>
-                                            </tr>
-                                            {% endif %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="row mt-4">
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Top Performers</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    {% for stat in user_stats|slice:":3" %}
-                                                    <li>
-                                                        <i data-feather="award" class="feather-12 text-success me-2"></i> 
-                                                        <strong>
-                                                            {% if stat.created_by__first_name or stat.created_by__last_name %}
-                                                                {{ stat.created_by__first_name }} {{ stat.created_by__last_name }}
-                                                            {% else %}
-                                                                {{ stat.created_by__username }}
-                                                            {% endif %}
-                                                        </strong>: 
-                                                        {{ stat.total_adjustments }} adjustments
-                                                    </li>
-                                                    {% empty %}
-                                                    <li>No top performers data</li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Training Needs</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    {% for stat in user_stats %}
-                                                        {% if stat.total_adjustments > 0 %}
-                                                            {% with total_non_decreases=stat.total_adjustments|subtract:stat.total_decreases %}
-                                                            {% with rate=total_non_decreases|divide:stat.total_adjustments|multiply:100 %}
-                                                                {% if rate < 60 %}
-                                                                <li>
-                                                                    <i data-feather="alert-circle" class="feather-12 text-danger me-2"></i> 
-                                                                    <strong>
-                                                                        {% if stat.created_by__first_name or stat.created_by__last_name %}
-                                                                            {{ stat.created_by__first_name }} {{ stat.created_by__last_name }}
-                                                                        {% else %}
-                                                                            {{ stat.created_by__username }}
-                                                                        {% endif %}
-                                                                    </strong>: 
-                                                                    {{ rate|floatformat:1 }}% approval rate
-                                                                </li>
-                                                                {% endif %}
-                                                            {% endwith %}
-                                                            {% endwith %}
-                                                        {% endif %}
-                                                    {% empty %}
-                                                    <li>No training needs identified</li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            <!-- User Summary -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i data-feather="users" class="feather-14 me-2"></i>
+                            User Activity
+                        </h6>
                     </div>
-
-                    <!-- Batch Adjustment Summary Tab -->
-                    <div class="tab-pane fade" id="batch-summary" role="tabpanel" aria-labelledby="batch-summary-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="package" class="feather-16 me-2"></i>
-                                    Batch Adjustment Summary
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="setDateRange('this_month')">This Month</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="setDateRange('last_month')">Last Month</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="setDateRange('quarter')">Quarterly</button>
-                                </div>
+                    <div class="card-body">
+                        {% for user in user_summary|slice:":5" %}
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>
+                                <span class="fw-semibold">
+                                    {% if user.created_by__first_name %}
+                                        {{ user.created_by__first_name }} {{ user.created_by__last_name }}
+                                    {% else %}
+                                        {{ user.created_by__username }}
+                                    {% endif %}
+                                </span>
+                                <small class="d-block text-muted">{{ user.count }} adjustments</small>
                             </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <canvas id="batchAdjustmentChart" height="100"></canvas>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Batch ID</th>
-                                                <th>Date</th>
-                                                <th>Description</th>
-                                                <th>Adjustments</th>
-                                                <th>Items Affected</th>
-                                                <th>Total Quantity Impact</th>
-                                                <th>Initiated By</th>
-                                                <th>Status</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for batch in batch_stats %}
-                                            <tr class="{% cycle '' 'table-light' %}">
-                                                <td><strong>{{ batch.reference|truncatechars:15 }}</strong></td>
-                                                <td>{{ batch.batch_date|date:"Y-m-d" }}</td>
-                                                <td>Batch adjustment - {{ batch.unique_products }} products</td>
-                                                <td>{{ batch.total_items }}</td>
-                                                <td>{{ batch.unique_products }}</td>
-                                                <td>{{ batch.total_quantity|stringformat:"+d" }}</td>
-                                                <td>{{ batch.initiator|default:"System" }}</td>
-                                                <td>
-                                                    {% comment %} Would need to check batch status from adjustments {% endcomment %}
-                                                    <span class="badge bg-success">Completed</span>
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-success"
-                                                            onclick="viewBatchDetails('{{ batch.reference }}')">
-                                                        View
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="9" class="text-center py-4">
-                                                    <div class="text-muted">
-                                                        <i data-feather="package" class="feather-48 mb-2"></i>
-                                                        <h5>No batch adjustments found</h5>
-                                                        <p>All adjustments appear to be individual</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="row mt-4">
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Batch Performance Summary</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    <li>
-                                                        <i data-feather="check-circle" class="feather-12 text-success me-2"></i> 
-                                                        <strong>Total Batches:</strong> {{ batch_stats|length }}
-                                                    </li>
-                                                    <li>
-                                                        <i data-feather="package" class="feather-12 text-info me-2"></i> 
-                                                        <strong>Total Items Adjusted:</strong> 
-                                                        {% with total_batch_items=batch_stats|map_attr:"total_items"|sum_list %}
-                                                            {{ total_batch_items|default:0 }}
-                                                        {% endwith %}
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Batch Efficiency</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    <li>
-                                                        <i data-feather="zap" class="feather-12 text-primary me-2"></i> 
-                                                        <strong>Avg. Adjustments per Batch:</strong>
-                                                        {% if batch_stats %}
-                                                            {% with total_items=batch_stats|map_attr:"total_items"|sum_list %}
-                                                                {{ total_items|divide:batch_stats|length|floatformat:1 }}
-                                                            {% endwith %}
-                                                        {% else %}0{% endif %}
-                                                    </li>
-                                                    <li>
-                                                        <i data-feather="trending-up" class="feather-12 text-success me-2"></i> 
-                                                        <strong>Batch Usage:</strong> {{ batch_stats|length }} batches this period
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <span class="badge {% if user.net_quantity > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ user.net_quantity|stringformat:"+d" }}
+                            </span>
                         </div>
+                        {% empty %}
+                        <p class="text-muted text-center">No user data available</p>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -971,981 +846,355 @@
     </div>
 </div>
 
-<!-- Modal for Adjustment Details -->
-<div class="modal fade" id="adjustmentDetailsModal" tabindex="-1" aria-labelledby="adjustmentDetailsModalLabel" aria-hidden="true">
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="adjustmentDetailsModalLabel">Adjustment Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">Adjustment Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div id="adjustmentDetailsContent">
-                    <!-- Content loaded via AJAX -->
-                </div>
+            <div class="modal-body" id="detailsModalBody">
+                Loading...
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="printAdjustmentBtn">
-                    <i data-feather="printer" class="feather-14 me-1"></i> Print
-                </button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-let reasonWiseChart;
-let batchAdjustmentChart;
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
 
-// Initialize charts and icons
-document.addEventListener('DOMContentLoaded', function() {
-    initializeReasonWiseChart();
-    initializeBatchAdjustmentChart();
-    initializeDateRangePicker();
+<script>
+// ==================== DROPDOWN SEARCH FUNCTIONS ====================
+window.toggleDropdown = function(element, event) {
+    if (!element) return;
     
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const filter = element.getAttribute('data-filter');
+    if (!filter) return;
+    
+    const dropdownId = filter + 'Dropdown';
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        setTimeout(() => {
+            const searchField = dropdown.querySelector('.dropdown-search-field');
+            if (searchField) searchField.focus();
+        }, 100);
+    }
+};
+
+window.filterDropdownOptions = function(input, filter, event) {
+    if (!input || !filter) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const searchTerm = input.value.toLowerCase().trim();
+    const dropdownId = filter + 'Dropdown';
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const options = dropdown.querySelectorAll('.dropdown-search-option');
+    
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        option.style.display = (searchTerm === '' || text.includes(searchTerm)) ? 'block' : 'none';
+    });
+};
+
+window.selectDropdownOption = function(option, filter, event) {
+    if (!option || !filter) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.getAttribute('data-value');
+    const text = option.textContent;
+    const select = document.getElementById('id_' + filter);
+    const selectedText = document.getElementById('selected' + filter.charAt(0).toUpperCase() + filter.slice(1) + 'Text');
+    
+    if (!select || !selectedText) return;
+    
+    select.value = value;
+    selectedText.textContent = text;
+    
+    const dropdown = document.getElementById(filter + 'Dropdown');
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+};
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-search-container')) {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+let startDateValue = '{{ start_date|default:"" }}';
+let endDateValue = '{{ end_date|default:"" }}';
+
+// FIXED: Simplified DataTable initialization
+$(document).ready(function() {
     // Initialize feather icons
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
     
     // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
+
+    // Initialize DataTable only if table exists and has real data rows (not empty/colspan rows)
+    var dataRows = $('#adjustmentsTable tbody tr').filter(function() {
+        return $(this).find('td').length === $('#adjustmentsTable thead tr th').length;
+    });
+
+    if ($('#adjustmentsTable').length > 0 && dataRows.length > 0) {
+        try {
+            var table = $('#adjustmentsTable').DataTable({
+                pageLength: 25,
+                order: [[1, 'desc']],
+                dom: '<"row"<"col-md-6"B><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+                buttons: [
+                    { extend: 'copy', text: '<i data-feather="copy"></i> Copy', className: 'btn btn-sm btn-outline-secondary' },
+                    { extend: 'csv', text: '<i data-feather="file-text"></i> CSV', className: 'btn btn-sm btn-outline-secondary' },
+                    { extend: 'excel', text: '<i data-feather="grid"></i> Excel', className: 'btn btn-sm btn-outline-secondary' },
+                    { extend: 'pdf', text: '<i data-feather="file"></i> PDF', className: 'btn btn-sm btn-outline-secondary' },
+                    { extend: 'print', text: '<i data-feather="printer"></i> Print', className: 'btn btn-sm btn-outline-secondary' }
+                ],
+                language: {
+                    search: "_INPUT_",
+                    searchPlaceholder: "Search adjustments...",
+                    emptyTable: "No data available",
+                    zeroRecords: "No matching records found"
+                },
+                initComplete: function() {
+                    $('.dataTables_filter').hide();
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+                },
+                drawCallback: function() {
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+                },
+                // FIXED: Explicitly define columns to match thead
+                columns: [
+                    null, // ID/Reference
+                    null, // Date & Time
+                    null, // Store
+                    null, // Product
+                    null, // SKU
+                    null, // Type
+                    null, // Quantity
+                    null, // Unit Cost
+                    null, // Value Impact
+                    null, // Reason
+                    null, // User
+                    null, // Status
+                    { orderable: false } // Actions - disable ordering
+                ]
+            });
+        } catch (e) {
+            console.log('DataTable initialization error:', e);
+        }
+    }
+
+    // Set initial date range display
+    const startDate = '{{ start_date|default:"" }}';
+    const endDate = '{{ end_date|default:"" }}';
+    if (startDate && endDate) {
+        document.getElementById('selectedDateRange').textContent = startDate + ' - ' + endDate;
+    }
 });
 
-function initializeReasonWiseChart() {
-    const ctx = document.getElementById('reasonWiseChart');
-    if (!ctx) return;
+window.openDateRangeModal = function() {
+    const modal = new bootstrap.Modal(document.getElementById('dateRangeModal'));
     
-    // Get data from Django template
-    const reasonStats = {{ reason_stats|safe }};
-    const totalAdjustments = {{ total_adjustments|default:1 }};
-    
-    if (reasonStats.length === 0) {
-        ctx.parentElement.innerHTML = `
-            <div class="text-center text-muted py-5">
-                <i data-feather="pie-chart" class="feather-48 mb-3"></i>
-                <h6>No reason data available for chart</h6>
-                <p>Adjustments don't have reason information</p>
-            </div>
-        `;
-        if (typeof feather !== 'undefined') {
-            feather.replace();
-        }
-        return;
+    if (startDateValue) {
+        document.getElementById('startDateInput').value = startDateValue;
+    }
+    if (endDateValue) {
+        document.getElementById('endDateInput').value = endDateValue;
     }
     
-    // Prepare chart data
-    const labels = reasonStats.slice(0, 8).map(r => {
-        const reason = r.reason || 'Unknown';
-        return reason.length > 20 ? reason.substring(0, 20) + '...' : reason;
-    });
-    
-    const data = reasonStats.slice(0, 8).map(r => {
-        const percentage = (r.count / totalAdjustments) * 100;
-        return parseFloat(percentage.toFixed(1));
-    });
-    
-    // Add "Others" if there are more than 8 reasons
-    if (reasonStats.length > 8) {
-        const othersCount = reasonStats.slice(8).reduce((sum, r) => sum + r.count, 0);
-        if (othersCount > 0) {
-            labels.push('Others');
-            const othersPercentage = (othersCount / totalAdjustments) * 100;
-            data.push(parseFloat(othersPercentage.toFixed(1)));
-        }
-    }
-    
-    const chartData = {
-        labels: labels,
-        datasets: [{
-            data: data,
-            backgroundColor: [
-                '#E74A3B', '#F6C23E', '#1CC88A', '#36B9CC',
-                '#4A90E2', '#6F42C1', '#FD7E14', '#858796',
-                '#5A6268' // Color for "Others"
-            ],
-            borderWidth: 2
-        }]
-    };
-    
-    reasonWiseChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: chartData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        boxWidth: 12,
-                        padding: 10,
-                        font: {
-                            size: 10
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            return `${label}: ${value}%`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
+    modal.show();
+};
 
-function initializeBatchAdjustmentChart() {
-    const ctx = document.getElementById('batchAdjustmentChart');
-    if (!ctx) return;
-    
-    // Get daily adjustments data from Django template
-    const dailyData = {{ daily_adjustments_json|safe }};
-    
-    if (dailyData.length === 0) {
-        ctx.parentElement.innerHTML = `
-            <div class="text-center text-muted py-5">
-                <i data-feather="bar-chart" class="feather-48 mb-3"></i>
-                <h6>No daily adjustment data available</h6>
-                <p>No adjustments found for the selected period</p>
-            </div>
-        `;
-        if (typeof feather !== 'undefined') {
-            feather.replace();
-        }
-        return;
-    }
-    
-    // Prepare data for chart (limit to last 15 days for better visibility)
-    const recentData = dailyData.slice(-15);
-    
-    const labels = recentData.map(item => {
-        const date = new Date(item.day);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    });
-    
-    const increasesData = recentData.map(item => item.increases);
-    const decreasesData = recentData.map(item => item.decreases);
-    
-    const chartData = {
-        labels: labels,
-        datasets: [
-            {
-                label: 'Increases',
-                data: increasesData,
-                backgroundColor: '#1CC88A',
-                borderColor: '#17A673',
-                borderWidth: 1
-            },
-            {
-                label: 'Decreases',
-                data: decreasesData.map(val => Math.abs(val)),
-                backgroundColor: '#E74A3B',
-                borderColor: '#E02D1B',
-                borderWidth: 1
-            }
-        ]
-    };
-    
-    batchAdjustmentChart = new Chart(ctx, {
-        type: 'bar',
-        data: chartData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Adjustments'
-                    },
-                    stacked: false
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Date'
-                    },
-                    stacked: false
-                }
-            }
-        }
-    });
-}
-
-function initializeDateRangePicker() {
-    const dateRangePicker = document.getElementById('dateRangePicker');
-    if (!dateRangePicker) return;
-    
-    $(dateRangePicker).daterangepicker({
-        opens: 'left',
-        startDate: '{{ start_date }}',
-        endDate: '{{ end_date }}',
-        ranges: {
-            'Today': [moment(), moment()],
-            'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-            'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-            'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-            'This Month': [moment().startOf('month'), moment().endOf('month')],
-            'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
-        },
-        locale: {
-            format: 'YYYY-MM-DD'
-        }
-    }, function(start, end) {
-        // Update hidden inputs when dates change
-        document.getElementById('hidden_start_date').value = start.format('YYYY-MM-DD');
-        document.getElementById('hidden_end_date').value = end.format('YYYY-MM-DD');
-        
-        // Update the visible input
-        dateRangePicker.value = start.format('YYYY-MM-DD') + ' - ' + end.format('YYYY-MM-DD');
-    });
-}
-
-function setDateRange(rangeType) {
-    let startDate, endDate;
+window.setPresetRange = function(range) {
     const today = new Date();
+    let startDate = new Date();
+    let endDate = new Date();
     
-    switch(rangeType) {
-        case 'this_month':
+    switch(range) {
+        case 'today':
+            startDate = today;
+            endDate = today;
+            break;
+        case 'yesterday':
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - 1);
+            endDate = new Date(today);
+            endDate.setDate(today.getDate() - 1);
+            break;
+        case 'last7days':
+            endDate = new Date(today);
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - 6);
+            break;
+        case 'last30days':
+            endDate = new Date(today);
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - 29);
+            break;
+        case 'thisMonth':
             startDate = new Date(today.getFullYear(), today.getMonth(), 1);
             endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
             break;
-        case 'last_month':
+        case 'lastMonth':
             startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
             endDate = new Date(today.getFullYear(), today.getMonth(), 0);
             break;
-        case 'quarter':
-            const quarter = Math.floor(today.getMonth() / 3);
-            startDate = new Date(today.getFullYear(), quarter * 3, 1);
-            endDate = new Date(today.getFullYear(), (quarter + 1) * 3, 0);
+        case 'thisYear':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = new Date(today.getFullYear(), 11, 31);
             break;
-        default:
-            return;
     }
     
-    // Format dates as YYYY-MM-DD
-    const formatDate = (date) => {
-        return date.toISOString().split('T')[0];
-    };
-    
-    // Update the form and submit
-    document.getElementById('hidden_start_date').value = formatDate(startDate);
-    document.getElementById('hidden_end_date').value = formatDate(endDate);
-    document.getElementById('dateRangePicker').value = formatDate(startDate) + ' - ' + formatDate(endDate);
-    document.getElementById('filterForm').submit();
-}
+    document.getElementById('startDateInput').value = formatDate(startDate);
+    document.getElementById('endDateInput').value = formatDate(endDate);
+};
 
-function viewAdjustmentDetails(adjustmentId) {
-    showLoading();
-    
-    fetch(`/api/adjustments/${adjustmentId}/details/`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            const content = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Basic Information</h6>
-                        <p><strong>Adjustment ID:</strong> ${data.reference || 'ADJ-' + data.id}</p>
-                        <p><strong>Date:</strong> ${data.created_at}</p>
-                        <p><strong>Store:</strong> ${data.store}</p>
-                        <p><strong>Status:</strong> <span class="badge bg-${data.status_color}">${data.status}</span></p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Product Details</h6>
-                        <p><strong>Product:</strong> ${data.product_name} (${data.sku})</p>
-                        <p><strong>Quantity Change:</strong> <span class="${data.quantity_change > 0 ? 'text-success' : 'text-danger'}">${data.quantity_change}</span></p>
-                        <p><strong>Unit Cost:</strong> UGX ${data.unit_cost}</p>
-                        <p><strong>Value Impact:</strong> UGX ${data.value_impact}</p>
-                    </div>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <h6>Additional Information</h6>
-                        <p><strong>Reason:</strong> ${data.reason || 'N/A'}</p>
-                        <p><strong>Created By:</strong> ${data.created_by}</p>
-                        <p><strong>Notes:</strong> ${data.notes || 'No additional notes'}</p>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('adjustmentDetailsContent').innerHTML = content;
-            const modal = new bootstrap.Modal(document.getElementById('adjustmentDetailsModal'));
-            modal.show();
-            
-            feather.replace();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            document.getElementById('adjustmentDetailsContent').innerHTML = `
-                <div class="alert alert-danger">
-                    <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-                    Failed to load adjustment details. Please try again.
-                </div>
-            `;
-            feather.replace();
-        })
-        .finally(() => {
-            hideLoading();
-        });
-}
+window.formatDate = function(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
-function viewBatchDetails(batchReference) {
-    showLoading();
+window.applyDateRange = function() {
+    startDateValue = document.getElementById('startDateInput').value;
+    endDateValue = document.getElementById('endDateInput').value;
     
-    fetch(`/api/adjustments/batch/${encodeURIComponent(batchReference)}/`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            let itemsHtml = '';
-            if (data.items && data.items.length > 0) {
-                itemsHtml = `
-                    <h6 class="mt-3">Items in Batch</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>SKU</th>
-                                    <th>Quantity</th>
-                                    <th>Unit Cost</th>
-                                    <th>Value Impact</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.items.map(item => `
-                                    <tr>
-                                        <td>${item.product_name}</td>
-                                        <td>${item.sku}</td>
-                                        <td class="${item.quantity_change > 0 ? 'text-success' : 'text-danger'}">${item.quantity_change}</td>
-                                        <td>UGX ${item.unit_cost}</td>
-                                        <td>UGX ${item.value_impact}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            }
-            
-            const content = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Batch Information</h6>
-                        <p><strong>Batch Reference:</strong> ${data.reference}</p>
-                        <p><strong>Date:</strong> ${data.date}</p>
-                        <p><strong>Total Items:</strong> ${data.total_items}</p>
-                        <p><strong>Total Quantity Impact:</strong> ${data.total_quantity}</p>
-                        <p><strong>Initiated By:</strong> ${data.initiated_by}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Summary</h6>
-                        <p><strong>Store:</strong> ${data.store}</p>
-                        <p><strong>Status:</strong> <span class="badge bg-${data.status_color}">${data.status}</span></p>
-                        <p><strong>Total Value Impact:</strong> UGX ${data.total_value_impact}</p>
-                    </div>
-                </div>
-                ${itemsHtml}
-            `;
-            
-            document.getElementById('adjustmentDetailsContent').innerHTML = content;
-            const modal = new bootstrap.Modal(document.getElementById('adjustmentDetailsModal'));
-            modal.show();
-            
-            feather.replace();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            document.getElementById('adjustmentDetailsContent').innerHTML = `
-                <div class="alert alert-danger">
-                    <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-                    Failed to load batch details. Please try again.
-                </div>
-            `;
-            feather.replace();
-        })
-        .finally(() => {
-            hideLoading();
-        });
-}
-
-function refreshReport() {
-    showLoading();
-    
-    // Reload the page with current filters
-    window.location.reload();
-}
-
-
-
-function exportReport(format) {
-    const filename = `Stick Adjustment-report-{{ period|slugify }}-${new Date().toISOString().split('T')[0]}`;
-    
-    // Build URL with current parameters
-    let baseUrl = '';
-    
-    if (format === 'csv') {
-        baseUrl = "{% url 'export_purchase_csv' %}";
-    } else if (format === 'pdf') {
-        baseUrl = "{% url 'export_stockadj_pdf' %}";
-    } else if (format === 'excel') {
-        baseUrl = "{% url 'export_purchase_excel' %}";
+    if (startDateValue && endDateValue) {
+        const dateRangeText = startDateValue + ' - ' + endDateValue;
+        document.getElementById('selectedDateRange').textContent = dateRangeText;
+        document.getElementById('startDate').value = startDateValue;
+        document.getElementById('endDate').value = endDateValue;
     } else {
-        showToast(`Invalid export format: ${format}`, 'error');
-        return;
+        document.getElementById('selectedDateRange').textContent = 'Select Date Range';
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
     }
     
-    // Get date range from the report
-    const dateRange = "{{ date_range }}";
-    let dateFrom = '', dateTo = '';
-    
-    if (dateRange && dateRange.includes(' - ')) {
-        const dates = dateRange.split(' - ');
-        dateFrom = dates[0].trim();
-        dateTo = dates[1].trim();
-    }
-    
-    // Build query parameters
-    const params = new URLSearchParams({
-        'date_from': dateFrom,
-        'date_to': dateTo,
-        'period': "{{ period }}"
-    });
-    
-    // Add store filter if present
-    const storeSelect = document.getElementById('storeFilter');
-    if (storeSelect && storeSelect.value) {
-        params.append('store', storeSelect.value);
-    }
-    
-    // Add supplier filter if present
-    const supplierSelect = document.getElementById('supplierFilter');
-    if (supplierSelect && supplierSelect.value) {
-        params.append('supplier', supplierSelect.value);
-    }
-    
-    // Create export URL
-    const exportUrl = `${baseUrl}?${params.toString()}`;
-    
-    // Show loading toast
-    showToast(`${format.toUpperCase()} export started...`, 'info');
-    
-    // SIMPLE APPROACH: Create and click download link
-    const link = document.createElement('a');
-    link.href = exportUrl;
-    link.download = `${filename}.${format}`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    
-    // Clean up
-    setTimeout(() => {
-        document.body.removeChild(link);
-        showToast(`${format.toUpperCase()} export completed`, 'success');
-    }, 1000);
-}
+    const modal = bootstrap.Modal.getInstance(document.getElementById('dateRangeModal'));
+    if (modal) modal.hide();
+};
 
+window.clearDateRange = function() {
+    document.getElementById('startDateInput').value = '';
+    document.getElementById('endDateInput').value = '';
+    startDateValue = '';
+    endDateValue = '';
+    document.getElementById('selectedDateRange').textContent = 'Select Date Range';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById('dateRangeModal'));
+    if (modal) modal.hide();
+};
 
+window.applyFilters = function() {
+    document.getElementById('startDate').value = startDateValue;
+    document.getElementById('endDate').value = endDateValue;
+    document.getElementById('filterForm').submit();
+};
 
-function showLoading() {
-    if (!document.getElementById('loading-overlay')) {
-        const loadingHTML = `
-            <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
-                 style="background: rgba(255,255,255,0.8); z-index: 9999;">
-                <div class="text-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Loading adjustment report data...</p>
-                </div>
+window.refreshData = function() {
+    window.location.reload();
+};
+
+window.exportData = function(format) {
+    var table = $('#adjustmentsTable').DataTable();
+    if (format === 'csv') table.button('.buttons-csv').trigger();
+    else if (format === 'excel') table.button('.buttons-excel').trigger();
+    else if (format === 'pdf') table.button('.buttons-pdf').trigger();
+    
+    alert(format.toUpperCase() + ' export started');
+};
+
+window.viewDetails = function(adjustmentId) {
+    $('#detailsModalBody').html(`
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', loadingHTML);
-    }
-}
-
-function hideLoading() {
-    const loadingOverlay = document.getElementById('loading-overlay');
-    if (loadingOverlay) {
-        loadingOverlay.remove();
-    }
-}
-
-function showToast(message, type = 'info') {
-    const toastHTML = `
-        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
+            <p class="mt-2">Loading adjustment details...</p>
         </div>
-    `;
+    `);
     
-    let toastContainer = document.querySelector('.toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        toastContainer.style.zIndex = '9999';
-        document.body.appendChild(toastContainer);
-    }
+    $('#detailsModal').modal('show');
     
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-    
-    const toastEl = toastContainer.querySelector('.toast:last-child');
-    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-    toast.show();
-}
-
-// Auto-hide loading overlay on page load
-window.addEventListener('load', function() {
-    hideLoading();
-});
-
-// Add event listener for print button
-document.addEventListener('DOMContentLoaded', function() {
-    const printBtn = document.getElementById('printAdjustmentBtn');
-    if (printBtn) {
-        printBtn.addEventListener('click', function() {
-            window.print();
-        });
-    }
-});
+    // Simulate API call
+    setTimeout(function() {
+        $('#detailsModalBody').html(`
+            <div class="alert alert-info">
+                <i data-feather="info-circle" class="feather-16 me-2"></i>
+                Details view for adjustment #${adjustmentId}
+            </div>
+        `);
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    }, 1000);
+};
 </script>
-
-<style>
-/* Side Tabs Styles */
-.side-tabs-card {
-    height: fit-content;
-    min-height: 500px;
-}
-
-.side-tabs-container {
-    height: 400px;
-    overflow-y: auto;
-}
-
-.side-tabs {
-    border-right: 1px solid #dee2e6;
-}
-
-.side-tab {
-    padding: 1rem 1.25rem;
-    border: none;
-    border-left: 4px solid transparent;
-    border-radius: 0;
-    text-align: left;
-    color: #495057;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    background-color: transparent;
-    position: relative;
-    width: 100%;
-}
-
-.side-tab:hover {
-    background-color: rgba(74, 144, 226, 0.05);
-    color: #4A90E2;
-    border-left-color: rgba(74, 144, 226, 0.3);
-}
-
-.side-tab.active {
-    background-color: rgba(74, 144, 226, 0.1);
-    color: #4A90E2;
-    border-left-color: #4A90E2;
-    font-weight: 600;
-}
-
-.side-tab i {
-    transition: transform 0.2s ease;
-}
-
-.side-tab:hover i {
-    transform: translateX(2px);
-}
-
-/* Tab Content Styles */
-.tab-content {
-    animation: fadeIn 0.3s ease;
-}
-
-.tab-pane {
-    padding: 0;
-}
-
-/* Card Styles */
-.card {
-    border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
-}
-
-.card-header {
-    background-color: #fff;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-    padding: 1rem 1.25rem;
-    border-radius: 8px 8px 0 0 !important;
-}
-
-.card-title {
-    font-weight: 600;
-    color: #495057;
-    margin: 0;
-    font-size: 1rem;
-}
-
-/* Table Styles */
-.table th {
-    border-top: none;
-    font-weight: 600;
-    color: #495057;
-    background-color: #f8f9fa;
-    font-size: 0.875rem;
-    white-space: nowrap;
-}
-
-.table td {
-    vertical-align: middle;
-    font-size: 0.875rem;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(74, 144, 226, 0.05);
-}
-
-/* Status table row colors */
-.table-danger {
-    background-color: rgba(220, 53, 69, 0.05);
-}
-.table-warning {
-    background-color: rgba(255, 193, 7, 0.05);
-}
-.table-success {
-    background-color: rgba(40, 167, 69, 0.05);
-}
-.table-info {
-    background-color: rgba(23, 162, 184, 0.05);
-}
-.table-light {
-    background-color: rgba(248, 249, 250, 0.5);
-}
-
-/* Status badge colors */
-.bg-light-warning {
-    background-color: rgba(255, 193, 7, 0.1) !important;
-}
-.bg-light-danger {
-    background-color: rgba(220, 53, 69, 0.1) !important;
-}
-.bg-light-success {
-    background-color: rgba(40, 167, 69, 0.1) !important;
-}
-.bg-light-primary {
-    background-color: rgba(0, 123, 255, 0.1) !important;
-}
-.bg-light-info {
-    background-color: rgba(23, 162, 184, 0.1) !important;
-}
-
-/* Adjustment type badges */
-.badge.bg-success {
-    background-color: #1CC88A !important;
-}
-.badge.bg-danger {
-    background-color: #E74A3B !important;
-}
-.badge.bg-warning {
-    background-color: #F6C23E !important;
-}
-.badge.bg-info {
-    background-color: #36B9CC !important;
-}
-
-/* Progress Bar Styles */
-.progress {
-    background-color: #e9ecef;
-    border-radius: 4px;
-}
-
-.progress-bar {
-    border-radius: 4px;
-}
-
-/* Button Styles */
-.btn-outline-primary {
-    border-color: #4A90E2;
-    color: #4A90E2;
-    border-width: 2px;
-    font-weight: 500;
-}
-
-.btn-outline-primary:hover,
-.btn-outline-primary.active {
-    background-color: #4A90E2;
-    border-color: #4A90E2;
-    color: white;
-}
-
-.btn-primary {
-    background-color: #4A90E2;
-    border-color: #4A90E2;
-}
-
-.btn-primary:hover {
-    background-color: #357ABD;
-    border-color: #357ABD;
-}
-
-.btn-group .btn {
-    border-width: 1px;
-}
-
-/* Search and filter styles */
-.input-group-text {
-    background-color: #f8f9fa;
-    border-color: #dee2e6;
-}
-
-/* Chart specific styles */
-#reasonWiseChart {
-    max-height: 250px;
-}
-
-/* Animation */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Pagination Styles */
-.pagination {
-    margin-bottom: 0;
-}
-
-.page-link {
-    color: #4A90E2;
-    border: 1px solid #dee2e6;
-}
-
-.page-link:hover {
-    color: #357ABD;
-    background-color: #f8f9fa;
-    border-color: #dee2e6;
-}
-
-.page-item.active .page-link {
-    background-color: #4A90E2;
-    border-color: #4A90E2;
-    color: white;
-}
-
-/* Empty state styling */
-.text-muted i {
-    color: #6c757d;
-    opacity: 0.5;
-}
-
-/* Responsive Design */
-@media (max-width: 992px) {
-    .side-tabs-card {
-        min-height: auto;
-        margin-bottom: 1rem;
-    }
-    
-    .side-tabs-container {
-        height: auto;
-        max-height: 300px;
-    }
-    
-    .side-tabs {
-        flex-direction: row !important;
-        overflow-x: auto;
-        border-right: none;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .side-tab {
-        border-left: none;
-        border-bottom: 3px solid transparent;
-        white-space: nowrap;
-        padding: 0.75rem 1rem;
-    }
-    
-    .side-tab.active,
-    .side-tab:hover {
-        border-left-color: transparent;
-        border-bottom-color: #4A90E2;
-    }
-    
-    /* Adjust chart size for medium screens */
-    #reasonWiseChart {
-        max-height: 200px;
-    }
-}
-
-@media (max-width: 768px) {
-    .card-header {
-        flex-direction: column;
-        align-items: flex-start !important;
-    }
-    
-    .card-header .btn-group {
-        margin-top: 0.5rem;
-        align-self: flex-start;
-    }
-    
-    .table-responsive {
-        font-size: 0.8rem;
-    }
-    
-    .side-tab span {
-        display: none;
-    }
-    
-    .side-tab i {
-        margin-right: 0 !important;
-    }
-    
-    /* Hide less important columns on mobile */
-    .table th:nth-child(7),
-    .table td:nth-child(7),
-    .table th:nth-child(8),
-    .table td:nth-child(8),
-    .table th:nth-child(9),
-    .table td:nth-child(9) {
-        display: none;
-    }
-    
-    /* Adjust filter layout */
-    .row > .col-md-3 {
-        margin-bottom: 0.5rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .page-header {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .table-top-head {
-        justify-content: center;
-        margin-top: 1rem;
-        flex-wrap: wrap;
-    }
-    
-    .card-body {
-        padding: 1rem;
-    }
-    
-    .row > div {
-        margin-bottom: 1rem;
-    }
-    
-    /* Hide more columns on very small screens */
-    .table th:nth-child(3),
-    .table td:nth-child(3),
-    .table th:nth-child(6),
-    .table td:nth-child(6) {
-        display: none;
-    }
-    
-    /* Smaller charts on mobile */
-    #reasonWiseChart {
-        max-height: 150px;
-    }
-}
-
-/* Scrollbar styling for side tabs */
-.side-tabs-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.side-tabs-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.side-tabs-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.side-tabs-container::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
-}
-
-/* Print styles */
-@media print {
-    .page-header,
-    .btn,
-    .table-top-head,
-    .card-header .btn,
-    .side-tabs-card,
-    .pagination,
-    .filter-form,
-    .modal,
-    .toast-container {
-        display: none !important;
-    }
-    
-    .tab-content > .tab-pane {
-        display: block !important;
-        opacity: 1 !important;
-    }
-    
-    .card {
-        break-inside: avoid;
-        box-shadow: none !important;
-        border: 1px solid #dee2e6 !important;
-    }
-    
-    .table {
-        font-size: 0.75rem;
-    }
-    
-    /* Show all columns when printing */
-    .table th,
-    .table td {
-        display: table-cell !important;
-    }
-}
-</style>
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 {% endblock %}

@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 from django.db import transaction
+from django.db.models import Q
 from app.models.transactions import SalesItem
 from app.models.products import Inventory, ProductUnitPrice
 from app.models.transactions import StockMovement
@@ -24,14 +25,15 @@ def update_inventory_on_sale(sender, instance, created, **kwargs):
         if created:
             # FIFO: Deduct from oldest, non-expired batches first
             batches = InventoryBatch.objects.filter(
-                product=instance.product,
+                Q(expiry_date__gte=date.today()) | Q(expiry_date__isnull=True),product=instance.product,
                 store=instance.order.store,
                 remaining_quantity__gt=0,
-                expiry_date__gte=date.today()
+                
             ).order_by('expiry_date', 'received_date')
             to_deduct = quantity_base
             
             for batch in batches:
+                print(f"Batch {batch.id}")
                 if batch.remaining_quantity >= to_deduct:
                     batch.remaining_quantity -= to_deduct
                     batch.save()

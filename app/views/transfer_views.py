@@ -233,6 +233,13 @@ def update_transfer_status(request, transfer_id):
                 transfer.refresh_from_db()
                 if transfer.status == 'completed':
                     transfer.apply_inventory_changes()
+                    # Mark the linked transfer request as fulfilled now that the
+                    # actual stock movement is complete.
+                    if transfer.transfer_request_id:
+                        TransferRequest.objects.filter(
+                            id=transfer.transfer_request_id,
+                            status='approved'
+                        ).update(status='fulfilled')
         
         return JsonResponse({
             'success': True,
@@ -1071,9 +1078,8 @@ def create_stock_transfer(request):
                         created_by=request.user,
                         status='pending'
                     )
-                    
-                    tr.status = 'fulfilled'
-                    tr.save()
+                    # Do NOT set fulfilled here — request stays 'approved' until
+                    # the stock transfer is marked completed.
                 else:
                     st = StockTransfer.objects.create(
                         from_store_id=data['from_store'],
@@ -1340,9 +1346,8 @@ def create_transfer_from_request(request, request_id):
                     quantity=request_item.quantity,
                     units=request_item.units,
                 )
-            
-            tr.status = 'fulfilled'
-            tr.save()
+            # Do NOT set fulfilled here — request stays 'approved' until
+            # the stock transfer is marked completed.
         
         try:
             transfer_url = reverse('stock_transfer_detail', kwargs={'transfer_id': st.id})

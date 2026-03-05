@@ -1,865 +1,1229 @@
 {% extends 'basic/base.html' %}
 {% load static %}
 {% load humanize %}
+{% load custom_filter %}
 
-{% block title %}Inventory Report Details{% endblock %}
-
-{% block extra_css %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
-{% endblock %}
+{% block title %}Inventory Status Dashboard{% endblock %}
 
 {% block content %}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+<style>
+    /* KPI Card Styling */
+    .metric-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border-left: 4px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card.value {
+        border-left-color: #667eea;
+    }
+    
+    .metric-card.products {
+        border-left-color: #f093fb;
+    }
+    
+    .metric-card.lowstock {
+        border-left-color: #ff6b6b;
+    }
+    
+    .metric-card.expiring {
+        border-left-color: #48c6ef;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    }
+    
+    .metric-label {
+        font-size: 14px;
+        color: #6c757d;
+        margin-bottom: 8px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .metric-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #2b2f32;
+        margin-bottom: 5px;
+        line-height: 1.2;
+    }
+    
+    .metric-sub {
+        font-size: 13px;
+        color: #6c757d;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #e9ecef;
+    }
+
+    /* Filter Section */
+    .filter-section {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+    
+    .filter-section .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+
+    /* Loading Overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.8);
+        z-index: 9999;
+        display: none;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .loading-overlay.active {
+        display: flex;
+    }
+    
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #4361ee;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Table Container */
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        position: relative;
+        min-height: 200px;
+    }
+    
+    .table-container.loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    .table-container.loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #4361ee;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    /* Status Badges */
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-block;
+    }
+    
+    .status-critical {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-warning {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-good {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+
+    /* Progress Bar */
+    .progress-thin {
+        height: 6px;
+        border-radius: 3px;
+    }
+
+    /* Card Styling */
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    
+    .card-body {
+        padding: 20px;
+    }
+    
+    .card-header {
+        background: white;
+        border-bottom: 1px solid #e9ecef;
+        padding: 15px 20px;
+        border-radius: 12px 12px 0 0 !important;
+    }
+    
+    .card-title {
+        font-weight: 600;
+        color: #2b2f32;
+        margin-bottom: 0;
+    }
+
+    /* Button Styling */
+    .btn-primary {
+        background-color: #4361ee;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .btn-primary:hover {
+        background-color: #3451d5;
+    }
+    
+    .btn-outline-primary {
+        border: 1px solid #dee2e6;
+        color: #495057;
+        background: white;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #f8f9fa;
+        border-color: #c1c9d0;
+        color: #212529;
+    }
+
+    /* Detail Button */
+    .btn-detail {
+        padding: 4px 8px;
+        font-size: 12px;
+        border-radius: 6px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        color: #495057;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .btn-detail:hover {
+        background: #e9ecef;
+        border-color: #ced4da;
+    }
+    
+    /* Batch Info Badge */
+    .batch-count-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #e7f1ff;
+        color: #0c63e4;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .batch-count-badge:hover {
+        background: #d4e4ff;
+        transform: scale(1.05);
+    }
+    
+    /* Modal Styles */
+    .modal-content {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    
+    .modal-header {
+        border-bottom: 1px solid #e9ecef;
+        padding: 16px 20px;
+        background: #f8f9fa;
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .modal-title {
+        font-weight: 600;
+        color: #2b2f32;
+    }
+    
+    .modal-body {
+        padding: 20px;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .modal-footer {
+        border-top: 1px solid #e9ecef;
+        padding: 16px 20px;
+        background: #f8f9fa;
+        border-radius: 0 0 12px 12px;
+    }
+    
+    /* Batch Details Table */
+    .batch-details-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .batch-details-table th {
+        text-align: left;
+        padding: 12px;
+        background: #f8f9fa;
+        font-size: 13px;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .batch-details-table td {
+        padding: 12px;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 13px;
+    }
+    
+    .batch-details-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .batch-details-table .expiry-critical {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    .batch-details-table .expiry-warning {
+        color: #fd7e14;
+        font-weight: 600;
+    }
+    
+    .batch-details-table .expiry-good {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    /* Summary Section in Modal */
+    .product-summary-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px dashed #dee2e6;
+    }
+    
+    .summary-row:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    
+    .summary-label {
+        color: #6c757d;
+        font-size: 13px;
+    }
+    
+    .summary-value {
+        font-weight: 600;
+        color: #212529;
+    }
+    
+    /* Batch Section Title */
+    .batch-section-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2b2f32;
+        margin: 20px 0 15px 0;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #4361ee;
+    }
+    
+    /* ==================== SEARCHABLE DROPDOWN STYLES ==================== */
+    .dropdown-search-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .dropdown-search-input {
+        width: 100%;
+        height: 40px;
+        padding: 0.375rem 2rem 0.375rem 0.75rem;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.2s;
+    }
+
+    .dropdown-search-input:hover {
+        background-color: #f8f9fa;
+        border-color: #c1c9d0;
+    }
+
+    .dropdown-search-input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+        outline: 0;
+    }
+
+    .dropdown-search-input.is-invalid {
+        border-color: #dc3545;
+    }
+
+    .dropdown-selected-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dropdown-arrow {
+        transition: transform 0.2s;
+        color: #6c757d;
+    }
+
+    .dropdown-search-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        min-width: 200px;
+        margin-top: 4px;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-height: 300px;
+        overflow: hidden;
+    }
+
+    .dropdown-search-header {
+        padding: 0.5rem;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background-color: #f8f9fa;
+    }
+
+    .dropdown-search-header i {
+        color: #6c757d;
+        font-size: 1rem;
+    }
+
+    .dropdown-search-field {
+        width: 100%;
+        padding: 0.25rem;
+        border: none;
+        outline: none;
+        font-size: 0.875rem;
+        background: transparent;
+    }
+
+    .dropdown-search-field:focus {
+        outline: none;
+    }
+
+    .dropdown-search-options {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    .dropdown-search-option {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: background-color 0.2s;
+        color: #495057;
+    }
+
+    .dropdown-search-option:hover {
+        background-color: #f8f9fa;
+        color: #4361ee;
+    }
+
+    .dropdown-search-option[data-selected="true"] {
+        background-color: #e7f1ff;
+        color: #0c63e4;
+        font-weight: 500;
+    }
+
+    .dropdown-search-option[data-selected="true"]:hover {
+        background-color: #d4e4ff;
+    }
+
+    .custom-dropdown-btn {
+        width: 100%;
+        height: 40px;
+        padding: 0.375rem 0.75rem;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.2s;
+    }
+
+    .custom-dropdown-btn:hover {
+        background-color: #f8f9fa;
+        border-color: #c1c9d0;
+    }
+
+    .custom-dropdown-btn .caret {
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 4px solid #6c757d;
+        display: inline-block;
+        margin-left: 5px;
+    }
+
+    /* Date Range Modal */
+    .date-range-input-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .date-range-input-group input {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    
+    .date-range-input-group input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+        outline: 0;
+    }
+    
+    .preset-ranges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 15px;
+    }
+    
+    .preset-range {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .preset-range:hover {
+        background: #e9ecef;
+        border-color: #ced4da;
+    }
+    
+    .preset-range.active {
+        background: #4361ee;
+        color: white;
+        border-color: #4361ee;
+    }
+
+    /* Recent Movements Pagination */
+    .movements-pagination {
+        margin-top: 15px;
+        display: flex;
+        justify-content: center;
+    }
+    
+    .movements-pagination .pagination {
+        margin-bottom: 0;
+    }
+    
+    .movements-pagination .page-link {
+        border: none;
+        padding: 8px 14px;
+        margin: 0 3px;
+        border-radius: 8px;
+        color: #495057;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .movements-pagination .page-link:hover {
+        background-color: #e9ecef;
+    }
+    
+    .movements-pagination .page-item.active .page-link {
+        background-color: #4361ee;
+        color: white;
+    }
+    
+    .movements-pagination .page-item.disabled .page-link {
+        color: #ced4da;
+        pointer-events: none;
+        cursor: default;
+    }
+    
+    .movements-table-info {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    /* Filter Active Indicator */
+    .filter-active {
+        position: relative;
+        border-color: #4361ee !important;
+        background-color: #f0f4ff !important;
+    }
+    
+    .filter-active::after {
+        content: '';
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 8px;
+        height: 8px;
+        background-color: #4361ee;
+        border-radius: 50%;
+    }
+</style>
+
 <div class="page-wrapper">
     <div class="content">
-        <!-- Page Header -->
-        <div class="page-header">
-            <div class="add-item d-flex">
-                <div class="page-title">
-                    <h4>Inventory Report Details</h4>
-                    <h6>Detailed view of inventory data and analysis</h6>
-                </div>
-            </div>
-            <ul class="table-top-head">
-                <li>
-                    <button class="btn btn-outline-primary" onclick="refreshReport()">
-                        <i data-feather="refresh-cw" class="feather-16 me-1"></i>
-                        Refresh
-                    </button>
-                </li>
-                <li>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                            <i data-feather="download" class="feather-16 me-1"></i>
-                            Export
-                        </button>
-                        <ul class="dropdown-menu"> 
-                            <li><a class="dropdown-item" href="#" style="width: 200px;" onclick="exportReport('csv')">
-                                <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
-                            </a></li>
-                            <li><a class="dropdown-item" style="width: 200px;" href="#" onclick="exportReport('pdf')">
-                                <i data-feather="file" class="feather-14 me-2"></i>Export PDF
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" style="width: 200px;" onclick="exportReport('excel')">
-                                <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
-                            </a></li>
-                        </ul>
-                    </div>
-                </li>
-                <li>
-                    <button class="btn btn-primary" onclick="goBack()">
-                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
-                        Back to Dashboard
-                    </button>
-                </li>
-            </ul>
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
         </div>
 
-        <!-- Report Header Info -->
-        <div class="row mb-4">
-            <div class="col-12">
+        <!-- Header -->
+        <div class="page-header d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="mb-1">Inventory Status Dashboard</h4>
+                <p class="text-muted mb-0">Complete inventory overview with batch tracking and expiry management</p>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary me-2" onclick="refreshData()">
+                    <i class="ti ti-refresh me-1"></i>
+                    Refresh
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="ti ti-download me-1"></i>
+                        Export
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="exportData('csv')">CSV</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportData('excel')">Excel</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportData('pdf')">PDF</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics Cards -->
+        <div class="row" id="kpiCards">
+            <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5 class="card-title mb-3">Inventory Status Report - {{ period }}</h5>
-                                <div class="row">
-                                    <div class="col-6">
-                                        <p class="mb-1"><strong>Report ID:</strong> {{ report_id }}</p>
-                                        <p class="mb-1"><strong>Category:</strong> Inventory Reports</p>
-                                        <p class="mb-1"><strong>Generated By:</strong> {{ generated_by }}</p>
-                                    </div>
-                                    <div class="col-6">
-                                        <p class="mb-1"><strong>Date Range:</strong> {{ date_range }}</p>
-                                        <p class="mb-1"><strong>Status:</strong> <span class="badge bg-success">Live</span></p>
-                                        <p class="mb-1"><strong>Last Updated:</strong> {% now "Y-m-d H:i" %}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3">
-                                                <h6 class="card-subtitle mb-2 text-muted">Total Inventory Value</h6>
-                                                <h4 class="card-title text-primary">UGX {{ total_inventory_value|floatformat:0|intcomma }}</h4>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card bg-light">
-                                            <div class="card-body p-3">
-                                                <h6 class="card-subtitle mb-2 text-muted">Total Products</h6>
-                                                <h4 class="card-title text-success">{{ total_products|intcomma }}</h4>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="card-subtitle mb-2 text-muted">Total Inventory Value</div>
+                        <div class="h3 mb-2">UGX <span id="totalInventoryValue">{{ total_inventory_value|default:0|floatformat:0|intcomma }}</span></div>
+                        <div class="text-muted small"><span id="totalProducts">{{ total_products|default:0 }}</span> Products | <span id="totalBatches">{{ total_batches|default:0 }}</span> Batches</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-subtitle mb-2 text-muted">Stock Health</div>
+                        <div class="h3 mb-2"><span id="totalUnits">{{ total_units|default:0|intcomma }}</span></div>
+                        <div class="text-muted small">
+                            <span class="badge bg-success me-1"><span id="healthyStock">{{ healthy_stock|default:0 }}</span>% Healthy</span>
+                            <span class="badge bg-warning me-1"><span id="lowStockPct">{{ low_stock_pct|default:0 }}</span>% Low</span>
+                            <span class="badge bg-danger"><span id="outStockPct">{{ out_stock_pct|default:0 }}</span>% Out</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-subtitle mb-2 text-muted">At Risk Stock</div>
+                        <div class="h3 mb-2"><span id="lowStockItems">{{ low_stock_items|default:0 }}</span></div>
+                        <div class="text-muted small">
+                            <span class="badge bg-warning me-1">Low: <span id="lowStockCount">{{ low_stock_count|default:0 }}</span></span>
+                            <span class="badge bg-danger">Out: <span id="outOfStockCount">{{ out_of_stock_count|default:0 }}</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-subtitle mb-2 text-muted">Expiry Summary</div>
+                        <div class="h3 mb-2"><span id="expiringSoonCount">{{ expiring_soon_count|default:0 }}</span></div>
+                        <div class="text-muted small">
+                            <span class="badge bg-danger me-1">Critical: <span id="criticalCount">{{ critical_count|default:0 }}</span></span>
+                            <span class="badge bg-warning">Warning: <span id="warningCount">{{ warning_count|default:0 }}</span></span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Tabbed Interface -->
-        <div class="row">
-            <!-- Side Tabs -->
-            <div class="col-lg-3 col-md-4">
-                <div class="card side-tabs-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i data-feather="grid" class="feather-16 me-2"></i>
-                            Inventory Report Sections
-                        </h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="side-tabs-container">
-                            <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
-                                <button class="nav-link side-tab active" id="stock-level-tab" data-bs-toggle="pill" data-bs-target="#stock-level" type="button" role="tab" aria-controls="stock-level" aria-selected="true">
-                                    <i data-feather="package" class="feather-16 me-2"></i>
-                                    Stock Level Report
-                                </button>
-                                <button class="nav-link side-tab" id="batch-expiry-tab" data-bs-toggle="pill" data-bs-target="#batch-expiry" type="button" role="tab" aria-controls="batch-expiry" aria-selected="false">
-                                    <i data-feather="calendar" class="feather-16 me-2"></i>
-                                    Batch Expiry Report
-                                </button>
-                                <button class="nav-link side-tab" id="expired-stock-tab" data-bs-toggle="pill" data-bs-target="#expired-stock" type="button" role="tab" aria-controls="expired-stock" aria-selected="false">
-                                    <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-                                    Expired Stock Report
-                                </button>
-                                <button class="nav-link side-tab" id="inventory-valuation-tab" data-bs-toggle="pill" data-bs-target="#inventory-valuation" type="button" role="tab" aria-controls="inventory-valuation" aria-selected="false">
-                                    <i data-feather="dollar-sign" class="feather-16 me-2"></i>
-                                    Inventory Valuation
-                                </button>
-                                <button class="nav-link side-tab" id="stock-aging-tab" data-bs-toggle="pill" data-bs-target="#stock-aging" type="button" role="tab" aria-controls="stock-aging" aria-selected="false">
-                                    <i data-feather="clock" class="feather-16 me-2"></i>
-                                    Stock Aging Report
-                                </button>
-                                <button class="nav-link side-tab" id="real-time-tab" data-bs-toggle="pill" data-bs-target="#real-time" type="button" role="tab" aria-controls="real-time" aria-selected="false">
-                                    <i data-feather="zap" class="feather-16 me-2"></i>
-                                    Real-time Stock Availability
-                                </button>
-                                <button class="nav-link side-tab" id="store-distribution-tab" data-bs-toggle="pill" data-bs-target="#store-distribution" type="button" role="tab" aria-controls="store-distribution" aria-selected="false">
-                                    <i data-feather="share-2" class="feather-16 me-2"></i>
-                                    Store-wise Stock Distribution
-                                </button>
+        <!-- Filter Section with Searchable Dropdowns -->
+        <div class="filter-section">
+            <div class="row align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">Date Range</label>
+                    <button class="custom-dropdown-btn" id="dateRangeButton" onclick="openDateRangeModal()">
+                        <span id="selectedDateRange">{% if request.GET.daterange %}{{ request.GET.daterange }}{% else %}Select Date Range{% endif %}</span>
+                        <span class="caret"></span>
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Store/Branch</label>
+                    <div class="dropdown-search-container">
+                        <div class="dropdown-search-input {% if request.GET.store %}filter-active{% endif %}" data-filter="store" onclick="toggleDropdown(this, event)">
+                            <span class="dropdown-selected-value" id="selectedStoreText">
+                                {% if request.GET.store %}
+                                    {% for store in stores %}{% if store.id|stringformat:"s" == request.GET.store %}{{ store.name }} ({{ store.branch.name|default:"Main" }}){% endif %}{% endfor %}
+                                {% else %}
+                                    All Stores
+                                {% endif %}
+                            </span>
+                            <i class="ti ti-chevron-down dropdown-arrow"></i>
+                        </div>
+                        <div class="dropdown-search-menu" id="storeDropdown" style="display: none;">
+                            <div class="dropdown-search-header">
+                                <i class="ti ti-search"></i>
+                                <input type="text" class="dropdown-search-field" placeholder="Search store..." onkeyup="filterDropdownOptions(this, 'store', event)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="dropdown-search-options">
+                                <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'store', event)" {% if not request.GET.store %}data-selected="true"{% endif %}>All Stores</div>
+                                {% for store in stores %}
+                                <div class="dropdown-search-option" data-value="{{ store.id }}" onclick="selectDropdownOption(this, 'store', event)" {% if request.GET.store == store.id|stringformat:"s" %}data-selected="true"{% endif %}>{{ store.name }} ({{ store.branch.name|default:"Main" }})</div>
+                                {% endfor %}
                             </div>
                         </div>
+                        <select name="store" id="id_store" class="form-select" style="display: none;">
+                            <option value="">All Stores</option>
+                            {% for store in stores %}
+                            <option value="{{ store.id }}" {% if request.GET.store == store.id|stringformat:"s" %}selected{% endif %}>{{ store.name }} ({{ store.branch.name|default:"Main" }})</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                    <div class="card-footer">
-                        <small class="text-muted">
-                            <i data-feather="info" class="feather-12 me-1"></i>
-                            Click on any section to view details
-                        </small>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Category</label>
+                    <div class="dropdown-search-container">
+                        <div class="dropdown-search-input {% if request.GET.category %}filter-active{% endif %}" data-filter="category" onclick="toggleDropdown(this, event)">
+                            <span class="dropdown-selected-value" id="selectedCategoryText">
+                                {% if request.GET.category %}
+                                    {% for category in categories %}{% if category.id|stringformat:"s" == request.GET.category %}{{ category.name }}{% endif %}{% endfor %}
+                                {% else %}
+                                    All Categories
+                                {% endif %}
+                            </span>
+                            <i class="ti ti-chevron-down dropdown-arrow"></i>
+                        </div>
+                        <div class="dropdown-search-menu" id="categoryDropdown" style="display: none;">
+                            <div class="dropdown-search-header">
+                                <i class="ti ti-search"></i>
+                                <input type="text" class="dropdown-search-field" placeholder="Search category..." onkeyup="filterDropdownOptions(this, 'category', event)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="dropdown-search-options">
+                                <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'category', event)" {% if not request.GET.category %}data-selected="true"{% endif %}>All Categories</div>
+                                {% for category in categories %}
+                                <div class="dropdown-search-option" data-value="{{ category.id }}" onclick="selectDropdownOption(this, 'category', event)" {% if request.GET.category == category.id|stringformat:"s" %}data-selected="true"{% endif %}>{{ category.name }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <select name="category" id="id_category" class="form-select" style="display: none;">
+                            <option value="">All Categories</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Stock Status</label>
+                    <div class="dropdown-search-container">
+                        <div class="dropdown-search-input {% if request.GET.stockstatus %}filter-active{% endif %}" data-filter="stockstatus" onclick="toggleDropdown(this, event)">
+                            <span class="dropdown-selected-value" id="selectedStockstatusText">
+                                {% if request.GET.stockstatus == 'healthy' %}Healthy
+                                {% elif request.GET.stockstatus == 'low' %}Low Stock
+                                {% elif request.GET.stockstatus == 'out' %}Out of Stock
+                                {% elif request.GET.stockstatus == 'over' %}Overstock
+                                {% else %}All Status{% endif %}
+                            </span>
+                            <i class="ti ti-chevron-down dropdown-arrow"></i>
+                        </div>
+                        <div class="dropdown-search-menu" id="stockstatusDropdown" style="display: none;">
+                            <div class="dropdown-search-header">
+                                <i class="ti ti-search"></i>
+                                <input type="text" class="dropdown-search-field" placeholder="Search status..." onkeyup="filterDropdownOptions(this, 'stockstatus', event)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="dropdown-search-options">
+                                <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'stockstatus', event)" {% if not request.GET.stockstatus %}data-selected="true"{% endif %}>All Status</div>
+                                <div class="dropdown-search-option" data-value="healthy" onclick="selectDropdownOption(this, 'stockstatus', event)" {% if request.GET.stockstatus == 'healthy' %}data-selected="true"{% endif %}>Healthy</div>
+                                <div class="dropdown-search-option" data-value="low" onclick="selectDropdownOption(this, 'stockstatus', event)" {% if request.GET.stockstatus == 'low' %}data-selected="true"{% endif %}>Low Stock</div>
+                                <div class="dropdown-search-option" data-value="out" onclick="selectDropdownOption(this, 'stockstatus', event)" {% if request.GET.stockstatus == 'out' %}data-selected="true"{% endif %}>Out of Stock</div>
+                                <div class="dropdown-search-option" data-value="over" onclick="selectDropdownOption(this, 'stockstatus', event)" {% if request.GET.stockstatus == 'over' %}data-selected="true"{% endif %}>Overstock</div>
+                            </div>
+                        </div>
+                        <select name="stockstatus" id="id_stockstatus" class="form-select" style="display: none;">
+                            <option value="">All Status</option>
+                            <option value="healthy" {% if request.GET.stockstatus == 'healthy' %}selected{% endif %}>Healthy</option>
+                            <option value="low" {% if request.GET.stockstatus == 'low' %}selected{% endif %}>Low Stock</option>
+                            <option value="out" {% if request.GET.stockstatus == 'out' %}selected{% endif %}>Out of Stock</option>
+                            <option value="over" {% if request.GET.stockstatus == 'over' %}selected{% endif %}>Overstock</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Expiry Status</label>
+                    <div class="dropdown-search-container">
+                        <div class="dropdown-search-input {% if request.GET.expiry %}filter-active{% endif %}" data-filter="expiry" onclick="toggleDropdown(this, event)">
+                            <span class="dropdown-selected-value" id="selectedExpiryText">
+                                {% if request.GET.expiry == 'critical' %}Critical (≤30 days)
+                                {% elif request.GET.expiry == 'warning' %}Warning (31-60 days)
+                                {% elif request.GET.expiry == 'monitor' %}Monitor (61-90 days)
+                                {% elif request.GET.expiry == 'safe' %}Safe (>90 days)
+                                {% elif request.GET.expiry == 'expired' %}Expired
+                                {% else %}All{% endif %}
+                            </span>
+                            <i class="ti ti-chevron-down dropdown-arrow"></i>
+                        </div>
+                        <div class="dropdown-search-menu" id="expiryDropdown" style="display: none;">
+                            <div class="dropdown-search-header">
+                                <i class="ti ti-search"></i>
+                                <input type="text" class="dropdown-search-field" placeholder="Search expiry..." onkeyup="filterDropdownOptions(this, 'expiry', event)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="dropdown-search-options">
+                                <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'expiry', event)" {% if not request.GET.expiry %}data-selected="true"{% endif %}>All</div>
+                                <div class="dropdown-search-option" data-value="critical" onclick="selectDropdownOption(this, 'expiry', event)" {% if request.GET.expiry == 'critical' %}data-selected="true"{% endif %}>Critical (≤30 days)</div>
+                                <div class="dropdown-search-option" data-value="warning" onclick="selectDropdownOption(this, 'expiry', event)" {% if request.GET.expiry == 'warning' %}data-selected="true"{% endif %}>Warning (31-60 days)</div>
+                                <div class="dropdown-search-option" data-value="monitor" onclick="selectDropdownOption(this, 'expiry', event)" {% if request.GET.expiry == 'monitor' %}data-selected="true"{% endif %}>Monitor (61-90 days)</div>
+                                <div class="dropdown-search-option" data-value="safe" onclick="selectDropdownOption(this, 'expiry', event)" {% if request.GET.expiry == 'safe' %}data-selected="true"{% endif %}>Safe (>90 days)</div>
+                                <div class="dropdown-search-option" data-value="expired" onclick="selectDropdownOption(this, 'expiry', event)" {% if request.GET.expiry == 'expired' %}data-selected="true"{% endif %}>Expired</div>
+                            </div>
+                        </div>
+                        <select name="expiry" id="id_expiry" class="form-select" style="display: none;">
+                            <option value="">All</option>
+                            <option value="critical" {% if request.GET.expiry == 'critical' %}selected{% endif %}>Critical (≤30 days)</option>
+                            <option value="warning" {% if request.GET.expiry == 'warning' %}selected{% endif %}>Warning (31-60 days)</option>
+                            <option value="monitor" {% if request.GET.expiry == 'monitor' %}selected{% endif %}>Monitor (61-90 days)</option>
+                            <option value="safe" {% if request.GET.expiry == 'safe' %}selected{% endif %}>Safe (>90 days)</option>
+                            <option value="expired" {% if request.GET.expiry == 'expired' %}selected{% endif %}>Expired</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Search</label>
+                    <input type="text" class="form-control" id="searchInput" placeholder="SKU, Product..." value="{{ request.GET.search|default:'' }}">
+                </div>
+                <div class="col-md-12 mt-3">
+                    <button class="btn btn-primary w-100" onclick="applyFilters()" id="applyFiltersBtn">
+                        <i class="ti ti-filter me-1"></i>
+                        Apply Filters
+                    </button>
+                    <button class="btn btn-outline-secondary w-100 mt-2" onclick="clearFilters()" id="clearFiltersBtn" style="{% if not request.GET %}display: none;{% endif %}">
+                        <i class="ti ti-x me-1"></i>
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date Range Modal -->
+        <div class="modal fade" id="dateRangeModal" tabindex="-1" aria-labelledby="dateRangeModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="dateRangeModalLabel">Select Date Range</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="date-range-input-group">
+                            <input type="date" id="startDate" class="form-control" placeholder="Start Date" value="{{ start_date|default:'' }}">
+                            <input type="date" id="endDate" class="form-control" placeholder="End Date" value="{{ end_date|default:'' }}">
+                        </div>
+                        
+                        <div class="preset-ranges">
+                            <span class="preset-range" onclick="setPresetRange('today')">Today</span>
+                            <span class="preset-range" onclick="setPresetRange('yesterday')">Yesterday</span>
+                            <span class="preset-range" onclick="setPresetRange('last7days')">Last 7 Days</span>
+                            <span class="preset-range" onclick="setPresetRange('last30days')">Last 30 Days</span>
+                            <span class="preset-range" onclick="setPresetRange('thisMonth')">This Month</span>
+                            <span class="preset-range" onclick="setPresetRange('lastMonth')">Last Month</span>
+                            <span class="preset-range" onclick="setPresetRange('thisYear')">This Year</span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearDateRange()">Clear</button> &nbsp; &nbsp;
+                        <button type="button" class="btn btn-primary" onclick="applyDateRange()">Apply</button>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Tab Content -->
-            <div class="col-lg-9 col-md-8">
-                <div class="tab-content" id="sideTabContent">
-                    <!-- Stock Level Report Tab -->
-                    <div class="tab-pane fade show active" id="stock-level" role="tabpanel" aria-labelledby="stock-level-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="package" class="feather-16 me-2"></i>
-                                    Stock Level Report
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterStock('all')">All</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterStock('low')">Low Stock</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterStock('out')">Out of Stock</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterStock('over')">Overstock</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-success">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">In Stock</h6>
-                                                <h4 class="card-title text-success">{{ in_stock_items }}</h4>
-                                                <small class="text-muted">Items</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-warning">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Low Stock</h6>
-                                                <h4 class="card-title text-warning">{{ low_stock_items }}</h4>
-                                                <small class="text-muted">Items</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-danger">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Out of Stock</h6>
-                                                <h4 class="card-title text-danger">{{ out_of_stock_items }}</h4>
-                                                <small class="text-muted">Items</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-info">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Overstock</h6>
-                                                <h4 class="card-title text-info">{{ overstock_items }}</h4>
-                                                <small class="text-muted">Items</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover" id="stockLevelTable">
-                                        <thead>
-                                            <tr>
-                                                <th>SKU</th>
-                                                <th>Product Name</th>
-                                                <th>Category</th>
-                                                <th>Current Stock</th>
-                                                <th>Reorder Level</th>
-                                                <th>Stock Status</th>
-                                                <th>Days of Stock</th>
-                                                <th>Last Received</th>
-                                                <th>Store</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for item in stock_level_data %}
-                                            <tr class="{{ item.table_class }}">
-                                                <td><strong>{{ item.sku }}</strong></td>
-                                                <td>{{ item.product_name }}</td>
-                                                <td>{{ item.category }}</td>
-                                                <td>{{ item.current_stock }}</td>
-                                                <td>{{ item.reorder_level }}</td>
-                                                <td>
-                                                    <span class="badge bg-{{ item.stock_status_class }}">
-                                                        {{ item.stock_status }}
-                                                    </span>
-                                                </td>
-                                                <td>{{ item.days_of_stock }}</td>
-                                                <td>{{ item.last_received|default:"Never" }}</td>
-                                                <td>{{ item.store_name }}</td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="9" class="text-center">No stock data available</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="row mt-4">
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Stock Status Summary</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> 
-                                                        {% widthratio in_stock_items total_products 100 %}% items in healthy stock levels
-                                                    </li>
-                                                    <li><i data-feather="alert-circle" class="feather-12 text-warning me-2"></i> 
-                                                        {% widthratio low_stock_items total_products 100 %}% items require reordering
-                                                    </li>
-                                                    <li><i data-feather="x-circle" class="feather-12 text-danger me-2"></i> 
-                                                        {% widthratio out_of_stock_items total_products 100 %}% items out of stock
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Recommendations</h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    {% if low_stock_items > 0 %}
-                                                    <li><i data-feather="shopping-cart" class="feather-12 text-primary me-2"></i> 
-                                                        Place orders for {{ low_stock_items }} low stock items
-                                                    </li>
-                                                    {% endif %}
-                                                    {% if out_of_stock_items > 0 %}
-                                                    <li><i data-feather="alert-octagon" class="feather-12 text-danger me-2"></i> 
-                                                        Urgent restocking needed for {{ out_of_stock_items }} items
-                                                    </li>
-                                                    {% endif %}
-                                                    <li><i data-feather="bell" class="feather-12 text-info me-2"></i> 
-                                                        Set up alerts for reorder levels
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+        <!-- Batch Details Modal -->
+        <div class="modal fade" id="batchDetailModal" tabindex="-1" aria-labelledby="batchDetailModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="batchDetailModalLabel">
+                            <i class="ti ti-package me-2"></i>
+                            Batch Details
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="batchModalBody">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Batch Expiry Report Tab -->
-                    <div class="tab-pane fade" id="batch-expiry" role="tabpanel" aria-labelledby="batch-expiry-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="calendar" class="feather-16 me-2"></i>
-                                    Batch Expiry Report
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterExpiry('all')">All</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterExpiry('30')">30 Days</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterExpiry('60')">60 Days</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterExpiry('90')">90 Days</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-danger">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Expiring in 30 Days</h6>
-                                                <h4 class="card-title text-danger">{{ critical_count }}</h4>
-                                                <small class="text-muted">Batches</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-warning">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Expiring in 60 Days</h6>
-                                                <h4 class="card-title text-warning">{{ warning_count }}</h4>
-                                                <small class="text-muted">Batches</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-info">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Expiring in 90 Days</h6>
-                                                <h4 class="card-title text-info">{{ monitor_count }}</h4>
-                                                <small class="text-muted">Batches</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="card bg-light-success">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Safe (>90 Days)</h6>
-                                                <h4 class="card-title text-success">{{ safe_count }}</h4>
-                                                <small class="text-muted">Batches</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover" id="batchExpiryTable">
-                                        <thead>
-                                            <tr>
-                                                <th>Batch No</th>
-                                                <th>Product Name</th>
-                                                <th>SKU</th>
-                                                <th>Expiry Date</th>
-                                                <th>Days to Expiry</th>
-                                                <th>Current Stock</th>
-                                                <th>Value at Risk (UGX)</th>
-                                                <th>Status</th>
-                                                <th>Store</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for batch in batch_expiry_data %}
-                                            <tr class="{{ batch.table_class }}">
-                                                <td><strong>{{ batch.batch_no }}</strong></td>
-                                                <td>{{ batch.product_name }}</td>
-                                                <td>{{ batch.sku }}</td>
-                                                <td>{{ batch.expiry_date }}</td>
-                                                <td>
-                                                    {% if batch.days_to_expiry %}
-                                                        {% if batch.days_to_expiry <= 30 %}
-                                                            <span class="badge bg-danger">{{ batch.days_to_expiry }} days</span>
-                                                        {% elif batch.days_to_expiry <= 60 %}
-                                                            <span class="badge bg-warning">{{ batch.days_to_expiry }} days</span>
-                                                        {% elif batch.days_to_expiry <= 90 %}
-                                                            <span class="badge bg-info">{{ batch.days_to_expiry }} days</span>
-                                                        {% else %}
-                                                            <span class="badge bg-success">{{ batch.days_to_expiry }} days</span>
-                                                        {% endif %}
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">No expiry</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ batch.current_stock }}</td>
-                                                <td>UGX {{ batch.value_at_risk|floatformat:0|intcomma }}</td>
-                                                <td><span class="badge bg-{{ batch.status_class }}">{{ batch.status }}</span></td>
-                                                <td>{{ batch.store_name }}</td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="9" class="text-center">No batch expiry data available</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="exportBatchDetails()">
+                            <i class="ti ti-download me-1"></i>
+                            Export Details
+                        </button>
                     </div>
+                </div>
+            </div>
+        </div>
 
-                    <!-- Expired Stock Report Tab -->
-                    <div class="tab-pane fade" id="expired-stock" role="tabpanel" aria-labelledby="expired-stock-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-                                    Expired Stock Report
-                                </h5>
-                                <span class="badge bg-danger">Immediate Action Required</span>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-4">
-                                        <div class="card bg-light-danger">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Expired Items</h6>
-                                                <h4 class="card-title text-danger">{{ expired_items_count }}</h4>
-                                                <small class="text-muted">SKUs</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card bg-light-danger">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Total Expired Units</h6>
-                                                <h4 class="card-title text-danger">{{ total_expired_units }}</h4>
-                                                <small class="text-muted">Units</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card bg-light-danger">
-                                            <div class="card-body p-3 text-center">
-                                                <h6 class="card-subtitle mb-1 text-muted">Total Value Lost</h6>
-                                                <h4 class="card-title text-danger">UGX {{ total_expired_value|floatformat:0|intcomma }}</h4>
-                                                <small class="text-muted">Potential Loss</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>SKU</th>
-                                                <th>Product Name</th>
-                                                <th>Category</th>
-                                                <th>Batch No</th>
-                                                <th>Expiry Date</th>
-                                                <th>Days Expired</th>
-                                                <th>Expired Units</th>
-                                                <th>Unit Cost (UGX)</th>
-                                                <th>Total Value (UGX)</th>
-                                                <th>Store</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for item in expired_stock_data %}
-                                            <tr class="table-danger">
-                                                <td><strong>{{ item.sku }}</strong></td>
-                                                <td>{{ item.product_name }}</td>
-                                                <td>{{ item.category }}</td>
-                                                <td>{{ item.batch_no }}</td>
-                                                <td>{{ item.expiry_date }}</td>
-                                                <td><span class="badge bg-danger">{{ item.days_expired }} days</span></td>
-                                                <td>{{ item.expired_units }}</td>
-                                                <td>UGX {{ item.unit_cost|floatformat:0|intcomma }}</td>
-                                                <td>UGX {{ item.total_value|floatformat:0|intcomma }}</td>
-                                                <td>{{ item.store_name }}</td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="10" class="text-center">No expired stock data available</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {% if expired_stock_data %}
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <div class="card bg-light-danger">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Disposal and Recovery Actions</h6>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Total Value at Risk:</strong> UGX {{ total_expired_value|floatformat:0|intcomma }}</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Potential Recovery:</strong> UGX 0 (0%)</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Net Loss Estimate:</strong> UGX {{ total_expired_value|floatformat:0|intcomma }}</p>
-                                                        <p class="mb-1"><strong>Action Deadline:</strong> {% now "Y-m-d" %}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+        <!-- Inventory Table -->
+        <div class="table-container" id="inventoryTableContainer">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Complete Inventory Status</h5>
+                <div>
+                    <span class="badge bg-light text-dark me-2">
+                        <i class="ti ti-clock me-1"></i>
+                        Last Updated: <span id="lastUpdated">{% now "Y-m-d H:i:s" %}</span>
+                    </span>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover" id="inventoryTable">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Store/Branch</th>
+                            <th>Current Stock</th>
+                            <th>Stock Status</th>
+                            <th>Total Value</th>
+                            <th>Expiry Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryTableBody">
+                        {% for item in inventory_data %}
+                        <tr class="{{ item.row_class|default:'' }}" data-index="{{ forloop.counter0 }}">
+                            <td>
+                                <strong>{{ item.sku|default:"N/A" }}</strong>
+                                {% if item.batch_count and item.batch_count > 1 %}
+                                <span class="batch-count-badge" onclick="showBatchDetails({{ forloop.counter0 }})">
+                                    {{ item.batch_count }} batches
+                                </span>
                                 {% endif %}
+                            </td>
+                            <td>
+                                {{ item.product_name|default:"-" }}
+                                {% if item.brand %}
+                                <small class="d-block text-muted">{{ item.brand }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.category|default:"Uncategorized" }}</td>
+                            <td>
+                                {{ item.store_name|default:"-" }}
+                                {% if item.branch_name %}
+                                <small class="d-block text-muted">{{ item.branch_name }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <strong>{{ item.current_stock|default:0|intcomma }}</strong>
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ item.status_class|default:'info' }}">
+                                    {{ item.stock_status|default:"Unknown" }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <strong>UGX {{ item.total_value|default:0|floatformat:0|intcomma }}</strong>
+                            </td>
+                            <td>
+                                {% if item.expiry_status %}
+                                    <span class="status-badge status-{{ item.expiry_class|default:'info' }}" onclick="showBatchDetails({{ forloop.counter0 }})" style="cursor: pointer;">
+                                        {{ item.expiry_status }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">No expiry</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn-detail" onclick="showBatchDetails({{ forloop.counter0 }})">
+                                    <i class="ti ti-eye me-1"></i>
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <i class="ti ti-package fs-48 text-muted mb-3"></i>
+                                <h6 class="text-muted">No inventory data available</h6>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-primary">
+                            <th colspan="6" class="text-end">Totals:</th>
+                            <th class="text-end">UGX <span id="totalInventoryValueFooter">{{ total_inventory_value|default:0|floatformat:0|intcomma }}</span></th>
+                            <th colspan="2"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Stock by Category</h6>
+                        <div id="categorySummary">
+                            {% for category in category_summary %}
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>{{ category.name }}</span>
+                                <span class="text-primary">{{ category.count }} items</span>
                             </div>
+                            <div class="progress-thin mb-3">
+                                <div class="progress-bar bg-primary" style="width: {{ category.percentage }}%"></div>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted">No data available</p>
+                            {% endfor %}
                         </div>
                     </div>
-
-                    <!-- Inventory Valuation Tab -->
-                    <div class="tab-pane fade" id="inventory-valuation" role="tabpanel" aria-labelledby="inventory-valuation-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="dollar-sign" class="feather-16 me-2"></i>
-                                    Inventory Valuation
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterValuation('fifo')">FIFO</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterValuation('avg')">Weighted Avg</button>
-                                </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Stock by Store</h6>
+                        <div id="storeSummary">
+                            {% for store in store_summary %}
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>{{ store.name }}</span>
+                                <span class="text-success">UGX {{ store.value|floatformat:0|intcomma }}</span>
                             </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-8">
-                                        <canvas id="inventoryValueChart" height="120"></canvas>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card bg-light h-100">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-3 text-muted">Valuation Summary</h6>
-                                                <div class="valuation-summary">
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Total Inventory Value</span>
-                                                        <span class="text-primary">UGX {{ total_inventory_value|floatformat:0|intcomma }}</span>
-                                                    </div>
-                                                    <div class="progress mb-3" style="height: 8px;">
-                                                        <div class="progress-bar bg-primary" style="width: 100%"></div>
-                                                    </div>
-                                                    
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Total Categories</span>
-                                                        <span class="text-info">{{ inventory_valuation_data|length }}</span>
-                                                    </div>
-                                                    
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Total Products</span>
-                                                        <span class="text-success">{{ total_products }}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Category</th>
-                                                <th>SKUs</th>
-                                                <th>Total Units</th>
-                                                <th>Avg. Unit Cost (UGX)</th>
-                                                <th>Total Cost (UGX)</th>
-                                                <th>% of Total</th>
-                                                <th>Avg. Selling Price (UGX)</th>
-                                                <th>Total Market Value (UGX)</th>
-                                                <th>Gross Margin</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for item in inventory_valuation_data %}
-                                            <tr>
-                                                <td><strong>{{ item.category_name }}</strong></td>
-                                                <td>{{ item.skus }}</td>
-                                                <td>{{ item.total_units|intcomma }}</td>
-                                                <td>UGX {{ item.avg_unit_cost|floatformat:0|intcomma }}</td>
-                                                <td>UGX {{ item.total_cost|floatformat:0|intcomma }}</td>
-                                                <td>{{ item.percentage_of_total|floatformat:1 }}%</td>
-                                                <td>UGX {{ item.avg_selling_price|floatformat:0|intcomma }}</td>
-                                                <td>UGX {{ item.total_market_value|floatformat:0|intcomma }}</td>
-                                                <td><span class="badge bg-success">{{ item.gross_margin|floatformat:0 }}%</span></td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="9" class="text-center">No inventory valuation data available</td>
-                                            </tr>
-                                            {% endfor %}
-                                            {% if inventory_valuation_data %}
-                                            <tr class="table-primary">
-                                                <td><strong>Total</strong></td>
-                                                <td><strong>{{ total_products }}</strong></td>
-                                                <td><strong>{{ total_units_all|intcomma }}</strong></td>
-                                                <td><strong>-</strong></td>
-                                                <td><strong>UGX {{ total_inventory_value|floatformat:0|intcomma }}</strong></td>
-                                                <td><strong>100%</strong></td>
-                                                <td><strong>-</strong></td>
-                                                <td><strong>UGX {{ total_market_value_all|floatformat:0|intcomma }}</strong></td>
-                                                <td><strong>50%</strong></td>
-                                            </tr>
-                                            {% endif %}
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <div class="progress-thin mb-3">
+                                <div class="progress-bar bg-success" style="width: {{ store.percentage }}%"></div>
                             </div>
+                            {% empty %}
+                            <p class="text-muted">No data available</p>
+                            {% endfor %}
                         </div>
                     </div>
-
-                    <!-- Stock Aging Report Tab -->
-                    <div class="tab-pane fade" id="stock-aging" role="tabpanel" aria-labelledby="stock-aging-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="clock" class="feather-16 me-2"></i>
-                                    Stock Aging Report
-                                </h5>
-                                <span class="badge bg-warning">Slow-moving Inventory</span>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <canvas id="stockAgingChart" height="100"></canvas>
-                                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Expiry Summary</h6>
+                        <div id="expirySummary">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>Critical (≤30 days)</span>
+                                    <span class="text-danger">{{ critical_count|default:0 }}</span>
                                 </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>SKU</th>
-                                                <th>Product Name</th>
-                                                <th>Category</th>
-                                                <th>Current Stock</th>
-                                                <th>Avg. Monthly Sales</th>
-                                                <th>Days in Stock</th>
-                                                <th>Aging Bucket</th>
-                                                <th>Last Sale Date</th>
-                                                <th>Stock Cover (Days)</th>
-                                                <th>Action Required</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <!-- This section needs sales data to be dynamic -->
-                                            <tr class="table-danger">
-                                                <td colspan="10" class="text-center">
-                                                    <i data-feather="database" class="feather-24 mb-3"></i>
-                                                    <h6>Stock Aging Data Not Available</h6>
-                                                    <p class="text-muted">This report requires sales history data</p>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                <div class="progress-thin">
+                                    <div class="progress-bar bg-danger" style="width: {{ critical_percentage|default:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>Warning (31-60 days)</span>
+                                    <span class="text-warning">{{ warning_count|default:0 }}</span>
+                                </div>
+                                <div class="progress-thin">
+                                    <div class="progress-bar bg-warning" style="width: {{ warning_percentage|default:0 }}%"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Quick Actions</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary btn-sm" onclick="quickFilter('low')">
+                                <i class="ti ti-alert-triangle me-2"></i>
+                                View Low Stock ({{ low_stock_count|default:0 }})
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="quickFilter('critical')">
+                                <i class="ti ti-calendar me-2"></i>
+                                View Expiring ({{ critical_count|default:0 }})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                    <!-- Real-time Stock Availability Tab -->
-                    <div class="tab-pane fade" id="real-time" role="tabpanel" aria-labelledby="real-time-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="zap" class="feather-16 me-2"></i>
-                                    Real-time Stock Availability
-                                    <span class="badge bg-success ms-2">Live</span>
-                                </h5>
-                                <div class="d-flex align-items-center">
-                                    <div class="spinner-grow spinner-grow-sm text-success me-2" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <small class="text-muted">Last updated: <span id="lastUpdated">Just now</span></small>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="input-group">
-                                            <span class="input-group-text">
-                                                <i data-feather="search" class="feather-16"></i>
+        <!-- Recent Movements with Pagination -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Recent Stock Movements</h6>
+                        <div>
+                            <span class="badge bg-primary me-2" id="totalMovements">{{ recent_movements|length }} Total Movements</span>
+                            {% if recent_movements|length > 8 %}
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleAllMovements()">
+                                <i class="ti ti-eye me-1"></i>
+                                View All
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="recentMovementsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Date/Time</th>
+                                        <th>Product</th>
+                                        <th>Type</th>
+                                        <th>Quantity</th>
+                                        <th>Store</th>
+                                        <th>User</th>
+                                        <th>Reference</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="movementsTableBody">
+                                    {% for movement in recent_movements %}
+                                    <tr class="movement-row">
+                                        <td>{{ movement.timestamp|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ movement.product.name }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if movement.quantity > 0 %}success{% else %}danger{% endif %}">
+                                                {{ movement.transaction_type }}
                                             </span>
-                                            <input type="text" class="form-control" placeholder="Search by SKU, product name, or category..." id="stockSearch">
-                                            <button class="btn btn-outline-primary" type="button" onclick="searchStock()">
-                                                Search
-                                            </button>
-                                            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
-                                                Clear
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover" id="realTimeTable">
-                                                <thead>
-                                                    <tr>
-                                                        <th>SKU</th>
-                                                        <th>Product Name</th>
-                                                        <th>Category</th>
-                                                        <th>Available Stock</th>
-                                                        <th>Reserved Stock</th>
-                                                        <th>Available for Sale</th>
-                                                        <th>In Transit</th>
-                                                        <th>Stock Status</th>
-                                                        <th>Location</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="realTimeTableBody">
-                                                    {% for item in real_time_stock_data %}
-                                                    <tr>
-                                                        <td><strong>{{ item.sku }}</strong></td>
-                                                        <td>{{ item.product_name }}</td>
-                                                        <td>{{ item.category }}</td>
-                                                        <td>{{ item.available_stock }}</td>
-                                                        <td>{{ item.reserved_stock }}</td>
-                                                        <td><strong>{{ item.available_for_sale }}</strong></td>
-                                                        <td>{{ item.in_transit }}</td>
-                                                        <td>
-                                                            <span class="badge bg-{{ item.status_class }}">
-                                                                {{ item.stock_status }}
-                                                            </span>
-                                                        </td>
-                                                        <td>{{ item.location }}</td>
-                                                    </tr>
-                                                    {% empty %}
-                                                    <tr>
-                                                        <td colspan="9" class="text-center">No real-time stock data available</td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-3 text-muted">Live Stock Alerts</h6>
-                                                {% if low_stock_items > 0 %}
-                                                <div class="alert alert-warning" role="alert">
-                                                    <div class="d-flex">
-                                                        <i data-feather="alert-triangle" class="feather-16 me-2"></i>
-                                                        <div>
-                                                            <strong>Low Stock Alert:</strong> {{ low_stock_items }} items below reorder level
-                                                            <div class="mt-1">
-                                                                <button class="btn btn-sm btn-outline-warning" onclick="viewLowStock()">View Details</button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {% endif %}
-                                                {% if out_of_stock_items > 0 %}
-                                                <div class="alert alert-danger" role="alert">
-                                                    <div class="d-flex">
-                                                        <i data-feather="x-octagon" class="feather-16 me-2"></i>
-                                                        <div>
-                                                            <strong>Out of Stock Alert:</strong> {{ out_of_stock_items }} items with zero stock
-                                                            <div class="mt-1">
-                                                                <button class="btn btn-sm btn-outline-danger" onclick="viewOutOfStock()">View Details</button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-3 text-muted">Quick Actions</h6>
-                                                <div class="d-grid gap-2">
-                                                    <button class="btn btn-outline-primary" onclick="placeQuickOrder()">
-                                                        <i data-feather="shopping-cart" class="feather-16 me-2"></i>
-                                                        Place Quick Order
-                                                    </button>
-                                                    <button class="btn btn-outline-success" onclick="updateStockLevels()">
-                                                        <i data-feather="refresh-cw" class="feather-16 me-2"></i>
-                                                        Update Stock Count
-                                                    </button>
-                                                    <button class="btn btn-outline-info" onclick="generateStockReport()">
-                                                        <i data-feather="file-text" class="feather-16 me-2"></i>
-                                                        Generate Stock Report
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                                        </td>
+                                        <td class="{% if movement.quantity > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {{ movement.quantity }}
+                                        </td>
+                                        <td>{{ movement.store.name }}</td>
+                                        <td>{{ movement.user }}</td>
+                                        <td><small>{{ movement.note|truncatechars:30 }}</small></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="7" class="text-center">No recent movements</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
-
-                    <!-- Store-wise Stock Distribution Tab -->
-                    <div class="tab-pane fade" id="store-distribution" role="tabpanel" aria-labelledby="store-distribution-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="share-2" class="feather-16 me-2"></i>
-                                    Store-wise Stock Distribution
-                                </h5>
-                                <span class="badge bg-primary">{{ total_stores }} Stores</span>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <canvas id="storeDistributionChart" height="100"></canvas>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Store</th>
-                                                <th>Total SKUs</th>
-                                                <th>Total Units</th>
-                                                <th>Inventory Value (UGX)</th>
-                                                <th>% of Total</th>
-                                                <th>Avg. Stock per SKU</th>
-                                                <th>Stock Health</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for store in store_distribution_data %}
-                                            <tr>
-                                                <td><strong>{{ store.store_name }}</strong></td>
-                                                <td>{{ store.total_skus }}</td>
-                                                <td>{{ store.total_units|intcomma }}</td>
-                                                <td>UGX {{ store.inventory_value|floatformat:0|intcomma }}</td>
-                                                <td>{{ store.percentage_of_total|floatformat:1 }}%</td>
-                                                <td>{{ store.avg_stock_per_sku|floatformat:1 }}</td>
-                                                <td>
-                                                    <span class="badge bg-{{ store.health_class }}">
-                                                        {{ store.stock_health }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            {% empty %}
-                                            <tr>
-                                                <td colspan="7" class="text-center">No store distribution data available</td>
-                                            </tr>
-                                            {% endfor %}
-                                            {% if store_distribution_data %}
-                                            <tr class="table-primary">
-                                                <td><strong>Total</strong></td>
-                                                <td><strong>{{ store_total_skus }}</strong></td>
-                                                <td><strong>{{ store_total_units|intcomma }}</strong></td>
-                                                <td><strong>UGX {{ total_inventory_value|floatformat:0|intcomma }}</strong></td>
-                                                <td><strong>100%</strong></td>
-                                                <td><strong>-</strong></td>
-                                                <td><strong>-</strong></td>
-                                            </tr>
-                                            {% endif %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                        
+                        <!-- Pagination Controls -->
+                        {% if recent_movements|length > 8 %}
+                        <div class="movements-pagination">
+                            <nav aria-label="Recent movements navigation">
+                                <ul class="pagination" id="movementsPagination">
+                                    <!-- Generated by JavaScript -->
+                                </ul>
+                            </nav>
                         </div>
+                        <div class="movements-table-info" id="movementsInfo">
+                            Showing 1-8 of {{ recent_movements|length }} movements
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -867,693 +1231,561 @@
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-// Get data from Django context
-const stockStatusData = {{ stock_status_data|safe }};
-const inventoryValueData = {{ inventory_value_data|safe }};
-const storeDistributionChartData = {{ store_distribution_chart_data|safe }};
-const stockAgingData = {{ stock_aging_data|safe }};
+// Inventory data from Django
+const inventoryData = [
+    {% for item in inventory_data %}
+    {
+        product_name: "{{ item.product_name|escapejs|default:'' }}",
+        sku: "{{ item.sku|escapejs|default:'' }}",
+        category: "{{ item.category|escapejs|default:'' }}",
+        store_name: "{{ item.store_name|escapejs|default:'' }}",
+        current_stock: {{ item.current_stock|default:'0' }},
+        total_value: {{ item.total_value|default:'0' }},
+        batch_info: [
+            {% for batch in item.batch_info %}
+            {
+                batch_no: {{ batch.batch_no|default:'null' }},
+                quantity: {{ batch.quantity|default:'0' }},
+                unit_cost: {{ batch.unit_cost|default:'0' }},
+                expiry_date: "{{ batch.expiry_date|date:'Y-m-d'|default:'' }}"
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
 
-let inventoryValueChart;
-let stockAgingChart;
-let storeDistributionChart;
-let realTimeInterval;
+// Movements pagination variables
+let currentPage = 1;
+const rowsPerPage = 8;
+let totalRows = 0;
+let totalPages = 1;
+let showingAllMovements = false;
 
-// Initialize charts and icons
-document.addEventListener('DOMContentLoaded', function() {
-    initializeCharts();
-    startRealTimeUpdates();
+// ==================== DROPDOWN SEARCH FUNCTIONS ====================
+function toggleDropdown(element, event) {
+    if (!element) return;
     
-    // Initialize feather icons
-    if (typeof feather !== 'undefined') {
-        feather.replace();
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const filter = element.dataset.filter;
+    if (!filter) return;
+    
+    const dropdownId = filter + 'Dropdown';
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    // Close all dropdowns first
+    document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    // Toggle current dropdown
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        setTimeout(() => {
+            const searchField = dropdown.querySelector('.dropdown-search-field');
+            if (searchField) searchField.focus();
+        }, 100);
+    }
+}
+
+function filterDropdownOptions(input, filter, event) {
+    if (!input || !filter) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const searchTerm = input.value.toLowerCase().trim();
+    const dropdownId = filter + 'Dropdown';
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const options = dropdown.querySelectorAll('.dropdown-search-option');
+    
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        option.style.display = (searchTerm === '' || text.includes(searchTerm)) ? 'block' : 'none';
+    });
+}
+
+function selectDropdownOption(option, filter, event) {
+    if (!option || !filter) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById('id_' + filter);
+    const selectedText = document.getElementById('selected' + filter.charAt(0).toUpperCase() + filter.slice(1) + 'Text');
+    
+    if (!select || !selectedText) return;
+    
+    // Update hidden select
+    select.value = value;
+    
+    // Update displayed text
+    selectedText.textContent = text;
+    
+    // Update selected state
+    const dropdown = document.getElementById(filter + 'Dropdown');
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    // Update active class
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="${filter}"]`);
+    if (dropdownInput) {
+        if (value) {
+            dropdownInput.classList.add('filter-active');
+        } else {
+            dropdownInput.classList.remove('filter-active');
+        }
+    }
+    
+    // Close dropdown
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-search-container')) {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
     }
 });
 
-function initializeCharts() {
-    // Initialize inventory value chart
-    if (inventoryValueData && inventoryValueData.labels && inventoryValueData.labels.length > 0) {
-        initializeInventoryValueChart();
+// Close on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
     }
-    
-    // Initialize stock aging chart
-    if (stockAgingData && stockAgingData.labels && stockAgingData.labels.length > 0) {
-        initializeStockAgingChart();
-    }
-    
-    // Initialize store distribution chart
-    if (storeDistributionChartData && storeDistributionChartData.labels && storeDistributionChartData.labels.length > 0) {
-        initializeStoreDistributionChart();
-    }
-}
+});
 
-function initializeInventoryValueChart() {
-    const ctx = document.getElementById('inventoryValueChart');
-    if (!ctx) return;
+// ==================== FILTER FUNCTIONS ====================
+let filterTimeout;
+
+function applyFilters() {
+    showLoading();
     
-    new Chart(ctx.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: inventoryValueData.labels,
-            datasets: [{
-                label: 'Inventory Value (UGX)',
-                data: inventoryValueData.data,
-                backgroundColor: [
-                    '#4A90E2', '#36B9CC', '#1CC88A', '#F6C23E', '#E74A3B', '#6F42C1'
-                ],
-                borderColor: [
-                    '#357ABD', '#2A9CA5', '#17A673', '#F4B619', '#E02D1B', '#5A3696'
-                ],
-                borderWidth: 1
-            }]
+    const filters = {
+        store: $('#id_store').val(),
+        category: $('#id_category').val(),
+        stockstatus: $('#id_stockstatus').val(),
+        expiry: $('#id_expiry').val(),
+        search: $('#searchInput').val(),
+        daterange: $('#selectedDateRange').text() !== 'Select Date Range' ? $('#selectedDateRange').text() : ''
+    };
+    
+    $.ajax({
+        url: window.location.pathname,
+        method: 'GET',
+        data: filters,
+        success: function(response) {
+            location.href = window.location.pathname + '?' + $.param(filters);
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const value = context.raw || 0;
-                            return `Value: UGX ${value.toLocaleString()}`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            if (value >= 1000000) {
-                                return 'UGX ' + (value / 1000000).toFixed(1) + 'M';
-                            } else if (value >= 1000) {
-                                return 'UGX ' + (value / 1000).toFixed(0) + 'K';
-                            }
-                            return 'UGX ' + value;
-                        }
-                    },
-                    title: {
-                        display: true,
-                        text: 'Inventory Value (UGX)'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Category'
-                    }
-                }
-            }
+        error: function() {
+            hideLoading();
+            alert('Error applying filters');
         }
     });
 }
 
-function initializeStockAgingChart() {
-    const ctx = document.getElementById('stockAgingChart');
-    if (!ctx) return;
-    
-    new Chart(ctx.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: stockAgingData.labels,
-            datasets: [{
-                label: 'Number of SKUs',
-                data: stockAgingData.data,
-                backgroundColor: [
-                    '#1CC88A', '#36B9CC', '#4A90E2', '#F6C23E', '#E74A3B', '#6F42C1'
-                ],
-                borderColor: [
-                    '#17A673', '#2A9CA5', '#357ABD', '#F4B619', '#E02D1B', '#5A3696'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const value = context.raw || 0;
-                            return `${value} SKUs`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of SKUs'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Aging Bucket'
-                    }
-                }
-            }
-        }
-    });
+function quickFilter(type) {
+    if (type === 'low') {
+        $('#id_stockstatus').val('low');
+        $('#selectedStockstatusText').text('Low Stock');
+        $('.dropdown-search-input[data-filter="stockstatus"]').addClass('filter-active');
+    } else if (type === 'critical') {
+        $('#id_expiry').val('critical');
+        $('#selectedExpiryText').text('Critical (≤30 days)');
+        $('.dropdown-search-input[data-filter="expiry"]').addClass('filter-active');
+    }
+    applyFilters();
 }
 
-function initializeStoreDistributionChart() {
-    const ctx = document.getElementById('storeDistributionChart');
-    if (!ctx) return;
+function clearFilters() {
+    $('#id_store').val('');
+    $('#id_category').val('');
+    $('#id_stockstatus').val('');
+    $('#id_expiry').val('');
+    $('#searchInput').val('');
+    $('#selectedDateRange').text('Select Date Range');
+    $('#startDate').val('');
+    $('#endDate').val('');
     
-    new Chart(ctx.getContext('2d'), {
-        type: 'doughnut',
-        data: {
-            labels: storeDistributionChartData.labels,
-            datasets: [{
-                data: storeDistributionChartData.data,
-                backgroundColor: [
-                    '#4A90E2', '#36B9CC', '#1CC88A', '#F6C23E', '#E74A3B'
-                ],
-                borderColor: [
-                    '#357ABD', '#2A9CA5', '#17A673', '#F4B619', '#E02D1B'
-                ],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            return `${label}: ${value.toFixed(1)}%`;
-                        }
-                    }
-                }
-            }
-        }
-    });
+    $('#selectedStoreText').text('All Stores');
+    $('#selectedCategoryText').text('All Categories');
+    $('#selectedStockstatusText').text('All Status');
+    $('#selectedExpiryText').text('All');
+    
+    $('.dropdown-search-input').removeClass('filter-active');
+    $('#clearFiltersBtn').hide();
+    
+    applyFilters();
 }
 
-function startRealTimeUpdates() {
-    // Update timestamp every minute
-    realTimeInterval = setInterval(() => {
-        const now = new Date();
-        const formattedTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('lastUpdated').textContent = formattedTime;
-    }, 60000);
+function showLoading() {
+    $('#loadingOverlay').addClass('active');
 }
 
-// Filter functions
-function filterStock(type) {
-    const table = document.getElementById('stockLevelTable');
-    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+function hideLoading() {
+    $('#loadingOverlay').removeClass('active');
+}
+
+// ==================== DATE RANGE FUNCTIONS ====================
+function openDateRangeModal() {
+    new bootstrap.Modal(document.getElementById('dateRangeModal')).show();
+}
+
+function setPresetRange(range) {
+    const today = new Date();
+    let start, end;
     
-    for (let row of rows) {
-        const statusCell = row.cells[5];
-        if (statusCell) {
-            const statusText = statusCell.textContent.toLowerCase();
-            let show = false;
-            
-            switch(type) {
-                case 'all': show = true; break;
-                case 'low': show = statusText.includes('low'); break;
-                case 'out': show = statusText.includes('out'); break;
-                case 'over': show = statusText.includes('over'); break;
-            }
-            
-            row.style.display = show ? '' : 'none';
-        }
+    switch(range) {
+        case 'today':
+            start = end = today;
+            break;
+        case 'yesterday':
+            start = end = new Date(today.setDate(today.getDate() - 1));
+            break;
+        case 'last7days':
+            end = new Date();
+            start = new Date(end);
+            start.setDate(end.getDate() - 6);
+            break;
+        case 'last30days':
+            end = new Date();
+            start = new Date(end);
+            start.setDate(end.getDate() - 29);
+            break;
+        case 'thisMonth':
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case 'lastMonth':
+            start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            end = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'thisYear':
+            start = new Date(today.getFullYear(), 0, 1);
+            end = new Date(today.getFullYear(), 11, 31);
+            break;
     }
     
-    // Update active button
-    updateActiveButton('stockFilter', type);
+    $('#startDate').val(formatDate(start));
+    $('#endDate').val(formatDate(end));
 }
 
-function filterExpiry(days) {
-    const table = document.getElementById('batchExpiryTable');
-    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-    
-    for (let row of rows) {
-        const daysCell = row.cells[4];
-        if (daysCell) {
-            const daysText = daysCell.textContent;
-            let show = false;
-            const daysMatch = daysText.match(/\d+/);
-            const daysValue = daysMatch ? parseInt(daysMatch[0]) : null;
-            
-            switch(days) {
-                case 'all': show = true; break;
-                case '30': show = daysValue !== null && daysValue <= 30; break;
-                case '60': show = daysValue !== null && daysValue <= 60; break;
-                case '90': show = daysValue !== null && daysValue <= 90; break;
-            }
-            
-            row.style.display = show ? '' : 'none';
-        }
-    }
-    
-    updateActiveButton('expiryFilter', days);
+function formatDate(date) {
+    return date.toISOString().split('T')[0];
 }
 
-function filterValuation(method) {
-    // Placeholder for valuation method filtering
-    showToast(`Switched to ${method.toUpperCase()} valuation method`, 'info');
-    updateActiveButton('valuationFilter', method);
-}
-
-function searchStock() {
-    const searchTerm = document.getElementById('stockSearch').value.toLowerCase();
-    const tableBody = document.getElementById('realTimeTableBody');
-    const rows = tableBody.getElementsByTagName('tr');
+function applyDateRange() {
+    const start = $('#startDate').val();
+    const end = $('#endDate').val();
     
-    for (let row of rows) {
-        const rowText = row.textContent.toLowerCase();
-        row.style.display = rowText.includes(searchTerm) ? '' : 'none';
+    if (start && end) {
+        $('#selectedDateRange').text(start + ' - ' + end);
+        bootstrap.Modal.getInstance(document.getElementById('dateRangeModal')).hide();
+        applyFilters();
     }
 }
 
-function clearSearch() {
-    document.getElementById('stockSearch').value = '';
-    const tableBody = document.getElementById('realTimeTableBody');
-    const rows = tableBody.getElementsByTagName('tr');
+function clearDateRange() {
+    $('#startDate').val('');
+    $('#endDate').val('');
+    $('#selectedDateRange').text('Select Date Range');
+    bootstrap.Modal.getInstance(document.getElementById('dateRangeModal')).hide();
+}
+
+// ==================== BATCH DETAILS FUNCTIONS ====================
+function showBatchDetails(index) {
+    const item = inventoryData[index];
     
-    for (let row of rows) {
-        row.style.display = '';
-    }
-}
-
-function updateActiveButton(group, activeType) {
-    // Remove active class from all buttons in the group
-    const buttons = document.querySelectorAll(`[onclick*="${group}"]`);
-    buttons.forEach(btn => {
-        btn.classList.remove('active');
-        btn.classList.add('btn-outline-primary');
-    });
-    
-    // Add active class to clicked button
-    const activeBtn = document.querySelector(`[onclick*="${group}('${activeType}')"]`);
-    if (activeBtn) {
-        activeBtn.classList.remove('btn-outline-primary');
-        activeBtn.classList.add('active');
-    }
-}
-
-function viewLowStock() {
-    // Switch to stock level tab and filter for low stock
-    const stockLevelTab = document.getElementById('stock-level-tab');
-    const bsTab = new bootstrap.Tab(stockLevelTab);
-    bsTab.show();
-    
-    setTimeout(() => {
-        filterStock('low');
-    }, 500);
-}
-
-function viewOutOfStock() {
-    const stockLevelTab = document.getElementById('stock-level-tab');
-    const bsTab = new bootstrap.Tab(stockLevelTab);
-    bsTab.show();
-    
-    setTimeout(() => {
-        filterStock('out');
-    }, 500);
-}
-
-function placeQuickOrder() {
-    showToast('Opening quick order form...', 'info');
-}
-
-function updateStockLevels() {
-    showToast('Opening stock count form...', 'info');
-}
-
-function generateStockReport() {
-    exportReport('pdf');
-}
-
-function refreshReport() {
-    window.location.reload();
-}
-
-function exportReport(format) {
-    const filename = `Inventory-report-{{ period|slugify }}-${new Date().toISOString().split('T')[0]}`;
-    
-    // Build URL with current parameters
-    let baseUrl = '';
-    
-    if (format === 'csv') {
-        baseUrl = "{% url 'export_purchase_csv' %}";
-    } else if (format === 'pdf') {
-        baseUrl = "{% url 'export_inventory_pdf' %}";
-    } else if (format === 'excel') {
-        baseUrl = "{% url 'export_purchase_excel' %}";
-    } else {
-        showToast(`Invalid export format: ${format}`, 'error');
+    if (!item || !item.batch_info || item.batch_info.length === 0) {
+        $('#batchModalBody').html(`
+            <div class="alert alert-info">
+                <i class="ti ti-info-circle me-2"></i>
+                No batch information available for this product.
+            </div>
+        `);
+        new bootstrap.Modal(document.getElementById('batchDetailModal')).show();
         return;
     }
     
-    // Get date range from the report
-    const dateRange = "{{ date_range }}";
-    let dateFrom = '', dateTo = '';
-    
-    if (dateRange && dateRange.includes(' - ')) {
-        const dates = dateRange.split(' - ');
-        dateFrom = dates[0].trim();
-        dateTo = dates[1].trim();
-    }
-    
-    // Build query parameters
-    const params = new URLSearchParams({
-        'date_from': dateFrom,
-        'date_to': dateTo,
-        'period': "{{ period }}"
-    });
-    
-    // Add store filter if present
-    const storeSelect = document.getElementById('storeFilter');
-    if (storeSelect && storeSelect.value) {
-        params.append('store', storeSelect.value);
-    }
-    
-    // Add supplier filter if present
-    const supplierSelect = document.getElementById('supplierFilter');
-    if (supplierSelect && supplierSelect.value) {
-        params.append('supplier', supplierSelect.value);
-    }
-    
-    // Create export URL
-    const exportUrl = `${baseUrl}?${params.toString()}`;
-    
-    // Show loading toast
-    showToast(`${format.toUpperCase()} export started...`, 'info');
-    
-    // SIMPLE APPROACH: Create and click download link
-    const link = document.createElement('a');
-    link.href = exportUrl;
-    link.download = `${filename}.${format}`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    
-    // Clean up
-    setTimeout(() => {
-        document.body.removeChild(link);
-        showToast(`${format.toUpperCase()} export completed`, 'success');
-    }, 1000);
-}
-
-
-function exportToCSV() {
-    // Get all table data
-    const tables = document.querySelectorAll('table');
-    let csvContent = "data:text/csv;charset=utf-8,";
-    
-    // Add header
-    csvContent += "Inventory Report Export\n";
-    csvContent += `Generated: ${new Date().toLocaleString()}\n`;
-    csvContent += `Report ID: {{ report_id }}\n\n`;
-    
-    // Export each table
-    tables.forEach((table, index) => {
-        const rows = table.querySelectorAll('tr');
-        rows.forEach(row => {
-            const cols = row.querySelectorAll('td, th');
-            const rowData = Array.from(cols).map(cell => {
-                // Remove badge HTML
-                let text = cell.textContent || cell.innerText;
-                text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-                return `"${text}"`;
-            }).join(',');
-            csvContent += rowData + "\n";
-        });
-        csvContent += "\n";
-    });
-    
-    // Create download link
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `inventory-report-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function goBack() {
-    window.history.back();
-}
-
-function showToast(message, type = 'info') {
-    // Create toast element
-    const toastHTML = `
-        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
+    let html = `
+        <div class="product-summary-card">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="summary-row">
+                        <span class="summary-label">Product:</span>
+                        <span class="summary-value">${item.product_name || 'N/A'}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">SKU:</span>
+                        <span class="summary-value">${item.sku || 'N/A'}</span>
+                    </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                <div class="col-md-6">
+                    <div class="summary-row">
+                        <span class="summary-label">Store:</span>
+                        <span class="summary-value">${item.store_name || 'N/A'}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Current Stock:</span>
+                        <span class="summary-value">${item.current_stock.toLocaleString()}</span>
+                    </div>
+                </div>
             </div>
         </div>
+        
+        <h6 class="batch-section-title">
+            Batch Details (${item.batch_info.length} batches)
+        </h6>
+        
+        <table class="batch-details-table">
+            <thead>
+                <tr>
+                    <th>Batch No.</th>
+                    <th>Quantity</th>
+                    <th>Unit Cost</th>
+                    <th>Total Value</th>
+                    <th>Expiry Date</th>
+                    <th>Days Left</th>
+                </tr>
+            </thead>
+            <tbody>
     `;
     
-    let toastContainer = document.querySelector('.toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        toastContainer.style.zIndex = '9999';
-        document.body.appendChild(toastContainer);
-    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+    item.batch_info.forEach(batch => {
+        let daysToExpiry = 'N/A';
+        let expiryClass = '';
+        
+        if (batch.expiry_date) {
+            const expiryDate = new Date(batch.expiry_date);
+            const diffTime = expiryDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            daysToExpiry = diffDays;
+            
+            if (diffDays <= 30) {
+                expiryClass = 'expiry-critical';
+            } else if (diffDays <= 60) {
+                expiryClass = 'expiry-warning';
+            } else if (diffDays > 60) {
+                expiryClass = 'expiry-good';
+            }
+        }
+        
+        html += `
+            <tr>
+                <td><strong>Batch #${batch.batch_no || 'N/A'}</strong></td>
+                <td class="text-end">${batch.quantity || 0}</td>
+                <td class="text-end">UGX ${(batch.unit_cost || 0).toLocaleString()}</td>
+                <td class="text-end">UGX ${((batch.quantity || 0) * (batch.unit_cost || 0)).toLocaleString()}</td>
+                <td>${batch.expiry_date || 'No expiry'}</td>
+                <td class="${expiryClass}">${daysToExpiry === 'N/A' ? 'N/A' : daysToExpiry + ' days'}</td>
+            </tr>
+        `;
+    });
     
-    const toastEl = toastContainer.querySelector('.toast:last-child');
-    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-    toast.show();
+    html += `</tbody></table>`;
+    
+    $('#batchModalBody').html(html);
+    new bootstrap.Modal(document.getElementById('batchDetailModal')).show();
 }
 
-// Clean up interval on page unload
-window.addEventListener('beforeunload', function() {
-    if (realTimeInterval) {
-        clearInterval(realTimeInterval);
+function exportBatchDetails() {
+    const table = document.querySelector('.batch-details-table');
+    if (!table) {
+        alert('No batch data to export');
+        return;
     }
+    
+    const rows = [];
+    const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+    rows.push(headers.join(','));
+    
+    table.querySelectorAll('tbody tr').forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).map(td => 
+            `"${td.textContent.trim().replace(/"/g, '""')}"`
+        );
+        rows.push(cells.join(','));
+    });
+    
+    const csv = rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `batch_details_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// ==================== MOVEMENTS PAGINATION ====================
+function initializeMovementsPagination() {
+    const rows = document.querySelectorAll('.movement-row');
+    totalRows = rows.length;
+    totalPages = Math.ceil(totalRows / rowsPerPage);
+    
+    if (totalRows > rowsPerPage) {
+        rows.forEach(row => row.style.display = 'none');
+        showMovementsPage(1);
+        generatePaginationButtons();
+    } else {
+        $('#movementsPagination, #movementsInfo').hide();
+    }
+}
+
+function showMovementsPage(page) {
+    const rows = document.querySelectorAll('.movement-row');
+    const start = (page - 1) * rowsPerPage;
+    const end = Math.min(start + rowsPerPage, totalRows);
+    
+    rows.forEach(row => row.style.display = 'none');
+    
+    for (let i = start; i < end; i++) {
+        if (rows[i]) rows[i].style.display = '';
+    }
+    
+    $('#movementsInfo').text(`Showing ${start + 1}-${end} of ${totalRows} movements`);
+    currentPage = page;
+    showingAllMovements = false;
+}
+
+function generatePaginationButtons() {
+    let paginationHtml = '';
+    
+    paginationHtml += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changeMovementsPage(${currentPage - 1}); return false;">&laquo;</a>
+        </li>
+    `;
+    
+    for (let i = 1; i <= totalPages; i++) {
+        paginationHtml += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="changeMovementsPage(${i}); return false;">${i}</a>
+            </li>
+        `;
+    }
+    
+    paginationHtml += `
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changeMovementsPage(${currentPage + 1}); return false;">&raquo;</a>
+        </li>
+    `;
+    
+    $('#movementsPagination').html(paginationHtml);
+}
+
+function changeMovementsPage(newPage) {
+    if (newPage < 1 || newPage > totalPages || newPage === currentPage) {
+        return false;
+    }
+    showMovementsPage(newPage);
+    generatePaginationButtons();
+    return false;
+}
+
+function toggleAllMovements() {
+    const rows = document.querySelectorAll('.movement-row');
+    const button = event.target.closest('button');
+    
+    if (!showingAllMovements) {
+        rows.forEach(row => row.style.display = '');
+        $('#movementsPagination, #movementsInfo').hide();
+        button.innerHTML = '<i class="ti ti-layout me-1"></i> Show Less';
+        showingAllMovements = true;
+    } else {
+        showMovementsPage(1);
+        generatePaginationButtons();
+        $('#movementsPagination, #movementsInfo').show();
+        button.innerHTML = '<i class="ti ti-eye me-1"></i> View All';
+        showingAllMovements = false;
+    }
+}
+
+function refreshData() {
+    location.reload();
+}
+
+function exportData(format) {
+    if ($.fn.DataTable.isDataTable('#inventoryTable')) {
+        var table = $('#inventoryTable').DataTable();
+        if (format === 'csv') {
+            table.button('.buttons-csv').trigger();
+        } else if (format === 'excel') {
+            table.button('.buttons-excel').trigger();
+        } else if (format === 'pdf') {
+            table.button('.buttons-pdf').trigger();
+        }
+    }
+}
+
+// Initialize DataTable and pagination on page load
+$(document).ready(function() {
+    if ($('#inventoryTable tbody tr').length > 1) {
+        $('#inventoryTable').DataTable({
+            pageLength: 25,
+            ordering: true,
+            searching: false,
+            info: true,
+            buttons: [
+                { extend: 'copy', className: 'btn btn-sm btn-outline-secondary' },
+                { extend: 'csv', className: 'btn btn-sm btn-outline-secondary' },
+                { extend: 'excel', className: 'btn btn-sm btn-outline-secondary' },
+                { extend: 'pdf', className: 'btn btn-sm btn-outline-secondary', orientation: 'landscape' },
+                { extend: 'print', className: 'btn btn-sm btn-outline-secondary' }
+            ],
+            dom: '<"row"<"col-md-6"B><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+            language: {
+                emptyTable: "No inventory data available"
+            }
+        });
+        $('.dataTables_filter').hide();
+    }
+    
+    initializeMovementsPagination();
+    
+    function updateClearButton() {
+        const hasFilters = $('#id_store').val() || $('#id_category').val() || 
+                          $('#id_stockstatus').val() || $('#id_expiry').val() || 
+                          $('#searchInput').val() || $('#selectedDateRange').text() !== 'Select Date Range';
+        $('#clearFiltersBtn').toggle(!!hasFilters);
+    }
+    
+    $('#id_store, #id_category, #id_stockstatus, #id_expiry, #searchInput').on('change keyup', updateClearButton);
+    updateClearButton();
 });
 </script>
-
-<style>
-/* Side Tabs Styles */
-.side-tabs-card {
-    height: fit-content;
-    min-height: 500px;
-}
-
-.side-tabs-container {
-    height: 400px;
-    overflow-y: auto;
-}
-
-.side-tabs {
-    border-right: 1px solid #dee2e6;
-}
-
-.side-tab {
-    padding: 1rem 1.25rem;
-    border: none;
-    border-left: 4px solid transparent;
-    border-radius: 0;
-    text-align: left;
-    color: #495057;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    background-color: transparent;
-    position: relative;
-    width: 100%;
-}
-
-.side-tab:hover {
-    background-color: rgba(74, 144, 226, 0.05);
-    color: #4A90E2;
-    border-left-color: rgba(74, 144, 226, 0.3);
-}
-
-.side-tab.active {
-    background-color: rgba(74, 144, 226, 0.1);
-    color: #4A90E2;
-    border-left-color: #4A90E2;
-    font-weight: 600;
-}
-
-.side-tab i {
-    transition: transform 0.2s ease;
-}
-
-.side-tab:hover i {
-    transform: translateX(2px);
-}
-
-/* Card Styles */
-.card {
-    border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
-}
-
-.card-header {
-    background-color: #fff;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-    padding: 1rem 1.25rem;
-    border-radius: 8px 8px 0 0 !important;
-}
-
-.card-title {
-    font-weight: 600;
-    color: #495057;
-    margin: 0;
-    font-size: 1rem;
-}
-
-/* Table Styles */
-.table th {
-    border-top: none;
-    font-weight: 600;
-    color: #495057;
-    background-color: #f8f9fa;
-    font-size: 0.875rem;
-    white-space: nowrap;
-}
-
-.table td {
-    vertical-align: middle;
-    font-size: 0.875rem;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(74, 144, 226, 0.05);
-}
-
-/* Status table row colors */
-.table-danger {
-    background-color: rgba(220, 53, 69, 0.05);
-}
-.table-warning {
-    background-color: rgba(255, 193, 7, 0.05);
-}
-.table-info {
-    background-color: rgba(23, 162, 184, 0.05);
-}
-.table-success {
-    background-color: rgba(40, 167, 69, 0.05);
-}
-
-/* Status badge colors for cards */
-.bg-light-warning {
-    background-color: rgba(255, 193, 7, 0.1) !important;
-}
-.bg-light-danger {
-    background-color: rgba(220, 53, 69, 0.1) !important;
-}
-.bg-light-success {
-    background-color: rgba(40, 167, 69, 0.1) !important;
-}
-.bg-light-info {
-    background-color: rgba(23, 162, 184, 0.1) !important;
-}
-
-/* Button Styles */
-.btn-outline-primary {
-    border-color: #4A90E2;
-    color: #4A90E2;
-    border-width: 2px;
-    font-weight: 500;
-}
-
-.btn-outline-primary:hover,
-.btn-outline-primary.active {
-    background-color: #4A90E2;
-    border-color: #4A90E2;
-    color: white;
-}
-
-.btn-primary {
-    background-color: #4A90E2;
-    border-color: #4A90E2;
-}
-
-.btn-primary:hover {
-    background-color: #357ABD;
-    border-color: #357ABD;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .card-header {
-        flex-direction: column;
-        align-items: flex-start !important;
-    }
-    
-    .card-header .btn-group {
-        margin-top: 0.5rem;
-        align-self: flex-start;
-    }
-    
-    .table-responsive {
-        font-size: 0.8rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .page-header {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .table-top-head {
-        justify-content: center;
-        margin-top: 1rem;
-        flex-wrap: wrap;
-    }
-    
-    .card-body {
-        padding: 1rem;
-    }
-}
-
-/* Scrollbar styling */
-.side-tabs-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.side-tabs-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.side-tabs-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.side-tabs-container::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
-}
-</style>
-
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 {% endblock %}

@@ -159,7 +159,7 @@ def app_menu(request):
                 # {'label': 'Financial Report', 'url_name': 'financial_details'},
                 {'label': 'Product Master Report', 'url_name': 'productmaster_details'},
                 {'label': 'Stock Location Report', 'url_name': 'stocklocation_details'},
-                {'label': 'reorder Level Report', 'url_name': 'reorder_details'},
+                # {'label': 'reorder Level Report', 'url_name': 'reorder_details'},
                 # {'label': 'Product Pricing Report', 'url_name': 'productpricing_details'},
                 
                 
