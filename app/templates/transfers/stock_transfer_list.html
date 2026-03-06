@@ -1292,158 +1292,164 @@ function getCookie(name) {
     if (parts.length === 2) return parts.pop().split(';').shift();
 }
 
+// ── cleanupModals ────────────────────────────────────────────────
+// Remove ALL Bootstrap backdrops and body-lock styles.
+// Must be called before opening any modal to prevent overlay stacking.
+function cleanupModals() {
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+}
+
 function showLoadingModal() {
-    const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    cleanupModals();
+    const el = document.getElementById('loadingModal');
+    const modal = new bootstrap.Modal(el, { backdrop: 'static', keyboard: false });
     modal.show();
     return modal;
 }
 
 function hideLoadingModal(modal) {
-    if (modal) modal.hide();
+    if (!modal) return;
+    try { modal.hide(); } catch(e) {}
+    setTimeout(cleanupModals, 350);
 }
 
 function showResultModal(title, message, isSuccess = true) {
-    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    cleanupModals();
+    const el = document.getElementById('resultModal');
+    const modal = new bootstrap.Modal(el, { backdrop: true, keyboard: true });
     const modalTitle = document.getElementById('resultModalTitle');
     const modalBody = document.getElementById('resultModalBody');
-    
+
     const icon = isSuccess ? 'check-circle' : 'alert-circle';
     const iconColor = isSuccess ? 'text-success' : 'text-danger';
-    
+
     modalTitle.innerHTML = `<i data-feather="${icon}" class="feather-16 me-2 ${iconColor}"></i>${title}`;
     modalBody.innerHTML = `<p>${message}</p>`;
-    
+
     modal.show();
-    
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
-    
-    if (isSuccess) {
-        modal._element.addEventListener('hidden.bs.modal', function() {
-            window.location.reload();
-        }, { once: true });
-    }
+    if (typeof feather !== 'undefined') feather.replace();
+
+    el.addEventListener('hidden.bs.modal', function() {
+        cleanupModals();
+        if (isSuccess) window.location.reload();
+    }, { once: true });
 }
 
 function confirmStartTransfer(transferId) {
     currentTransferId = transferId;
-    const modal = new bootstrap.Modal(document.getElementById('startTransferModal'));
-    modal.show();
+    cleanupModals();
+    new bootstrap.Modal(document.getElementById('startTransferModal')).show();
 }
 
 function confirmCompleteTransfer(transferId) {
     currentTransferId = transferId;
-    const modal = new bootstrap.Modal(document.getElementById('completeTransferModal'));
-    modal.show();
+    cleanupModals();
+    new bootstrap.Modal(document.getElementById('completeTransferModal')).show();
 }
 
 function confirmCancelTransfer(transferId) {
     currentTransferId = transferId;
-    const modal = new bootstrap.Modal(document.getElementById('cancelTransferModal'));
-    modal.show();
+    cleanupModals();
+    document.getElementById('cancelReason').value = '';
+    new bootstrap.Modal(document.getElementById('cancelTransferModal')).show();
 }
 
+// Close confirm modal first, wait for its animation to finish,
+// then cleanupModals + open loading + POST — prevents backdrop stacking.
 function startTransfer() {
     if (!currentTransferId) return;
-
+    const confirmEl = document.getElementById('startTransferModal');
+    const confirmModal = bootstrap.Modal.getInstance(confirmEl);
+    if (confirmModal) {
+        confirmEl.addEventListener('hidden.bs.modal', function handler() {
+            confirmEl.removeEventListener('hidden.bs.modal', handler);
+            _doStartTransfer();
+        });
+        confirmModal.hide();
+    } else { _doStartTransfer(); }
+}
+function _doStartTransfer() {
+    cleanupModals();
     const loadingModal = showLoadingModal();
-    const csrftoken = getCookie('csrftoken');
-
-    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('startTransferModal'));
-    if (confirmModal) confirmModal.hide();
-
     fetch(`/stock_transfers/${currentTransferId}/update_status/`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken,
-            'X-Requested-With': 'XMLHttpRequest'
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ status: 'in_transit' })
     })
     .then(async resp => {
         hideLoadingModal(loadingModal);
         const data = await resp.json();
-        if (data.success) {
-            showResultModal('Success', 'Transfer started and is now in transit.', true);
-        } else {
-            showResultModal('Error', data.error || 'Failed to start transfer.', false);
-        }
+        setTimeout(() => data.success
+            ? showResultModal('Success', 'Transfer started — now in transit.', true)
+            : showResultModal('Error', data.error || 'Failed to start transfer.', false), 400);
     })
-    .catch(err => {
-        hideLoadingModal(loadingModal);
-        console.error('Error starting transfer:', err);
-        showResultModal('Error', 'Error starting transfer. Please try again.', false);
-    });
+    .catch(() => { hideLoadingModal(loadingModal); setTimeout(() => showResultModal('Error', 'Network error — please try again.', false), 400); });
 }
+
 function completeTransfer() {
     if (!currentTransferId) return;
-
+    const confirmEl = document.getElementById('completeTransferModal');
+    const confirmModal = bootstrap.Modal.getInstance(confirmEl);
+    if (confirmModal) {
+        confirmEl.addEventListener('hidden.bs.modal', function handler() {
+            confirmEl.removeEventListener('hidden.bs.modal', handler);
+            _doCompleteTransfer();
+        });
+        confirmModal.hide();
+    } else { _doCompleteTransfer(); }
+}
+function _doCompleteTransfer() {
+    cleanupModals();
     const loadingModal = showLoadingModal();
-    const csrftoken = getCookie('csrftoken');
-
-    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('completeTransferModal'));
-    if (confirmModal) confirmModal.hide();
-
     fetch(`/stock_transfers/${currentTransferId}/update_status/`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken,
-            'X-Requested-With': 'XMLHttpRequest'
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ status: 'completed' })
     })
     .then(async resp => {
         hideLoadingModal(loadingModal);
         const data = await resp.json();
-        if (data.success) {
-            showResultModal('Success', 'Transfer marked as completed. Inventory has been updated.', true);
-        } else {
-            showResultModal('Error', data.error || 'Failed to complete transfer.', false);
-        }
+        setTimeout(() => data.success
+            ? showResultModal('Success', 'Transfer completed. Inventory has been updated.', true)
+            : showResultModal('Error', data.error || 'Failed to complete transfer.', false), 400);
     })
-    .catch(err => {
-        hideLoadingModal(loadingModal);
-        console.error('Error completing transfer:', err);
-        showResultModal('Error', 'Error completing transfer. Please try again.', false);
-    });
+    .catch(() => { hideLoadingModal(loadingModal); setTimeout(() => showResultModal('Error', 'Network error — please try again.', false), 400); });
 }
+
 function cancelTransfer() {
     if (!currentTransferId) return;
-
     const reason = document.getElementById('cancelReason').value;
+    const confirmEl = document.getElementById('cancelTransferModal');
+    const confirmModal = bootstrap.Modal.getInstance(confirmEl);
+    if (confirmModal) {
+        confirmEl.addEventListener('hidden.bs.modal', function handler() {
+            confirmEl.removeEventListener('hidden.bs.modal', handler);
+            _doCancelTransfer(reason);
+        });
+        confirmModal.hide();
+    } else { _doCancelTransfer(reason); }
+}
+function _doCancelTransfer(reason) {
+    cleanupModals();
     const loadingModal = showLoadingModal();
-    const csrftoken = getCookie('csrftoken');
-
-    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('cancelTransferModal'));
-    if (confirmModal) confirmModal.hide();
-
     fetch(`/stock_transfers/${currentTransferId}/update_status/`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken,
-            'X-Requested-With': 'XMLHttpRequest'
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ status: 'cancelled', cancellation_reason: reason })
     })
     .then(async resp => {
         hideLoadingModal(loadingModal);
         const data = await resp.json();
-        if (data.success) {
-            showResultModal('Success', 'Transfer has been cancelled.', true);
-        } else {
-            showResultModal('Error', data.error || 'Failed to cancel transfer.', false);
-        }
+        setTimeout(() => data.success
+            ? showResultModal('Success', 'Transfer has been cancelled.', true)
+            : showResultModal('Error', data.error || 'Failed to cancel transfer.', false), 400);
     })
-    .catch(err => {
-        hideLoadingModal(loadingModal);
-        console.error('Error cancelling transfer:', err);
-        showResultModal('Error', 'Error cancelling transfer. Please try again.', false);
-    });
+    .catch(() => { hideLoadingModal(loadingModal); setTimeout(() => showResultModal('Error', 'Network error — please try again.', false), 400); });
 }
+
 function refreshTransfers() {
     window.location.reload();
 }
@@ -1456,7 +1462,7 @@ function showApprovedRequestsModal() {
     modalContent.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
     modal.show();
     
-    fetch('/api/transfer-requests/approved/')
+    fetch("{% url 'approved_transfer_requests' %}")
         .then(response => response.json())
         .then(data => {
             let content = '';
@@ -1566,7 +1572,7 @@ function createSingleTransfer(event) {
     const loadingModal = showLoadingModal();
     const csrftoken = getCookie('csrftoken');
 
-    fetch(`/transfer-request/${requestId}/create-transfer/`, {
+    fetch(`/stock_transfers/create/from-request/${requestId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrftoken,
@@ -1611,7 +1617,7 @@ function createBulkTransfers() {
     const formData = new FormData();
     selectedRequests.forEach(id => formData.append('request_ids', id));
 
-    fetch('/transfer-requests/create-bulk-transfers/', {
+    fetch('/stock_transfers/bulk/create/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrftoken,

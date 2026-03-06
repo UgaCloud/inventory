@@ -215,38 +215,38 @@ def update_transfer_status(request, transfer_id):
         transfer.status = new_status
         
         now = timezone.now()
+        user_name = request.user.get_full_name() or request.user.username
         if new_status == 'in_transit':
             transfer.started_date = now
-            transfer.started_by = request.user
+            transfer.started_by = user_name
         elif new_status == 'completed':
             transfer.completion_date = now
-            transfer.completed_by = request.user
+            transfer.completed_by = user_name
         elif new_status == 'cancelled':
             transfer.cancellation_date = now
-            transfer.cancelled_by = request.user
+            transfer.cancelled_by = user_name
             transfer.cancellation_reason = data.get('cancellation_reason', comments)
         
         transfer.save()
-        
+
+        # ── Sync the linked TransferRequest status ──────────────────────
+        if transfer.transfer_request:
+            tr = transfer.transfer_request
+            tr.status = new_status  # mirror exactly: in_transit, completed, cancelled
+            tr.save(update_fields=['status'])
+
         if new_status == 'completed' and old_status != 'completed':
             with transaction.atomic():
                 transfer.refresh_from_db()
                 if transfer.status == 'completed':
                     transfer.apply_inventory_changes()
-                    # Mark the linked transfer request as fulfilled now that the
-                    # actual stock movement is complete.
-                    if transfer.transfer_request_id:
-                        TransferRequest.objects.filter(
-                            id=transfer.transfer_request_id,
-                            status='approved'
-                        ).update(status='fulfilled')
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Transfer status updated to {new_status}',
             'new_status': new_status
         })
-        
+
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -1078,8 +1078,9 @@ def create_stock_transfer(request):
                         created_by=request.user,
                         status='pending'
                     )
-                    # Do NOT set fulfilled here — request stays 'approved' until
-                    # the stock transfer is marked completed.
+                    
+                    tr.status = 'fulfilled'
+                    tr.save()
                 else:
                     st = StockTransfer.objects.create(
                         from_store_id=data['from_store'],
@@ -1346,8 +1347,9 @@ def create_transfer_from_request(request, request_id):
                     quantity=request_item.quantity,
                     units=request_item.units,
                 )
-            # Do NOT set fulfilled here — request stays 'approved' until
-            # the stock transfer is marked completed.
+            
+            tr.status = 'fulfilled'
+            tr.save()
         
         try:
             transfer_url = reverse('stock_transfer_detail', kwargs={'transfer_id': st.id})

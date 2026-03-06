@@ -217,17 +217,17 @@
                     <span class="badge bg-warning">
                       <i data-feather="clock" class="feather-12 me-1"></i>Pending
                     </span>
-                  {% elif request.status == 'approved' %}
+                  {% elif request.status == 'approved' or request.status == 'in_transit' %}
+                    <span class="badge bg-info">
+                      <i data-feather="truck" class="feather-12 me-1"></i>Approved
+                    </span>
+                  {% elif request.status == 'completed' or request.status == 'fulfilled' %}
                     <span class="badge bg-success">
-                      <i data-feather="check-circle" class="feather-12 me-1"></i>Approved
+                      <i data-feather="check-circle" class="feather-12 me-1"></i>Completed
                     </span>
-                  {% elif request.status == 'rejected' %}
+                  {% elif request.status == 'rejected' or request.status == 'cancelled' %}
                     <span class="badge bg-danger">
-                      <i data-feather="x-circle" class="feather-12 me-1"></i>Rejected
-                    </span>
-                  {% elif request.status == 'fulfilled' %}
-                    <span class="badge bg-primary">
-                      <i data-feather="package" class="feather-12 me-1"></i>Fulfilled
+                      <i data-feather="x-circle" class="feather-12 me-1"></i>Cancelled
                     </span>
                   {% endif %}
                 </td>
