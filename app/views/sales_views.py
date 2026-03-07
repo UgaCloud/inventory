@@ -9,7 +9,8 @@ from django.utils import timezone
 from django.db import transaction
 from app.views.salehelp import *
 from app.forms.transaction_forms import SalesForm, SalesItemFormSet
-from app.selectors.sales_selectors import get_all_sales, get_sale_by_id, get_sales_items_for_sale
+from app.selectors.transaction_selectors import *
+from app.selectors.sales_selectors import *
 from app.models.transactions import *
 from app.models.products import *
 from app.models.customers import *

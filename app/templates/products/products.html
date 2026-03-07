@@ -61,39 +61,127 @@
                     </span>
                 </div>
                 
-                <!-- Category Filter with Real-time -->
-                <select id="categoryFilter" class="form-select form-select-sm" style="max-width: 180px;">
-                    <option value="">All Categories</option>
-                    {% for category in categories %}
-                    <option value="{{ category.id }}" {% if selected_category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
-                    {% endfor %}
-                </select>
+                <!-- Category Filter with Search -->
+                <div class="dropdown-search-container" style="max-width: 180px; position: relative;">
+                    <div class="dropdown-search-input" data-filter="category" onclick="toggleDropdown(this)">
+                        <span class="dropdown-selected-value" id="selectedCategoryText">
+                            {% if selected_category %}
+                                {% for category in categories %}
+                                    {% if category.id|stringformat:"s" == selected_category|stringformat:"s" %}
+                                        {{ category.name }}
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                All Categories
+                            {% endif %}
+                        </span>
+                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                    </div>
+                    <div class="dropdown-search-menu" id="categoryDropdown" style="display: none;">
+                        <div class="dropdown-search-header">
+                            <i class="ti ti-search"></i>
+                            <input type="text" class="dropdown-search-field" placeholder="Search category..." onkeyup="filterDropdownOptions(this, 'category')">
+                        </div>
+                        <div class="dropdown-search-options">
+                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'category')">
+                                All Categories
+                            </div>
+                            {% for category in categories %}
+                            <div class="dropdown-search-option" data-value="{{ category.id }}" {% if selected_category|stringformat:"s" == category.id|stringformat:"s" %}data-selected="true"{% endif %} onclick="selectDropdownOption(this, 'category')">
+                                {{ category.name }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <select id="categoryFilter" class="form-select form-select-sm" style="display: none;">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if selected_category|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 
-                <!-- Brand Filter with Real-time -->
-                <select id="brandFilter" class="form-select form-select-sm" style="max-width: 150px;">
-                    <option value="">All Brands</option>
-                    {% for brand in brands %}
-                    <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
-                    {% endfor %}
-                </select>
+                <!-- Brand Filter with Search -->
+                <div class="dropdown-search-container" style="max-width: 150px; position: relative;">
+                    <div class="dropdown-search-input" data-filter="brand" onclick="toggleDropdown(this)">
+                        <span class="dropdown-selected-value" id="selectedBrandText">
+                            {% if selected_brand %}
+                                {{ selected_brand }}
+                            {% else %}
+                                All Brands
+                            {% endif %}
+                        </span>
+                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                    </div>
+                    <div class="dropdown-search-menu" id="brandDropdown" style="display: none;">
+                        <div class="dropdown-search-header">
+                            <i class="ti ti-search"></i>
+                            <input type="text" class="dropdown-search-field" placeholder="Search brand..." onkeyup="filterDropdownOptions(this, 'brand')">
+                        </div>
+                        <div class="dropdown-search-options">
+                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'brand')">
+                                All Brands
+                            </div>
+                            {% for brand in brands %}
+                            <div class="dropdown-search-option" data-value="{{ brand }}" {% if selected_brand == brand %}data-selected="true"{% endif %} onclick="selectDropdownOption(this, 'brand')">
+                                {{ brand }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <select id="brandFilter" class="form-select form-select-sm" style="display: none;">
+                        <option value="">All Brands</option>
+                        {% for brand in brands %}
+                        <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 
-                <!-- Status Filter with Real-time -->
-                <select id="statusFilter" class="form-select form-select-sm" style="max-width: 130px;">
-                    <option value="">All Status</option>
-                    <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
-                </select>
+                <!-- Status Filter with Search -->
+                <div class="dropdown-search-container" style="max-width: 130px; position: relative;">
+                    <div class="dropdown-search-input" data-filter="status" onclick="toggleDropdown(this)">
+                        <span class="dropdown-selected-value" id="selectedStatusText">
+                            {% if selected_status == 'active' %}
+                                Active
+                            {% elif selected_status == 'inactive' %}
+                                Inactive
+                            {% else %}
+                                All Status
+                            {% endif %}
+                        </span>
+                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                    </div>
+                    <div class="dropdown-search-menu" id="statusDropdown" style="display: none;">
+                        <div class="dropdown-search-header">
+                            <i class="ti ti-search"></i>
+                            <input type="text" class="dropdown-search-field" placeholder="Search status..." onkeyup="filterDropdownOptions(this, 'status')">
+                        </div>
+                        <div class="dropdown-search-options">
+                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'status')">
+                                All Status
+                            </div>
+                            <div class="dropdown-search-option" data-value="active" {% if selected_status == 'active' %}data-selected="true"{% endif %} onclick="selectDropdownOption(this, 'status')">
+                                Active
+                            </div>
+                            <div class="dropdown-search-option" data-value="inactive" {% if selected_status == 'inactive' %}data-selected="true"{% endif %} onclick="selectDropdownOption(this, 'status')">
+                                Inactive
+                            </div>
+                        </div>
+                    </div>
+                    <select id="statusFilter" class="form-select form-select-sm" style="display: none;">
+                        <option value="">All Status</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
                 
-                <!-- Items per page -->
+                <!-- Items per page (kept as normal select) -->
                 <select id="itemsPerPage" class="form-select form-select-sm" style="max-width: 80px;">
                     <option value="10">10</option>
                     <option value="25" selected>25</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
                 </select>
-                
-                <!-- Results Count -->
-                <!-- <span id="resultCount" class="badge bg-light text-dark ms-2"></span> -->
                 
                 <!-- Clear Filters Button -->
                 <button id="clearFiltersBtn" class="btn btn-outline-secondary btn-sm d-flex align-items-center" onclick="clearAllFilters()" style="display: none;">
@@ -439,8 +527,6 @@ function displayCurrentPage() {
     // Update result count
     const startIndex = filteredProducts.length > 0 ? start + 1 : 0;
     const endIndex = Math.min(end, filteredProducts.length);
-    document.getElementById('resultCount').textContent = 
-        `Showing ${startIndex} to ${endIndex} of ${filteredProducts.length} products`;
     document.getElementById('paginationInfo').innerHTML = 
         `Showing ${startIndex} to ${endIndex} of ${filteredProducts.length} products`;
 }
@@ -632,9 +718,33 @@ function handleItemsPerPageChange() {
 // Clear all filters
 function clearAllFilters() {
     document.getElementById('searchInput').value = '';
+    
+    // Reset searchable dropdowns
     document.getElementById('categoryFilter').value = '';
     document.getElementById('brandFilter').value = '';
     document.getElementById('statusFilter').value = '';
+    
+    // Update displayed text
+    document.getElementById('selectedCategoryText').textContent = 'All Categories';
+    document.getElementById('selectedBrandText').textContent = 'All Brands';
+    document.getElementById('selectedStatusText').textContent = 'All Status';
+    
+    // Remove selected attributes from options
+    document.querySelectorAll('#categoryDropdown .dropdown-search-option').forEach(opt => {
+        opt.removeAttribute('data-selected');
+    });
+    document.querySelector('#categoryDropdown .dropdown-search-option[data-value=""]')?.setAttribute('data-selected', 'true');
+    
+    document.querySelectorAll('#brandDropdown .dropdown-search-option').forEach(opt => {
+        opt.removeAttribute('data-selected');
+    });
+    document.querySelector('#brandDropdown .dropdown-search-option[data-value=""]')?.setAttribute('data-selected', 'true');
+    
+    document.querySelectorAll('#statusDropdown .dropdown-search-option').forEach(opt => {
+        opt.removeAttribute('data-selected');
+    });
+    document.querySelector('#statusDropdown .dropdown-search-option[data-value=""]')?.setAttribute('data-selected', 'true');
+    
     filterProducts();
 }
 
@@ -651,6 +761,76 @@ function toggleClearFiltersButton() {
 
 // Debounced filter function
 const debouncedFilter = debounce(filterProducts, 300);
+
+// Dropdown functions for searchable selects
+function toggleDropdown(element) {
+    const filter = element.dataset.filter;
+    const dropdown = document.getElementById(filter + 'Dropdown');
+    const isVisible = dropdown.style.display === 'block';
+    
+    // Close all dropdowns first
+    document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    // Toggle current dropdown
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        // Focus on search input
+        setTimeout(() => {
+            dropdown.querySelector('.dropdown-search-field')?.focus();
+        }, 100);
+    }
+}
+
+function filterDropdownOptions(input, filter) {
+    const searchTerm = input.value.toLowerCase();
+    const options = document.querySelectorAll('#' + filter + 'Dropdown .dropdown-search-option');
+    
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            option.style.display = 'block';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+}
+
+function selectDropdownOption(option, filter) {
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById(filter + 'Filter');
+    const selectedText = document.getElementById('selected' + filter.charAt(0).toUpperCase() + filter.slice(1) + 'Text');
+    
+    // Update hidden select
+    select.value = value;
+    
+    // Update displayed text
+    selectedText.textContent = text;
+    
+    // Update selected state in dropdown
+    document.querySelectorAll('#' + filter + 'Dropdown .dropdown-search-option').forEach(opt => {
+        opt.removeAttribute('data-selected');
+    });
+    option.setAttribute('data-selected', 'true');
+    
+    // Close dropdown
+    document.getElementById(filter + 'Dropdown').style.display = 'none';
+    
+    // Trigger filter
+    filterProducts();
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-search-container')) {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
 
 // Stock modal function
 function showStockModal(productId, productName, productSku) {
@@ -852,9 +1032,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listeners
     document.getElementById('searchInput').addEventListener('input', debouncedFilter);
-    document.getElementById('categoryFilter').addEventListener('change', filterProducts);
-    document.getElementById('brandFilter').addEventListener('change', filterProducts);
-    document.getElementById('statusFilter').addEventListener('change', filterProducts);
     document.getElementById('itemsPerPage').addEventListener('change', handleItemsPerPageChange);
     
     // Select all checkbox
@@ -988,6 +1165,112 @@ document.addEventListener('DOMContentLoaded', function() {
     color: #6c757d;
 }
 
+/* Searchable Dropdown Styles */
+.dropdown-search-container {
+    position: relative;
+    width: 100%;
+}
+
+.dropdown-search-input {
+    width: 100%;
+    height: 31px;
+    padding: 0.25rem 2rem 0.25rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dropdown-search-input:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-selected-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-arrow {
+    transition: transform 0.2s;
+}
+
+.dropdown-search-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    min-width: 200px;
+    margin-top: 4px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dropdown-search-header {
+    padding: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dropdown-search-header i {
+    color: #6c757d;
+    font-size: 1rem;
+}
+
+.dropdown-search-field {
+    width: 100%;
+    padding: 0.25rem;
+    border: none;
+    outline: none;
+    font-size: 0.875rem;
+}
+
+.dropdown-search-field:focus {
+    outline: none;
+}
+
+.dropdown-search-options {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.dropdown-search-option {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: background-color 0.2s;
+}
+
+.dropdown-search-option:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-search-option[data-selected="true"] {
+    background-color: #e7f1ff;
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.dropdown-search-option[data-selected="true"]:hover {
+    background-color: #d4e4ff;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .card-header .d-flex {
@@ -996,10 +1279,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     .card-header .input-group,
+    .card-header .dropdown-search-container,
     .card-header select,
     .card-header button {
         width: 100%;
         max-width: none !important;
+    }
+    
+    .dropdown-search-menu {
+        min-width: 100%;
     }
 }
 </style>

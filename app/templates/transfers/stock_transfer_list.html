@@ -31,13 +31,14 @@
             </ul>
           </div>
         </li>
-        <button class="btn btn-outline-info btn-sm d-flex align-items-center">
-          <a href="{% url 'transfer_request_list' %}?status=approved">
-            <i data-feather="list" class="feather-16"></i>
-            <span>View Approved Requests</span>
-          </a>
-        </button>
-
+        <li>
+          <button class="btn btn-outline-info btn-sm d-flex align-items-center">
+            <a href="{% url 'transfer_request_list' %}?status=approved">
+              <i data-feather="list" class="feather-16"></i>
+              <span>View Approved Requests</span>
+            </a>
+          </button>
+        </li>
         <li>
           <div class="dropdown">
             <button class="btn btn-primary btn-sm dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -45,8 +46,8 @@
               <span>Create Transfer</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li class="dropdown-item"><a href="#" style="width: 200px; border: 0;"  data-action="showApprovedRequestsModal">From Approved Request</a></li>
-              <li class="dropdown-item"><a href="#" style="width: 200px; border: 0;"  data-action="showDirectTransferModal">Direct Transfer</a></li>
+              <li class="dropdown-item"><a href="#" style="width: 200px; border: 0;" data-action="showApprovedRequestsModal">From Approved Request</a></li>
+              <li class="dropdown-item"><a href="#" style="width: 200px; border: 0;" data-action="showDirectTransferModal">Direct Transfer</a></li>
             </ul>
           </div>
         </li>
@@ -132,7 +133,6 @@
           </div>
         </div>
       </div>
-
       <div class="col-lg-2 col-md-4 col-sm-6">
         <div class="card bg-primary text-white">
           <div class="card-body text-center">
@@ -169,7 +169,6 @@
                 <th>Items</th>
                 <th>Total Value</th>
                 <th>Created Date</th>
-                
                 <th>Status</th>
                 <th>Progress</th>
                 <th>Actions</th>
@@ -250,7 +249,6 @@
                     <small class="text-muted">{{ transfer.transfer_date|time:"g:i A" }}</small>
                   </div>
                 </td>
-              
                 <td>
                   {% if transfer.status == 'pending' %}
                     <span class="badge bg-warning">
@@ -324,18 +322,23 @@
                         <ul class="dropdown-menu">
                           <li>
                             <a class="dropdown-item" href="#">
-                            <i data-feather="printer" class="feather-14 me-2"></i>Print Slip
-                          </a></li>
+                              <i data-feather="printer" class="feather-14 me-2"></i>Print Slip
+                            </a>
+                          </li>
                           {% if transfer.transfer_request %}
-                          <li><a class="dropdown-item" href="{% url 'transfer_request_detail' transfer.transfer_request.id %}">
-                            <i data-feather="file-text" class="feather-14 me-2"></i>View Original Request
-                          </a></li>
+                          <li>
+                            <a class="dropdown-item" href="{% url 'transfer_request_detail' transfer.transfer_request.id %}">
+                              <i data-feather="file-text" class="feather-14 me-2"></i>View Original Request
+                            </a>
+                          </li>
                           {% endif %}
                           {% if transfer.status != 'completed' and transfer.status != 'cancelled' %}
                           <li><hr class="dropdown-divider"></li>
-                          <li><a class="dropdown-item text-danger" href="#" data-action="confirmCancelTransfer" data-transfer-id="{{ transfer.id }}">
-                            <i data-feather="x-circle" class="feather-14 me-2"></i>Cancel Transfer
-                          </a></li>
+                          <li>
+                            <a class="dropdown-item text-danger" href="#" data-action="confirmCancelTransfer" data-transfer-id="{{ transfer.id }}">
+                              <i data-feather="x-circle" class="feather-14 me-2"></i>Cancel Transfer
+                            </a>
+                          </li>
                           {% endif %}
                         </ul>
                       </div>
@@ -461,14 +464,60 @@
             <div class="col-md-6">
               <div class="mb-3">
                 <label for="id_from_store" class="form-label">From Store *</label>
-                {{ stock_form.from_store }}
+                <div class="dropdown-search-container" style="position: relative;">
+                  <div class="dropdown-search-input" data-filter="from_store" onclick="toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedFromStoreText">Select Store</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                  </div>
+                  <div class="dropdown-search-menu" id="from_storeDropdown" style="display: none;">
+                    <div class="dropdown-search-header">
+                      <i class="ti ti-search"></i>
+                      <input type="text" class="dropdown-search-field" placeholder="Search store..." onkeyup="filterDropdownOptions(this, 'from_store', event)">
+                    </div>
+                    <div class="dropdown-search-options">
+                      <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'from_store', event)">Select Store</div>
+                      {% for store in stores %}
+                      <div class="dropdown-search-option" data-value="{{ store.id }}" onclick="selectDropdownOption(this, 'from_store', event)">{{ store.name }}</div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <select name="from_store" id="id_from_store" class="form-select" style="display: none;" required>
+                    <option value="">Select Store</option>
+                    {% for store in stores %}
+                    <option value="{{ store.id }}">{{ store.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
                 <div class="invalid-feedback">Please select a from store.</div>
               </div>
             </div>
             <div class="col-md-6">
               <div class="mb-3">
                 <label for="id_to_store" class="form-label">To Store *</label>
-                {{ stock_form.to_store }}
+                <div class="dropdown-search-container" style="position: relative;">
+                  <div class="dropdown-search-input" data-filter="to_store" onclick="toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedToStoreText">Select Store</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                  </div>
+                  <div class="dropdown-search-menu" id="to_storeDropdown" style="display: none;">
+                    <div class="dropdown-search-header">
+                      <i class="ti ti-search"></i>
+                      <input type="text" class="dropdown-search-field" placeholder="Search store..." onkeyup="filterDropdownOptions(this, 'to_store', event)">
+                    </div>
+                    <div class="dropdown-search-options">
+                      <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'to_store', event)">Select Store</div>
+                      {% for store in stores %}
+                      <div class="dropdown-search-option" data-value="{{ store.id }}" onclick="selectDropdownOption(this, 'to_store', event)">{{ store.name }}</div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <select name="to_store" id="id_to_store" class="form-select" style="display: none;" required>
+                    <option value="">Select Store</option>
+                    {% for store in stores %}
+                    <option value="{{ store.id }}">{{ store.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
                 <div class="invalid-feedback">Please select a to store.</div>
               </div>
             </div>
@@ -483,7 +532,28 @@
             <div class="col-md-6">
               <div class="mb-3">
                 <label for="id_status" class="form-label">Status</label>
-                {{ stock_form.status }}
+                <div class="dropdown-search-container" style="position: relative;">
+                  <div class="dropdown-search-input" data-filter="status" onclick="toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedStatusText">Pending</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                  </div>
+                  <div class="dropdown-search-menu" id="statusDropdown" style="display: none;">
+                    <div class="dropdown-search-header">
+                      <i class="ti ti-search"></i>
+                      <input type="text" class="dropdown-search-field" placeholder="Search status..." onkeyup="filterDropdownOptions(this, 'status', event)">
+                    </div>
+                    <div class="dropdown-search-options">
+                      <div class="dropdown-search-option" data-value="pending" onclick="selectDropdownOption(this, 'status', event)" data-selected="true">Pending</div>
+                      <div class="dropdown-search-option" data-value="in_transit" onclick="selectDropdownOption(this, 'status', event)">In Transit</div>
+                      <div class="dropdown-search-option" data-value="completed" onclick="selectDropdownOption(this, 'status', event)">Completed</div>
+                    </div>
+                  </div>
+                  <select name="status" id="id_status" class="form-select" style="display: none;">
+                    <option value="pending" selected>Pending</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -553,7 +623,6 @@
   </div>
 </div>
 
-<!-- Action Modals -->
 <!-- Start Transfer Confirmation Modal -->
 <div class="modal fade" id="startTransferModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
@@ -645,7 +714,7 @@
   </div>
 </div>
 
-<!-- Result Modal (for success/error messages) -->
+<!-- Result Modal -->
 <div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -656,9 +725,7 @@
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body" id="resultModalBody">
-        <!-- Content will be set dynamically -->
-      </div>
+      <div class="modal-body" id="resultModalBody"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
       </div>
@@ -681,14 +748,201 @@
 </div>
 
 <script>
-// Helper: read CSRF token from cookie
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
+// ==================== DROPDOWN SEARCH FUNCTIONS ====================
+function toggleDropdown(element, event) {
+    if (!element) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const filter = element.dataset.filter;
+    if (!filter) return;
+    
+    let dropdownId;
+    if (filter.startsWith('product-') || filter.startsWith('unit-')) {
+        dropdownId = filter.replace('-', 'Dropdown-');
+    } else {
+        dropdownId = filter + 'Dropdown';
+    }
+    
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        setTimeout(() => {
+            const searchField = dropdown.querySelector('.dropdown-search-field');
+            if (searchField) searchField.focus();
+        }, 100);
+    }
 }
 
-// ========== STOCK MANAGER CLASS (WITH CONVERSION FACTORS) ==========
+function filterDropdownOptions(input, filter, event) {
+    if (!input || !filter) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const searchTerm = input.value.toLowerCase();
+    
+    let dropdownId;
+    if (filter.startsWith('product-') || filter.startsWith('unit-')) {
+        dropdownId = filter.replace('-', 'Dropdown-');
+    } else {
+        dropdownId = filter + 'Dropdown';
+    }
+    
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const options = dropdown.querySelectorAll('.dropdown-search-option');
+    
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        option.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+}
+
+function selectDropdownOption(option, filter, event) {
+    if (!option || !filter) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById('id_' + filter);
+    const selectedText = document.getElementById('selected' + filter.charAt(0).toUpperCase() + filter.slice(1) + 'Text');
+    
+    if (!select || !selectedText) return;
+    
+    select.value = value;
+    selectedText.textContent = text;
+    
+    const dropdown = document.getElementById(filter + 'Dropdown');
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    
+    select.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="${filter}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+}
+
+function selectProductOption(option, index, event) {
+    if (!option || index === undefined) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById(`id_items-${index}-product`);
+    const selectedText = document.getElementById(`selectedProductText-${index}`);
+    
+    if (!select || !selectedText) return;
+    
+    select.value = value;
+    selectedText.textContent = text;
+    
+    const dropdown = document.getElementById(`productDropdown-${index}`);
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    
+    select.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="product-${index}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+    
+    if (stockManager) {
+        stockManager.fetchStockInfo(select);
+    }
+}
+
+function selectUnitOption(option, index, event) {
+    if (!option || index === undefined) return;
+    
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById(`id_items-${index}-units`);
+    const selectedText = document.getElementById(`selectedUnitText-${index}`);
+    
+    if (!select || !selectedText) return;
+    
+    select.value = value;
+    selectedText.textContent = text;
+    
+    const dropdown = document.getElementById(`unitDropdown-${index}`);
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    
+    select.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="unit-${index}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+    
+    const row = select.closest('tr');
+    if (row && stockManager) {
+        stockManager.updateRowTotal(row);
+    }
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-search-container')) {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+// ========== STOCK MANAGER CLASS ==========
 class StockManager {
     constructor() {
         this.pendingRequests = new Map();
@@ -697,33 +951,6 @@ class StockManager {
         this.abortControllers = new Map();
         this.rowStocks = new Map();
         this.conversionFactors = new Map();
-    }
-
-    getConversionFactor(productId, unitId, unitsData) {
-        const cacheKey = `cf_${productId}_${unitId}`;
-        
-        if (this.conversionFactors.has(cacheKey)) {
-            return this.conversionFactors.get(cacheKey);
-        }
-        
-        if (unitsData) {
-            const unit = unitsData.find(u => u.id == unitId);
-            if (unit && unit.conversion_factor) {
-                this.conversionFactors.set(cacheKey, unit.conversion_factor);
-                return unit.conversion_factor;
-            }
-        }
-        
-        return 1.0;
-    }
-
-    calculateBaseQuantity(displayQuantity, conversionFactor) {
-        return Math.round(displayQuantity * conversionFactor);
-    }
-
-    calculateDisplayQuantity(baseQuantity, conversionFactor) {
-        if (conversionFactor === 0) return 0;
-        return Math.round(baseQuantity / conversionFactor);
     }
 
     async updateProductStock(selectElement, delay = 300) {
@@ -736,7 +963,6 @@ class StockManager {
         
         const availableStock = row.querySelector('.available-stock');
         const unitCost = row.querySelector('.unit-cost');
-        const quantityInput = row.querySelector('.quantity-input');
         
         if (availableStock) {
             availableStock.textContent = 'Loading...';
@@ -745,14 +971,18 @@ class StockManager {
         if (unitCost) {
             unitCost.textContent = 'Loading...';
         }
-        if (quantityInput) {
-            quantityInput.value = '';
-            quantityInput.classList.remove('is-invalid', 'is-valid');
-        }
         
-        const unitsSelect = row.querySelector('select[name*="units"]');
+        const unitsSelect = row.querySelector('.units-select');
         if (unitsSelect) {
             unitsSelect.innerHTML = '<option value="">Select Unit</option>';
+            const index = row.id.split('-')[1];
+            const unitDropdown = document.getElementById(`unitDropdown-${index}`);
+            if (unitDropdown) {
+                const optionsContainer = unitDropdown.querySelector('.dropdown-search-options');
+                if (optionsContainer) {
+                    optionsContainer.innerHTML = '<div class="dropdown-search-option" data-value="" onclick="selectUnitOption(this, ' + index + ', event)">Select Unit</div>';
+                }
+            }
         }
         
         const timeoutId = setTimeout(async () => {
@@ -772,6 +1002,7 @@ class StockManager {
         const availableStock = row.querySelector('.available-stock');
         const unitCost = row.querySelector('.unit-cost');
         const cacheKey = this.getCacheKey(selectElement);
+        const index = row.id.split('-')[1];
         
         if (!productId || !storeId) {
             if (availableStock) {
@@ -796,7 +1027,7 @@ class StockManager {
         this.abortControllers.set(cacheKey, controller);
         
         try {
-            const url = `{% url "get_product_stock_transfer_info" %}?product_id=${productId}&store_id=${storeId}&t=${Date.now()}`;
+            const url = `/api/product/${productId}/stock-info/?store_id=${storeId}&t=${Date.now()}`;
             
             const response = await fetch(url, { 
                 signal: controller.signal,
@@ -827,7 +1058,7 @@ class StockManager {
             });
             
             this.updateStockDisplayFromData(row, data);
-            this.populateUnitsDropdown(row, data);
+            this.populateUnitsDropdown(row, data, index);
             
         } catch (error) {
             console.error('Stock fetch error:', error);
@@ -843,32 +1074,37 @@ class StockManager {
         }
     }
 
-    populateUnitsDropdown(row, data) {
-        const unitsSelect = row.querySelector('select[name*="units"]');
+    populateUnitsDropdown(row, data, index) {
+        const unitsSelect = row.querySelector('.units-select');
         if (!unitsSelect || !data.units) return;
         
-        unitsSelect.innerHTML = '<option value="">Select Unit</option>';
+        let options = '<option value="">Select Unit</option>';
+        let dropdownOptions = '<div class="dropdown-search-option" data-value="" onclick="selectUnitOption(this, ' + index + ', event)">Select Unit</div>';
         
         data.units.forEach(unit => {
-            const option = document.createElement('option');
-            option.value = unit.id;
-            option.textContent = `${unit.name} (CF: ${unit.conversion_factor}) - UGX ${unit.price.toLocaleString()}`;
-            option.dataset.price = unit.price;
-            option.dataset.conversion_factor = unit.conversion_factor;
-            option.dataset.abbreviation = unit.abbreviation;
-            option.dataset.is_base_unit = unit.is_base_unit || false;
-            unitsSelect.appendChild(option);
+            const unitValue = unit.id;
+            const unitName = unit.name;
+            const abbreviation = unit.abbreviation || '';
+            const isBase = unit.is_base_unit ? ' (Base)' : '';
+            
+            options += `<option value="${unitValue}" data-price="${unit.price}" data-conversion_factor="${unit.conversion_factor}" data-abbreviation="${abbreviation}" ${unit.is_base_unit ? 'selected' : ''}>${unitName} (${abbreviation})${isBase} - UGX ${unit.price.toLocaleString()}</option>`;
+            dropdownOptions += `<div class="dropdown-search-option" data-value="${unitValue}" onclick="selectUnitOption(this, ${index}, event)">${unitName} (${abbreviation})${isBase} - UGX ${unit.price.toLocaleString()}</div>`;
         });
+        
+        unitsSelect.innerHTML = options;
+        
+        const unitDropdown = document.getElementById(`unitDropdown-${index}`);
+        if (unitDropdown) {
+            const optionsContainer = unitDropdown.querySelector('.dropdown-search-options');
+            if (optionsContainer) {
+                optionsContainer.innerHTML = dropdownOptions;
+            }
+        }
         
         if (data.units.length > 0) {
             const baseUnit = data.units.find(u => u.is_base_unit);
             if (baseUnit) {
-                const unitOption = unitsSelect.querySelector(`option[value="${baseUnit.id}"]`);
-                if (unitOption) {
-                    unitOption.selected = true;
-                } else {
-                    unitsSelect.selectedIndex = 1;
-                }
+                unitsSelect.value = baseUnit.id;
             } else {
                 unitsSelect.selectedIndex = 1;
             }
@@ -905,8 +1141,6 @@ class StockManager {
             } else if (status === 'muted') {
                 availableStock.classList.add('text-muted');
             }
-            
-            availableStock.title = `Available: ${data.available_stock} base units\nTotal: ${data.total_stock}\nCommitted: ${data.committed_stock}`;
         }
         
         if (unitCost && data.unit_cost) {
@@ -917,8 +1151,9 @@ class StockManager {
 
     updateFromCache(selectElement, data) {
         const row = selectElement.closest('tr');
+        const index = row.id.split('-')[1];
         this.updateStockDisplayFromData(row, data);
-        this.populateUnitsDropdown(row, data);
+        this.populateUnitsDropdown(row, data, index);
         
         const rowId = row.id;
         this.rowStocks.set(rowId, {
@@ -933,7 +1168,7 @@ class StockManager {
 
     updateAvailableStock(row, displayQuantity) {
         const availableStock = row.querySelector('.available-stock');
-        const unitsSelect = row.querySelector('select[name*="units"]');
+        const unitsSelect = row.querySelector('.units-select');
         const rowId = row.id;
         
         if (!availableStock || !unitsSelect || !this.rowStocks.has(rowId)) return;
@@ -948,7 +1183,6 @@ class StockManager {
         const baseQuantityNeeded = Math.round(displayQuantity * conversionFactor);
         const remainingStock = originalStock - baseQuantityNeeded;
         
-        const unitAbbr = selectedUnit.dataset.abbreviation || 'units';
         const baseUnitAbbr = rowData.unitsData?.find(u => u.is_base_unit)?.abbreviation || 'base units';
         
         availableStock.textContent = `${remainingStock} ${baseUnitAbbr}`;
@@ -967,8 +1201,6 @@ class StockManager {
         
         rowData.currentStock = remainingStock;
         this.rowStocks.set(rowId, rowData);
-        
-        this.validateQuantity(row.querySelector('.quantity-input'), originalStock, conversionFactor);
     }
 
     validateQuantity(quantityInput, originalStock, conversionFactor) {
@@ -981,35 +1213,13 @@ class StockManager {
         
         if (displayQuantity <= 0) {
             quantityInput.classList.add('is-invalid');
-            this.showStockWarning(row, 'Quantity must be greater than 0');
             return false;
         } else if (baseQuantityNeeded > available) {
             quantityInput.classList.add('is-invalid');
-            this.showStockWarning(row, `Only ${available} base units available (${Math.floor(available/conversionFactor)} display units)`);
             return false;
         } else {
             quantityInput.classList.add('is-valid');
-            this.hideStockWarning(row);
             return true;
-        }
-    }
-
-    showStockWarning(row, message) {
-        let warning = row.querySelector('.stock-warning');
-        if (!warning) {
-            warning = document.createElement('div');
-            warning.className = 'stock-warning text-danger small mt-1';
-            const quantityCell = row.querySelector('.quantity-input').closest('td');
-            quantityCell.appendChild(warning);
-        }
-        warning.textContent = message;
-        warning.style.display = 'block';
-    }
-
-    hideStockWarning(row) {
-        const warning = row.querySelector('.stock-warning');
-        if (warning) {
-            warning.style.display = 'none';
         }
     }
 
@@ -1019,15 +1229,10 @@ class StockManager {
         return `stock_${productId}_${storeId}`;
     }
 
-    async updateAllStocks() {
+    async forceRefreshAllStocks() {
+        this.localCache.clear();
+        this.conversionFactors.clear();
         const productSelects = document.querySelectorAll('#directTransferModal .product-select');
-        
-        const storeId = document.querySelector('#directTransferModal select[name="from_store"]')?.value || '';
-        for (const key of this.localCache.keys()) {
-            if (key.includes(`_${storeId}`)) {
-                this.localCache.delete(key);
-            }
-        }
         
         const updates = Array.from(productSelects)
             .filter(select => select.value)
@@ -1036,20 +1241,13 @@ class StockManager {
         await Promise.allSettled(updates);
     }
 
-    async forceRefreshAllStocks() {
-        this.localCache.clear();
-        this.conversionFactors.clear();
-        await this.updateAllStocks();
-    }
-
     updateRowTotal(row) {
-        const productSelect = row.querySelector('.product-select');
         const quantityInput = row.querySelector('.quantity-input');
-        const unitsSelect = row.querySelector('select[name*="units"]');
+        const unitsSelect = row.querySelector('.units-select');
         const rowTotal = row.querySelector('.row-total');
         const unitCost = row.querySelector('.unit-cost');
         
-        if (productSelect && quantityInput && unitsSelect && rowTotal && unitCost) {
+        if (quantityInput && unitsSelect && rowTotal && unitCost) {
             const selectedUnit = unitsSelect.options[unitsSelect.selectedIndex];
             const unitPrice = selectedUnit ? parseFloat(selectedUnit.dataset.price || 0) : 0;
             const displayQuantity = parseFloat(quantityInput.value) || 0;
@@ -1083,282 +1281,287 @@ class StockManager {
     }
 }
 
-// Initialize stock manager globally
 const stockManager = new StockManager();
 
-// ========== ACTION MODAL FUNCTIONS ==========
+// ========== ACTION FUNCTIONS ==========
 let currentTransferId = null;
 
-function confirmStartTransfer(transferId) {
-    currentTransferId = transferId;
-    const modal = new bootstrap.Modal(document.getElementById('startTransferModal'));
-    modal.show();
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
 }
 
-function confirmCompleteTransfer(transferId) {
-    currentTransferId = transferId;
-    const modal = new bootstrap.Modal(document.getElementById('completeTransferModal'));
-    modal.show();
-}
-
-function confirmCancelTransfer(transferId) {
-    currentTransferId = transferId;
-    const modal = new bootstrap.Modal(document.getElementById('cancelTransferModal'));
-    modal.show();
+// ── cleanupModals ────────────────────────────────────────────────
+// Remove ALL Bootstrap backdrops and body-lock styles.
+// Must be called before opening any modal to prevent overlay stacking.
+function cleanupModals() {
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
 }
 
 function showLoadingModal() {
-    const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    cleanupModals();
+    const el = document.getElementById('loadingModal');
+    const modal = new bootstrap.Modal(el, { backdrop: 'static', keyboard: false });
     modal.show();
     return modal;
 }
 
 function hideLoadingModal(modal) {
-    if (modal) modal.hide();
+    if (!modal) return;
+    try { modal.hide(); } catch(e) {}
+    setTimeout(cleanupModals, 350);
 }
 
 function showResultModal(title, message, isSuccess = true) {
-    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    cleanupModals();
+    const el = document.getElementById('resultModal');
+    const modal = new bootstrap.Modal(el, { backdrop: true, keyboard: true });
     const modalTitle = document.getElementById('resultModalTitle');
     const modalBody = document.getElementById('resultModalBody');
-    
-    // Set icon based on success/failure
+
     const icon = isSuccess ? 'check-circle' : 'alert-circle';
     const iconColor = isSuccess ? 'text-success' : 'text-danger';
-    
+
     modalTitle.innerHTML = `<i data-feather="${icon}" class="feather-16 me-2 ${iconColor}"></i>${title}`;
     modalBody.innerHTML = `<p>${message}</p>`;
-    
+
     modal.show();
-    
-    // Refresh feather icons in modal
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
-    
-    // Reload page after successful action
-    if (isSuccess) {
-        modal._element.addEventListener('hidden.bs.modal', function() {
-            window.location.reload();
-        }, { once: true });
-    }
+    if (typeof feather !== 'undefined') feather.replace();
+
+    el.addEventListener('hidden.bs.modal', function() {
+        cleanupModals();
+        if (isSuccess) window.location.reload();
+    }, { once: true });
 }
 
-// ========== TRANSFER ACTION FUNCTIONS ==========
+function confirmStartTransfer(transferId) {
+    currentTransferId = transferId;
+    cleanupModals();
+    new bootstrap.Modal(document.getElementById('startTransferModal')).show();
+}
+
+function confirmCompleteTransfer(transferId) {
+    currentTransferId = transferId;
+    cleanupModals();
+    new bootstrap.Modal(document.getElementById('completeTransferModal')).show();
+}
+
+function confirmCancelTransfer(transferId) {
+    currentTransferId = transferId;
+    cleanupModals();
+    document.getElementById('cancelReason').value = '';
+    new bootstrap.Modal(document.getElementById('cancelTransferModal')).show();
+}
+
+// Close confirm modal first, wait for its animation to finish,
+// then cleanupModals + open loading + POST — prevents backdrop stacking.
 function startTransfer() {
     if (!currentTransferId) return;
-    
+    const confirmEl = document.getElementById('startTransferModal');
+    const confirmModal = bootstrap.Modal.getInstance(confirmEl);
+    if (confirmModal) {
+        confirmEl.addEventListener('hidden.bs.modal', function handler() {
+            confirmEl.removeEventListener('hidden.bs.modal', handler);
+            _doStartTransfer();
+        });
+        confirmModal.hide();
+    } else { _doStartTransfer(); }
+}
+function _doStartTransfer() {
+    cleanupModals();
     const loadingModal = showLoadingModal();
-    const csrftoken = getCookie('csrftoken');
-    
-    // Create and submit a hidden form
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = `{% url 'start_stock_transfer' 9999 %}`.replace('9999', currentTransferId);
-    form.style.display = 'none';
-    
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrfmiddlewaretoken';
-    csrfInput.value = csrftoken;
-    
-    form.appendChild(csrfInput);
-    document.body.appendChild(form);
-    
-    // Submit the form
-    form.submit();
-    
-    // Hide loading modal after a short delay (in case form submission takes time)
-    setTimeout(() => {
+    fetch(`/stock_transfers/${currentTransferId}/update_status/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ status: 'in_transit' })
+    })
+    .then(async resp => {
         hideLoadingModal(loadingModal);
-    }, 2000);
+        const data = await resp.json();
+        setTimeout(() => data.success
+            ? showResultModal('Success', 'Transfer started — now in transit.', true)
+            : showResultModal('Error', data.error || 'Failed to start transfer.', false), 400);
+    })
+    .catch(() => { hideLoadingModal(loadingModal); setTimeout(() => showResultModal('Error', 'Network error — please try again.', false), 400); });
 }
 
 function completeTransfer() {
     if (!currentTransferId) return;
-    
+    const confirmEl = document.getElementById('completeTransferModal');
+    const confirmModal = bootstrap.Modal.getInstance(confirmEl);
+    if (confirmModal) {
+        confirmEl.addEventListener('hidden.bs.modal', function handler() {
+            confirmEl.removeEventListener('hidden.bs.modal', handler);
+            _doCompleteTransfer();
+        });
+        confirmModal.hide();
+    } else { _doCompleteTransfer(); }
+}
+function _doCompleteTransfer() {
+    cleanupModals();
     const loadingModal = showLoadingModal();
-    const csrftoken = getCookie('csrftoken');
-    
-    // Create and submit a hidden form
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = `{% url 'complete_stock_transfer' 9999 %}`.replace('9999', currentTransferId);
-    form.style.display = 'none';
-    
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrfmiddlewaretoken';
-    csrfInput.value = csrftoken;
-    
-    form.appendChild(csrfInput);
-    document.body.appendChild(form);
-    
-    // Submit the form
-    form.submit();
-    
-    // Hide loading modal after a short delay
-    setTimeout(() => {
+    fetch(`/stock_transfers/${currentTransferId}/update_status/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ status: 'completed' })
+    })
+    .then(async resp => {
         hideLoadingModal(loadingModal);
-    }, 2000);
+        const data = await resp.json();
+        setTimeout(() => data.success
+            ? showResultModal('Success', 'Transfer completed. Inventory has been updated.', true)
+            : showResultModal('Error', data.error || 'Failed to complete transfer.', false), 400);
+    })
+    .catch(() => { hideLoadingModal(loadingModal); setTimeout(() => showResultModal('Error', 'Network error — please try again.', false), 400); });
 }
 
 function cancelTransfer() {
     if (!currentTransferId) return;
-    
     const reason = document.getElementById('cancelReason').value;
+    const confirmEl = document.getElementById('cancelTransferModal');
+    const confirmModal = bootstrap.Modal.getInstance(confirmEl);
+    if (confirmModal) {
+        confirmEl.addEventListener('hidden.bs.modal', function handler() {
+            confirmEl.removeEventListener('hidden.bs.modal', handler);
+            _doCancelTransfer(reason);
+        });
+        confirmModal.hide();
+    } else { _doCancelTransfer(reason); }
+}
+function _doCancelTransfer(reason) {
+    cleanupModals();
     const loadingModal = showLoadingModal();
-    const csrftoken = getCookie('csrftoken');
-    
-    // Create and submit a hidden form
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = `{% url 'update_transfer_status' 9999 %}`.replace('9999', currentTransferId);
-    form.style.display = 'none';
-    
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrfmiddlewaretoken';
-    csrfInput.value = csrftoken;
-    
-    const statusInput = document.createElement('input');
-    statusInput.type = 'hidden';
-    statusInput.name = 'status';
-    statusInput.value = 'cancelled';
-    
-    form.appendChild(csrfInput);
-    form.appendChild(statusInput);
-    
-    if (reason) {
-        const noteInput = document.createElement('input');
-        noteInput.type = 'hidden';
-        noteInput.name = 'note';
-        noteInput.value = `Cancelled: ${reason}`;
-        form.appendChild(noteInput);
-    }
-    
-    document.body.appendChild(form);
-    
-    // Submit the form
-    form.submit();
-    
-    // Hide loading modal after a short delay
-    setTimeout(() => {
+    fetch(`/stock_transfers/${currentTransferId}/update_status/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ status: 'cancelled', cancellation_reason: reason })
+    })
+    .then(async resp => {
         hideLoadingModal(loadingModal);
-    }, 2000);
+        const data = await resp.json();
+        setTimeout(() => data.success
+            ? showResultModal('Success', 'Transfer has been cancelled.', true)
+            : showResultModal('Error', data.error || 'Failed to cancel transfer.', false), 400);
+    })
+    .catch(() => { hideLoadingModal(loadingModal); setTimeout(() => showResultModal('Error', 'Network error — please try again.', false), 400); });
+}
+
+function refreshTransfers() {
+    window.location.reload();
 }
 
 // ========== APPROVED REQUESTS MODAL ==========
 function showApprovedRequestsModal() {
-  const modal = new bootstrap.Modal(document.getElementById('approvedRequestsModal'));
-  const modalContent = document.getElementById('approvedRequestsContent');
-  
-  modalContent.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
-  modal.show();
-  
-  // Fetch approved requests
-  fetch('{% url "approved_transfer_requests_json" %}')
-    .then(response => response.json())
-    .then(data => {
-      let content = '';
-      
-      if (data.requests && data.requests.length > 0) {
-        content = `
-          <div class="table-responsive">
-            <table class="table table-sm">
-              <thead class="table-light">
-                <tr>
-                  <th width="50px">
-                    <input type="checkbox" id="selectAllRequests">
-                  </th>
-                  <th>Request ID</th>
-                  <th>Route</th>
-                  <th>Items</th>
-                  <th>Priority</th>
-                  <th>Approved Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-        `;
-        
-        data.requests.forEach(request => {
-          content += `
-            <tr>
-              <td>
-                <input type="checkbox" class="request-checkbox" value="${request.id}">
-              </td>
-              <td>
-                <a href="{% url 'transfer_request_detail' 0 %}".replace('0', request.id) class="fw-bold text-primary">
-                  #TR${String(request.id).padStart(4, '0')}
-                </a>
-              </td>
-              <td>
-                <div class="small">
-                  <div>${request.from_store_name} →</div>
-                  <div>${request.to_store_name}</div>
+    const modal = new bootstrap.Modal(document.getElementById('approvedRequestsModal'));
+    const modalContent = document.getElementById('approvedRequestsContent');
+    
+    modalContent.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+    modal.show();
+    
+    fetch("{% url 'approved_transfer_requests' %}")
+        .then(response => response.json())
+        .then(data => {
+            let content = '';
+            
+            if (data.requests && data.requests.length > 0) {
+                content = `
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="50px">
+                                        <input type="checkbox" id="selectAllRequests">
+                                    </th>
+                                    <th>Request ID</th>
+                                    <th>Route</th>
+                                    <th>Items</th>
+                                    <th>Priority</th>
+                                    <th>Approved Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                data.requests.forEach(request => {
+                    content += `
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="request-checkbox" value="${request.id}">
+                            </td>
+                            <td>
+                                <a href="/transfer-request/${request.id}/" class="fw-bold text-primary">
+                                    #TR${String(request.id).padStart(4, '0')}
+                                </a>
+                            </td>
+                            <td>
+                                <div class="small">
+                                    <div>${request.from_store_name} →</div>
+                                    <div>${request.to_store_name}</div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">${request.items_count} item${request.items_count !== 1 ? 's' : ''}</span>
+                            </td>
+                            <td>
+                                <span class="badge ${request.priority === 'urgent' ? 'bg-danger' : request.priority === 'high' ? 'bg-warning' : 'bg-secondary'}">
+                                    ${request.priority}
+                                </span>
+                            </td>
+                            <td>${request.approved_date ? new Date(request.approved_date).toLocaleDateString() : 'N/A'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" data-action="createSingleTransfer" data-request-id="${request.id}">
+                                    <i data-feather="truck" class="feather-12"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                content += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                content = `
+                    <div class="text-center py-4">
+                        <i data-feather="check-circle" class="feather-48 text-success mb-3"></i>
+                        <h5 class="text-muted">No approved requests pending</h5>
+                        <p class="text-muted">All approved transfer requests have been converted to stock transfers.</p>
+                    </div>
+                `;
+            }
+            
+            modalContent.innerHTML = content;
+            
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+            
+            const selectAll = document.getElementById('selectAllRequests');
+            const checkboxes = document.querySelectorAll('.request-checkbox');
+            
+            if (selectAll) {
+                selectAll.addEventListener('change', function() {
+                    checkboxes.forEach(cb => cb.checked = this.checked);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading approved requests:', error);
+            modalContent.innerHTML = `
+                <div class="text-center py-4">
+                    <i data-feather="alert-circle" class="feather-48 text-danger mb-3"></i>
+                    <h5 class="text-muted">Error loading requests</h5>
+                    <p class="text-muted">Unable to load approved transfer requests at this time.</p>
                 </div>
-              </td>
-              <td>
-                <span class="badge bg-info">${request.items_count} item${request.items_count !== 1 ? 's' : ''}</span>
-              </td>
-              <td>
-                <span class="badge ${request.priority === 'urgent' ? 'bg-danger' : request.priority === 'high' ? 'bg-warning' : 'bg-secondary'}">
-                  ${request.priority}
-                </span>
-              </td>
-              <td>${request.approved_date ? new Date(request.approved_date).toLocaleDateString() : 'N/A'}</td>
-              <td>
-                <button class="btn btn-sm btn-primary" data-action="createSingleTransfer" data-request-id="${request.id}">
-                  <i data-feather="truck" class="feather-12"></i>
-                </button>
-              </td>
-            </tr>
-          `;
+            `;
         });
-        
-        content += `
-              </tbody>
-            </table>
-          </div>
-        `;
-      } else {
-        content = `
-          <div class="text-center py-4">
-            <i data-feather="check-circle" class="feather-48 text-success mb-3"></i>
-            <h5 class="text-muted">No approved requests pending</h5>
-            <p class="text-muted">All approved transfer requests have been converted to stock transfers.</p>
-          </div>
-        `;
-      }
-      
-      modalContent.innerHTML = content;
-      
-      // Re-initialize feather icons
-      if (typeof feather !== 'undefined') {
-        feather.replace();
-      }
-      
-      // Setup select all functionality
-      const selectAll = document.getElementById('selectAllRequests');
-      const checkboxes = document.querySelectorAll('.request-checkbox');
-      
-      if (selectAll) {
-        selectAll.addEventListener('change', function() {
-          checkboxes.forEach(cb => cb.checked = this.checked);
-        });
-      }
-    })
-    .catch(error => {
-      console.error('Error loading approved requests:', error);
-      modalContent.innerHTML = `
-        <div class="text-center py-4">
-          <i data-feather="alert-circle" class="feather-48 text-danger mb-3"></i>
-          <h5 class="text-muted">Error loading requests</h5>
-          <p class="text-muted">Unable to load approved transfer requests at this time.</p>
-        </div>
-      `;
-    });
 }
 
 function createSingleTransfer(event) {
@@ -1367,11 +1570,9 @@ function createSingleTransfer(event) {
     
     const requestId = button.dataset.requestId;
     const loadingModal = showLoadingModal();
-    
-    const url = '{% url "create_transfer_from_request" 0 %}'.replace('0', requestId);
     const csrftoken = getCookie('csrftoken');
 
-    fetch(url, {
+    fetch(`/stock_transfers/create/from-request/${requestId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrftoken,
@@ -1405,55 +1606,50 @@ function createSingleTransfer(event) {
 }
 
 function createBulkTransfers() {
-  const selectedRequests = Array.from(document.querySelectorAll('.request-checkbox:checked')).map(cb => cb.value);
-  if (selectedRequests.length === 0) {
-    showResultModal('Warning', 'Please select at least one transfer request.', false);
-    return;
-  }
-
-  const loadingModal = showLoadingModal();
-  const csrftoken = getCookie('csrftoken');
-  const formData = new FormData();
-  selectedRequests.forEach(id => formData.append('request_ids', id));
-
-  fetch('{% url "create_bulk_transfers" %}', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrftoken,
-    },
-    body: formData
-  }).then(async resp => {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('approvedRequestsModal'));
-    if (modal) modal.hide();
-    hideLoadingModal(loadingModal);
-    
-    try {
-      const data = await resp.json();
-      if (data.success) {
-        showResultModal('Success', `Successfully created ${data.created} transfer(s)`, true);
-      } else {
-        showResultModal('Error', 'Failed to create bulk transfers: ' + (data.error || 'Unknown error'), false);
-      }
-    } catch {
-      showResultModal('Success', 'Transfers created successfully!', true);
+    const selectedRequests = Array.from(document.querySelectorAll('.request-checkbox:checked')).map(cb => cb.value);
+    if (selectedRequests.length === 0) {
+        showResultModal('Warning', 'Please select at least one transfer request.', false);
+        return;
     }
-  }).catch(err => {
-    console.error('Error creating bulk transfers:', err);
-    hideLoadingModal(loadingModal);
-    showResultModal('Error', 'Error creating bulk transfers', false);
-  });
+
+    const loadingModal = showLoadingModal();
+    const csrftoken = getCookie('csrftoken');
+    const formData = new FormData();
+    selectedRequests.forEach(id => formData.append('request_ids', id));
+
+    fetch('/stock_transfers/bulk/create/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+        },
+        body: formData
+    }).then(async resp => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('approvedRequestsModal'));
+        if (modal) modal.hide();
+        hideLoadingModal(loadingModal);
+        
+        try {
+            const data = await resp.json();
+            if (data.success) {
+                showResultModal('Success', `Successfully created ${data.created} transfer(s)`, true);
+            } else {
+                showResultModal('Error', 'Failed to create bulk transfers: ' + (data.error || 'Unknown error'), false);
+            }
+        } catch {
+            showResultModal('Success', 'Transfers created successfully!', true);
+        }
+    }).catch(err => {
+        console.error('Error creating bulk transfers:', err);
+        hideLoadingModal(loadingModal);
+        showResultModal('Error', 'Error creating bulk transfers', false);
+    });
 }
 
 // ========== DIRECT TRANSFER MODAL ==========
 function showDirectTransferModal() {
-    console.log('🚀 Opening direct transfer modal...');
     const modal = document.getElementById('directTransferModal');
-    if (!modal) {
-        console.error('Modal element not found');
-        return;
-    }
+    if (!modal) return;
 
-    // Reset form and state
     const form = document.getElementById('directTransferForm');
     if (form) {
         form.reset();
@@ -1464,41 +1660,51 @@ function showDirectTransferModal() {
         form.querySelectorAll('.stock-warning').forEach(el => el.remove());
     }
 
-    // Clear formset
     const tbody = document.getElementById('formset-tbody');
     if (tbody) {
         tbody.innerHTML = '';
     }
 
-    // Reset management form
     const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
     const initialFormsInput = document.getElementById('id_items-INITIAL_FORMS');
     if (totalFormsInput) totalFormsInput.value = '0';
     if (initialFormsInput) initialFormsInput.value = '0';
 
-    // Reset totals
     const grandTotalElement = document.getElementById('grand-total');
     if (grandTotalElement) {
         grandTotalElement.textContent = 'UGX 0.00';
     }
 
-    // Clear stock cache
+    document.getElementById('selectedFromStoreText').textContent = 'Select Store';
+    document.getElementById('selectedToStoreText').textContent = 'Select Store';
+    document.getElementById('selectedStatusText').textContent = 'Pending';
+    
+    document.querySelectorAll('#from_storeDropdown .dropdown-search-option').forEach(opt => {
+        opt.removeAttribute('data-selected');
+    });
+    document.querySelectorAll('#to_storeDropdown .dropdown-search-option').forEach(opt => {
+        opt.removeAttribute('data-selected');
+    });
+    document.querySelectorAll('#statusDropdown .dropdown-search-option').forEach(opt => {
+        opt.removeAttribute('data-selected');
+    });
+    
+    const pendingOption = document.querySelector('#statusDropdown .dropdown-search-option[data-value="pending"]');
+    if (pendingOption) {
+        pendingOption.setAttribute('data-selected', 'true');
+    }
+
     stockManager.clearCache();
 
-    // Show modal
     const bootstrapModal = new bootstrap.Modal(modal);
     bootstrapModal.show();
 
-    // Set up event listeners when modal is fully shown
     modal.addEventListener('shown.bs.modal', function() {
-        console.log('✅ Modal fully shown, setting up real-time stock listeners...');
         setupRealTimeStockListeners();
-        addFormsetRow(); // Add initial row
+        addFormsetRow();
     }, { once: true });
 
-    // Clear cache when modal hides
     modal.addEventListener('hidden.bs.modal', function() {
-        console.log('🗑️ Modal closed, clearing stock cache...');
         stockManager.clearCache();
     });
 }
@@ -1507,16 +1713,13 @@ function setupRealTimeStockListeners() {
     const modal = document.getElementById('directTransferModal');
     if (!modal) return;
 
-    // Store change listener
     const fromStoreSelect = modal.querySelector('select[name="from_store"]');
     if (fromStoreSelect) {
         fromStoreSelect.addEventListener('change', function() {
-            console.log('🏪 Store changed to:', this.value);
             stockManager.forceRefreshAllStocks();
         });
     }
 
-    // Manual refresh button
     const refreshBtn = modal.querySelector('#refreshStockBtn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
@@ -1524,15 +1727,12 @@ function setupRealTimeStockListeners() {
         });
     }
 
-    // Product change with debouncing
     modal.addEventListener('change', function(e) {
         if (e.target.classList.contains('product-select')) {
-            console.log('📦 Product selected:', e.target.value);
-            stockManager.updateProductStock(e.target, 300); // 300ms debounce
+            stockManager.updateProductStock(e.target, 300);
         }
     });
 
-    // Quantity input - REAL-TIME UPDATES
     modal.addEventListener('input', function(e) {
         if (e.target.classList.contains('quantity-input')) {
             const row = e.target.closest('tr');
@@ -1540,50 +1740,17 @@ function setupRealTimeStockListeners() {
         }
     });
 
-    // Quantity blur - validate against stock
-    modal.addEventListener('blur', function(e) {
-        if (e.target.classList.contains('quantity-input')) {
-            const row = e.target.closest('tr');
-            const rowId = row.id;
-            
-            if (stockManager.rowStocks.has(rowId)) {
-                const rowData = stockManager.rowStocks.get(rowId);
-                const unitsSelect = row.querySelector('select[name*="units"]');
-                const selectedUnit = unitsSelect?.options[unitsSelect.selectedIndex];
-                const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
-                
-                stockManager.validateQuantity(e.target, rowData.originalStock, conversionFactor);
-            }
-        }
-    });
-
-    // Unit change - update costs and validation
     modal.addEventListener('change', function(e) {
-        if (e.target.matches('select[name*="units"]')) {
+        if (e.target.matches('.units-select')) {
             const row = e.target.closest('tr');
             stockManager.updateRowTotal(row);
-            
-            const quantityInput = row.querySelector('.quantity-input');
-            if (quantityInput && quantityInput.value) {
-                const rowId = row.id;
-                if (stockManager.rowStocks.has(rowId)) {
-                    const rowData = stockManager.rowStocks.get(rowId);
-                    const selectedUnit = e.target.options[e.target.selectedIndex];
-                    const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
-                    
-                    stockManager.validateQuantity(quantityInput, rowData.originalStock, conversionFactor);
-                }
-            }
         }
     });
 }
 
 function addFormsetRow() {
     const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
-    if (!totalFormsInput) {
-        console.error('Total forms input not found');
-        return;
-    }
+    if (!totalFormsInput) return;
 
     const currentForms = parseInt(totalFormsInput.value);
     const tbody = document.getElementById('formset-tbody');
@@ -1592,18 +1759,37 @@ function addFormsetRow() {
     newRow.className = 'formset-row';
     newRow.id = `row-${currentForms}`;
     
+    let productOptions = '<option value="">Select Product</option>';
+    let productDropdownOptions = '<div class="dropdown-search-option" data-value="" onclick="selectProductOption(this, ' + currentForms + ', event)">Select Product</div>';
+    
+    {% for product in products %}
+    productOptions += `<option value="{{ product.id }}" data-sku="{{ product.sku }}">{{ product.name }} ({{ product.sku }})</option>`;
+    productDropdownOptions += `<div class="dropdown-search-option" data-value="{{ product.id }}" onclick="selectProductOption(this, ${currentForms}, event)">{{ product.name }} ({{ product.sku }})</div>`;
+    {% endfor %}
+    
     newRow.innerHTML = `
         <td>
-            <select name="items-${currentForms}-product" 
-                   class="form-select form-select-sm product-select" required>
-                <option value="">Select Product</option>
-                {% for product in products %}
-                <option value="{{ product.id }}" 
-                        data-sku="{{ product.sku }}">
-                    {{ product.name }} ({{ product.sku }})
-                </option>
-                {% endfor %}
-            </select>
+            <div class="dropdown-search-container" style="position: relative;">
+                <div class="dropdown-search-input" data-filter="product-${currentForms}" onclick="toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedProductText-${currentForms}">Select Product</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                </div>
+                <div class="dropdown-search-menu" id="productDropdown-${currentForms}" style="display: none;">
+                    <div class="dropdown-search-header">
+                        <i class="ti ti-search"></i>
+                        <input type="text" class="dropdown-search-field" placeholder="Search product..." onkeyup="filterDropdownOptions(this, 'product-${currentForms}', event)">
+                    </div>
+                    <div class="dropdown-search-options">
+                        ${productDropdownOptions}
+                    </div>
+                </div>
+                <select name="items-${currentForms}-product" 
+                       id="id_items-${currentForms}-product" 
+                       class="form-select form-select-sm product-select" 
+                       style="display: none;" required>
+                    ${productOptions}
+                </select>
+            </div>
             <div class="invalid-feedback">Please select a product.</div>
         </td>
         <td>
@@ -1616,11 +1802,27 @@ function addFormsetRow() {
             <div class="invalid-feedback">Please enter a valid quantity.</div>
         </td>
         <td>
-            <select name="items-${currentForms}-units"
-                   class="form-select form-select-sm units-select" required>
-                <option value="">Select Unit</option>
-                <!-- Units will be auto-populated when product is selected -->
-            </select>
+            <div class="dropdown-search-container" style="position: relative;">
+                <div class="dropdown-search-input" data-filter="unit-${currentForms}" onclick="toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedUnitText-${currentForms}">Select Unit</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                </div>
+                <div class="dropdown-search-menu" id="unitDropdown-${currentForms}" style="display: none;">
+                    <div class="dropdown-search-header">
+                        <i class="ti ti-search"></i>
+                        <input type="text" class="dropdown-search-field" placeholder="Search unit..." onkeyup="filterDropdownOptions(this, 'unit-${currentForms}', event)">
+                    </div>
+                    <div class="dropdown-search-options">
+                        <div class="dropdown-search-option" data-value="" onclick="selectUnitOption(this, ${currentForms}, event)">Select Unit</div>
+                    </div>
+                </div>
+                <select name="items-${currentForms}-units"
+                       id="id_items-${currentForms}-units"
+                       class="form-select form-select-sm units-select" 
+                       style="display: none;" required>
+                    <option value="">Select Unit</option>
+                </select>
+            </div>
             <div class="invalid-feedback">Please select a unit.</div>
         </td>
         <td>
@@ -1639,12 +1841,6 @@ function addFormsetRow() {
     tbody.appendChild(newRow);
     totalFormsInput.value = currentForms + 1;
     
-    // Initialize row features
-    initializeRowFeatures(newRow);
-    
-    console.log(`✅ Added formset row ${currentForms}, total forms: ${totalFormsInput.value}`);
-    
-    // Refresh feather icons
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
@@ -1658,22 +1854,37 @@ function removeFormsetRow(event) {
     const tbody = document.getElementById('formset-tbody');
     
     if (tbody.children.length <= 1) {
-        // Clear values but keep the row
+        const productSelect = row.querySelector('.product-select');
+        const productText = row.querySelector('[id^="selectedProductText-"]');
+        const unitText = row.querySelector('[id^="selectedUnitText-"]');
         const inputs = row.querySelectorAll('input:not([type="hidden"]), select');
+        const index = row.id.split('-')[1];
+        
         inputs.forEach(input => {
             input.value = '';
             input.classList.remove('is-invalid', 'is-valid');
         });
+        
+        if (productText) productText.textContent = 'Select Product';
+        if (unitText) unitText.textContent = 'Select Unit';
+        
         row.querySelector('.available-stock').textContent = 'Select product first';
         row.querySelector('.available-stock').className = 'available-stock text-muted';
         row.querySelector('.unit-cost').textContent = 'UGX 0.00';
         row.querySelector('.row-total').textContent = 'UGX 0.00';
-        stockManager.hideStockWarning(row);
         
-        // Clear units dropdown
-        const unitsSelect = row.querySelector('select[name*="units"]');
-        if (unitsSelect) {
-            unitsSelect.innerHTML = '<option value="">Select Unit</option>';
+        const productDropdown = document.getElementById(`productDropdown-${index}`);
+        if (productDropdown) {
+            productDropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+                opt.removeAttribute('data-selected');
+            });
+        }
+        
+        const unitDropdown = document.getElementById(`unitDropdown-${index}`);
+        if (unitDropdown) {
+            unitDropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+                opt.removeAttribute('data-selected');
+            });
         }
         
         updateGrandTotal();
@@ -1683,73 +1894,87 @@ function removeFormsetRow(event) {
     row.remove();
     updateGrandTotal();
     
-    // Update form indices and TOTAL_FORMS count
     const rows = tbody.querySelectorAll('.formset-row');
     const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
     if (totalFormsInput) {
         totalFormsInput.value = rows.length;
     }
     
-    // Renumber the remaining rows
-    rows.forEach((row, index) => {
+    rows.forEach((row, newIndex) => {
+        const oldIndex = row.id.split('-')[1];
+        row.id = `row-${newIndex}`;
+        
         const productSelect = row.querySelector('.product-select');
+        const productText = document.getElementById(`selectedProductText-${oldIndex}`);
+        const productDropdown = document.getElementById(`productDropdown-${oldIndex}`);
+        const productSearchField = productDropdown?.querySelector('.dropdown-search-field');
+        const productInput = row.querySelector(`.dropdown-search-input[data-filter="product-${oldIndex}"]`);
+        
+        if (productSelect) {
+            productSelect.name = `items-${newIndex}-product`;
+            productSelect.id = `id_items-${newIndex}-product`;
+        }
+        if (productText) productText.id = `selectedProductText-${newIndex}`;
+        if (productDropdown) productDropdown.id = `productDropdown-${newIndex}`;
+        if (productSearchField) {
+            productSearchField.setAttribute('onkeyup', `filterDropdownOptions(this, 'product-${newIndex}', event)`);
+        }
+        if (productInput) {
+            productInput.setAttribute('data-filter', `product-${newIndex}`);
+            productInput.setAttribute('onclick', 'toggleDropdown(this, event)');
+        }
+        
+        if (productDropdown) {
+            productDropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+                const currentOnclick = opt.getAttribute('onclick');
+                if (currentOnclick && currentOnclick.includes('selectProductOption')) {
+                    opt.setAttribute('onclick', `selectProductOption(this, ${newIndex}, event)`);
+                }
+            });
+        }
+        
+        const unitsSelect = row.querySelector('.units-select');
+        const unitText = document.getElementById(`selectedUnitText-${oldIndex}`);
+        const unitDropdown = document.getElementById(`unitDropdown-${oldIndex}`);
+        const unitSearchField = unitDropdown?.querySelector('.dropdown-search-field');
+        const unitInput = row.querySelector(`.dropdown-search-input[data-filter="unit-${oldIndex}"]`);
+        
+        if (unitsSelect) {
+            unitsSelect.name = `items-${newIndex}-units`;
+            unitsSelect.id = `id_items-${newIndex}-units`;
+        }
+        if (unitText) unitText.id = `selectedUnitText-${newIndex}`;
+        if (unitDropdown) unitDropdown.id = `unitDropdown-${newIndex}`;
+        if (unitSearchField) {
+            unitSearchField.setAttribute('onkeyup', `filterDropdownOptions(this, 'unit-${newIndex}', event)`);
+        }
+        if (unitInput) {
+            unitInput.setAttribute('data-filter', `unit-${newIndex}`);
+            unitInput.setAttribute('onclick', 'toggleDropdown(this, event)');
+        }
+        
+        if (unitDropdown) {
+            unitDropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+                const currentOnclick = opt.getAttribute('onclick');
+                if (currentOnclick && currentOnclick.includes('selectUnitOption')) {
+                    opt.setAttribute('onclick', `selectUnitOption(this, ${newIndex}, event)`);
+                }
+            });
+        }
+        
         const quantityInput = row.querySelector('.quantity-input');
-        const unitsSelect = row.querySelector('select[name*="units"]');
+        if (quantityInput) {
+            quantityInput.name = `items-${newIndex}-quantity`;
+        }
         
-        if (productSelect) productSelect.name = `items-${index}-product`;
-        if (quantityInput) quantityInput.name = `items-${index}-quantity`;
-        if (unitsSelect) unitsSelect.name = `items-${index}-units`;
-        
-        row.id = `row-${index}`;
+        if (stockManager.rowStocks.has(`row-${oldIndex}`)) {
+            const stockData = stockManager.rowStocks.get(`row-${oldIndex}`);
+            stockManager.rowStocks.set(`row-${newIndex}`, stockData);
+            stockManager.rowStocks.delete(`row-${oldIndex}`);
+        }
     });
-    
-    console.log(`🗑️ Removed formset row, total forms now: ${totalFormsInput.value}`);
 }
 
-function initializeRowFeatures(row) {
-    // Product select
-    const productSelect = row.querySelector('.product-select');
-    if (productSelect) {
-        productSelect.addEventListener('change', function() {
-            // Unit selection will be handled by stockManager
-        });
-    }
-
-    // Quantity input
-    const quantityInput = row.querySelector('.quantity-input');
-    if (quantityInput) {
-        quantityInput.addEventListener('blur', function() {
-            const rowId = row.id;
-            if (stockManager.rowStocks.has(rowId)) {
-                const rowData = stockManager.rowStocks.get(rowId);
-                const unitsSelect = row.querySelector('.units-select');
-                const selectedUnit = unitsSelect?.options[unitsSelect.selectedIndex];
-                const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
-                
-                stockManager.validateQuantity(this, rowData.originalStock, conversionFactor);
-            }
-        });
-    }
-
-    // Unit select
-    const unitsSelect = row.querySelector('.units-select');
-    if (unitsSelect) {
-        unitsSelect.addEventListener('change', function() {
-            const rowId = row.id;
-            const quantityInput = row.querySelector('.quantity-input');
-            
-            if (stockManager.rowStocks.has(rowId) && quantityInput.value) {
-                const rowData = stockManager.rowStocks.get(rowId);
-                const selectedUnit = this.options[this.selectedIndex];
-                const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
-                
-                stockManager.validateQuantity(quantityInput, rowData.originalStock, conversionFactor);
-            }
-        });
-    }
-}
-
-// ========== CALCULATION FUNCTIONS ==========
 function updateGrandTotal() {
     const rowTotals = document.querySelectorAll('.row-total');
     let grandTotal = 0;
@@ -1766,54 +1991,41 @@ function updateGrandTotal() {
     }
 }
 
-function refreshTransfers() {
-    window.location.reload();
-}
-
 // ========== FORM SUBMISSION ==========
 function setupFormSubmission() {
     const directTransferForm = document.getElementById('directTransferForm');
-    if (!directTransferForm) {
-        console.error('Direct transfer form not found');
-        return;
-    }
-
-    console.log('🔧 Setting up form submission handler...');
+    if (!directTransferForm) return;
 
     directTransferForm.addEventListener('submit', function(e) {
-        console.log('📤 Form submission started...');
         const submitBtn = document.getElementById('submitTransferBtn');
         const spinner = submitBtn.querySelector('.spinner-border');
         const icon = submitBtn.querySelector('i[data-feather="save"]');
         
-        // Show spinner, hide icon
         if (spinner) spinner.classList.remove('d-none');
         if (icon) icon.style.display = 'none';
         submitBtn.disabled = true;
         
-        // Validate form
         if (!directTransferForm.checkValidity()) {
             e.preventDefault();
             e.stopPropagation();
             directTransferForm.classList.add('was-validated');
-            resetSubmitButton(submitBtn, spinner, icon);
+            if (spinner) spinner.classList.add('d-none');
+            if (icon) icon.style.display = 'inline';
+            submitBtn.disabled = false;
             return;
         }
         
-        // Validate at least one item exists
         const totalForms = parseInt(document.getElementById('id_items-TOTAL_FORMS').value);
-        console.log(`📋 Total forms: ${totalForms}`);
         if (totalForms === 0) {
             e.preventDefault();
             showResultModal('Error', 'Please add at least one item to the transfer.', false);
-            resetSubmitButton(submitBtn, spinner, icon);
+            if (spinner) spinner.classList.add('d-none');
+            if (icon) icon.style.display = 'inline';
+            submitBtn.disabled = false;
             return;
         }
         
-        // Validate all items have product, quantity, and units
         let validItems = 0;
-        let hasInvalidStock = false;
-        let stockErrors = [];
         
         for (let i = 0; i < totalForms; i++) {
             const product = document.querySelector(`select[name="items-${i}-product"]`);
@@ -1822,112 +2034,45 @@ function setupFormSubmission() {
             
             if (product && product.value && quantity && quantity.value && units && units.value) {
                 validItems++;
-                
-                // Check stock availability with conversion factors
-                const row = product.closest('tr');
-                const rowId = row.id;
-                
-                if (stockManager.rowStocks.has(rowId)) {
-                    const rowData = stockManager.rowStocks.get(rowId);
-                    const available = rowData.originalStock;
-                    const displayQty = parseInt(quantity.value) || 0;
-                    
-                    // Get conversion factor
-                    const selectedUnit = units.options[units.selectedIndex];
-                    const conversionFactor = selectedUnit ? parseFloat(selectedUnit.dataset.conversion_factor) || 1.0 : 1.0;
-                    const baseQtyNeeded = Math.round(displayQty * conversionFactor);
-                    
-                    if (baseQtyNeeded > available) {
-                        hasInvalidStock = true;
-                        quantity.classList.add('is-invalid');
-                        const warning = row.querySelector('.stock-warning') || 
-                                        document.createElement('div');
-                        warning.className = 'stock-warning text-danger small mt-1';
-                        warning.textContent = `Only ${available} base units available`;
-                        quantity.parentElement.appendChild(warning);
-                        
-                        stockErrors.push(`${product.options[product.selectedIndex].text}: Needs ${baseQtyNeeded} base units, only ${available} available`);
-                    }
-                }
             }
         }
         
-        console.log(`Valid items: ${validItems}`);
         if (validItems === 0) {
             e.preventDefault();
             showResultModal('Error', 'Please fill in product, quantity, and units for at least one item.', false);
-            resetSubmitButton(submitBtn, spinner, icon);
+            if (spinner) spinner.classList.add('d-none');
+            if (icon) icon.style.display = 'inline';
+            submitBtn.disabled = false;
             return;
         }
         
-        if (hasInvalidStock) {
-            e.preventDefault();
-            showResultModal('Error', 'Some items have quantities exceeding available stock.\n\n' + stockErrors.join('\n'), false);
-            resetSubmitButton(submitBtn, spinner, icon);
-            return;
-        }
-        
-        // Validate from_store and to_store
         const fromStore = document.querySelector('select[name="from_store"]');
         const toStore = document.querySelector('select[name="to_store"]');
         
         if (fromStore.value === toStore.value) {
             e.preventDefault();
             showResultModal('Error', 'From Store and To Store cannot be the same.', false);
-            resetSubmitButton(submitBtn, spinner, icon);
+            if (spinner) spinner.classList.add('d-none');
+            if (icon) icon.style.display = 'inline';
+            submitBtn.disabled = false;
             return;
         }
-        
-        console.log('🎉 Form validation passed, submitting...');
-        // Allow normal form submission
     });
-
-    // Real-time validation for store fields
-    const fromStore = directTransferForm.querySelector('select[name="from_store"]');
-    const toStore = directTransferForm.querySelector('select[name="to_store"]');
-    
-    if (fromStore && toStore) {
-        const validateStores = () => {
-            if (fromStore.value && toStore.value && fromStore.value === toStore.value) {
-                fromStore.classList.add('is-invalid');
-                toStore.classList.add('is-invalid');
-                fromStore.parentElement.querySelector('.invalid-feedback').textContent = 'Cannot be same as To Store';
-                toStore.parentElement.querySelector('.invalid-feedback').textContent = 'Cannot be same as From Store';
-            } else {
-                fromStore.classList.remove('is-invalid');
-                toStore.classList.remove('is-invalid');
-            }
-        };
-        
-        fromStore.addEventListener('change', validateStores);
-        toStore.addEventListener('change', validateStores);
-    }
-}
-
-function resetSubmitButton(submitBtn, spinner, icon) {
-    if (spinner) spinner.classList.add('d-none');
-    if (icon) icon.style.display = 'inline';
-    submitBtn.disabled = false;
 }
 
 // ========== INITIALIZATION ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🏁 DOM loaded, initializing stock transfer system...');
-    
-    // Initialize form submission handler
     setupFormSubmission();
+
+    const startBtn = document.getElementById('confirmStartTransferBtn');
+    if (startBtn) startBtn.addEventListener('click', startTransfer);
     
-    // Initialize any existing formset rows
-    document.querySelectorAll('.formset-row').forEach(row => {
-        initializeRowFeatures(row);
-    });
+    const completeBtn = document.getElementById('confirmCompleteTransferBtn');
+    if (completeBtn) completeBtn.addEventListener('click', completeTransfer);
+    
+    const cancelBtn = document.getElementById('confirmCancelTransferBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', cancelTransfer);
 
-    // Setup modal button handlers
-    document.getElementById('confirmStartTransferBtn').addEventListener('click', startTransfer);
-    document.getElementById('confirmCompleteTransferBtn').addEventListener('click', completeTransfer);
-    document.getElementById('confirmCancelTransferBtn').addEventListener('click', cancelTransfer);
-
-    // Global event delegation for elements with data-action attribute
     document.body.addEventListener('click', function(e) {
         const el = e.target.closest('[data-action]');
         if (!el) return;
@@ -1970,20 +2115,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 case 'removeFormsetRow':
                     removeFormsetRow(e);
                     break;
-                default:
-                    console.log('Unhandled action:', action);
-                    break;
             }
         } catch (err) {
             console.error('Error handling action', action, err);
             showResultModal('Error', 'Error executing action: ' + err.message, false);
         }
     });
-    
-    console.log('✅ Stock transfer system fully initialized');
 });
 
-// Feather icons refresh helper
+// MutationObserver to ensure dropdowns work on dynamically added elements
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.addedNodes.length) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === 1) {
+                    const dropdownInputs = node.querySelectorAll ? node.querySelectorAll('.dropdown-search-input') : [];
+                    dropdownInputs.forEach(input => {
+                        if (!input.hasAttribute('data-listener')) {
+                            input.setAttribute('data-listener', 'true');
+                            input.setAttribute('onclick', 'toggleDropdown(this, event)');
+                        }
+                    });
+                }
+            });
+        }
+    });
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+
+// Feather icons refresh
 function refreshFeatherIcons() {
     if (typeof feather !== 'undefined') {
         feather.replace();
@@ -1992,6 +2156,117 @@ function refreshFeatherIcons() {
 </script>
 
 <style>
+/* Searchable Dropdown Styles */
+.dropdown-search-container {
+    position: relative;
+    width: 100%;
+}
+
+.dropdown-search-input {
+    width: 100%;
+    height: 38px;
+    padding: 0.375rem 2rem 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dropdown-search-input:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-search-input.is-invalid {
+    border-color: #dc3545;
+}
+
+.dropdown-selected-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-arrow {
+    transition: transform 0.2s;
+}
+
+.dropdown-search-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    min-width: 200px;
+    margin-top: 4px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dropdown-search-header {
+    padding: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dropdown-search-header i {
+    color: #6c757d;
+    font-size: 1rem;
+}
+
+.dropdown-search-field {
+    width: 100%;
+    padding: 0.25rem;
+    border: none;
+    outline: none;
+    font-size: 0.875rem;
+}
+
+.dropdown-search-field:focus {
+    outline: none;
+}
+
+.dropdown-search-options {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.dropdown-search-option {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: background-color 0.2s;
+}
+
+.dropdown-search-option:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-search-option[data-selected="true"] {
+    background-color: #e7f1ff;
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.dropdown-search-option[data-selected="true"]:hover {
+    background-color: #d4e4ff;
+}
+
+/* Original styles remain unchanged */
 .transfer-route {
     font-size: 0.875rem;
     margin-bottom: 2px;
@@ -2070,74 +2345,12 @@ function refreshFeatherIcons() {
     color: #0d6efd;
 }
 
-.stock-warning {
-    font-size: 0.75rem;
-    font-weight: 500;
-    display: none;
-    background-color: #f8d7da;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    margin-top: 0.25rem;
-}
-
-.conversion-factor-info {
-    font-size: 0.75rem;
-    color: #6c757d;
-    font-style: italic;
-}
-
 .is-invalid {
     border-color: #dc3545;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right calc(0.375em + 0.1875rem) center;
-    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
 }
 
 .is-valid {
     border-color: #198754;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right calc(0.375em + 0.1875rem) center;
-    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
-}
-
-/* Loading animation for stock */
-.available-stock:empty::before {
-    content: 'Loading...';
-    color: #6c757d;
-    font-style: italic;
-}
-
-/* Unit dropdown styling */
-option[data-is_base_unit="true"] {
-    font-weight: bold;
-    background-color: #e8f4f8;
-}
-
-/* Real-time update indicators */
-.product-select:focus + .available-stock::after {
-    content: ' ⟳';
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* Base unit indicator */
-.base-unit-indicator {
-    font-size: 0.7rem;
-    color: #6c757d;
-    margin-left: 0.25rem;
-}
-
-/* Loading modal background */
-#loadingModal .modal-content {
-    background: transparent;
-    border: none;
-    box-shadow: none;
 }
 
 /* Responsive adjustments */
@@ -2162,38 +2375,8 @@ option[data-is_base_unit="true"] {
         display: block;
         overflow-x: auto;
     }
-    
-    #formset-table thead {
-        display: none;
-    }
-    
-    #formset-table tbody tr {
-        display: block;
-        margin-bottom: 1rem;
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
-    }
-    
-    #formset-table tbody td {
-        display: block;
-        text-align: right;
-        padding: 0.5rem;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    #formset-table tbody td:before {
-        content: attr(data-label);
-        float: left;
-        font-weight: bold;
-        color: #6c757d;
-    }
-    
-    #formset-table tbody td:last-child {
-        border-bottom: none;
-    }
 }
 
-/* Top bar list styling for actions */
 .table-top-head {
     list-style: none;
     padding: 0;
@@ -2205,11 +2388,5 @@ option[data-is_base_unit="true"] {
 .table-top-head li { display: inline-block; }
 .table-top-head .btn { border-radius: 0.38rem; }
 .table-top-head .btn i.feather-16 { margin-right: 0.45rem; }
-
-/* Small-screen adjustments */
-@media (max-width: 576px) {
-    .table-top-head { flex-direction: column; gap: 0.4rem; align-items: stretch; }
-    .table-top-head .btn { width: 100%; justify-content: flex-start; }
-}
 </style>
 {% endblock %}

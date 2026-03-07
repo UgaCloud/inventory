@@ -3,1011 +3,838 @@
 {% load humanize %}
 {% load custom_filter %}
 
-{% block title %}Store Location Reports{% endblock %}
 
-{% block extra_css %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 <style>
-    /* Custom styles for store reports */
-    .store-card {
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        border: 1px solid #dee2e6;
+    /* Modern Store Report Styling */
+    :root {
+        --primary: #4A90E2;
+        --success: #1CC88A;
+        --warning: #F6C23E;
+        --danger: #E74A3B;
+        --info: #36B9CC;
+        --dark: #5a5c69;
+        --light: #f8f9fc;
     }
-    
-    .store-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    
-    .store-header {
-        border-radius: 12px 12px 0 0;
-        padding: 1rem;
-        color: white;
-        font-weight: 600;
-    }
-    
-    .store-kampala { background: linear-gradient(135deg, #4A90E2, #357ABD); }
-    .store-entebbe { background: linear-gradient(135deg, #36B9CC, #2A9CA5); }
-    .store-jinja { background: linear-gradient(135deg, #1CC88A, #17A673); }
-    .store-gulu { background: linear-gradient(135deg, #F6C23E, #F4B619); }
-    .store-mbarara { background: linear-gradient(135deg, #E74A3B, #E02D1B); }
-    .store-default { background: linear-gradient(135deg, #667eea, #764ba2); }
-    
-    .capacity-meter {
-        height: 8px;
-        background-color: #e9ecef;
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 10px 0;
-    }
-    
-    .capacity-fill {
-        height: 100%;
-        border-radius: 4px;
-        transition: width 1s ease;
-    }
-    
-    .capacity-low { background-color: #1CC88A; }
-    .capacity-medium { background-color: #F6C23E; }
-    .capacity-high { background-color: #E74A3B; }
-    
-    .store-metrics {
-        display: flex;
-        justify-content: space-between;
-        margin: 15px 0;
-    }
-    
-    .metric-item {
-        text-align: center;
-        flex: 1;
-        padding: 0 5px;
-    }
-    
-    .metric-value {
-        font-size: 1.2rem;
-        font-weight: 600;
-        display: block;
-    }
-    
-    .metric-label {
-        font-size: 0.75rem;
-        color: #6c757d;
-    }
-    
-    .activity-timeline {
-        border-left: 2px solid #dee2e6;
-        padding-left: 20px;
-        margin-left: 10px;
-    }
-    
-    .activity-item {
-        position: relative;
+
+    .metric-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border-left: 4px solid var(--primary);
+        transition: transform 0.2s;
         margin-bottom: 20px;
     }
-    
-    .activity-item::before {
-        content: '';
-        position: absolute;
-        left: -25px;
-        top: 5px;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background-color: white;
-        border: 3px solid;
+
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-    
-    .activity-high { border-color: #1CC88A; }
-    .activity-medium { border-color: #F6C23E; }
-    .activity-low { border-color: #E74A3B; }
-    
-    .comparison-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        margin: 20px 0;
+
+    .metric-card.primary { border-left-color: var(--primary); }
+    .metric-card.success { border-left-color: var(--success); }
+    .metric-card.warning { border-left-color: var(--warning); }
+    .metric-card.danger { border-left-color: var(--danger); }
+
+    .metric-value {
+        font-size: 24px;
+        font-weight: 600;
+        margin: 5px 0;
     }
-    
-    .comparison-card {
+
+    .metric-label {
+        color: #6c757d;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .filter-section {
         background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .table-container {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .store-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 500;
+        background: #e9ecef;
+        color: #495057;
+    }
+
+    .store-badge.default {
+        background: var(--primary);
+        color: white;
+    }
+
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .status-active { background: #d4edda; color: #155724; }
+    .status-inactive { background: #f8d7da; color: #721c24; }
+
+    .utilization-bar {
+        width: 100%;
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .utilization-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s;
+    }
+
+    .fill-high { background: var(--danger); }
+    .fill-medium { background: var(--warning); }
+    .fill-low { background: var(--success); }
+
+    .performance-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .tag-excellent { background: rgba(28, 200, 138, 0.1); color: var(--success); }
+    .tag-good { background: rgba(246, 194, 62, 0.1); color: var(--warning); }
+    .tag-fair { background: rgba(231, 74, 59, 0.1); color: var(--danger); }
+
+    .trend-up { color: var(--success); }
+    .trend-down { color: var(--danger); }
+
+    .store-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .branch-indicator {
+        font-size: 11px;
+        color: #6c757d;
+    }
+
+    .quick-stats {
+        display: flex;
+        gap: 15px;
+        margin-top: 8px;
+    }
+
+    .quick-stat {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+    }
+
+    .dataTables_filter input {
         border: 1px solid #dee2e6;
         border-radius: 8px;
-        padding: 15px;
+        padding: 8px 12px;
+        margin-left: 10px;
+    }
+
+    .dataTables_length select {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin: 0 10px;
+    }
+
+    .btn-export {
+        margin: 0 3px;
+        border-radius: 8px;
+    }
+
+    .date-range-display {
+        background: #f8f9fc;
+        padding: 8px 15px;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    /* ==================== SEARCHABLE DROPDOWN STYLES ==================== */
+    .dropdown-search-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .dropdown-search-input {
+        width: 100%;
+        height: 40px;
+        padding: 0.375rem 2rem 0.375rem 0.75rem;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.2s;
+    }
+
+    .dropdown-search-input:hover {
+        background-color: #f8f9fa;
+        border-color: #c1c9d0;
+    }
+
+    .dropdown-search-input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+        outline: 0;
+    }
+
+    .dropdown-search-input.is-invalid {
+        border-color: #dc3545;
+    }
+
+    .dropdown-selected-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dropdown-arrow {
+        transition: transform 0.2s;
+        color: #6c757d;
+    }
+
+    .dropdown-search-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        min-width: 200px;
+        margin-top: 4px;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-height: 300px;
+        overflow: hidden;
+    }
+
+    .dropdown-search-header {
+        padding: 0.5rem;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background-color: #f8f9fa;
+    }
+
+    .dropdown-search-header i {
+        color: #6c757d;
+        font-size: 1rem;
+    }
+
+    .dropdown-search-field {
+        width: 100%;
+        padding: 0.25rem;
+        border: none;
+        outline: none;
+        font-size: 0.875rem;
+        background: transparent;
+    }
+
+    .dropdown-search-field:focus {
+        outline: none;
+    }
+
+    .dropdown-search-options {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    .dropdown-search-option {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: background-color 0.2s;
+        color: #495057;
+    }
+
+    .dropdown-search-option:hover {
+        background-color: #f8f9fa;
+        color: #4A90E2;
+    }
+
+    .dropdown-search-option[data-selected="true"] {
+        background-color: #e7f1ff;
+        color: #0c63e4;
+        font-weight: 500;
+    }
+
+    .dropdown-search-option[data-selected="true"]:hover {
+        background-color: #d4e4ff;
+    }
+
+    .custom-dropdown-btn {
+        width: 100%;
+        height: 40px;
+        padding: 0.375rem 0.75rem;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.2s;
+    }
+
+    .custom-dropdown-btn:hover {
+        background-color: #f8f9fa;
+        border-color: #c1c9d0;
+    }
+
+    .custom-dropdown-btn .caret {
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 4px solid #6c757d;
+        display: inline-block;
+        margin-left: 5px;
+    }
+
+    /* Date Range Modal */
+    .modal-content {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
     
-    .comparison-header {
+    .modal-header {
+        border-bottom: 1px solid #e9ecef;
+        padding: 16px 20px;
+    }
+    
+    .modal-title {
+        font-weight: 600;
+        color: #2b2f32;
+    }
+    
+    .modal-body {
+        padding: 20px;
+    }
+    
+    .modal-footer {
+        border-top: 1px solid #e9ecef;
+        padding: 16px 20px;
+    }
+    
+    .date-range-input-group {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        gap: 10px;
         margin-bottom: 15px;
     }
     
-    .comparison-stats {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-    }
-    
-    .stat-item {
-        text-align: center;
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 6px;
-    }
-    
-    .stat-value {
-        font-size: 1.1rem;
-        font-weight: 600;
-        display: block;
-    }
-    
-    .stat-label {
-        font-size: 0.75rem;
-        color: #6c757d;
-    }
-    
-    .store-map {
-        height: 200px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 8px;
-        position: relative;
-        overflow: hidden;
-        margin: 20px 0;
-    }
-    
-    .map-marker {
-        position: absolute;
-        width: 12px;
-        height: 12px;
-        background-color: white;
-        border: 2px solid;
-        border-radius: 50%;
-        cursor: pointer;
-        transition: transform 0.2s;
-    }
-    
-    .map-marker:hover {
-        transform: scale(1.5);
-    }
-    
-    .marker-kampala { border-color: #4A90E2; top: 30%; left: 40%; }
-    .marker-entebbe { border-color: #36B9CC; top: 35%; left: 35%; }
-    .marker-jinja { border-color: #1CC88A; top: 40%; left: 45%; }
-    .marker-gulu { border-color: #F6C23E; top: 25%; left: 30%; }
-    .marker-mbarara { border-color: #E74A3B; top: 50%; left: 35%; }
-    .marker-default { border-color: #667eea; top: 45%; left: 50%; }
-    
-    .performance-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 500;
-    }
-    
-    .performance-excellent { background-color: rgba(28, 200, 138, 0.1); color: #1CC88A; }
-    .performance-good { background-color: rgba(246, 194, 62, 0.1); color: #F6C23E; }
-    .performance-fair { background-color: rgba(231, 74, 59, 0.1); color: #E74A3B; }
-    
-    .trend-indicator {
-        display: inline-flex;
-        align-items: center;
-        font-size: 0.8rem;
-        margin-left: 5px;
-    }
-    
-    .trend-up { color: #1CC88A; }
-    .trend-down { color: #E74A3B; }
-    .trend-neutral { color: #6c757d; }
-    
-    .default-store-indicator {
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        background-color: #4A90E2;
-        color: white;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.7rem;
-    }
-    
-    .store-score {
-        font-size: 2rem;
-        font-weight: 700;
-        text-align: center;
-        margin: 10px 0;
-    }
-    
-    .score-excellent { color: #1CC88A; }
-    .score-good { color: #F6C23E; }
-    .score-fair { color: #E74A3B; }
-    
-    .store-chart-container {
-        height: 200px;
-        position: relative;
-        margin: 20px 0;
-    }
-    
-    /* Filter controls */
-    .date-range-picker {
-        background-color: white;
+    .date-range-input-group input {
+        flex: 1;
+        padding: 10px 12px;
         border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 0.5rem;
-        cursor: pointer;
+        border-radius: 8px;
+        font-size: 14px;
     }
     
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-        .store-metrics {
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .metric-item {
-            text-align: left;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 5px 0;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        .comparison-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .comparison-stats {
-            grid-template-columns: 1fr;
-        }
+    .date-range-input-group input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+        outline: 0;
     }
     
-    @media (max-width: 576px) {
-        .store-header h5 {
-            font-size: 1rem;
-        }
-        
-        .activity-timeline {
-            padding-left: 15px;
-            margin-left: 5px;
-        }
-        
-        .activity-item::before {
-            left: -20px;
-        }
-    }
-    
-    /* Loading overlay */
-    #loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.9);
-        z-index: 9999;
+    .preset-ranges {
         display: flex;
-        justify-content: center;
-        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 15px;
+    }
+    
+    .preset-range {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .preset-range:hover {
+        background: #e9ecef;
+        border-color: #ced4da;
+    }
+    
+    .preset-range.active {
+        background: #4A90E2;
+        color: white;
+        border-color: #4A90E2;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .metric-value { font-size: 20px; }
+        .quick-stats { flex-wrap: wrap; }
+        .store-avatar { width: 30px; height: 30px; font-size: 12px; }
     }
 </style>
-{% endblock %}
 
-{% block content %}
 <div class="page-wrapper">
     <div class="content">
-        <!-- Page Header -->
-        <div class="page-header">
-            <div class="add-item d-flex">
-                <div class="page-title">
-                    <h4>Store Location Reports</h4>
-                    <h6>Store performance, capacity, and activity analysis</h6>
-                </div>
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="mb-1">Store Location Performance Reports</h4>
+                <p class="text-muted mb-0">Comprehensive store-wise performance analysis</p>
             </div>
-            <ul class="table-top-head">
-                <li>
-                    <div class="date-range-picker" id="dateRangePicker">
-                        <i data-feather="calendar" class="feather-16 me-2"></i>
-                        <span>{{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}</span>
-                    </div>
-                </li>
-                <li>
-                    <button class="btn btn-outline-primary" onclick="refreshStoreReports()">
-                        <i data-feather="refresh-cw" class="feather-16 me-1"></i>
-                        Refresh
+            <div>
+                <button class="btn btn-outline-primary me-2" onclick="refreshReport()">
+                    <i data-feather="refresh-cw" class="feather-16 me-1"></i>
+                    Refresh
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i data-feather="download" class="feather-16 me-1"></i>
+                        Export
                     </button>
-                </li>
-                <li>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                            <i data-feather="download" class="feather-16 me-1"></i>
-                            Export
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="exportStoreReport('csv')">
-                                <i data-feather="file-text" class="feather-14 me-2"></i>Export CSV
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportStoreReport('pdf')">
-                                <i data-feather="file" class="feather-14 me-2"></i>Export PDF
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="exportStoreReport('excel')">
-                                <i data-feather="grid" class="feather-14 me-2"></i>Export Excel
-                            </a></li>
-                        </ul>
-                    </div>
-                </li>
-                <li>
-                    <button class="btn btn-primary" onclick="goBack()">
-                        <i data-feather="arrow-left" class="feather-16 me-1"></i>
-                        Back to Dashboard
-                    </button>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Report Header Info -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card" style="border-left: 4px solid #4A90E2;">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5 class="card-title mb-3">
-                                    <i data-feather="map-pin" class="feather-16 me-2"></i>
-                                    Store Network Overview
-                                </h5>
-                                <div class="row">
-                                    <div class="col-6">
-                                        <p class="mb-1"><strong>Total Stores:</strong> {{ total_stores }} locations</p>
-                                        <p class="mb-1"><strong>Default Store:</strong> {{ default_store.name|default:"Not set" }}</p>
-                                        <p class="mb-1"><strong>Reporting Period:</strong> {{ start_date|date:"M Y" }}</p>
-                                    </div>
-                                    <div class="col-6">
-                                        <p class="mb-1"><strong>Best Performing:</strong> {{ best_performing.name|default:"N/A" }}</p>
-                                        <p class="mb-1"><strong>Total Sales:</strong> UGX {{ total_sales|intcomma }}</p>
-                                        <p class="mb-1"><strong>Avg Utilization:</strong> {{ avg_utilization }}%</p>
-                                    </div>
-                                </div>
-                            </div>
-                           
-                        </div>
-                    </div>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('csv')">CSV</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('excel')">Excel</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('pdf')">PDF</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
 
-        <!-- Tabbed Interface -->
+        <!-- Key Metrics Cards -->
         <div class="row">
-            <!-- Side Tabs -->
-            <div class="col-lg-3 col-md-4">
-                <div class="card side-tabs-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i data-feather="bar-chart-2" class="feather-16 me-2"></i>
-                            Store Analysis Sections
-                        </h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="side-tabs-container">
-                            <div class="nav flex-column side-tabs" id="sideTab" role="tablist" aria-orientation="vertical">
-                                <button class="nav-link side-tab active" id="capacity-tab" data-bs-toggle="pill" data-bs-target="#capacity" type="button" role="tab" aria-controls="capacity" aria-selected="true">
-                                    <i data-feather="package" class="feather-16 me-2"></i>
-                                    Store Capacity/Utilization
-                                </button>
-                                <button class="nav-link side-tab" id="activity-tab" data-bs-toggle="pill" data-bs-target="#activity" type="button" role="tab" aria-controls="activity" aria-selected="false">
-                                    <i data-feather="activity" class="feather-16 me-2"></i>
-                                    Store Activity Analysis
-                                </button>
-                                <button class="nav-link side-tab" id="comparison-tab" data-bs-toggle="pill" data-bs-target="#comparison" type="button" role="tab" aria-controls="comparison" aria-selected="false">
-                                    <i data-feather="git-merge" class="feather-16 me-2"></i>
-                                    Branch-wise Comparison
-                                </button>
-                                <button class="nav-link side-tab" id="default-tab" data-bs-toggle="pill" data-bs-target="#default" type="button" role="tab" aria-controls="default" aria-selected="false">
-                                    <i data-feather="star" class="feather-16 me-2"></i>
-                                    Default Store Analysis
-                                </button>
+            <div class="col-md-3">
+                <div class="metric-card primary">
+                    <div class="metric-label">Total Stores</div>
+                    <div class="metric-value">{{ total_stores|default:0|intcomma }}</div>
+                    <small class="text-muted">
+                        {{ active_stores|default:0 }} active · {{ inactive_stores|default:0 }} inactive
+                    </small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card success">
+                    <div class="metric-label">Total Sales</div>
+                    <div class="metric-value">UGX {{ total_sales|default:0|floatformat:0|intcomma }}</div>
+                    <small class="text-muted">Across all locations</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card warning">
+                    <div class="metric-label">Avg Utilization</div>
+                    <div class="metric-value">{{ avg_utilization|default:0 }}%</div>
+                    <small class="text-muted">{{ stores_above_target|default:0 }} stores above target</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card danger">
+                    <div class="metric-label">Total Stock</div>
+                    <div class="metric-value">{{ total_stock_units|default:0|intcomma }}</div>
+                    <small class="text-muted">{{ total_skus|default:0 }} unique products</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section with Searchable Dropdowns -->
+        <div class="filter-section">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <label class="form-label">Date Range</label>
+                    <button class="custom-dropdown-btn" id="dateRangeButton" onclick="openDateRangeModal()">
+                        <span id="selectedDateRange">{{ start_date|date:"Y-m-d" }} - {{ end_date|date:"Y-m-d" }}</span>
+                        <span class="caret"></span>
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Branch</label>
+                    <div class="dropdown-search-container">
+                        <div class="dropdown-search-input" data-filter="branch" onclick="toggleDropdown(this, event)">
+                            <span class="dropdown-selected-value" id="selectedBranchText">All Branches</span>
+                            <i class="ti ti-chevron-down dropdown-arrow"></i>
+                        </div>
+                        <div class="dropdown-search-menu" id="branchDropdown" style="display: none;">
+                            <div class="dropdown-search-header">
+                                <i class="ti ti-search"></i>
+                                <input type="text" class="dropdown-search-field" placeholder="Search branch..." onkeyup="filterDropdownOptions(this, 'branch', event)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="dropdown-search-options">
+                                <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'branch', event)" data-selected="true">All Branches</div>
+                                {% for branch in branches %}
+                                <div class="dropdown-search-option" data-value="{{ branch.id }}" onclick="selectDropdownOption(this, 'branch', event)">{{ branch.name }}</div>
+                                {% endfor %}
                             </div>
                         </div>
+                        <select name="branch" id="id_branch" class="form-select" style="display: none;">
+                            <option value="">All Branches</option>
+                            {% for branch in branches %}
+                            <option value="{{ branch.id }}">{{ branch.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                    <div class="card-footer">
-                        <small class="text-muted">
-                            <i data-feather="info" class="feather-12 me-1"></i>
-                            Click store markers on map for details
-                        </small>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Store Status</label>
+                    <div class="dropdown-search-container">
+                        <div class="dropdown-search-input" data-filter="status" onclick="toggleDropdown(this, event)">
+                            <span class="dropdown-selected-value" id="selectedStatusText">All</span>
+                            <i class="ti ti-chevron-down dropdown-arrow"></i>
+                        </div>
+                        <div class="dropdown-search-menu" id="statusDropdown" style="display: none;">
+                            <div class="dropdown-search-header">
+                                <i class="ti ti-search"></i>
+                                <input type="text" class="dropdown-search-field" placeholder="Search status..." onkeyup="filterDropdownOptions(this, 'status', event)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="dropdown-search-options">
+                                <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'status', event)" data-selected="true">All</div>
+                                <div class="dropdown-search-option" data-value="active" onclick="selectDropdownOption(this, 'status', event)">Active</div>
+                                <div class="dropdown-search-option" data-value="inactive" onclick="selectDropdownOption(this, 'status', event)">Inactive</div>
+                            </div>
+                        </div>
+                        <select name="status" id="id_status" class="form-select" style="display: none;">
+                            <option value="">All</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Performance</label>
+                    <div class="dropdown-search-container">
+                        <div class="dropdown-search-input" data-filter="performance" onclick="toggleDropdown(this, event)">
+                            <span class="dropdown-selected-value" id="selectedPerformanceText">All</span>
+                            <i class="ti ti-chevron-down dropdown-arrow"></i>
+                        </div>
+                        <div class="dropdown-search-menu" id="performanceDropdown" style="display: none;">
+                            <div class="dropdown-search-header">
+                                <i class="ti ti-search"></i>
+                                <input type="text" class="dropdown-search-field" placeholder="Search performance..." onkeyup="filterDropdownOptions(this, 'performance', event)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="dropdown-search-options">
+                                <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'performance', event)" data-selected="true">All</div>
+                                <div class="dropdown-search-option" data-value="excellent" onclick="selectDropdownOption(this, 'performance', event)">Excellent (80%+)</div>
+                                <div class="dropdown-search-option" data-value="good" onclick="selectDropdownOption(this, 'performance', event)">Good (60-80%)</div>
+                                <div class="dropdown-search-option" data-value="fair" onclick="selectDropdownOption(this, 'performance', event)">Fair (Below 60%)</div>
+                            </div>
+                        </div>
+                        <select name="performance" id="id_performance" class="form-select" style="display: none;">
+                            <option value="">All</option>
+                            <option value="excellent">Excellent (80%+)</option>
+                            <option value="good">Good (60-80%)</option>
+                            <option value="fair">Fair (Below 60%)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" onclick="applyFilters()">
+                        <i data-feather="filter" class="feather-16 me-1"></i>
+                        Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date Range Modal -->
+        <div class="modal fade" id="dateRangeModal" tabindex="-1" aria-labelledby="dateRangeModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="dateRangeModalLabel">Select Date Range</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="date-range-input-group">
+                            <input type="date" id="startDate" class="form-control" placeholder="Start Date" value="{{ start_date|date:'Y-m-d' }}">
+                            <input type="date" id="endDate" class="form-control" placeholder="End Date" value="{{ end_date|date:'Y-m-d' }}">
+                        </div>
+                        
+                        <div class="preset-ranges">
+                            <span class="preset-range" onclick="setPresetRange('today')">Today</span>
+                            <span class="preset-range" onclick="setPresetRange('yesterday')">Yesterday</span>
+                            <span class="preset-range" onclick="setPresetRange('last7days')">Last 7 Days</span>
+                            <span class="preset-range" onclick="setPresetRange('last30days')">Last 30 Days</span>
+                            <span class="preset-range" onclick="setPresetRange('thisMonth')">This Month</span>
+                            <span class="preset-range" onclick="setPresetRange('lastMonth')">Last Month</span>
+                            <span class="preset-range" onclick="setPresetRange('thisYear')">This Year</span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearDateRange()">Clear</button> &nbsp; &nbsp;
+                        <button type="button" class="btn btn-primary" onclick="applyDateRange()">Apply</button>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Tab Content -->
-            <div class="col-lg-9 col-md-8">
-                <div class="tab-content" id="sideTabContent">
-                    <!-- Store Capacity/Utilization Tab -->
-                    <div class="tab-pane fade show active" id="capacity" role="tabpanel" aria-labelledby="capacity-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="package" class="feather-16 me-2"></i>
-                                    Store Capacity & Utilization
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterCapacity('all')">All Stores</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterCapacity('high')">High Utilization</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterCapacity('low')">Low Utilization</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="store-chart-container">
-                                            <canvas id="capacityChart"></canvas>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row" id="capacityGrid">
-                                    {% for report in store_reports %}
-                                    <div class="col-lg-6 mb-4">
-                                        <div class="card store-card">
-                                            <div class="store-header {{ report.color_class }}">
-                                                <h5 class="mb-0">{{ report.store.name }}</h5>
-                                                <small>
-                                                    {% if report.store.is_default %}Default Store{% else %}Branch{% endif %}
-                                                    {% if report.store.branch %} • {{ report.store.branch.name }}{% endif %}
-                                                </small>
-                                                {% if report.store.is_default %}
-                                                <div class="default-store-indicator" data-bs-toggle="tooltip" data-bs-placement="top" title="Default Store">
-                                                    <i data-feather="star" class="feather-12"></i>
-                                                </div>
-                                                {% endif %}
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="store-metrics">
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">{{ report.utilization_percentage }}%</span>
-                                                        <span class="metric-label">Utilization</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">{{ report.inventory_data.total_skus|default:0 }}</span>
-                                                        <span class="metric-label">SKUs</span>
-                                                    </div>
-                                                    <div class="metric-item">
-                                                        <span class="metric-value">{{ report.total_units|intcomma }}</span>
-                                                        <span class="metric-label">Stock</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <div class="d-flex justify-content-between mb-1">
-                                                        <small>Storage Utilization</small>
-                                                        <small><strong>{{ report.utilization_percentage }}%</strong></small>
-                                                    </div>
-                                                    <div class="capacity-meter">
-                                                        <div class="capacity-fill 
-                                                            {% if report.utilization_percentage >= 70 %}capacity-high
-                                                            {% elif report.utilization_percentage >= 50 %}capacity-medium
-                                                            {% else %}capacity-low{% endif %}" 
-                                                            style="width: {{ report.utilization_percentage }}%">
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Monthly Sales</small>
-                                                        <p class="mb-0"><strong>UGX {{ report.sales_data.total_sales|default:0|intcomma }}</strong></p>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Performance</small>
-                                                        <p class="mb-0"><strong>{{ report.performance_score }}/10</strong></p>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <span class="performance-badge {{ report.performance_badge }}">
-                                                        <i data-feather="trending-up" class="feather-12 me-1"></i>
-                                                        {{ report.performance_category|title }}
-                                                    </span>
-                                                    {% if report.growth_rate > 0 %}
-                                                    <span class="trend-indicator trend-up ms-2">
-                                                        <i data-feather="arrow-up" class="feather-12 me-1"></i>
-                                                        {{ report.growth_rate }}%
-                                                    </span>
-                                                    {% elif report.growth_rate < 0 %}
-                                                    <span class="trend-indicator trend-down ms-2">
-                                                        <i data-feather="arrow-down" class="feather-12 me-1"></i>
-                                                        {{ report.growth_rate }}%
-                                                    </span>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Capacity Utilization Summary</h6>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Average Utilization:</strong> {{ avg_utilization }}%</p>
-                                                        <p class="mb-1"><strong>Total Stock Units:</strong> {{ store_reports|sum_total_units }}</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Highest Utilization:</strong> {{ store_reports|max_utilization_store }}</p>
-                                                        <p class="mb-1"><strong>Lowest Utilization:</strong> {{ store_reports|min_utilization_store }}</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Recommendation:</strong> Optimize stock distribution</p>
-                                                        <p class="mb-1"><strong>Target Utilization:</strong> 70-80% optimal range</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+        <!-- Main Store Performance Table -->
+        <div class="table-container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Store Performance Details</h5>
+                <div class="date-range-display">
+                    <i data-feather="calendar" class="feather-14 me-1"></i>
+                    <span id="headerDateRange">{{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}</span>
+                </div>
+            </div>
 
-                    <!-- Store Activity Analysis Tab -->
-                    <div class="tab-pane fade" id="activity" role="tabpanel" aria-labelledby="activity-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="activity" class="feather-16 me-2"></i>
-                                    Store Activity Analysis
-                                </h5>
-                                <div class="d-flex align-items-center">
-                                    <span class="badge bg-success me-2">Live Data</span>
-                                    <small class="text-muted">Updated: <span id="activityTimestamp">Just now</span></small>
+            <table class="table table-hover" id="storePerformanceTable">
+                <thead>
+                    <tr>
+                        <th>Store</th>
+                        <th>Branch/Location</th>
+                        <th>Status</th>
+                        <th>Performance Score</th>
+                        <th>Utilization</th>
+                        <th>Monthly Sales</th>
+                        <th>Transactions</th>
+                        <th>Avg Transaction</th>
+                        <th>Stock Value</th>
+                        <th>Low Stock Items</th>
+                        <th>Staff Efficiency</th>
+                        <th>Growth</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for store in store_performance_data %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="store-avatar" style="background: {{ store.color|default:'#4A90E2' }};">
+                                    {{ store.name|first|upper }}
                                 </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="store-chart-container">
-                                            <canvas id="activityChart"></canvas>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="card-title mb-0">
-                                                    <i data-feather="shopping-cart" class="feather-16 me-2"></i>
-                                                    Recent Activity
-                                                </h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="activity-timeline">
-                                                    {% for report in store_reports|slice:":4" %}
-                                                    <div class="activity-item {% if report.recent_activity > 50 %}activity-high{% elif report.recent_activity > 20 %}activity-medium{% else %}activity-low{% endif %}">
-                                                        <div class="d-flex justify-content-between">
-                                                            <strong>{{ report.store.name }}</strong>
-                                                            <small class="text-muted">{{ report.recent_activity }} actions</small>
-                                                        </div>
-                                                        <p class="mb-1 small">
-                                                            {% if report.sales_data.total_transactions %}
-                                                            {{ report.sales_data.total_transactions }} transactions
-                                                            {% else %}
-                                                            No recent transactions
-                                                            {% endif %}
-                                                        </p>
-                                                        <span class="badge {% if report.sales_data.total_sales and report.sales_data.total_sales > 10000000 %}bg-success{% elif report.sales_data.total_sales and report.sales_data.total_sales > 5000000 %}bg-warning{% else %}bg-info{% endif %}">
-                                                            UGX {{ report.sales_data.total_sales|default:0|intcomma }}
-                                                        </span>
-                                                    </div>
-                                                    {% endfor %}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-6">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="card-title mb-0">
-                                                    <i data-feather="trending-up" class="feather-16 me-2"></i>
-                                                    Store Performance Metrics
-                                                </h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="table-responsive">
-                                                    <table class="table table-hover">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Store</th>
-                                                                <th>Transactions</th>
-                                                                <th>Avg Value</th>
-                                                                <th>Growth</th>
-                                                                <th>Efficiency</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {% for report in store_reports %}
-                                                            <tr>
-                                                                <td><strong>{{ report.store.name|truncatechars:12 }}</strong></td>
-                                                                <td>{{ report.sales_data.total_transactions|default:0 }}</td>
-                                                                <td>UGX {{ report.sales_data.avg_sale_value|default:0|intcomma }}</td>
-                                                                <td>
-                                                                    {% if report.growth_rate > 0 %}
-                                                                    <span class="trend-up">{{ report.growth_rate }}%</span>
-                                                                    {% elif report.growth_rate < 0 %}
-                                                                    <span class="trend-down">{{ report.growth_rate }}%</span>
-                                                                    {% else %}
-                                                                    <span class="trend-neutral">0%</span>
-                                                                    {% endif %}
-                                                                </td>
-                                                                <td><span class="performance-badge {{ report.performance_badge }}">{{ report.efficiency_score }}%</span></td>
-                                                            </tr>
-                                                            {% endfor %}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Activity Insights & Recommendations</h6>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Busiest Store:</strong> {{ store_reports|max_activity_store }}</p>
-                                                        <p class="mb-1"><strong>Avg Transaction Value:</strong> UGX {{ store_reports|avg_transaction_value }}</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Total Transactions:</strong> {{ store_reports|total_transactions }}</p>
-                                                        <p class="mb-1"><strong>Most Improved:</strong> {{ store_reports|most_improved_store }}</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Recommendation:</strong> Focus on underperforming stores</p>
-                                                        <p class="mb-1"><strong>Improvement Target:</strong> Increase avg transaction value by 15%</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Branch-wise Store Comparison Tab -->
-                    <div class="tab-pane fade" id="comparison" role="tabpanel" aria-labelledby="comparison-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="git-merge" class="feather-16 me-2"></i>
-                                    Branch-wise Store Comparison
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="compareBy('performance')">Performance</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="compareBy('sales')">Sales</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="compareBy('efficiency')">Efficiency</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="store-chart-container">
-                                            <canvas id="comparisonChart"></canvas>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="comparison-grid">
-                                    {% for report in store_reports %}
-                                    <div class="comparison-card">
-                                        <div class="comparison-header">
-                                            <h6 class="mb-0" style="color: {{ report|get_store_color_hex }};">{{ report.store.name }}</h6>
-                                            <div class="store-score {{ report.score_class }}">{{ report.performance_score }}</div>
-                                        </div>
-                                        <div class="comparison-stats">
-                                            <div class="stat-item">
-                                                <span class="stat-value">UGX {{ report.sales_data.total_sales|default:0|divide:1000000|floatformat:1 }}M</span>
-                                                <span class="stat-label">Monthly Sales</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">{{ report.sales_data.total_transactions|default:0 }}</span>
-                                                <span class="stat-label">Transactions</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">{{ report.efficiency_score }}%</span>
-                                                <span class="stat-label">Efficiency</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-value">{{ report.performance_score|floatformat:1 }}★</span>
-                                                <span class="stat-label">Rating</span>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <small class="text-muted">
-                                                {% if report.performance_score >= 8.5 %}Strengths
-                                                {% elif report.performance_score >= 7.0 %}Opportunities
-                                                {% else %}Improvements{% endif %}
-                                            </small>
-                                            {% if report.performance_score >= 8.5 %}
-                                            <p class="small mb-1">• High customer volume</p>
-                                            <p class="small mb-1">• Excellent staff efficiency</p>
-                                            <p class="small mb-0">• Optimal inventory utilization</p>
-                                            {% elif report.performance_score >= 7.0 %}
-                                            <p class="small mb-1">• Good growth potential</p>
-                                            <p class="small mb-1">• Stable performance</p>
-                                            <p class="small mb-0">• Opportunity for improvement</p>
-                                            {% else %}
-                                            <p class="small mb-1">• Need staff training</p>
-                                            <p class="small mb-1">• Optimize inventory mix</p>
-                                            <p class="small mb-0">• Local marketing needed</p>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <div class="card bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Comparative Analysis Summary</h6>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Top Performer:</strong> {{ store_reports|max_score_store }} (Score: {{ store_reports|max_score_value }})</p>
-                                                        <p class="mb-1"><strong>Most Improved:</strong> {{ store_reports|most_improved_store }}</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Average Store Score:</strong> {{ store_reports|avg_score|floatformat:2 }}</p>
-                                                        <p class="mb-1"><strong>Sales Range:</strong> UGX {{ store_reports|min_sales|intcomma }} - {{ store_reports|max_sales|intcomma }}</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Recommendation:</strong> Implement best practices across network</p>
-                                                        <p class="mb-1"><strong>Target:</strong> Bring all stores above 7.0 score</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Default Store Analysis Tab -->
-                    <div class="tab-pane fade" id="default" role="tabpanel" aria-labelledby="default-tab">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i data-feather="star" class="feather-16 me-2"></i>
-                                    Default Store Analysis
-                                    {% if default_store %}
-                                    <span class="badge bg-primary ms-2">{{ default_store.name }}</span>
+                                <div class="ms-2">
+                                    <strong>{{ store.name }}</strong>
+                                    {% if store.is_default %}
+                                    <span class="store-badge default ms-1">Default</span>
                                     {% endif %}
-                                </h5>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary active" onclick="showDefaultMetrics('overview')">Overview</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showDefaultMetrics('performance')">Performance</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showDefaultMetrics('inventory')">Inventory</button>
                                 </div>
                             </div>
-                            <div class="card-body">
-                                {% if default_store and default_store_report %}
-                                {% with report=default_store_report %}
-                                <div class="row mb-4">
-                                    <div class="col-md-8">
-                                        <div class="store-chart-container">
-                                            <canvas id="defaultStoreChart"></canvas>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card" style="position: relative;">
-                                            <div class="default-store-indicator" data-bs-toggle="tooltip" data-bs-placement="top" title="Default Store">
-                                                <i data-feather="star" class="feather-12"></i>
-                                            </div>
-                                            <div class="store-header {{ report.color_class }}">
-                                                <h5 class="mb-0 text-center">{{ report.store.name }}</h5>
-                                                <small class="text-center d-block">Default Store</small>
-                                            </div>
-                                            <div class="card-body text-center">
-                                                <div class="store-score {{ report.score_class }} mb-3">{{ report.performance_score }}</div>
-                                                <p class="small mb-3">Overall Store Rating</p>
-                                                
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <small class="text-muted">SKUs</small>
-                                                        <p class="mb-0"><strong>{{ report.inventory_data.total_skus|default:0 }}</strong></p>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Stock Units</small>
-                                                        <p class="mb-0"><strong>{{ report.total_units|intcomma }}</strong></p>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <span class="performance-badge {{ report.performance_badge }}">
-                                                        <i data-feather="award" class="feather-12 me-1"></i>
-                                                        {{ report.performance_category|title }}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="card-title mb-0">
-                                                    <i data-feather="trending-up" class="feather-16 me-2"></i>
-                                                    Key Metrics
-                                                </h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-3">
-                                                    <small class="text-muted">Monthly Sales Growth</small>
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 {% if report.growth_rate > 0 %}text-success{% elif report.growth_rate < 0 %}text-danger{% else %}text-muted{% endif %}">
-                                                            {{ report.growth_rate|floatformat:1 }}%
-                                                        </span>
-                                                        <i data-feather="{% if report.growth_rate > 0 %}trending-up{% elif report.growth_rate < 0 %}trending-down{% else %}minus{% endif %}" 
-                                                           class="feather-16 {% if report.growth_rate > 0 %}text-success{% elif report.growth_rate < 0 %}text-danger{% else %}text-muted{% endif %}"></i>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <small class="text-muted">Store Utilization</small>
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 {% if report.utilization_percentage >= 70 and report.utilization_percentage <= 85 %}text-success{% elif report.utilization_percentage > 85 %}text-danger{% else %}text-warning{% endif %}">
-                                                            {{ report.utilization_percentage }}%
-                                                        </span>
-                                                        <i data-feather="package" class="feather-16 {% if report.utilization_percentage >= 70 and report.utilization_percentage <= 85 %}text-success{% elif report.utilization_percentage > 85 %}text-danger{% else %}text-warning{% endif %}"></i>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <small class="text-muted">Transaction Efficiency</small>
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 text-info">{{ report.efficiency_score }}%</span>
-                                                        <i data-feather="check-circle" class="feather-16 text-info"></i>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <small class="text-muted">Low Stock Items</small>
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="h5 mb-0 {% if report.inventory_data.low_stock_items and report.inventory_data.low_stock_items > 10 %}text-warning{% else %}text-success{% endif %}">
-                                                            {{ report.inventory_data.low_stock_items|default:0 }}
-                                                        </span>
-                                                        <i data-feather="alert-triangle" class="feather-16 {% if report.inventory_data.low_stock_items and report.inventory_data.low_stock_items > 10 %}text-warning{% else %}text-success{% endif %}"></i>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-8">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="card-title mb-0">
-                                                    <i data-feather="target" class="feather-16 me-2"></i>
-                                                    Strategic Role & Performance
-                                                </h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="row mb-3">
-                                                    <div class="col-md-6">
-                                                        <h6>Primary Functions</h6>
-                                                        <ul class="list-unstyled mb-0">
-                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Training center for new staff</li>
-                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Main inventory hub</li>
-                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Corporate sales headquarters</li>
-                                                            <li><i data-feather="check-circle" class="feather-12 text-success me-2"></i> Product launch showcase</li>
-                                                        </ul>
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <h6>Performance Targets</h6>
-                                                        <ul class="list-unstyled mb-0">
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Monthly sales: UGX {{ report.sales_data.total_sales|default:0|add_percentage:20|intcomma }}</li>
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Store utilization: 75-85%</li>
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Efficiency score: 90%+</li>
-                                                            <li><i data-feather="target" class="feather-12 text-primary me-2"></i> Low stock items: &lt; 5%</li>
-                                                        </ul>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <h6>Benchmark Comparison</h6>
-                                                    <div class="table-responsive">
-                                                        <table class="table table-sm">
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>Metric</th>
-                                                                    <th>{{ report.store.name }}</th>
-                                                                    <th>Average of Others</th>
-                                                                    <th>Difference</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td>Utilization %</td>
-                                                                    <td>{{ report.utilization_percentage }}%</td>
-                                                                    <td>{{ store_reports|avg_utilization_excluding:report.store.id }}%</td>
-                                                                    <td class="{% if report.utilization_percentage > store_reports|avg_utilization_excluding:report.store.id %}text-success{% else %}text-danger{% endif %}">
-                                                                        {{ report.utilization_percentage|subtract:store_reports|avg_utilization_excluding:report.store.id|floatformat:1 }}%
-                                                                    </td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td>Sales/Transaction</td>
-                                                                    <td>UGX {{ report.sales_data.avg_sale_value|default:0|intcomma }}</td>
-                                                                    <td>UGX {{ store_reports|avg_transaction_excluding:report.store.id|intcomma }}</td>
-                                                                    <td class="{% if report.sales_data.avg_sale_value > store_reports|avg_transaction_excluding:report.store.id %}text-success{% else %}text-danger{% endif %}">
-                                                                        {{ report.sales_data.avg_sale_value|percentage_difference:store_reports|avg_transaction_excluding:report.store.id|floatformat:1 }}%
-                                                                    </td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td>Performance Score</td>
-                                                                    <td>{{ report.performance_score }}</td>
-                                                                    <td>{{ store_reports|avg_score_excluding:report.store.id|floatformat:1 }}</td>
-                                                                    <td class="{% if report.performance_score > store_reports|avg_score_excluding:report.store.id %}text-success{% else %}text-danger{% endif %}">
-                                                                        {{ report.performance_score|subtract:store_reports|avg_score_excluding:report.store.id|floatformat:1 }}
-                                                                    </td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                        <div class="card bg-light-primary">
-                                            <div class="card-body">
-                                                <h6 class="card-subtitle mb-2 text-muted">Default Store Leadership Role</h6>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Best Practices:</strong> {{ report.performance_score|multiply:1.2|floatformat:0 }} identified</p>
-                                                        <p class="mb-1"><strong>Training Programs:</strong> 4 active monthly</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Knowledge Sharing:</strong> Weekly sessions</p>
-                                                        <p class="mb-1"><strong>Cross-training:</strong> 8 staff/month</p>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <p class="mb-1"><strong>Target Impact:</strong> Improve network average by 15%</p>
-                                                        <p class="mb-1"><strong>Review Cycle:</strong> Quarterly assessment</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endwith %}
+                        </td>
+                        <td>
+                            {{ store.branch.name|default:"Main Branch" }}
+                            <div class="branch-indicator">
+                                <i data-feather="map-pin" class="feather-10"></i>
+                                {{ store.address|default:"Location not set"|truncatechars:30 }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if store.is_active %}
+                            <span class="status-badge status-active">
+                                <i data-feather="check-circle" class="feather-10 me-1"></i>Active
+                            </span>
+                            {% else %}
+                            <span class="status-badge status-inactive">
+                                <i data-feather="x-circle" class="feather-10 me-1"></i>Inactive
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="fw-bold me-2">{{ store.performance_score|default:0 }}/10</span>
+                                {% if store.performance_score >= 8 %}
+                                <span class="performance-tag tag-excellent">Excellent</span>
+                                {% elif store.performance_score >= 6 %}
+                                <span class="performance-tag tag-good">Good</span>
                                 {% else %}
-                                <div class="text-center py-5">
-                                    <i data-feather="alert-circle" class="feather-48 text-warning mb-3"></i>
-                                    <h5>No Default Store Configured</h5>
-                                    <p class="text-muted">Please set a default store in the store settings to view detailed analysis.</p>
-                                </div>
+                                <span class="performance-tag tag-fair">Fair</span>
                                 {% endif %}
                             </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold">{{ store.utilization|default:0 }}%</span>
+                                <div class="utilization-bar">
+                                    <div class="utilization-fill 
+                                        {% if store.utilization >= 70 %}fill-high
+                                        {% elif store.utilization >= 40 %}fill-medium
+                                        {% else %}fill-low{% endif %}" 
+                                        style="width: {{ store.utilization|default:0 }}%">
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <strong>UGX {{ store.monthly_sales|default:0|floatformat:0|intcomma }}</strong>
+                            <div class="quick-stat">
+                                <i data-feather="trending-up" class="feather-10 text-success"></i>
+                                {{ store.sales_trend|default:0 }}% vs last month
+                            </div>
+                        </td>
+                        <td>
+                            {{ store.transactions|default:0|intcomma }}
+                            <div class="quick-stat text-muted">
+                                <i data-feather="clock" class="feather-10"></i>
+                                {{ store.daily_avg|default:0 }}/day
+                            </div>
+                        </td>
+                        <td>
+                            UGX {{ store.avg_transaction|default:0|floatformat:0|intcomma }}
+                            {% if store.avg_transaction > 100000 %}
+                            <span class="performance-tag tag-excellent ms-1">High</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            UGX {{ store.stock_value|default:0|floatformat:0|intcomma }}
+                            <div class="quick-stat text-muted">
+                                <i data-feather="package" class="feather-10"></i>
+                                {{ store.total_units|default:0 }} units
+                            </div>
+                        </td>
+                        <td>
+                            <span class="{% if store.low_stock_items > 5 %}text-danger{% else %}text-success{% endif %}">
+                                {{ store.low_stock_items|default:0 }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-1">
+                                <span>{{ store.efficiency|default:0 }}%</span>
+                                <i data-feather="users" class="feather-12 text-muted"></i>
+                            </div>
+                            <small class="text-muted">{{ store.staff_count|default:0 }} staff</small>
+                        </td>
+                        <td>
+                            {% if store.growth > 0 %}
+                            <span class="trend-up">
+                                <i data-feather="arrow-up" class="feather-12"></i>
+                                {{ store.growth }}%
+                            </span>
+                            {% elif store.growth < 0 %}
+                            <span class="trend-down">
+                                <i data-feather="arrow-down" class="feather-12"></i>
+                                {{ store.growth|abs }}%
+                            </span>
+                            {% else %}
+                            <span class="text-muted">0%</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="12" class="text-center py-5">
+                            <i data-feather="map" class="feather-48 text-muted mb-3"></i>
+                            <h6 class="text-muted">No store data available</h6>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-primary">
+                        <th colspan="5" class="text-end">Totals/Averages:</th>
+                        <th>UGX {{ total_sales|default:0|floatformat:0|intcomma }}</th>
+                        <th>{{ total_transactions|default:0|intcomma }}</th>
+                        <th>UGX {{ avg_transaction_total|default:0|floatformat:0|intcomma }}</th>
+                        <th>UGX {{ total_stock_value|default:0|floatformat:0|intcomma }}</th>
+                        <th>{{ total_low_stock|default:0 }}</th>
+                        <th>{{ avg_efficiency|default:0 }}%</th>
+                        <th>{{ avg_growth|default:0 }}%</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Store Summary Cards -->
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-3 text-muted">Top Performers</h6>
+                        {% for store in top_performers|slice:":3" %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ store.name }}</span>
+                            <span class="badge bg-success">{{ store.performance_score }}</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted mb-0">No data</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-3 text-muted">Need Attention</h6>
+                        {% for store in need_attention|slice:":3" %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ store.name }}</span>
+                            <span class="badge bg-danger">{{ store.low_stock_items }} low</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted mb-0">All stores healthy</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-3 text-muted">Branch Performance</h6>
+                        {% for branch in branch_summary|slice:":3" %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ branch.name }}</span>
+                            <span class="text-success">UGX {{ branch.sales|floatformat:0|intcomma }}</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted mb-0">No data</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-3 text-muted">Quick Stats</h6>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Stores with Growth</span>
+                            <span class="text-success">{{ stores_with_growth }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Below Target</span>
+                            <span class="text-danger">{{ stores_below_target }}</span>
                         </div>
                     </div>
                 </div>
@@ -1016,752 +843,460 @@
     </div>
 </div>
 
-<script>
-let capacityChart;
-let activityChart;
-let comparisonChart;
-let defaultStoreChart;
 
-// Initialize charts and functionality
-document.addEventListener('DOMContentLoaded', function() {
-    initializeCapacityChart();
-    initializeActivityChart();
-    initializeComparisonChart();
-    initializeDefaultStoreChart();
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ==================== DROPDOWN SEARCH FUNCTIONS ====================
+// Global function to toggle dropdown visibility
+function toggleDropdown(element, event) {
+    if (!element) return;
     
-    // Initialize feather icons
+    // Prevent event from bubbling up
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const filter = element.dataset.filter;
+    if (!filter) return;
+    
+    const dropdownId = filter + 'Dropdown';
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) {
+        console.log('Dropdown not found:', dropdownId);
+        return;
+    }
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    // Close all dropdowns first
+    document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    // Toggle current dropdown
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        // Focus on search input
+        setTimeout(() => {
+            const searchField = dropdown.querySelector('.dropdown-search-field');
+            if (searchField) searchField.focus();
+        }, 100);
+    }
+}
+
+// Global function to filter dropdown options
+function filterDropdownOptions(input, filter, event) {
+    if (!input || !filter) return;
+    
+    // Prevent event from bubbling
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const searchTerm = input.value.toLowerCase().trim();
+    const dropdownId = filter + 'Dropdown';
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const options = dropdown.querySelectorAll('.dropdown-search-option');
+    
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        if (searchTerm === '' || text.includes(searchTerm)) {
+            option.style.display = 'block';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+}
+
+// Global function to select dropdown option
+function selectDropdownOption(option, filter, event) {
+    if (!option || !filter) return;
+    
+    // Prevent event from bubbling
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById('id_' + filter);
+    const selectedText = document.getElementById('selected' + filter.charAt(0).toUpperCase() + filter.slice(1) + 'Text');
+    
+    if (!select || !selectedText) return;
+    
+    // Update hidden select
+    select.value = value;
+    
+    // Update displayed text
+    selectedText.textContent = text;
+    
+    // Update selected state in dropdown
+    const dropdown = document.getElementById(filter + 'Dropdown');
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    // Close dropdown
+    if (dropdown) dropdown.style.display = 'none';
+    
+    // Trigger change event for any listeners
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-search-container')) {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+// Close on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+// Global variables for filter values
+let selectedBranchValue = '';
+let selectedStatusValue = '';
+let selectedPerformanceValue = '';
+let startDateValue = '{{ start_date|date:"Y-m-d" }}';
+let endDateValue = '{{ end_date|date:"Y-m-d" }}';
+
+$(document).ready(function() {
+    // Check if table has data before initializing DataTable
+    if ($('#storePerformanceTable tbody tr').length > 0) {
+        // Check if the first row has the correct number of columns
+        var headerCols = $('#storePerformanceTable thead tr th').length;
+        var firstBodyRowCols = $('#storePerformanceTable tbody tr:first td').length;
+        
+        console.log('Header columns:', headerCols);
+        console.log('First body row columns:', firstBodyRowCols);
+        
+        // Only initialize if column counts match
+        if (headerCols === firstBodyRowCols) {
+            var table = $('#storePerformanceTable').DataTable({
+                pageLength: 25,
+                order: [[3, 'desc']], // Sort by performance score by default
+                dom: '<"row"<"col-md-6"B><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+                buttons: [
+                    {
+                        extend: 'copy',
+                        text: '<i data-feather="copy" class="feather-14"></i> Copy',
+                        className: 'btn btn-sm btn-outline-secondary',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    },
+                    {
+                        extend: 'csv',
+                        text: '<i data-feather="file-text" class="feather-14"></i> CSV',
+                        className: 'btn btn-sm btn-outline-secondary',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    },
+                    {
+                        extend: 'excel',
+                        text: '<i data-feather="grid" class="feather-14"></i> Excel',
+                        className: 'btn btn-sm btn-outline-secondary',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    },
+                    {
+                        extend: 'pdf',
+                        text: '<i data-feather="file" class="feather-14"></i> PDF',
+                        className: 'btn btn-sm btn-outline-secondary',
+                        orientation: 'landscape',
+                        pageSize: 'A4',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    },
+                    {
+                        extend: 'print',
+                        text: '<i data-feather="printer" class="feather-14"></i> Print',
+                        className: 'btn btn-sm btn-outline-secondary',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    }
+                ],
+                language: {
+                    search: "_INPUT_",
+                    searchPlaceholder: "Search stores...",
+                    emptyTable: "No data available in table",
+                    zeroRecords: "No matching records found"
+                },
+                initComplete: function() {
+                    // Hide the default filter input since we're using custom filters
+                    $('.dataTables_filter').hide();
+                }
+            });
+        } else {
+            console.warn('Column count mismatch - DataTable not initialized');
+            console.log('Header has', headerCols, 'columns but body has', firstBodyRowCols, 'columns');
+        }
+    }
+    
+    // Set up listeners for select changes
+    const branchSelect = document.getElementById('id_branch');
+    const statusSelect = document.getElementById('id_status');
+    const performanceSelect = document.getElementById('id_performance');
+    
+    if (branchSelect) {
+        branchSelect.addEventListener('change', function(e) {
+            selectedBranchValue = e.target.value;
+        });
+    }
+    
+    if (statusSelect) {
+        statusSelect.addEventListener('change', function(e) {
+            selectedStatusValue = e.target.value;
+        });
+    }
+    
+    if (performanceSelect) {
+        performanceSelect.addEventListener('change', function(e) {
+            selectedPerformanceValue = e.target.value;
+        });
+    }
+    
+    // Initialize from URL parameters if any
+    initFromUrlParams();
+    
+    // Re-initialize feather icons
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
-    
-    // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-    
-    // Initialize date range picker
-    initializeDateRangePicker();
-    
-    // Start activity updates
-    startActivityUpdates();
 });
 
-function initializeCapacityChart() {
-    const ctx = document.getElementById('capacityChart').getContext('2d');
+function initFromUrlParams() {
+    const urlParams = new URLSearchParams(window.location.search);
     
-    // Parse data from Django template
-    const labels = JSON.parse('{{ capacity_labels|escapejs }}');
-    const data = JSON.parse('{{ capacity_data|escapejs }}');
-    const colors = JSON.parse('{{ capacity_colors|escapejs }}');
-    
-    // Darken colors for borders
-    const borderColors = colors.map(color => darkenColor(color, 0.2));
-    
-    capacityChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Storage Utilization (%)',
-                data: data,
-                backgroundColor: colors,
-                borderColor: borderColors,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `Utilization: ${context.raw}%`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Utilization (%)'
-                    },
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Store Locations'
-                    }
-                }
-            }
-        }
-    });
-}
-
-function initializeActivityChart() {
-    const ctx = document.getElementById('activityChart').getContext('2d');
-    
-    // Parse data from Django template
-    const labels = JSON.parse('{{ activity_labels|escapejs }}');
-    const activityData = JSON.parse('{{ activity_data|escapejs }}');
-    
-    // Prepare datasets
-    const datasets = [];
-    const storeNames = Object.keys(activityData);
-    
-    // Limit to first 3 stores for clarity
-    const maxStores = Math.min(3, storeNames.length);
-    
-    for (let i = 0; i < maxStores; i++) {
-        const storeName = storeNames[i];
-        const storeInfo = activityData[storeName];
-        
-        datasets.push({
-            label: storeName,
-            data: storeInfo.data,
-            borderColor: storeInfo.color,
-            backgroundColor: hexToRgba(storeInfo.color, 0.1),
-            tension: 0.4,
-            fill: true,
-            pointRadius: 3,
-            pointHoverRadius: 5
-        });
-    }
-    
-    activityChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Activity Level'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Time of Day'
-                    }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'nearest'
-            }
-        }
-    });
-}
-
-function initializeComparisonChart() {
-    const ctx = document.getElementById('comparisonChart').getContext('2d');
-    
-    // Parse data from Django template
-    const labels = JSON.parse('{{ comparison_labels|escapejs }}');
-    const comparisonData = JSON.parse('{{ comparison_data|escapejs }}');
-    
-    // Prepare datasets
-    const datasets = [];
-    const storeNames = Object.keys(comparisonData);
-    
-    // Limit to first 3 stores for clarity
-    const maxStores = Math.min(3, storeNames.length);
-    
-    for (let i = 0; i < maxStores; i++) {
-        const storeName = storeNames[i];
-        const storeInfo = comparisonData[storeName];
-        
-        datasets.push({
-            label: storeName,
-            data: storeInfo.data,
-            backgroundColor: hexToRgba(storeInfo.color, 0.2),
-            borderColor: storeInfo.border_color || storeInfo.color,
-            pointBackgroundColor: storeInfo.color,
-            pointBorderColor: '#fff',
-            pointHoverBackgroundColor: '#fff',
-            pointHoverBorderColor: storeInfo.color
-        });
-    }
-    
-    comparisonChart = new Chart(ctx, {
-        type: 'radar',
-        data: {
-            labels: labels,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            },
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        stepSize: 20,
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-function initializeDefaultStoreChart() {
-    const ctx = document.getElementById('defaultStoreChart').getContext('2d');
-    
-    // Sample data for default store chart
-    // In production, you would fetch this from your API
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    // Generate sample data based on current store performance
-    const currentMonth = new Date().getMonth();
-    const salesData = [];
-    const growthData = [];
-    
-    for (let i = 0; i < months.length; i++) {
-        // Generate realistic sales data
-        let baseSales = 65 + (i * 2.5);
-        if (i > currentMonth) {
-            // Future months - projected
-            baseSales = baseSales * 0.9;
-        }
-        salesData.push(baseSales + (Math.random() * 10 - 5));
-        
-        // Generate growth data
-        if (i === 0) {
-            growthData.push(8);
-        } else {
-            growthData.push(8 + (Math.random() * 8 - 4));
+    // Branch filter
+    const branchParam = urlParams.get('branch');
+    if (branchParam) {
+        const branchOption = document.querySelector(`#branchDropdown .dropdown-search-option[data-value="${branchParam}"]`);
+        if (branchOption) {
+            selectDropdownOption(branchOption, 'branch', null);
         }
     }
     
-    defaultStoreChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: months,
-            datasets: [
-                {
-                    label: 'Sales (UGX M)',
-                    data: salesData,
-                    backgroundColor: 'rgba(74, 144, 226, 0.5)',
-                    borderColor: '#4A90E2',
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'Growth %',
-                    data: growthData,
-                    backgroundColor: 'rgba(28, 200, 138, 0.5)',
-                    borderColor: '#1CC88A',
-                    borderWidth: 1,
-                    type: 'line',
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            },
-            scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Sales (UGX Millions)'
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Growth (%)'
-                    },
-                    grid: {
-                        drawOnChartArea: false
-                    },
-                    min: 0,
-                    max: 20
-                }
-            }
+    // Status filter
+    const statusParam = urlParams.get('status');
+    if (statusParam) {
+        const statusOption = document.querySelector(`#statusDropdown .dropdown-search-option[data-value="${statusParam}"]`);
+        if (statusOption) {
+            selectDropdownOption(statusOption, 'status', null);
         }
-    });
-}
-
-function initializeDateRangePicker() {
-    const picker = $('#dateRangePicker');
-    const startDate = moment('{{ start_date|date:"Y-m-d" }}');
-    const endDate = moment('{{ end_date|date:"Y-m-d" }}');
+    }
     
-    picker.daterangepicker({
-        startDate: startDate,
-        endDate: endDate,
-        ranges: {
-           'Today': [moment(), moment()],
-           'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-           'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-           'This Month': [moment().startOf('month'), moment().endOf('month')],
-           'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+    // Performance filter
+    const performanceParam = urlParams.get('performance');
+    if (performanceParam) {
+        const performanceOption = document.querySelector(`#performanceDropdown .dropdown-search-option[data-value="${performanceParam}"]`);
+        if (performanceOption) {
+            selectDropdownOption(performanceOption, 'performance', null);
         }
-    }, function(start, end) {
-        $('#dateRangePicker span').html(start.format('MMM D, YYYY') + ' - ' + end.format('MMM D, YYYY'));
-        // Redirect with date parameters
-        const url = new URL(window.location.href);
-        url.searchParams.set('start_date', start.format('YYYY-MM-DD'));
-        url.searchParams.set('end_date', end.format('YYYY-MM-DD'));
-        window.location.href = url.toString();
-    });
-}
-
-function startActivityUpdates() {
-    // Update activity timestamp every minute
-    setInterval(() => {
-        const now = new Date();
-        const formattedTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('activityTimestamp').textContent = formattedTime;
-    }, 60000); // Update every minute
-}
-
-function filterCapacity(type) {
-    const buttons = document.querySelectorAll('#capacity .btn-group .btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    }
     
-    const storeCards = document.querySelectorAll('.store-card');
-    storeCards.forEach(card => {
-        const utilizationText = card.querySelector('.metric-value').textContent;
-        const utilization = parseFloat(utilizationText.replace('%', ''));
-        
-        if (type === 'all') {
-            card.style.display = 'block';
-        } else if (type === 'high' && utilization >= 70) {
-            card.style.display = 'block';
-        } else if (type === 'low' && utilization < 70) {
-            card.style.display = 'block';
-        } else {
-            card.style.display = 'none';
+    // Date range
+    const dateRangeParam = urlParams.get('daterange');
+    if (dateRangeParam) {
+        document.getElementById('selectedDateRange').textContent = dateRangeParam;
+        document.getElementById('headerDateRange').textContent = dateRangeParam;
+        const dates = dateRangeParam.split(' - ');
+        if (dates.length === 2) {
+            startDateValue = dates[0];
+            endDateValue = dates[1];
         }
-    });
+    }
 }
 
-function compareBy(metric) {
-    const buttons = document.querySelectorAll('#comparison .btn-group .btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+function openDateRangeModal() {
+    const modal = new bootstrap.Modal(document.getElementById('dateRangeModal'));
     
-    // This would typically update the comparison chart based on metric
-    showToast(`Comparing stores by: ${metric}`, 'info');
+    // Set current values if any
+    if (startDateValue) {
+        document.getElementById('startDate').value = startDateValue;
+    }
+    if (endDateValue) {
+        document.getElementById('endDate').value = endDateValue;
+    }
     
-    // In production, you would fetch new data and update the chart
-    // For now, we'll just show a toast
+    modal.show();
 }
 
-function showDefaultMetrics(view) {
-    const buttons = document.querySelectorAll('#default .btn-group .btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+function setPresetRange(range) {
+    const today = new Date();
+    let startDate = new Date();
+    let endDate = new Date();
     
-    // This would typically show different metrics based on view
-    showToast(`Showing default store: ${view}`, 'info');
+    switch(range) {
+        case 'today':
+            startDate = today;
+            endDate = today;
+            break;
+        case 'yesterday':
+            startDate = new Date(today.setDate(today.getDate() - 1));
+            endDate = new Date(today.setDate(today.getDate() - 1));
+            break;
+        case 'last7days':
+            endDate = new Date();
+            startDate = new Date(today.setDate(today.getDate() - 6));
+            break;
+        case 'last30days':
+            endDate = new Date();
+            startDate = new Date(today.setDate(today.getDate() - 29));
+            break;
+        case 'thisMonth':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case 'lastMonth':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'thisYear':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = new Date(today.getFullYear(), 11, 31);
+            break;
+    }
     
-    // In production, you would update the content based on the view
+    document.getElementById('startDate').value = formatDate(startDate);
+    document.getElementById('endDate').value = formatDate(endDate);
 }
 
-function refreshStoreReports() {
-    showLoading();
-    
-    // Simulate API refresh
-    setTimeout(() => {
-        // Destroy old charts
-        if (capacityChart) capacityChart.destroy();
-        if (activityChart) activityChart.destroy();
-        if (comparisonChart) comparisonChart.destroy();
-        if (defaultStoreChart) defaultStoreChart.destroy();
-        
-        // Reinitialize charts
-        initializeCapacityChart();
-        initializeActivityChart();
-        initializeComparisonChart();
-        initializeDefaultStoreChart();
-        
-        // Refresh feather icons
-        if (typeof feather !== 'undefined') {
-            feather.replace();
-        }
-        
-        // Hide loading
-        const loadingOverlay = document.getElementById('loading-overlay');
-        if (loadingOverlay) {
-            loadingOverlay.remove();
-        }
-        
-        // Show success message
-        showToast('Store reports refreshed successfully!', 'success');
-    }, 1000);
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
-function exportStoreReport(format) {
-    let exportUrl;
-    let filename = `store-reports-{{ start_date|date:"Y-m-d" }}-to-{{ end_date|date:"Y-m-d" }}`;
+function applyDateRange() {
+    startDateValue = document.getElementById('startDate').value;
+    endDateValue = document.getElementById('endDate').value;
+    
+    if (startDateValue && endDateValue) {
+        const dateRangeText = startDateValue + ' - ' + endDateValue;
+        document.getElementById('selectedDateRange').textContent = dateRangeText;
+        document.getElementById('headerDateRange').textContent = 
+            moment(startDateValue).format('MMM D, YYYY') + ' - ' + moment(endDateValue).format('MMM D, YYYY');
+    } else {
+        document.getElementById('selectedDateRange').textContent = 'Select Date Range';
+    }
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('dateRangeModal'));
+    modal.hide();
+}
+
+function clearDateRange() {
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    startDateValue = '';
+    endDateValue = '';
+    document.getElementById('selectedDateRange').textContent = 'Select Date Range';
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('dateRangeModal'));
+    modal.hide();
+}
+
+function applyFilters() {
+    let url = window.location.pathname + '?';
+    const params = [];
+    
+    const branchSelect = document.getElementById('id_branch');
+    const statusSelect = document.getElementById('id_status');
+    const performanceSelect = document.getElementById('id_performance');
+    
+    if (branchSelect && branchSelect.value) {
+        params.push('branch=' + encodeURIComponent(branchSelect.value));
+    }
+    
+    if (statusSelect && statusSelect.value) {
+        params.push('status=' + encodeURIComponent(statusSelect.value));
+    }
+    
+    if (performanceSelect && performanceSelect.value) {
+        params.push('performance=' + encodeURIComponent(performanceSelect.value));
+    }
+    
+    if (startDateValue && endDateValue) {
+        const dateRange = startDateValue + ' - ' + endDateValue;
+        params.push('daterange=' + encodeURIComponent(dateRange));
+    }
+    
+    url += params.join('&');
+    window.location.href = url;
+}
+
+function refreshReport() {
+    window.location.reload();
+}
+
+function exportReport(format) {
+    const table = $('#storePerformanceTable').DataTable();
     
     if (format === 'csv') {
-        exportUrl = '/reports/store/export/csv/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}';
-        filename += '.csv';
-    } else if (format === 'pdf') {
-        exportUrl = '/reports/store/export/pdf/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}';
-        filename += '.pdf';
+        table.button('.buttons-csv').trigger();
     } else if (format === 'excel') {
-        exportUrl = '/reports/store/export/excel/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}';
-        filename += '.xlsx';
+        table.button('.buttons-excel').trigger();
+    } else if (format === 'pdf') {
+        table.button('.buttons-pdf').trigger();
     }
-    
-    // Create temporary link and download
-    const link = document.createElement('a');
-    link.href = exportUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    showToast(`${format.toUpperCase()} export started!`, 'info');
 }
 
-function goBack() {
-    window.history.back();
-    // Or redirect to dashboard:
-    // window.location.href = '/reports/dashboard/';
-}
-
-function showLoading() {
-    // Add loading overlay
-    const loadingHTML = `
-        <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
-             style="background: rgba(255,255,255,0.9); z-index: 9999;">
-            <div class="text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading store reports...</p>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', loadingHTML);
-}
-
+// Show toast notification
 function showToast(message, type = 'info') {
-    // Create toast element
     const toastHTML = `
-        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast align-items-center text-bg-${type} border-0" role="alert">
             <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
         </div>
     `;
     
-    const toastContainer = document.querySelector('.toast-container');
-    if (!toastContainer) {
-        const container = document.createElement('div');
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
         container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
         container.style.zIndex = '9999';
         document.body.appendChild(container);
     }
     
-    document.querySelector('.toast-container').insertAdjacentHTML('beforeend', toastHTML);
+    container.insertAdjacentHTML('beforeend', toastHTML);
     
-    // Initialize and show toast
-    const toastEl = document.querySelector('.toast-container .toast:last-child');
+    const toastEl = container.querySelector('.toast:last-child');
     const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
     toast.show();
 }
-
-// Add map marker click handlers
-document.querySelectorAll('.map-marker').forEach(marker => {
-    marker.addEventListener('click', function() {
-        const storeName = this.getAttribute('title');
-        showToast(`Viewing details for ${storeName}`, 'info');
-        
-        // Scroll to the corresponding store card
-        const storeCards = document.querySelectorAll('.store-card');
-        storeCards.forEach(card => {
-            if (card.querySelector('h5').textContent === storeName) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                // Add highlight effect
-                card.style.boxShadow = '0 0 0 3px rgba(74, 144, 226, 0.5)';
-                setTimeout(() => {
-                    card.style.boxShadow = '';
-                }, 2000);
-            }
-        });
-    });
-});
-
-// Helper functions
-function showStoreDetails(storeId) {
-    showToast(`Fetching details for store ID: ${storeId}`, 'info');
-    // In production, you would fetch store details via AJAX
-}
-
-function darkenColor(color, amount) {
-    // Simple color darkening for borders
-    if (color.startsWith('#')) {
-        const num = parseInt(color.slice(1), 16);
-        const amt = Math.round(2.55 * amount * 100);
-        const R = (num >> 16) - amt;
-        const G = (num >> 8 & 0x00FF) - amt;
-        const B = (num & 0x0000FF) - amt;
-        return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-            (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-            (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
-    }
-    return color;
-}
-
-function hexToRgba(hex, alpha) {
-    // Convert hex to rgba
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-// Clean up intervals on page unload
-window.addEventListener('beforeunload', function() {
-    // Clean up any intervals
-    if (activityUpdateInterval) {
-        clearInterval(activityUpdateInterval);
-    }
-});
-
-// Add event listener for tab changes to resize charts
-document.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
-    tab.addEventListener('shown.bs.tab', function() {
-        // Resize charts when tab becomes active
-        setTimeout(() => {
-            if (capacityChart) capacityChart.resize();
-            if (activityChart) activityChart.resize();
-            if (comparisonChart) comparisonChart.resize();
-            if (defaultStoreChart) defaultStoreChart.resize();
-        }, 100);
-    });
-});
 </script>
-
-<style>
-/* Additional styles for side tabs */
-.side-tabs-card {
-    height: fit-content;
-    min-height: 500px;
-}
-
-.side-tabs-container {
-    height: 400px;
-    overflow-y: auto;
-}
-
-.side-tabs {
-    border-right: 1px solid #dee2e6;
-}
-
-.side-tab {
-    padding: 1rem 1.25rem;
-    border: none;
-    border-left: 4px solid transparent;
-    border-radius: 0;
-    text-align: left;
-    color: #495057;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    background-color: transparent;
-    position: relative;
-    width: 100%;
-}
-
-.side-tab:hover {
-    background-color: rgba(74, 144, 226, 0.05);
-    color: #4A90E2;
-    border-left-color: rgba(74, 144, 226, 0.3);
-}
-
-.side-tab.active {
-    background-color: rgba(74, 144, 226, 0.1);
-    color: #4A90E2;
-    border-left-color: #4A90E2;
-    font-weight: 600;
-}
-
-/* Responsive adjustments */
-@media (max-width: 992px) {
-    .side-tabs-card {
-        min-height: auto;
-        margin-bottom: 1rem;
-    }
-    
-    .side-tabs-container {
-        height: auto;
-        max-height: 300px;
-    }
-    
-    .side-tabs {
-        flex-direction: row !important;
-        overflow-x: auto;
-        border-right: none;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .side-tab {
-        border-left: none;
-        border-bottom: 3px solid transparent;
-        white-space: nowrap;
-        padding: 0.75rem 1rem;
-    }
-    
-    .side-tab.active,
-    .side-tab:hover {
-        border-left-color: transparent;
-        border-bottom-color: #4A90E2;
-    }
-}
-
-@media (max-width: 768px) {
-    .card-header {
-        flex-direction: column;
-        align-items: flex-start !important;
-    }
-    
-    .card-header .btn-group {
-        margin-top: 0.5rem;
-        align-self: flex-start;
-    }
-    
-    .table-responsive {
-        font-size: 0.8rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .page-header {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .table-top-head {
-        justify-content: center;
-        margin-top: 1rem;
-        flex-wrap: wrap;
-    }
-}
-
-/* Scrollbar styling */
-.side-tabs-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.side-tabs-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.side-tabs-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.side-tabs-container::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
-}
-
-/* Store card hover effects */
-.store-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.store-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-}
-
-/* Map marker animation */
-.map-marker {
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(74, 144, 226, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 10px rgba(74, 144, 226, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(74, 144, 226, 0);
-    }
-}
-
-/* Chart container responsive */
-.store-chart-container {
-    position: relative;
-    height: 200px;
-    width: 100%;
-}
-
-@media (max-width: 768px) {
-    .store-chart-container {
-        height: 150px;
-    }
-}
-</style>
-
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 {% endblock %}

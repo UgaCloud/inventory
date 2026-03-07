@@ -57,7 +57,7 @@
         <div class="ms-2">
           <p class="text-white mb-1">Today's Sales</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
-            <h4 class="text-white">UGX {{ total_sales|default:"0"|intcomma }}</h4>
+            <h4 class="text-white">UGX {{ total_sales_per_user|default:"0"|intcomma }}</h4>
             <span class="badge badge-soft-primary">
               <i class="ti ti-arrow-up me-1"></i>Today
             </span>

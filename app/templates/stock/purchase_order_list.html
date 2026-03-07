@@ -241,30 +241,74 @@
                                     </div>
                                     <div class="card-body">
                                         <div class="row">
-                                            <!-- Supplier Field -->
+                                            <!-- Supplier Field with Search -->
                                             <div class="col-md-6 mb-3">
                                                 <label for="id_supplier" class="form-label">
                                                     Supplier <span class="text-danger">*</span>
                                                 </label>
-                                                <select name="supplier" id="id_supplier" class="form-select" required>
-                                                    <option value="">Select Supplier</option>
-                                                    {% for supplier in suppliers %}
-                                                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                                                    {% endfor %}
-                                                </select>
+                                                <div class="dropdown-search-container" style="position: relative;">
+                                                    <div class="dropdown-search-input" data-filter="supplier" onclick="toggleDropdown(this, event)">
+                                                        <span class="dropdown-selected-value" id="selectedSupplierText">Select Supplier</span>
+                                                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                                                    </div>
+                                                    <div class="dropdown-search-menu" id="supplierDropdown" style="display: none;">
+                                                        <div class="dropdown-search-header">
+                                                            <i class="ti ti-search"></i>
+                                                            <input type="text" class="dropdown-search-field" placeholder="Search supplier..." onkeyup="filterDropdownOptions(this, 'supplier', event)">
+                                                        </div>
+                                                        <div class="dropdown-search-options">
+                                                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'supplier', event)">
+                                                                Select Supplier
+                                                            </div>
+                                                            {% for supplier in suppliers %}
+                                                            <div class="dropdown-search-option" data-value="{{ supplier.id }}" onclick="selectDropdownOption(this, 'supplier', event)">
+                                                                {{ supplier.name }}
+                                                            </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                    <select name="supplier" id="id_supplier" class="form-select" style="display: none;" required>
+                                                        <option value="">Select Supplier</option>
+                                                        {% for supplier in suppliers %}
+                                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
                                             </div>
                                             
-                                            <!-- Store Field -->
+                                            <!-- Store Field with Search -->
                                             <div class="col-md-6 mb-3">
                                                 <label for="id_store" class="form-label">
                                                     Store <span class="text-danger">*</span>
                                                 </label>
-                                                <select name="store" id="id_store" class="form-select" required>
-                                                    <option value="">Select Store</option>
-                                                    {% for store in stores %}
-                                                    <option value="{{ store.id }}">{{ store.name }}</option>
-                                                    {% endfor %}
-                                                </select>
+                                                <div class="dropdown-search-container" style="position: relative;">
+                                                    <div class="dropdown-search-input" data-filter="store" onclick="toggleDropdown(this, event)">
+                                                        <span class="dropdown-selected-value" id="selectedStoreText">Select Store</span>
+                                                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                                                    </div>
+                                                    <div class="dropdown-search-menu" id="storeDropdown" style="display: none;">
+                                                        <div class="dropdown-search-header">
+                                                            <i class="ti ti-search"></i>
+                                                            <input type="text" class="dropdown-search-field" placeholder="Search store..." onkeyup="filterDropdownOptions(this, 'store', event)">
+                                                        </div>
+                                                        <div class="dropdown-search-options">
+                                                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'store', event)">
+                                                                Select Store
+                                                            </div>
+                                                            {% for store in stores %}
+                                                            <div class="dropdown-search-option" data-value="{{ store.id }}" onclick="selectDropdownOption(this, 'store', event)">
+                                                                {{ store.name }}
+                                                            </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                    <select name="store" id="id_store" class="form-select" style="display: none;" required>
+                                                        <option value="">Select Store</option>
+                                                        {% for store in stores %}
+                                                        <option value="{{ store.id }}">{{ store.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
                                         
@@ -287,16 +331,39 @@
                                                        class="form-control">
                                             </div>
                                             
-                                            <!-- Status Field -->
+                                            <!-- Status Field with Search -->
                                             <div class="col-md-4 mb-3">
                                                 <label for="id_status" class="form-label">
                                                     Status <span class="text-danger">*</span>
                                                 </label>
-                                                <select name="status" id="id_status" class="form-select" required>
-                                                    <option value="">Select Status</option>
-                                                    <option value="PENDING">Pending</option>
-                                                    <option value="RECEIVED">Received</option>
-                                                </select>
+                                                <div class="dropdown-search-container" style="position: relative;">
+                                                    <div class="dropdown-search-input" data-filter="status" onclick="toggleDropdown(this, event)">
+                                                        <span class="dropdown-selected-value" id="selectedStatusText">Select Status</span>
+                                                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                                                    </div>
+                                                    <div class="dropdown-search-menu" id="statusDropdown" style="display: none;">
+                                                        <div class="dropdown-search-header">
+                                                            <i class="ti ti-search"></i>
+                                                            <input type="text" class="dropdown-search-field" placeholder="Search status..." onkeyup="filterDropdownOptions(this, 'status', event)">
+                                                        </div>
+                                                        <div class="dropdown-search-options">
+                                                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'status', event)">
+                                                                Select Status
+                                                            </div>
+                                                            <div class="dropdown-search-option" data-value="PENDING" onclick="selectDropdownOption(this, 'status', event)">
+                                                                Pending
+                                                            </div>
+                                                            <div class="dropdown-search-option" data-value="RECEIVED" onclick="selectDropdownOption(this, 'status', event)">
+                                                                Received
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <select name="status" id="id_status" class="form-select" style="display: none;" required>
+                                                        <option value="">Select Status</option>
+                                                        <option value="PENDING">Pending</option>
+                                                        <option value="RECEIVED">Received</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
                                         
@@ -338,6 +405,343 @@
     </div>
 
 <script>
+// ==================== DROPDOWN SEARCH FUNCTIONS ====================
+// Global function to toggle dropdown visibility
+function toggleDropdown(element, event) {
+    if (!element) return;
+    
+    // Prevent event from bubbling up
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const filter = element.dataset.filter;
+    if (!filter) return;
+    
+    // Handle both regular filters and indexed filters
+    let dropdownId;
+    if (filter.startsWith('product-') || filter.startsWith('unit-')) {
+        dropdownId = filter.replace('-', 'Dropdown-');
+    } else {
+        dropdownId = filter + 'Dropdown';
+    }
+    
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) {
+        console.log('Dropdown not found:', dropdownId);
+        return;
+    }
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    // Close all dropdowns first
+    document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    // Toggle current dropdown
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        // Focus on search input
+        setTimeout(() => {
+            const searchField = dropdown.querySelector('.dropdown-search-field');
+            if (searchField) searchField.focus();
+        }, 100);
+    }
+}
+
+// Global function to filter dropdown options
+function filterDropdownOptions(input, filter, event) {
+    if (!input || !filter) return;
+    
+    // Prevent event from bubbling
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const searchTerm = input.value.toLowerCase();
+    
+    // Handle both regular and indexed filters
+    let dropdownId;
+    if (filter.startsWith('product-') || filter.startsWith('unit-')) {
+        dropdownId = filter.replace('-', 'Dropdown-');
+    } else {
+        dropdownId = filter + 'Dropdown';
+    }
+    
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const options = dropdown.querySelectorAll('.dropdown-search-option');
+    
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        option.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+}
+
+// Global function to select dropdown option
+function selectDropdownOption(option, filter, event) {
+    if (!option || !filter) return;
+    
+    // Prevent event from bubbling
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById('id_' + filter);
+    const selectedText = document.getElementById('selected' + filter.charAt(0).toUpperCase() + filter.slice(1) + 'Text');
+    
+    if (!select || !selectedText) return;
+    
+    // Update hidden select
+    select.value = value;
+    
+    // Update displayed text
+    selectedText.textContent = text;
+    
+    // Update selected state in dropdown
+    const dropdown = document.getElementById(filter + 'Dropdown');
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    // Close dropdown
+    if (dropdown) dropdown.style.display = 'none';
+    
+    // Trigger change event for any listeners
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    
+    // Remove validation error if present
+    select.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="${filter}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+}
+
+// Global function to select product option
+function selectProductOption(option, index, event) {
+    if (!option || index === undefined) return;
+    
+    // Prevent event from bubbling
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById(`id_items-${index}-product`);
+    const selectedText = document.getElementById(`selectedProductText-${index}`);
+    
+    if (!select || !selectedText) return;
+    
+    // Update hidden select
+    select.value = value;
+    
+    // Update displayed text
+    selectedText.textContent = text;
+    
+    // Update selected state in dropdown
+    const dropdown = document.getElementById(`productDropdown-${index}`);
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    // Close dropdown
+    if (dropdown) dropdown.style.display = 'none';
+    
+    // Trigger change event
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    
+    // Remove validation error if present
+    select.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="product-${index}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+    
+    // Fetch units for this product
+    if (value) {
+        fetchUnitsForProduct(value, index);
+    } else {
+        // Reset unit selection if no product
+        const unitSelect = document.getElementById(`id_items-${index}-unit`);
+        const unitSelectedText = document.getElementById(`selectedUnitText-${index}`);
+        const unitDropdown = document.getElementById(`unitDropdown-${index}`);
+        
+        if (unitSelect) {
+            unitSelect.value = '';
+            unitSelect.disabled = true;
+            unitSelect.innerHTML = '<option value="">Select Product first</option>';
+        }
+        
+        if (unitSelectedText) {
+            unitSelectedText.textContent = 'Select Product first';
+        }
+        
+        if (unitDropdown) {
+            const optionsContainer = unitDropdown.querySelector('.dropdown-search-options');
+            if (optionsContainer) {
+                optionsContainer.innerHTML = '<div class="dropdown-search-option" data-value="" onclick="selectUnitOption(this, ' + index + ', event)">Select Product first</div>';
+            }
+        }
+    }
+}
+
+// Global function to select unit option
+function selectUnitOption(option, index, event) {
+    if (!option || index === undefined) return;
+    
+    // Prevent event from bubbling
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    const value = option.dataset.value;
+    const text = option.textContent;
+    const select = document.getElementById(`id_items-${index}-unit`);
+    const selectedText = document.getElementById(`selectedUnitText-${index}`);
+    
+    if (!select || !selectedText) return;
+    
+    // Update hidden select
+    select.value = value;
+    
+    // Update displayed text
+    selectedText.textContent = text;
+    
+    // Update selected state in dropdown
+    const dropdown = document.getElementById(`unitDropdown-${index}`);
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    // Close dropdown
+    if (dropdown) dropdown.style.display = 'none';
+    
+    // Trigger change event
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    
+    // Remove validation error if present
+    select.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="unit-${index}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+}
+
+// Function to fetch units for a product
+function fetchUnitsForProduct(productId, index) {
+    if (!productId || index === undefined) return Promise.resolve();
+    
+    const unitSelect = document.getElementById(`id_items-${index}-unit`);
+    const unitSelectedText = document.getElementById(`selectedUnitText-${index}`);
+    const unitDropdown = document.getElementById(`unitDropdown-${index}`);
+    
+    if (!unitSelect || !unitSelectedText || !unitDropdown) return Promise.resolve();
+    
+    // Enable unit select
+    unitSelect.disabled = false;
+    
+    // Show loading state
+    unitSelect.innerHTML = '<option value="">Loading units...</option>';
+    unitSelectedText.textContent = 'Loading units...';
+    
+    // Update dropdown options
+    const optionsContainer = unitDropdown.querySelector('.dropdown-search-options');
+    if (optionsContainer) {
+        optionsContainer.innerHTML = '<div class="dropdown-search-option">Loading units...</div>';
+    }
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    
+    // Fetch units from API
+    return fetch(`/api/product/${productId}/units/`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken,
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success && data.units && data.units.length > 0) {
+            // Update hidden select
+            let options = '<option value="">Select Unit</option>';
+            let dropdownOptions = '<div class="dropdown-search-option" data-value="" onclick="selectUnitOption(this, ' + index + ', event)">Select Unit</div>';
+            
+            data.units.forEach(unit => {
+                const unitValue = unit.unit_id || unit.id;
+                const unitName = unit.unit_name || unit.name;
+                const abbreviation = unit.abbreviation || '';
+                const isBase = unit.is_base_unit ? ' (Base)' : '';
+                
+                options += `<option value="${unitValue}">${unitName} (${abbreviation})${isBase}</option>`;
+                dropdownOptions += `<div class="dropdown-search-option" data-value="${unitValue}" onclick="selectUnitOption(this, ${index}, event)">${unitName} (${abbreviation})${isBase}</div>`;
+            });
+            
+            unitSelect.innerHTML = options;
+            unitSelectedText.textContent = 'Select Unit';
+            
+            if (optionsContainer) {
+                optionsContainer.innerHTML = dropdownOptions;
+            }
+        } else {
+            unitSelect.innerHTML = '<option value="">No units available</option>';
+            unitSelectedText.textContent = 'No units available';
+            
+            if (optionsContainer) {
+                optionsContainer.innerHTML = '<div class="dropdown-search-option" data-value="" onclick="selectUnitOption(this, ' + index + ', event)">No units available</div>';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching units:', error);
+        unitSelect.innerHTML = '<option value="">Error loading units</option>';
+        unitSelectedText.textContent = 'Error loading units';
+        
+        if (optionsContainer) {
+            optionsContainer.innerHTML = '<div class="dropdown-search-option">Error loading units</div>';
+        }
+    });
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-search-container')) {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+// Close on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
 // ==================== REAL-TIME SEARCH AND PAGINATION ====================
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Search and pagination initialized');
@@ -383,7 +787,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function filterRows() {
         searchTerm = searchInput.value.toLowerCase().trim();
         
-        if (allRows.length === 0) return;
+        if (allRows.length === 0) return [];
         
         // Filter rows
         const visibleRows = allRows.filter(row => {
@@ -602,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ==================== YOUR ORIGINAL PURCHASE ORDER FORM CODE - COMPLETELY UNTOUCHED ====================
+// ==================== PURCHASE ORDER FORM CODE ====================
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Purchase Order Form Initialized');
     
@@ -611,8 +1015,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const addItemBtn = document.getElementById('add-item-btn');
     const totalForms = document.getElementById('id_items-TOTAL_FORMS');
     const initialForms = document.getElementById('id_items-INITIAL_FORMS');
-    const minNumForms = document.getElementById('id_items-MIN_NUM_FORMS');
-    const maxNumForms = document.getElementById('id_items-MAX_NUM_FORMS');
     const purchaseOrderForm = document.getElementById('purchaseOrderForm');
     const modalTitle = document.getElementById('modal-title');
     const submitBtn = document.getElementById('submit-form');
@@ -621,9 +1023,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let formIndex = totalForms ? parseInt(totalForms.value) : 1;
     let isEditMode = false;
     
-    // Store for units data (product_id -> units array)
-    let unitsCache = {};
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
     
     // Set default dates
     const today = new Date().toISOString().split('T')[0];
@@ -631,73 +1031,7 @@ document.addEventListener('DOMContentLoaded', function() {
     nextWeek.setDate(nextWeek.getDate() + 7);
     const nextWeekStr = nextWeek.toISOString().split('T')[0];
     
-    // Function to fetch units for a product
-    function fetchUnitsForProduct(productId, unitSelectElement, index) {
-        if (!productId) {
-            unitSelectElement.innerHTML = '<option value="">Select Product first</option>';
-            unitSelectElement.disabled = true;
-            return Promise.resolve();
-        }
-        
-        // Check cache first
-        if (unitsCache[productId]) {
-            populateUnitSelect(unitsCache[productId], unitSelectElement, index);
-            unitSelectElement.disabled = false;
-            return Promise.resolve();
-        }
-        
-        // Show loading
-        unitSelectElement.innerHTML = '<option value="">Loading units...</option>';
-        unitSelectElement.disabled = true;
-        
-        // Fetch units from API
-        return fetch(`/api/product/${productId}/units/`, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': csrfToken
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                unitsCache[productId] = data.units;
-                populateUnitSelect(data.units, unitSelectElement, index);
-                unitSelectElement.disabled = false;
-            } else {
-                unitSelectElement.innerHTML = '<option value="">No units available</option>';
-                unitSelectElement.disabled = false;
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching units:', error);
-            unitSelectElement.innerHTML = '<option value="">Error loading units</option>';
-            unitSelectElement.disabled = false;
-        });
-    }
-    
-    // Function to populate unit select with options
-    function populateUnitSelect(units, unitSelectElement, index) {
-        let options = '<option value="">Select Unit</option>';
-        
-        if (units && units.length > 0) {
-            units.forEach(unit => {
-                const unitValue = unit.unit_id || unit.id;
-                const unitName = unit.unit_name || unit.name;
-                const abbreviation = unit.abbreviation || '';
-                const isBase = unit.is_base_unit ? ' (Base)' : '';
-                
-                options += `<option value="${unitValue}">${unitName} (${abbreviation})${isBase}</option>`;
-            });
-            
-            unitSelectElement.innerHTML = options;
-        } else {
-            options = '<option value="">No units available</option>';
-            unitSelectElement.innerHTML = options;
-        }
-    }
-    
-    // Function to create empty form template
+    // Function to create empty form template with searchable dropdowns
     function createEmptyFormTemplate(index, itemData = null) {
         const productId = itemData && itemData.product_id ? itemData.product_id : '';
         const unitId = itemData && itemData.unit_id ? itemData.unit_id : '';
@@ -706,41 +1040,76 @@ document.addEventListener('DOMContentLoaded', function() {
         const expiryDate = itemData && itemData.expiry_date ? itemData.expiry_date : '';
         const itemId = itemData && itemData.id ? itemData.id : '';
         
-        // Build product options
+        // Build product dropdown options
         let productOptions = '<option value="">Select Product</option>';
+        let productDropdownOptions = '<div class="dropdown-search-option" data-value="" onclick="selectProductOption(this, ' + index + ', event)">Select Product</div>';
+        
         {% for product in products %}
         productOptions += `<option value="{{ product.id }}" ${productId == '{{ product.id }}' ? 'selected' : ''}>{{ product.name }} ({{ product.sku }})</option>`;
+        productDropdownOptions += `<div class="dropdown-search-option" data-value="{{ product.id }}" ${productId == '{{ product.id }}' ? 'data-selected="true"' : ''} onclick="selectProductOption(this, ${index}, event)">{{ product.name }} ({{ product.sku }})</div>`;
         {% endfor %}
         
         return `
         <div class="item-form card mb-3" data-index="${index}" data-item-id="${itemId}">
             <div class="card-body">
                 <div class="row">
-                    <!-- Product Field -->
+                    <!-- Product Field with Search -->
                     <div class="col-md-3 mb-3">
                         <label for="id_items-${index}-product" class="form-label">
                             Product <span class="text-danger">*</span>
                         </label>
-                        <select name="items-${index}-product" 
-                                id="id_items-${index}-product" 
-                                class="form-select product-select" 
-                                data-index="${index}" required>
-                            ${productOptions}
-                        </select>
+                        <div class="dropdown-search-container" style="position: relative;">
+                            <div class="dropdown-search-input" data-filter="product-${index}" onclick="toggleDropdown(this, event)">
+                                <span class="dropdown-selected-value" id="selectedProductText-${index}">${productId ? 'Loading...' : 'Select Product'}</span>
+                                <i class="ti ti-chevron-down dropdown-arrow"></i>
+                            </div>
+                            <div class="dropdown-search-menu" id="productDropdown-${index}" style="display: none;">
+                                <div class="dropdown-search-header">
+                                    <i class="ti ti-search"></i>
+                                    <input type="text" class="dropdown-search-field" placeholder="Search product..." onkeyup="filterDropdownOptions(this, 'product-${index}', event)">
+                                </div>
+                                <div class="dropdown-search-options">
+                                    ${productDropdownOptions}
+                                </div>
+                            </div>
+                            <select name="items-${index}-product" 
+                                    id="id_items-${index}-product" 
+                                    class="form-select product-select" 
+                                    data-index="${index}" 
+                                    style="display: none;" required>
+                                ${productOptions}
+                            </select>
+                        </div>
                     </div>
                     
-                    <!-- Unit Field -->
+                    <!-- Unit Field with Search -->
                     <div class="col-md-2 mb-3">
                         <label for="id_items-${index}-unit" class="form-label">
                             Unit <span class="text-danger">*</span>
                         </label>
-                        <select name="items-${index}-unit" 
-                                id="id_items-${index}-unit" 
-                                class="form-select unit-select" 
-                                data-index="${index}" 
-                                ${productId ? '' : 'disabled'} required>
-                            <option value="">${productId ? 'Select Unit' : 'Select Product first'}</option>
-                        </select>
+                        <div class="dropdown-search-container" style="position: relative;">
+                            <div class="dropdown-search-input" data-filter="unit-${index}" onclick="toggleDropdown(this, event)">
+                                <span class="dropdown-selected-value" id="selectedUnitText-${index}">${productId ? 'Select Unit' : 'Select Product first'}</span>
+                                <i class="ti ti-chevron-down dropdown-arrow"></i>
+                            </div>
+                            <div class="dropdown-search-menu" id="unitDropdown-${index}" style="display: none;">
+                                <div class="dropdown-search-header">
+                                    <i class="ti ti-search"></i>
+                                    <input type="text" class="dropdown-search-field" placeholder="Search unit..." onkeyup="filterDropdownOptions(this, 'unit-${index}', event)">
+                                </div>
+                                <div class="dropdown-search-options">
+                                    <div class="dropdown-search-option" data-value="" onclick="selectUnitOption(this, ${index}, event)">${productId ? 'Select Unit' : 'Select Product first'}</div>
+                                </div>
+                            </div>
+                            <select name="items-${index}-unit" 
+                                    id="id_items-${index}-unit" 
+                                    class="form-select unit-select" 
+                                    data-index="${index}" 
+                                    ${productId ? '' : 'disabled'} 
+                                    style="display: none;" required>
+                                <option value="">${productId ? 'Select Unit' : 'Select Product first'}</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <!-- Quantity Field -->
@@ -819,12 +1188,36 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Populate form fields
-                document.getElementById('id_supplier').value = data.order.supplier_id || '';
-                document.getElementById('id_store').value = data.order.store_id || '';
+                // Populate form fields - update both hidden selects and dropdown displays
+                if (data.order.supplier_id) {
+                    document.getElementById('id_supplier').value = data.order.supplier_id;
+                    const supplierOption = document.querySelector(`#supplierDropdown .dropdown-search-option[data-value="${data.order.supplier_id}"]`);
+                    if (supplierOption) {
+                        document.getElementById('selectedSupplierText').textContent = supplierOption.textContent;
+                        supplierOption.setAttribute('data-selected', 'true');
+                    }
+                }
+                
+                if (data.order.store_id) {
+                    document.getElementById('id_store').value = data.order.store_id;
+                    const storeOption = document.querySelector(`#storeDropdown .dropdown-search-option[data-value="${data.order.store_id}"]`);
+                    if (storeOption) {
+                        document.getElementById('selectedStoreText').textContent = storeOption.textContent;
+                        storeOption.setAttribute('data-selected', 'true');
+                    }
+                }
+                
+                if (data.order.status) {
+                    document.getElementById('id_status').value = data.order.status;
+                    const statusOption = document.querySelector(`#statusDropdown .dropdown-search-option[data-value="${data.order.status}"]`);
+                    if (statusOption) {
+                        document.getElementById('selectedStatusText').textContent = statusOption.textContent;
+                        statusOption.setAttribute('data-selected', 'true');
+                    }
+                }
+                
                 document.getElementById('id_purchase_date').value = data.order.purchase_date || today;
                 document.getElementById('id_expected_date').value = data.order.expected_date || nextWeekStr;
-                document.getElementById('id_status').value = data.order.status || 'PENDING';
                 document.getElementById('id_note').value = data.order.note || '';
                 document.getElementById('id_total_cost').value = data.order.total_cost || 0;
                 
@@ -849,25 +1242,38 @@ document.addEventListener('DOMContentLoaded', function() {
                         const newFormElement = tempDiv.firstChild;
                         formsetContainer.appendChild(newFormElement);
                         
-                        // Set product select value
-                        const productSelect = newFormElement.querySelector('.product-select');
+                        // Set product select value and update display
+                        const productSelect = document.getElementById(`id_items-${index}-product`);
                         if (productSelect && item.product_id) {
                             productSelect.value = item.product_id;
                             
+                            // Update product dropdown display
+                            const productOption = document.querySelector(`#productDropdown-${index} .dropdown-search-option[data-value="${item.product_id}"]`);
+                            if (productOption) {
+                                document.getElementById(`selectedProductText-${index}`).textContent = productOption.textContent;
+                                productOption.setAttribute('data-selected', 'true');
+                            }
+                            
                             // Handle unit select
-                            const unitSelect = newFormElement.querySelector('.unit-select');
-                            if (unitSelect) {
-                                fetchUnitsForProduct(item.product_id, unitSelect, index)
-                                    .then(() => {
-                                        if (item.unit_id) {
-                                            unitSelect.value = item.unit_id;
-                                        }
-                                    });
+                            if (item.unit_id) {
+                                // Fetch units first, then set the value
+                                fetchUnitsForProduct(item.product_id, index).then(() => {
+                                    const unitSelect = document.getElementById(`id_items-${index}-unit`);
+                                    const unitOption = document.querySelector(`#unitDropdown-${index} .dropdown-search-option[data-value="${item.unit_id}"]`);
+                                    
+                                    if (unitSelect && unitOption) {
+                                        unitSelect.value = item.unit_id;
+                                        document.getElementById(`selectedUnitText-${index}`).textContent = unitOption.textContent;
+                                        unitOption.setAttribute('data-selected', 'true');
+                                    }
+                                });
+                            } else {
+                                fetchUnitsForProduct(item.product_id, index);
                             }
                         }
                     });
                     
-                    // CRITICAL FIX: Update management form fields
+                    // Update management form fields
                     if (totalForms) {
                         totalForms.value = data.items.length;
                     }
@@ -892,7 +1298,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Update form index
                 formIndex = formsetContainer.children.length;
-                console.log(`Form populated with ${formIndex} items, TOTAL_FORMS=${totalForms?.value}, INITIAL_FORMS=${initialForms?.value}`);
+                console.log(`Form populated with ${formIndex} items`);
             }
         })
         .catch(error => {
@@ -940,8 +1346,27 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Reset form fields
         document.getElementById('id_supplier').value = '';
+        document.getElementById('selectedSupplierText').textContent = 'Select Supplier';
+        document.querySelectorAll('#supplierDropdown .dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+        
         document.getElementById('id_store').value = '';
+        document.getElementById('selectedStoreText').textContent = 'Select Store';
+        document.querySelectorAll('#storeDropdown .dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+        
         document.getElementById('id_status').value = 'PENDING';
+        document.getElementById('selectedStatusText').textContent = 'Pending';
+        document.querySelectorAll('#statusDropdown .dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+        const pendingOption = document.querySelector('#statusDropdown .dropdown-search-option[data-value="PENDING"]');
+        if (pendingOption) {
+            pendingOption.setAttribute('data-selected', 'true');
+        }
+        
         document.getElementById('id_note').value = '';
         document.getElementById('id_total_cost').value = '0';
         
@@ -967,8 +1392,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         formIndex = 1;
-        unitsCache = {};
-        console.log('Reset to create mode: TOTAL_FORMS=1, INITIAL_FORMS=0');
+        console.log('Reset to create mode');
     }
     
     // Add new item form
@@ -988,15 +1412,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Event delegation for product selection change
+    // Handle product selection change (for backward compatibility)
     formsetContainer.addEventListener('change', function(e) {
         if (e.target.classList.contains('product-select')) {
             const productId = e.target.value;
             const formElement = e.target.closest('.item-form');
-            const unitSelect = formElement.querySelector('.unit-select');
-            const index = formElement.dataset.index;
+            if (!formElement) return;
             
-            fetchUnitsForProduct(productId, unitSelect, index);
+            const index = formElement.dataset.index;
+            if (index !== undefined && productId) {
+                // Fetch units
+                fetchUnitsForProduct(productId, index);
+            }
         }
     });
     
@@ -1025,6 +1452,7 @@ document.addEventListener('DOMContentLoaded', function() {
         forms.forEach((form, index) => {
             form.dataset.index = index;
             
+            // Update all input names and ids
             form.querySelectorAll('input, select, textarea, label').forEach(element => {
                 if (element.name && element.name.includes('items-')) {
                     element.name = element.name.replace(/items-\d+-/, `items-${index}-`);
@@ -1036,6 +1464,64 @@ document.addEventListener('DOMContentLoaded', function() {
                     element.htmlFor = element.htmlFor.replace(/id_items-\d+-/, `id_items-${index}-`);
                 }
             });
+            
+            // Update dropdown IDs and attributes
+            const productDropdown = form.querySelector(`.dropdown-search-menu[id^="productDropdown-"]`);
+            if (productDropdown) {
+                productDropdown.id = `productDropdown-${index}`;
+                const searchField = productDropdown.querySelector('.dropdown-search-field');
+                if (searchField) {
+                    searchField.setAttribute('onkeyup', `filterDropdownOptions(this, 'product-${index}', event)`);
+                }
+                
+                // Update onclick for options
+                productDropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+                    const currentOnclick = opt.getAttribute('onclick');
+                    if (currentOnclick && currentOnclick.includes('selectProductOption')) {
+                        opt.setAttribute('onclick', `selectProductOption(this, ${index}, event)`);
+                    }
+                });
+            }
+            
+            const unitDropdown = form.querySelector(`.dropdown-search-menu[id^="unitDropdown-"]`);
+            if (unitDropdown) {
+                unitDropdown.id = `unitDropdown-${index}`;
+                const searchField = unitDropdown.querySelector('.dropdown-search-field');
+                if (searchField) {
+                    searchField.setAttribute('onkeyup', `filterDropdownOptions(this, 'unit-${index}', event)`);
+                }
+                
+                // Update onclick for options
+                unitDropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+                    const currentOnclick = opt.getAttribute('onclick');
+                    if (currentOnclick && currentOnclick.includes('selectUnitOption')) {
+                        opt.setAttribute('onclick', `selectUnitOption(this, ${index}, event)`);
+                    }
+                });
+            }
+            
+            const productInput = form.querySelector(`.dropdown-search-input[data-filter^="product-"]`);
+            if (productInput) {
+                productInput.setAttribute('data-filter', `product-${index}`);
+                productInput.setAttribute('onclick', 'toggleDropdown(this, event)');
+            }
+            
+            const unitInput = form.querySelector(`.dropdown-search-input[data-filter^="unit-"]`);
+            if (unitInput) {
+                unitInput.setAttribute('data-filter', `unit-${index}`);
+                unitInput.setAttribute('onclick', 'toggleDropdown(this, event)');
+            }
+            
+            // Update selected text element IDs
+            const productText = form.querySelector(`[id^="selectedProductText-"]`);
+            if (productText) {
+                productText.id = `selectedProductText-${index}`;
+            }
+            
+            const unitText = form.querySelector(`[id^="selectedUnitText-"]`);
+            if (unitText) {
+                unitText.id = `selectedUnitText-${index}`;
+            }
         });
         
         if (totalForms) {
@@ -1062,24 +1548,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 isValid = false;
                 errorMessages.push('Supplier is required');
                 supplier.classList.add('is-invalid');
+                document.getElementById('selectedSupplierText').parentElement.classList.add('is-invalid');
             } else {
                 supplier.classList.remove('is-invalid');
+                document.getElementById('selectedSupplierText').parentElement.classList.remove('is-invalid');
             }
             
             if (!store.value) {
                 isValid = false;
                 errorMessages.push('Store is required');
                 store.classList.add('is-invalid');
+                document.getElementById('selectedStoreText').parentElement.classList.add('is-invalid');
             } else {
                 store.classList.remove('is-invalid');
+                document.getElementById('selectedStoreText').parentElement.classList.remove('is-invalid');
             }
             
             if (!status.value) {
                 isValid = false;
                 errorMessages.push('Status is required');
                 status.classList.add('is-invalid');
+                document.getElementById('selectedStatusText').parentElement.classList.add('is-invalid');
             } else {
                 status.classList.remove('is-invalid');
+                document.getElementById('selectedStatusText').parentElement.classList.remove('is-invalid');
             }
             
             if (!purchaseDate.value) {
@@ -1099,19 +1591,33 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Check each item form
             itemForms.forEach((form, index) => {
-                const product = form.querySelector('select[name$="-product"]');
-                const unit = form.querySelector('select[name$="-unit"]');
-                const quantity = form.querySelector('input[name$="-quantity"]');
-                const unitCost = form.querySelector('input[name$="-unit_cost"]');
+                const product = document.getElementById(`id_items-${index}-product`);
+                const unit = document.getElementById(`id_items-${index}-unit`);
+                const quantity = document.getElementById(`id_items-${index}-quantity`);
+                const unitCost = document.getElementById(`id_items-${index}-unit_cost`);
                 
                 if (!product || !product.value) {
                     isValid = false;
                     errorMessages.push(`Item ${index + 1}: Product is required`);
+                    if (product) {
+                        product.classList.add('is-invalid');
+                        document.getElementById(`selectedProductText-${index}`).parentElement.classList.add('is-invalid');
+                    }
+                } else if (product) {
+                    product.classList.remove('is-invalid');
+                    document.getElementById(`selectedProductText-${index}`).parentElement.classList.remove('is-invalid');
                 }
                 
                 if (!unit || !unit.value) {
                     isValid = false;
                     errorMessages.push(`Item ${index + 1}: Unit is required`);
+                    if (unit) {
+                        unit.classList.add('is-invalid');
+                        document.getElementById(`selectedUnitText-${index}`).parentElement.classList.add('is-invalid');
+                    }
+                } else if (unit) {
+                    unit.classList.remove('is-invalid');
+                    document.getElementById(`selectedUnitText-${index}`).parentElement.classList.remove('is-invalid');
                 }
                 
                 if (!quantity || !quantity.value || parseFloat(quantity.value) <= 0) {
@@ -1137,13 +1643,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         </ul>
                     `;
                     errorDiv.classList.remove('d-none');
+                    
+                    // Scroll to error div
+                    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 
                 return false;
             }
             
-            console.log('Form submission valid, sending with:');
-            console.log(`TOTAL_FORMS=${totalForms?.value}, INITIAL_FORMS=${initialForms?.value}`);
+            console.log('Form submission valid');
         });
     }
     
@@ -1245,6 +1753,116 @@ document.addEventListener('DOMContentLoaded', function() {
 .badge.bg-light {
     background-color: #f8f9fa !important;
     border: 1px solid #dee2e6;
+}
+
+/* Searchable Dropdown Styles */
+.dropdown-search-container {
+    position: relative;
+    width: 100%;
+}
+
+.dropdown-search-input {
+    width: 100%;
+    height: 38px;
+    padding: 0.375rem 2rem 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dropdown-search-input:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-search-input.is-invalid {
+    border-color: #dc3545;
+}
+
+.dropdown-selected-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-arrow {
+    transition: transform 0.2s;
+}
+
+.dropdown-search-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    min-width: 200px;
+    margin-top: 4px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dropdown-search-header {
+    padding: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dropdown-search-header i {
+    color: #6c757d;
+    font-size: 1rem;
+}
+
+.dropdown-search-field {
+    width: 100%;
+    padding: 0.25rem;
+    border: none;
+    outline: none;
+    font-size: 0.875rem;
+}
+
+.dropdown-search-field:focus {
+    outline: none;
+}
+
+.dropdown-search-options {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.dropdown-search-option {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: background-color 0.2s;
+}
+
+.dropdown-search-option:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-search-option[data-selected="true"] {
+    background-color: #e7f1ff;
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.dropdown-search-option[data-selected="true"]:hover {
+    background-color: #d4e4ff;
 }
 
 /* Your original modal styles */

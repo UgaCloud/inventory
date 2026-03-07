@@ -97,32 +97,6 @@
       </div>
     </div>
 
-    <!-- Conversion Factor Info Panel -->
-    <!-- <div class="card mb-4 bg-light border-info">
-      <div class="card-body py-3">
-        <div class="row align-items-center">
-          <div class="col-md-8">
-            <div class="d-flex align-items-center">
-              <i data-feather="info" class="feather-24 text-info me-3"></i>
-              <div>
-                <h6 class="mb-1 text-info">Conversion Factor Logic Applied</h6>
-                <p class="mb-0 text-muted small">
-                  All stock calculations use: <strong>QTY × CF = Base Units</strong>. 
-                  System converts your selected units to base units for accurate inventory tracking.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4 text-end">
-            <button class="btn btn-sm btn-outline-info" onclick="showConversionHelp()">
-              <i data-feather="help-circle" class="feather-14 me-1"></i>
-              How it works
-            </button>
-          </div>
-        </div>
-      </div>
-    </div> -->
-
     <!-- Requests Table -->
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
@@ -243,17 +217,17 @@
                     <span class="badge bg-warning">
                       <i data-feather="clock" class="feather-12 me-1"></i>Pending
                     </span>
-                  {% elif request.status == 'approved' %}
+                  {% elif request.status == 'approved' or request.status == 'in_transit' %}
+                    <span class="badge bg-info">
+                      <i data-feather="truck" class="feather-12 me-1"></i>Approved
+                    </span>
+                  {% elif request.status == 'completed' or request.status == 'fulfilled' %}
                     <span class="badge bg-success">
-                      <i data-feather="check-circle" class="feather-12 me-1"></i>Approved
+                      <i data-feather="check-circle" class="feather-12 me-1"></i>Completed
                     </span>
-                  {% elif request.status == 'rejected' %}
+                  {% elif request.status == 'rejected' or request.status == 'cancelled' %}
                     <span class="badge bg-danger">
-                      <i data-feather="x-circle" class="feather-12 me-1"></i>Rejected
-                    </span>
-                  {% elif request.status == 'fulfilled' %}
-                    <span class="badge bg-primary">
-                      <i data-feather="package" class="feather-12 me-1"></i>Fulfilled
+                      <i data-feather="x-circle" class="feather-12 me-1"></i>Cancelled
                     </span>
                   {% endif %}
                 </td>
@@ -393,7 +367,7 @@
 </div>
 
 <!-- New Transfer Request Modal -->
-<div class="modal fade" id="newRequestModal" tabindex="-1" aria-labelledby="newRequestModalLabel" aria-hidden="true">
+<div class="modal fade" id="newRequestModal" tabindex="-1" aria-labelledby="newRequestModalLabel" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
@@ -403,7 +377,7 @@
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body" onclick="event.stopPropagation()">
         <form id="newRequestForm">
           {% csrf_token %}
           <input type="hidden" id="editRequestId" name="edit_request_id" value="">
@@ -425,24 +399,72 @@
             <div class="col-md-6">
               <div class="mb-3">
                 <label for="from_store" class="form-label">From Store <span class="text-danger">*</span></label>
-                <select id="from_store" name="from_store" class="form-select" required>
-                  <option value="">Select source store</option>
-                  {% for store in stores %}
-                  <option value="{{ store.id }}">{{ store.name }}</option>
-                  {% endfor %}
-                </select>
+                
+                <!-- Searchable dropdown for From Store -->
+                <div class="dropdown-search-container" style="position: relative;">
+                  <div class="dropdown-search-input" data-filter="from_store" onclick="event.stopPropagation(); toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedFromStoreText">Select source store</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                  </div>
+                  <div class="dropdown-search-menu" id="from_storeDropdown" style="display: none;" onclick="event.stopPropagation()">
+                    <div class="dropdown-search-header" onclick="event.stopPropagation()">
+                      <i class="ti ti-search"></i>
+                      <input type="text" class="dropdown-search-field" placeholder="Search store..." onclick="event.stopPropagation()" onkeyup="filterDropdownOptions(this, 'from_store', event)">
+                    </div>
+                    <div class="dropdown-search-options" onclick="event.stopPropagation()">
+                      <div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectDropdownOption(this, 'from_store', event)">
+                        Select source store
+                      </div>
+                      {% for store in stores %}
+                      <div class="dropdown-search-option" data-value="{{ store.id }}" onclick="event.stopPropagation(); selectDropdownOption(this, 'from_store', event)">
+                        {{ store.name }}
+                      </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <select id="from_store" name="from_store" class="form-select" style="display: none;" required>
+                    <option value="">Select source store</option>
+                    {% for store in stores %}
+                    <option value="{{ store.id }}">{{ store.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
                 <div class="invalid-feedback">Please select a source store</div>
               </div>
             </div>
             <div class="col-md-6">
               <div class="mb-3">
                 <label for="to_store" class="form-label">To Store <span class="text-danger">*</span></label>
-                <select id="to_store" name="to_store" class="form-select" required>
-                  <option value="">Select destination store</option>
-                  {% for store in stores %}
-                  <option value="{{ store.id }}">{{ store.name }}</option>
-                  {% endfor %}
-                </select>
+                
+                <!-- Searchable dropdown for To Store -->
+                <div class="dropdown-search-container" style="position: relative;">
+                  <div class="dropdown-search-input" data-filter="to_store" onclick="event.stopPropagation(); toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedToStoreText">Select destination store</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                  </div>
+                  <div class="dropdown-search-menu" id="to_storeDropdown" style="display: none;" onclick="event.stopPropagation()">
+                    <div class="dropdown-search-header" onclick="event.stopPropagation()">
+                      <i class="ti ti-search"></i>
+                      <input type="text" class="dropdown-search-field" placeholder="Search store..." onclick="event.stopPropagation()" onkeyup="filterDropdownOptions(this, 'to_store', event)">
+                    </div>
+                    <div class="dropdown-search-options" onclick="event.stopPropagation()">
+                      <div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectDropdownOption(this, 'to_store', event)">
+                        Select destination store
+                      </div>
+                      {% for store in stores %}
+                      <div class="dropdown-search-option" data-value="{{ store.id }}" onclick="event.stopPropagation(); selectDropdownOption(this, 'to_store', event)">
+                        {{ store.name }}
+                      </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <select id="to_store" name="to_store" class="form-select" style="display: none;" required>
+                    <option value="">Select destination store</option>
+                    {% for store in stores %}
+                    <option value="{{ store.id }}">{{ store.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
                 <div class="invalid-feedback">Please select a destination store different from source store</div>
               </div>
             </div>
@@ -452,11 +474,36 @@
             <div class="col-md-4">
               <div class="mb-3">
                 <label for="priority" class="form-label">Priority <span class="text-danger">*</span></label>
-                <select id="priority" name="priority" class="form-select" required>
-                  <option value="normal">Normal</option>
-                  <option value="high">High Priority</option>
-                  <option value="urgent">Urgent</option>
-                </select>
+                
+                <!-- Searchable dropdown for Priority -->
+                <div class="dropdown-search-container" style="position: relative;">
+                  <div class="dropdown-search-input" data-filter="priority" onclick="event.stopPropagation(); toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedPriorityText">Normal</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                  </div>
+                  <div class="dropdown-search-menu" id="priorityDropdown" style="display: none;" onclick="event.stopPropagation()">
+                    <div class="dropdown-search-header" onclick="event.stopPropagation()">
+                      <i class="ti ti-search"></i>
+                      <input type="text" class="dropdown-search-field" placeholder="Search priority..." onclick="event.stopPropagation()" onkeyup="filterDropdownOptions(this, 'priority', event)">
+                    </div>
+                    <div class="dropdown-search-options" onclick="event.stopPropagation()">
+                      <div class="dropdown-search-option" data-value="normal" onclick="event.stopPropagation(); selectDropdownOption(this, 'priority', event)" data-selected="true">
+                        Normal
+                      </div>
+                      <div class="dropdown-search-option" data-value="high" onclick="event.stopPropagation(); selectDropdownOption(this, 'priority', event)">
+                        High Priority
+                      </div>
+                      <div class="dropdown-search-option" data-value="urgent" onclick="event.stopPropagation(); selectDropdownOption(this, 'priority', event)">
+                        Urgent
+                      </div>
+                    </div>
+                  </div>
+                  <select id="priority" name="priority" class="form-select" style="display: none;" required>
+                    <option value="normal" selected>Normal</option>
+                    <option value="high">High Priority</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div class="col-md-4">
@@ -468,12 +515,36 @@
             <div class="col-md-4">
               <div class="mb-3">
                 <label for="department" class="form-label">Department</label>
-                <select id="department" name="department" class="form-select">
-                  <option value="">Select a department</option>
-                  {% for dept in departments %}
-                  <option value="{{ dept.id }}">{{ dept.name }}</option>
-                  {% endfor %}
-                </select>
+                
+                <!-- Searchable dropdown for Department -->
+                <div class="dropdown-search-container" style="position: relative;">
+                  <div class="dropdown-search-input" data-filter="department" onclick="event.stopPropagation(); toggleDropdown(this, event)">
+                    <span class="dropdown-selected-value" id="selectedDepartmentText">Select a department</span>
+                    <i class="ti ti-chevron-down dropdown-arrow"></i>
+                  </div>
+                  <div class="dropdown-search-menu" id="departmentDropdown" style="display: none;" onclick="event.stopPropagation()">
+                    <div class="dropdown-search-header" onclick="event.stopPropagation()">
+                      <i class="ti ti-search"></i>
+                      <input type="text" class="dropdown-search-field" placeholder="Search department..." onclick="event.stopPropagation()" onkeyup="filterDropdownOptions(this, 'department', event)">
+                    </div>
+                    <div class="dropdown-search-options" onclick="event.stopPropagation()">
+                      <div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectDropdownOption(this, 'department', event)">
+                        Select a department
+                      </div>
+                      {% for dept in departments %}
+                      <div class="dropdown-search-option" data-value="{{ dept.id }}" onclick="event.stopPropagation(); selectDropdownOption(this, 'department', event)">
+                        {{ dept.name }}
+                      </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <select id="department" name="department" class="form-select" style="display: none;">
+                    <option value="">Select a department</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.id }}">{{ dept.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -501,7 +572,7 @@
                 Add Item
               </button>
             </div>
-            <div class="card-body">
+            <div class="card-body" onclick="event.stopPropagation()">
               <div class="table-responsive">
                 <table class="table table-sm" id="requestItemsTable">
                   <thead class="table-light">
@@ -731,16 +802,201 @@
   </div>
 </div>
 
-
-
 <script>
-// Global variables
+// ==================== DROPDOWN SEARCH FUNCTIONS ====================
+function toggleDropdown(element, event) {
+    if (!element) return;
+    if (event) event.stopPropagation();
+    
+    const filter = element.dataset.filter;
+    if (!filter) return;
+    
+    let dropdownId;
+    if (filter.startsWith('product-') || filter.startsWith('unit-')) {
+        dropdownId = filter.replace('-', 'Dropdown-');
+    } else {
+        dropdownId = filter + 'Dropdown';
+    }
+    
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        setTimeout(() => {
+            const searchField = dropdown.querySelector('.dropdown-search-field');
+            if (searchField) searchField.focus();
+        }, 100);
+    }
+}
+
+function filterDropdownOptions(input, filter, event) {
+    if (!input || !filter) return;
+    if (event) event.stopPropagation();
+    
+    const searchTerm = input.value.toLowerCase();
+    
+    let dropdownId;
+    if (filter.startsWith('product-') || filter.startsWith('unit-')) {
+        dropdownId = filter.replace('-', 'Dropdown-');
+    } else {
+        dropdownId = filter + 'Dropdown';
+    }
+    
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    dropdown.querySelectorAll('.dropdown-search-option').forEach(option => {
+        const text = option.textContent.toLowerCase();
+        option.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+}
+
+// ── FIX: build camelCase element ID correctly for underscored filter names ──
+// from_store  →  selectedFromStoreText  ✓
+// to_store    →  selectedToStoreText    ✓
+// priority    →  selectedPriorityText   ✓
+// department  →  selectedDepartmentText ✓
+function buildSelectedTextId(filter) {
+    return 'selected' + filter.split('_').map(function(w) {
+        return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join('') + 'Text';
+}
+
+function selectDropdownOption(option, filter, event) {
+    if (!option || !filter) return;
+    if (event) event.stopPropagation();
+    
+    const value = option.dataset.value;
+    const text = option.textContent.trim();
+    const select = document.getElementById(filter);
+    const selectedText = document.getElementById(buildSelectedTextId(filter));  // ← FIXED
+    
+    if (!select || !selectedText) return;
+    
+    select.value = value;
+    selectedText.textContent = text;
+    
+    const dropdown = document.getElementById(filter + 'Dropdown');
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+        dropdown.style.display = 'none';
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    const changeEvent = new Event('change', { bubbles: true });
+    select.dispatchEvent(changeEvent);
+    
+    select.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="${filter}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+}
+
+function selectProductOption(option, index, event) {
+    if (!option || index === undefined) return;
+    if (event) event.stopPropagation();
+    
+    const value = option.dataset.value;
+    const text = option.textContent.trim();
+    
+    let productSelect = document.querySelector(`.product-select[data-item-id="${index}"]`);
+    if (!productSelect) {
+        const container = document.querySelector(`#productDropdown-${index}`);
+        if (container) productSelect = container.closest('.dropdown-search-container')?.querySelector('.product-select');
+    }
+    
+    const selectedText = document.getElementById(`selectedProductText-${index}`);
+    if (!productSelect || !selectedText) return;
+    
+    productSelect.value = value;
+    selectedText.textContent = text;
+    
+    const dropdown = document.getElementById(`productDropdown-${index}`);
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => opt.removeAttribute('data-selected'));
+        dropdown.style.display = 'none';
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    const changeEvent = new Event('change', { bubbles: true });
+    productSelect.dispatchEvent(changeEvent);
+    
+    productSelect.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="product-${index}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+    
+    handleProductChange(index);
+}
+
+function selectUnitOption(option, index, event) {
+    if (!option || index === undefined) return;
+    if (event) event.stopPropagation();
+    
+    const value = option.dataset.value;
+    const text = option.textContent.trim();
+    
+    let unitSelect = document.querySelector(`.unit-select[data-item-id="${index}"]`);
+    if (!unitSelect) {
+        const container = document.querySelector(`#unitDropdown-${index}`);
+        if (container) unitSelect = container.closest('.dropdown-search-container')?.querySelector('.unit-select');
+    }
+    
+    const selectedText = document.getElementById(`selectedUnitText-${index}`);
+    if (!unitSelect || !selectedText) return;
+    
+    unitSelect.value = value;
+    selectedText.textContent = text;
+    
+    const dropdown = document.getElementById(`unitDropdown-${index}`);
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => opt.removeAttribute('data-selected'));
+        dropdown.style.display = 'none';
+    }
+    option.setAttribute('data-selected', 'true');
+    
+    const changeEvent = new Event('change', { bubbles: true });
+    unitSelect.dispatchEvent(changeEvent);
+    
+    unitSelect.classList.remove('is-invalid');
+    const dropdownInput = document.querySelector(`.dropdown-search-input[data-filter="unit-${index}"]`);
+    if (dropdownInput) dropdownInput.classList.remove('is-invalid');
+    
+    handleUnitChange(index);
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-search-container')) {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-search-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+// ==================== EXISTING FUNCTIONS ====================
+
 let requestItemCounter = 0;
 let availableProducts = [];
 let currentEditRequestId = null;
 let totalBaseUnits = 0;
 
-// CSRF token for AJAX requests
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -757,43 +1013,27 @@ function getCookie(name) {
 }
 const csrftoken = getCookie('csrftoken');
 
-// Show toast notification
 function showToast(message, kind = 'success') {
   let container = document.getElementById('toastContainer');
   if (!container) {
     container = document.createElement('div');
     container.id = 'toastContainer';
-    container.style.position = 'fixed';
-    container.style.top = '1rem';
-    container.style.right = '1rem';
-    container.style.zIndex = 1060;
+    container.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;';
     document.body.appendChild(container);
   }
-
   const toast = document.createElement('div');
   toast.className = `toast align-items-center text-bg-${kind} border-0 show`;
   toast.role = 'alert';
   toast.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
-
   container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3500);
 }
 
-// Show conversion help modal
 function showConversionHelp() {
-  const modal = new bootstrap.Modal(document.getElementById('conversionHelpModal'));
-  modal.show();
+  new bootstrap.Modal(document.getElementById('conversionHelpModal')).show();
 }
 
-// Show new request modal
 function showNewRequestModal() {
-  console.log('showNewRequestModal called');
-  
-  // Reset everything
   requestItemCounter = 0;
   currentEditRequestId = null;
   totalBaseUnits = 0;
@@ -802,92 +1042,68 @@ function showNewRequestModal() {
   document.getElementById('stockAlert').style.display = 'none';
   document.getElementById('formErrorsAlert').style.display = 'none';
   
-  // Reset totals
+  document.getElementById('selectedFromStoreText').textContent = 'Select source store';
+  document.getElementById('selectedToStoreText').textContent = 'Select destination store';
+  document.getElementById('selectedPriorityText').textContent = 'Normal';
+  document.getElementById('selectedDepartmentText').textContent = 'Select a department';
+  
+  document.getElementById('from_store').value = '';
+  document.getElementById('to_store').value = '';
+  document.getElementById('priority').value = 'normal';
+  document.getElementById('department').value = '';
+  
   document.getElementById('totalBaseUnits').textContent = 'Total: 0 base units';
   document.getElementById('footerTotalBaseUnits').textContent = 'Total Base Units: 0';
   
-  // Reset edit mode
   document.getElementById('editRequestId').value = '';
   document.getElementById('modalTitle').textContent = 'Create New Transfer Request';
   document.getElementById('submitBtnText').textContent = 'Submit Request';
   
-  // Clear validation classes
   document.getElementById('from_store').classList.remove('is-invalid');
   document.getElementById('to_store').classList.remove('is-invalid');
   document.getElementById('reason').classList.remove('is-invalid');
   
-  // Show modal first, then load products
   const modalElement = document.getElementById('newRequestModal');
   if (modalElement) {
     const modal = new bootstrap.Modal(modalElement);
     modal.show();
-    
-    // Load products and add initial item after modal is shown
     setTimeout(() => {
-      loadProductsFromAPI().then(() => {
-        addRequestItem();
-        document.getElementById('from_store').focus();
-      }).catch(error => {
-        console.error('Error loading products:', error);
-        addRequestItem();
-      });
+      loadProductsFromAPI().then(() => addRequestItem()).catch(() => addRequestItem());
     }, 500);
   }
 }
 
-// Load products from the API endpoint
 async function loadProductsFromAPI() {
   try {
     const response = await fetch('/api/products/?active_only=true');
     if (response.ok) {
       const data = await response.json();
-      if (data.products || data.results) {
-        availableProducts = data.products || data.results || [];
-        console.log('Loaded products:', availableProducts.length);
-      } else {
-        availableProducts = data || [];
-      }
+      availableProducts = data.products || data.results || data || [];
     } else {
-      console.warn('Failed to load products, status:', response.status);
       availableProducts = [];
     }
   } catch (error) {
-    console.error('Error loading products:', error);
     availableProducts = [];
   }
 }
 
-// Update total base units calculation
 function updateTotalBaseUnits() {
   totalBaseUnits = 0;
-  const rows = document.querySelectorAll('#requestItemsBody tr');
-  
-  rows.forEach(row => {
+  document.querySelectorAll('#requestItemsBody tr').forEach(row => {
     const quantityInput = row.querySelector('.requested-qty');
     const cfInput = row.querySelector('.conversion-factor');
     const baseUnitsCell = row.querySelector('.base-units-display');
-    
     if (quantityInput && cfInput && quantityInput.value) {
-      const quantity = parseInt(quantityInput.value) || 0;
-      const cf = parseFloat(cfInput.value) || 1;
-      const baseUnits = Math.round(quantity * cf);
-      
-      if (baseUnitsCell) {
-        baseUnitsCell.textContent = baseUnits;
-      }
-      
+      const baseUnits = Math.round((parseInt(quantityInput.value) || 0) * (parseFloat(cfInput.value) || 1));
+      if (baseUnitsCell) baseUnitsCell.textContent = baseUnits;
       totalBaseUnits += baseUnits;
     }
   });
-  
-  // Update totals display
   document.getElementById('totalBaseUnits').textContent = `Total: ${totalBaseUnits} base units`;
   document.getElementById('footerTotalBaseUnits').textContent = `Total Base Units: ${totalBaseUnits}`;
-  
   return totalBaseUnits;
 }
 
-// Add request item row with conversion factor support
 function addRequestItem() {
   const tbody = document.getElementById('requestItemsBody');
   const idx = requestItemCounter++;
@@ -895,13 +1111,37 @@ function addRequestItem() {
   row.id = `request-item-row-${idx}`;
   row.dataset.index = String(idx);
   
+  let productOptions = '<option value="">Select product...</option>';
+  let productDropdownOptions = `<div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectProductOption(this, ${idx}, event)">Select product...</div>`;
+  
+  if (availableProducts && availableProducts.length > 0) {
+    availableProducts.forEach(product => {
+      let displayText = product.name || 'Unnamed Product';
+      if (product.sku) displayText += ` (${product.sku})`;
+      else if (product.code) displayText += ` (${product.code})`;
+      productOptions += `<option value="${product.id}">${displayText}</option>`;
+      productDropdownOptions += `<div class="dropdown-search-option" data-value="${product.id}" onclick="event.stopPropagation(); selectProductOption(this, ${idx}, event)">${displayText}</div>`;
+    });
+  } else {
+    productDropdownOptions = '<div class="dropdown-search-option" data-value="">No products available</div>';
+  }
+  
   row.innerHTML = `
     <td>
-      <select name="items-${idx}-product" class="form-select form-select-sm product-select" 
-              data-item-id="${idx}" required
-              onchange="handleProductChange(${idx})">
-        <option value="">Select product...</option>
-      </select>
+      <div class="dropdown-search-container" style="position: relative;">
+        <div class="dropdown-search-input" data-filter="product-${idx}" onclick="event.stopPropagation(); toggleDropdown(this, event)">
+          <span class="dropdown-selected-value" id="selectedProductText-${idx}">Select product...</span>
+          <i class="ti ti-chevron-down dropdown-arrow"></i>
+        </div>
+        <div class="dropdown-search-menu" id="productDropdown-${idx}" style="display: none;" onclick="event.stopPropagation()">
+          <div class="dropdown-search-header" onclick="event.stopPropagation()">
+            <i class="ti ti-search"></i>
+            <input type="text" class="dropdown-search-field" placeholder="Search product..." onclick="event.stopPropagation()" onkeyup="filterDropdownOptions(this, 'product-${idx}', event)">
+          </div>
+          <div class="dropdown-search-options" onclick="event.stopPropagation()">${productDropdownOptions}</div>
+        </div>
+        <select name="items-${idx}-product" class="product-select" data-item-id="${idx}" style="display: none;" required>${productOptions}</select>
+      </div>
       <div class="conversion-factor-info small text-muted mt-1" id="cf-info-${idx}" style="display: none;"></div>
     </td>
     <td>
@@ -913,31 +1153,32 @@ function addRequestItem() {
       <input type="hidden" class="conversion-factor" id="conversion-factor-${idx}" value="1">
     </td>
     <td>
-      <input type="number" name="items-${idx}-quantity" 
-             class="form-control form-control-sm requested-qty" 
-             min="1" step="1" placeholder="0" required
-             onchange="handleQuantityChange(${idx})"
-             oninput="handleQuantityChange(${idx})">
+      <input type="number" name="items-${idx}-quantity" class="form-control form-control-sm requested-qty" min="1" step="1" placeholder="0" required onchange="handleQuantityChange(${idx})" oninput="handleQuantityChange(${idx})">
       <div class="invalid-feedback">Quantity exceeds available stock</div>
     </td>
     <td>
-      <select name="items-${idx}-units" class="form-select form-select-sm unit-select"
-              data-item-id="${idx}"
-              onchange="handleUnitChange(${idx})">
-        <option value="">Select unit...</option>
-      </select>
-      <div class="unit-info mt-1">
-        <small class="cf-display-text" id="cf-display-${idx}"></small>
+      <div class="dropdown-search-container" style="position: relative;">
+        <div class="dropdown-search-input" data-filter="unit-${idx}" onclick="event.stopPropagation(); toggleDropdown(this, event)">
+          <span class="dropdown-selected-value" id="selectedUnitText-${idx}">Select unit...</span>
+          <i class="ti ti-chevron-down dropdown-arrow"></i>
+        </div>
+        <div class="dropdown-search-menu" id="unitDropdown-${idx}" style="display: none;" onclick="event.stopPropagation()">
+          <div class="dropdown-search-header" onclick="event.stopPropagation()">
+            <i class="ti ti-search"></i>
+            <input type="text" class="dropdown-search-field" placeholder="Search unit..." onclick="event.stopPropagation()" onkeyup="filterDropdownOptions(this, 'unit-${idx}', event)">
+          </div>
+          <div class="dropdown-search-options" onclick="event.stopPropagation()">
+            <div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectUnitOption(this, ${idx}, event)">Select unit...</div>
+          </div>
+        </div>
+        <select name="items-${idx}-units" class="unit-select" data-item-id="${idx}" style="display: none;" required disabled>
+          <option value="">Select unit...</option>
+        </select>
       </div>
+      <div class="unit-info mt-1"><small class="cf-display-text" id="cf-display-${idx}"></small></div>
     </td>
-    <td>
-      <div class="base-units-display text-center fw-bold" id="base-units-${idx}">0</div>
-    </td>
-    <td>
-      <input type="text" name="items-${idx}-notes" 
-             class="form-control form-control-sm" 
-             placeholder="Optional notes...">
-    </td>
+    <td><div class="base-units-display text-center fw-bold" id="base-units-${idx}">0</div></td>
+    <td><input type="text" name="items-${idx}-notes" class="form-control form-control-sm" placeholder="Optional notes..."></td>
     <td>
       <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRequestItem(${idx})">
         <i data-feather="trash-2" class="feather-12"></i>
@@ -946,87 +1187,22 @@ function addRequestItem() {
   `;
 
   tbody.appendChild(row);
-  
-  loadProductsIntoDropdown(idx);
-  
-  if (typeof feather !== 'undefined') {
-    feather.replace();
-  }
-  
+  if (typeof feather !== 'undefined') feather.replace();
   return idx;
 }
 
-// Load products into dropdown
-async function loadProductsIntoDropdown(itemId) {
-  const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
-  
-  // Clear existing options except first one
-  while (productSelect.options.length > 1) {
-    productSelect.remove(1);
-  }
-  
-  // If no products loaded yet, load them
-  if (!availableProducts || availableProducts.length === 0) {
-    try {
-      await loadProductsFromAPI();
-    } catch (error) {
-      console.error('Error loading products in dropdown:', error);
-    }
-  }
-  
-  // Populate dropdown
-  if (availableProducts && availableProducts.length > 0) {
-    availableProducts.forEach(product => {
-      const option = document.createElement('option');
-      option.value = product.id;
-      
-      // Create display text with available information
-      let displayText = product.name || 'Unnamed Product';
-      if (product.sku) {
-        displayText += ` (${product.sku})`;
-      } else if (product.code) {
-        displayText += ` (${product.code})`;
-      } else if (product.barcode) {
-        displayText += ` [${product.barcode}]`;
-      }
-      
-      option.textContent = displayText;
-      productSelect.appendChild(option);
-    });
-  } else {
-    // Add a fallback option
-    const option = document.createElement('option');
-    option.value = '';
-    option.textContent = 'No products available';
-    option.disabled = true;
-    productSelect.appendChild(option);
-  }
-}
-
-// DEBUG: Log API response
-async function debugProductUnits(productId) {
-  try {
-    const response = await fetch(`{% url "product_units" 0 %}`.replace('0', productId));
-    const data = await response.json();
-    console.log('DEBUG Product Units Response:', data);
-    return data;
-  } catch (error) {
-    console.error('DEBUG Error:', error);
-    return null;
-  }
-}
-
-// Handle product selection with conversion factor support - FIXED VERSION
 async function handleProductChange(itemId) {
-  console.log(`Product changed for item ${itemId}`);
-  
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
   const fromStoreSelect = document.getElementById('from_store');
   const cfInfo = document.getElementById(`cf-info-${itemId}`);
+  const unitDropdown = document.getElementById(`unitDropdown-${itemId}`);
   
   if (!productSelect.value) {
     unitSelect.innerHTML = '<option value="">Select unit...</option>';
+    unitSelect.disabled = true;
+    if (unitDropdown) unitDropdown.querySelector('.dropdown-search-options').innerHTML = `<div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectUnitOption(this, ${itemId}, event)">Select unit...</div>`;
+    document.getElementById(`selectedUnitText-${itemId}`).textContent = 'Select unit...';
     cfInfo.style.display = 'none';
     return;
   }
@@ -1034,125 +1210,76 @@ async function handleProductChange(itemId) {
   if (!fromStoreSelect.value) {
     showToast('Please select a source store first', 'warning');
     productSelect.value = '';
+    document.getElementById(`selectedProductText-${itemId}`).textContent = 'Select product...';
     return;
   }
   
   unitSelect.innerHTML = '<option value="">Loading units...</option>';
   unitSelect.disabled = true;
+  if (unitDropdown) unitDropdown.querySelector('.dropdown-search-options').innerHTML = '<div class="dropdown-search-option">Loading units...</div>';
+  document.getElementById(`selectedUnitText-${itemId}`).textContent = 'Loading units...';
   cfInfo.style.display = 'none';
   
   try {
-    // First, debug the API response
-    const debugData = await debugProductUnits(productSelect.value);
-    
     const response = await fetch(`{% url "product_units" 0 %}`.replace('0', productSelect.value));
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    console.log('Product units API response:', data);
     
     if (data.success && data.units && data.units.length > 0) {
-      unitSelect.innerHTML = '<option value="">Select unit...</option>';
+      let options = '<option value="">Select unit...</option>';
+      let dropdownOptions = `<div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectUnitOption(this, ${itemId}, event)">Select unit...</div>`;
       
       data.units.forEach(unit => {
-        const option = document.createElement('option');
-        
-        // Use the correct field names based on your API response
-        // Check what fields are actually available
-        console.log('Unit object structure:', unit);
-        
-        // IMPORTANT: Use the correct ID field (ProductUnitPrice ID, not UnitOfMeasure ID)
-        option.value = unit.id || unit.unit_price_id; // This should be ProductUnitPrice ID
-        
-        // Get the correct field names
-        const unitName = unit.unit_name || unit.name || unit.unit?.name || 'Unit';
-        const abbreviation = unit.abbreviation || unit.unit?.abbreviation || '';
-        const conversionFactor = unit.conversion_factor || unit.conversionFactor || 1;
+        const unitValue = unit.id || unit.unit_price_id;
+        const unitName = unit.unit_name || unit.name || 'Unit';
+        const conversionFactor = unit.conversion_factor || 1;
         const isBaseUnit = unit.is_base_unit || (conversionFactor === 1);
-        const price = unit.price || 0;
-        
         const cfText = conversionFactor === 1 ? 'Base Unit' : `CF: ${conversionFactor}`;
-        const baseUnitIndicator = isBaseUnit ? ' (Base Unit)' : '';
-        
-        option.textContent = `${unitName}${baseUnitIndicator} - ${cfText}`;
-        
-        // Store data as attributes for later use
-        option.dataset.price = price;
-        option.dataset.conversion_factor = conversionFactor;
-        option.dataset.is_base_unit = isBaseUnit;
-        option.dataset.abbreviation = abbreviation;
-        option.dataset.unit_name = unitName;
-        
-        unitSelect.appendChild(option);
+        const displayText = `${unitName}${isBaseUnit ? ' (Base Unit)' : ''} - ${cfText}`;
+        options += `<option value="${unitValue}" data-conversion-factor="${conversionFactor}" data-is-base-unit="${isBaseUnit}">${displayText}</option>`;
+        dropdownOptions += `<div class="dropdown-search-option" data-value="${unitValue}" data-conversion-factor="${conversionFactor}" data-is-base-unit="${isBaseUnit}" onclick="event.stopPropagation(); selectUnitOption(this, ${itemId}, event)">${displayText}</div>`;
       });
       
+      unitSelect.innerHTML = options;
       unitSelect.disabled = false;
+      if (unitDropdown) unitDropdown.querySelector('.dropdown-search-options').innerHTML = dropdownOptions;
       
-      // Auto-select base unit if available
-      const baseUnit = Array.from(unitSelect.options).find(opt => 
-        opt.dataset.is_base_unit === 'true' || opt.dataset.conversion_factor === '1'
-      );
-      
-      if (baseUnit) {
-        unitSelect.value = baseUnit.value;
-      } else if (data.units.length > 0) {
-        // Select first unit if no base unit found
-        unitSelect.value = data.units[0].id;
+      const baseUnitOption = Array.from(unitSelect.options).find(opt => opt.dataset.isBaseUnit === 'true');
+      if (baseUnitOption) {
+        unitSelect.value = baseUnitOption.value;
+        document.getElementById(`selectedUnitText-${itemId}`).textContent = baseUnitOption.textContent;
+        const dropdownOpt = document.querySelector(`#unitDropdown-${itemId} .dropdown-search-option[data-value="${baseUnitOption.value}"]`);
+        if (dropdownOpt) dropdownOpt.setAttribute('data-selected', 'true');
+        await handleUnitChange(itemId);
       }
-      
-      // Trigger unit change
-      await handleUnitChange(itemId);
     } else {
       unitSelect.innerHTML = '<option value="">No units available</option>';
-      unitSelect.disabled = false;
-      console.warn('No units found for product:', data);
+      unitSelect.disabled = true;
+      if (unitDropdown) unitDropdown.querySelector('.dropdown-search-options').innerHTML = `<div class="dropdown-search-option" data-value="" onclick="event.stopPropagation(); selectUnitOption(this, ${itemId}, event)">No units available</div>`;
+      document.getElementById(`selectedUnitText-${itemId}`).textContent = 'No units available';
       showToast('No units configured for this product', 'warning');
     }
-    
     await updateStockAvailability(itemId);
-    
   } catch (error) {
-    console.error('Error fetching product units:', error);
     unitSelect.innerHTML = '<option value="">Error loading units</option>';
-    unitSelect.disabled = false;
-    
-    // Show more detailed error
+    unitSelect.disabled = true;
+    document.getElementById(`selectedUnitText-${itemId}`).textContent = 'Error loading units';
     showToast(`Error loading units: ${error.message}`, 'danger');
   }
 }
 
-// Handle unit selection with conversion factor - FIXED VERSION
 async function handleUnitChange(itemId) {
-  console.log(`Unit changed for item ${itemId}`);
-  
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const unitSelect = document.querySelector(`.unit-select[data-item-id="${itemId}"]`);
   const cfDisplay = document.getElementById(`cf-display-${itemId}`);
   const cfInput = document.getElementById(`conversion-factor-${itemId}`);
   const cfInfo = document.getElementById(`cf-info-${itemId}`);
   
-  if (!productSelect.value || !unitSelect.value) {
-    cfDisplay.textContent = '';
-    cfInfo.style.display = 'none';
-    return;
-  }
+  if (!productSelect.value || !unitSelect.value) { cfDisplay.textContent = ''; cfInfo.style.display = 'none'; return; }
   
   const selectedOption = unitSelect.options[unitSelect.selectedIndex];
-  
-  // Debug selected option
-  console.log('Selected option data:', {
-    value: selectedOption.value,
-    text: selectedOption.textContent,
-    dataset: selectedOption.dataset
-  });
-  
-  const conversionFactor = parseFloat(selectedOption.dataset.conversion_factor) || 1.0;
-  const isBaseUnit = selectedOption.dataset.is_base_unit === 'true';
-  const unitAbbreviation = selectedOption.dataset.abbreviation || selectedOption.dataset.unit_name || '';
-  const unitName = selectedOption.dataset.unit_name || '';
-  
+  const conversionFactor = parseFloat(selectedOption.dataset.conversionFactor) || 1.0;
+  const unitName = selectedOption.textContent.split(' - ')[0] || '';
   cfInput.value = conversionFactor;
   
   if (conversionFactor === 1) {
@@ -1161,24 +1288,18 @@ async function handleUnitChange(itemId) {
     cfInfo.textContent = 'Base unit';
     cfInfo.className = 'conversion-factor-info small text-success';
   } else {
-    cfDisplay.textContent = `1 ${unitAbbreviation} = ${conversionFactor} base units`;
+    cfDisplay.textContent = `CF: ${conversionFactor}`;
     cfDisplay.className = 'cf-display-text small text-info';
-    cfInfo.textContent = `1 ${unitAbbreviation} = ${conversionFactor} base units`;
+    cfInfo.textContent = `1 ${unitName} = ${conversionFactor} base units`;
     cfInfo.className = 'conversion-factor-info small text-info';
   }
   cfInfo.style.display = 'block';
   
-  // Update base units calculation if quantity exists
   const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
-  if (quantityInput && quantityInput.value) {
-    await handleQuantityChange(itemId);
-  }
-  
-  // Also update stock availability display
+  if (quantityInput && quantityInput.value) await handleQuantityChange(itemId);
   await updateStockAvailability(itemId);
 }
 
-// Handle quantity change with conversion calculation
 async function handleQuantityChange(itemId) {
   const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
   const cfInput = document.getElementById(`conversion-factor-${itemId}`);
@@ -1189,11 +1310,9 @@ async function handleQuantityChange(itemId) {
   const cf = parseFloat(cfInput.value) || 1;
   const baseUnits = Math.round(quantity * cf);
   
-  // Update base units display
   baseUnitsDisplay.textContent = baseUnits;
   baseUnitsDisplay.className = `base-units-display text-center fw-bold ${baseUnits > 0 ? 'text-primary' : 'text-muted'}`;
   
-  // Validate stock
   if (quantity > 0 && availableStockBase > 0) {
     if (baseUnits > availableStockBase) {
       quantityInput.classList.add('is-invalid');
@@ -1203,12 +1322,9 @@ async function handleQuantityChange(itemId) {
       baseUnitsDisplay.classList.remove('text-danger');
     }
   }
-  
-  // Update total
   updateTotalBaseUnits();
 }
 
-// Update product availability with conversion factor support
 async function updateStockAvailability(itemId) {
   const productSelect = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
   const availableSpan = document.getElementById(`available-${itemId}`);
@@ -1223,39 +1339,21 @@ async function updateStockAvailability(itemId) {
     return;
   }
   
-  const productId = productSelect.value;
-  const storeId = fromStoreSelect.value;
-  
   try {
-    // FIRST: Try the exact URL pattern that matches your Django URL
-    const url = `/api/product/${productId}/store/${storeId}/stock/`;
-    console.log('Fetching stock from URL:', url);
-    
-    const response = await fetch(url);
-    
+    const response = await fetch(`/api/product/${productSelect.value}/store/${fromStoreSelect.value}/stock/`);
     if (response.ok) {
       const data = await response.json();
-      console.log('Stock API response:', data);
-      
       if (data.success) {
-        // Handle the response based on your view's return structure
         const availableBaseUnits = data.stock.available_stock || 0;
         availableValueInput.value = availableBaseUnits;
         
-        // Display based on selected unit
         if (unitSelect && unitSelect.value) {
           const selectedOption = unitSelect.options[unitSelect.selectedIndex];
-          const conversionFactor = parseFloat(selectedOption.dataset.conversion_factor) || 1.0;
-          const unitAbbreviation = selectedOption.dataset.abbreviation || selectedOption.dataset.unit_name || '';
-          
-          if (conversionFactor > 0 && conversionFactor !== 1) {
+          const conversionFactor = parseFloat(selectedOption.dataset.conversionFactor) || 1.0;
+          if (conversionFactor > 1) {
             const displayUnits = Math.floor(availableBaseUnits / conversionFactor);
-            const remainingBaseUnits = availableBaseUnits % conversionFactor;
-            
-            availableSpan.textContent = `${displayUnits} ${unitAbbreviation}`;
-            if (remainingBaseUnits > 0) {
-              availableSpan.textContent += ` + ${remainingBaseUnits} base units`;
-            }
+            const remaining = availableBaseUnits % conversionFactor;
+            availableSpan.textContent = `${displayUnits} units${remaining > 0 ? ` + ${remaining} base` : ''}`;
           } else {
             availableSpan.textContent = `${availableBaseUnits} base units`;
           }
@@ -1263,92 +1361,23 @@ async function updateStockAvailability(itemId) {
           availableSpan.textContent = `${availableBaseUnits} base units`;
         }
         
-        // Color code based on stock level
-        if (availableBaseUnits === 0) {
-          availableSpan.className = 'available-stock text-danger fw-bold';
-        } else if (availableBaseUnits < 10) {
-          availableSpan.className = 'available-stock text-warning fw-bold';
-        } else {
-          availableSpan.className = 'available-stock text-success fw-bold';
-        }
-        
-        // Validate quantity if already entered
+        availableSpan.className = `available-stock fw-bold ${availableBaseUnits === 0 ? 'text-danger' : availableBaseUnits < 10 ? 'text-warning' : 'text-success'}`;
         const quantityInput = document.querySelector(`input[name="items-${itemId}-quantity"]`);
-        if (quantityInput && quantityInput.value) {
-          await handleQuantityChange(itemId);
-        }
+        if (quantityInput && quantityInput.value) await handleQuantityChange(itemId);
       } else {
-        availableSpan.textContent = 'No stock data';
-        availableSpan.className = 'available-stock text-warning';
-        availableValueInput.value = 0;
-        console.warn('Stock API returned error:', data.error);
+        availableSpan.textContent = 'No stock data'; availableSpan.className = 'available-stock text-warning'; availableValueInput.value = 0;
       }
     } else {
-      console.warn(`Stock API returned ${response.status}: ${response.statusText}`);
-      
-      // Try alternative URL patterns
-      const alternativeUrls = [
-        `/api/product/${productId}/stock/${storeId}/`,
-        `/api/products/${productId}/stores/${storeId}/stock/`,
-        `/api/stock/product/${productId}/store/${storeId}/`,
-        `/api/inventory/product/${productId}/store/${storeId}/`
-      ];
-      
-      let success = false;
-      
-      for (const altUrl of alternativeUrls) {
-        try {
-          console.log('Trying alternative URL:', altUrl);
-          const altResponse = await fetch(altUrl);
-          if (altResponse.ok) {
-            const altData = await altResponse.json();
-            console.log('Alternative API response:', altData);
-            
-            if (altData.success) {
-              const availableBaseUnits = altData.stock?.available_stock || altData.available_stock || 0;
-              availableValueInput.value = availableBaseUnits;
-              availableSpan.textContent = `${availableBaseUnits} units`;
-              availableSpan.className = 'available-stock text-info fw-bold';
-              success = true;
-              console.log('Success with alternative URL:', altUrl);
-              break;
-            }
-          }
-        } catch (altError) {
-          console.log(`Alternative URL ${altUrl} failed:`, altError.message);
-        }
-      }
-      
-      if (!success) {
-        availableSpan.textContent = 'Stock API Error';
-        availableSpan.className = 'available-stock text-muted';
-        availableValueInput.value = 0;
-        console.warn('All stock API attempts failed');
-        
-        // Show help message
-        showToast('Stock API endpoint not found. Check URL configuration.', 'warning');
-      }
+      availableSpan.textContent = 'Stock API Error'; availableSpan.className = 'available-stock text-muted'; availableValueInput.value = 0;
     }
   } catch (error) {
-    console.error('Error fetching stock info:', error);
-    availableSpan.textContent = 'Network Error';
-    availableSpan.className = 'available-stock text-muted';
-    availableValueInput.value = 0;
-    
-    // Show error details
-    showToast(`Network error: ${error.message}`, 'danger');
+    availableSpan.textContent = 'Network Error'; availableSpan.className = 'available-stock text-muted'; availableValueInput.value = 0;
   }
 }
 
-
-
-
-
-// Validate form before submission
 function validateForm() {
   let isValid = true;
   let errors = [];
-  
   const fromStore = document.getElementById('from_store').value;
   const toStore = document.getElementById('to_store').value;
   
@@ -1361,109 +1390,50 @@ function validateForm() {
     document.getElementById('from_store').classList.remove('is-invalid');
     document.getElementById('to_store').classList.remove('is-invalid');
   }
-  
-  if (!fromStore) {
-    errors.push('Source store is required');
-    document.getElementById('from_store').classList.add('is-invalid');
-    isValid = false;
-  }
-  
-  if (!toStore) {
-    errors.push('Destination store is required');
-    document.getElementById('to_store').classList.add('is-invalid');
-    isValid = false;
-  }
-  
-  if (!document.getElementById('reason').value.trim()) {
-    errors.push('Reason for transfer is required');
-    document.getElementById('reason').classList.add('is-invalid');
-    isValid = false;
-  } else {
-    document.getElementById('reason').classList.remove('is-invalid');
-  }
+  if (!fromStore) { errors.push('Source store is required'); document.getElementById('from_store').classList.add('is-invalid'); isValid = false; }
+  if (!toStore) { errors.push('Destination store is required'); document.getElementById('to_store').classList.add('is-invalid'); isValid = false; }
+  if (!document.getElementById('reason').value.trim()) { errors.push('Reason for transfer is required'); document.getElementById('reason').classList.add('is-invalid'); isValid = false; } else { document.getElementById('reason').classList.remove('is-invalid'); }
   
   const tbody = document.getElementById('requestItemsBody');
-  if (tbody.children.length === 0) {
-    errors.push('Please add at least one item to request.');
-    isValid = false;
-  }
+  if (tbody.children.length === 0) { errors.push('Please add at least one item to request.'); isValid = false; }
   
-  const productSelects = document.querySelectorAll('.product-select');
   let hasValidItems = false;
-  
-  productSelects.forEach((select, index) => {
-    if (!select.value) {
-      errors.push(`Item ${index + 1}: Product selection is required`);
-      isValid = false;
-    } else {
-      hasValidItems = true;
-    }
-    
+  document.querySelectorAll('.product-select').forEach((select, index) => {
+    if (!select.value) { errors.push(`Item ${index + 1}: Product selection is required`); isValid = false; } else { hasValidItems = true; }
     const quantityInput = document.querySelector(`input[name="items-${index}-quantity"]`);
-    if (select.value && (!quantityInput.value || parseInt(quantityInput.value) <= 0)) {
-      errors.push(`Item ${index + 1}: Valid quantity is required`);
-      isValid = false;
-      quantityInput.classList.add('is-invalid');
-    }
-    
-    if (quantityInput.classList.contains('is-invalid')) {
-      errors.push(`Item ${index + 1}: Insufficient stock available`);
-      isValid = false;
-    }
-    
+    if (select.value && (!quantityInput.value || parseInt(quantityInput.value) <= 0)) { errors.push(`Item ${index + 1}: Valid quantity is required`); isValid = false; quantityInput.classList.add('is-invalid'); }
+    if (quantityInput.classList.contains('is-invalid')) { errors.push(`Item ${index + 1}: Insufficient stock available`); isValid = false; }
     const unitSelect = document.querySelector(`.unit-select[data-item-id="${index}"]`);
-    if (select.value && (!unitSelect.value || unitSelect.value === '')) {
-      errors.push(`Item ${index + 1}: Unit selection is required`);
-      isValid = false;
-    }
+    if (select.value && (!unitSelect.value || unitSelect.value === '')) { errors.push(`Item ${index + 1}: Unit selection is required`); isValid = false; }
   });
-  
-  if (!hasValidItems) {
-    errors.push('Please add at least one valid item to the request.');
-    isValid = false;
-  }
+  if (!hasValidItems) { errors.push('Please add at least one valid item to the request.'); isValid = false; }
   
   if (errors.length > 0) {
-    const errorContainer = document.getElementById('formErrorsAlert');
-    const errorMessage = document.getElementById('formErrorsMessage');
-    errorMessage.innerHTML = errors.map(error => `<div>• ${error}</div>`).join('');
-    errorContainer.style.display = 'block';
-    
-    setTimeout(() => {
-      errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+    document.getElementById('formErrorsMessage').innerHTML = errors.map(e => `<div>• ${e}</div>`).join('');
+    document.getElementById('formErrorsAlert').style.display = 'block';
+    setTimeout(() => document.getElementById('formErrorsAlert').scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
   } else {
     document.getElementById('formErrorsAlert').style.display = 'none';
   }
-  
   return isValid;
 }
 
-// Store change handler - update all product availabilities
 document.getElementById('from_store')?.addEventListener('change', async function() {
-  console.log('Source store changed to:', this.value);
-  
   const toStoreSelect = document.getElementById('to_store');
-  
   if (toStoreSelect.value === this.value) {
     toStoreSelect.value = '';
+    document.getElementById('selectedToStoreText').textContent = 'Select destination store';
     toStoreSelect.classList.add('is-invalid');
     showStockAlert('Cannot transfer stock to the same store');
   } else {
     toStoreSelect.classList.remove('is-invalid');
     hideStockAlert();
   }
-  
-  const productSelects = document.querySelectorAll('.product-select');
-  for (const select of productSelects) {
-    if (select.value) {
-      const itemId = select.getAttribute('data-item-id');
-      await updateStockAvailability(itemId);
-    }
+  for (const select of document.querySelectorAll('.product-select')) {
+    if (select.value) await updateStockAvailability(select.getAttribute('data-item-id'));
   }
 });
 
-// To store change handler - prevent same store selection
 document.getElementById('to_store')?.addEventListener('change', function() {
   const fromStoreSelect = document.getElementById('from_store');
   if (this.value && this.value === fromStoreSelect.value) {
@@ -1475,49 +1445,25 @@ document.getElementById('to_store')?.addEventListener('change', function() {
   }
 });
 
-// Remove request item row
 function removeRequestItem(itemId) {
-  const row = document.getElementById(`request-item-row-${itemId}`);
-  if (row) {
-    row.remove();
-  }
-  
-  // Update totals
+  document.getElementById(`request-item-row-${itemId}`)?.remove();
   updateTotalBaseUnits();
-  
-  const tbody = document.getElementById('requestItemsBody');
-  if (tbody.children.length === 0) {
-    addRequestItem();
-  }
+  if (document.getElementById('requestItemsBody').children.length === 0) addRequestItem();
 }
 
-// Show stock alert
 function showStockAlert(message) {
-  const alert = document.getElementById('stockAlert');
-  const messageSpan = document.getElementById('stockAlertMessage');
-  messageSpan.textContent = message;
-  alert.style.display = 'block';
-  
-  setTimeout(() => {
-    hideStockAlert();
-  }, 5000);
+  document.getElementById('stockAlertMessage').textContent = message;
+  document.getElementById('stockAlert').style.display = 'block';
+  setTimeout(hideStockAlert, 5000);
 }
+function hideStockAlert() { document.getElementById('stockAlert').style.display = 'none'; }
 
-// Hide stock alert
-function hideStockAlert() {
-  document.getElementById('stockAlert').style.display = 'none';
-}
-
-// Enhanced submit function with conversion factor data
 async function submitNewRequest() {
-  if (!validateForm()) {
-    return;
-  }
+  if (!validateForm()) return;
   
   const submitBtn = document.getElementById('submitRequestBtn');
   const spinner = submitBtn.querySelector('.spinner-border');
   const editId = document.getElementById('editRequestId').value;
-  
   submitBtn.disabled = true;
   spinner.classList.remove('d-none');
   
@@ -1531,79 +1477,33 @@ async function submitNewRequest() {
     items: []
   };
   
-  const rows = document.querySelectorAll('#requestItemsBody tr');
-  rows.forEach((row, index) => {
+  document.querySelectorAll('#requestItemsBody tr').forEach((row) => {
     const product = row.querySelector('.product-select');
     const quantity = row.querySelector('.requested-qty');
     const units = row.querySelector('.unit-select');
     const notes = row.querySelector('input[name$="-notes"]');
-    const itemId = row.querySelector('input[name$="-id"]');
     const conversionFactor = row.querySelector('.conversion-factor');
-    
     if (product.value && quantity.value && units.value) {
-      const itemData = {
-        product_id: product.value,
-        quantity: quantity.value,
-        units_id: units.value, // This should be ProductUnitPrice ID
-        conversion_factor: conversionFactor ? conversionFactor.value : 1,
-        notes: notes?.value || ''
-      };
-      
-      if (itemId && itemId.value) {
-        itemData.id = itemId.value;
-      }
-      
-      formData.items.push(itemData);
+      formData.items.push({ product_id: product.value, quantity: quantity.value, units_id: units.value, conversion_factor: conversionFactor ? conversionFactor.value : 1, notes: notes?.value || '' });
     }
   });
   
   const url = editId ? `{% url "update_transfer_request" 0 %}`.replace('0', editId) : `{% url "create_transfer_request" %}`;
-  const method = 'POST';
-  
   try {
-    const response = await fetch(url, {
-      method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrftoken,
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(formData)
-    });
-    
+    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify(formData) });
     const data = await response.json();
-    
     if (data.success) {
-      const modal = bootstrap.Modal.getInstance(document.getElementById('newRequestModal'));
-      if (modal) modal.hide();
-      
-      const action = editId ? 'updated' : 'created';
-      showToast(`Transfer request #TR${String(data.request_id).padStart(4, '0')} ${action} successfully!`, 'success');
-      
-      // Show conversion summary if available
-      if (data.conversion_summary) {
-        console.log('Conversion Summary:', data.conversion_summary);
-      }
-      
-      setTimeout(() => {
-        location.reload();
-      }, 1500);
+      bootstrap.Modal.getInstance(document.getElementById('newRequestModal'))?.hide();
+      showToast(`Transfer request #TR${String(data.request_id).padStart(4, '0')} ${editId ? 'updated' : 'created'} successfully!`, 'success');
+      setTimeout(() => location.reload(), 1500);
     } else {
-      const errorContainer = document.getElementById('formErrorsAlert');
-      const errorMessage = document.getElementById('formErrorsMessage');
-      
       let errorHtml = `<div><strong>Error:</strong> ${data.error}</div>`;
-      if (data.details && Array.isArray(data.details)) {
-        errorHtml += data.details.map(detail => `<div>• ${detail}</div>`).join('');
-      }
-      
-      errorMessage.innerHTML = errorHtml;
-      errorContainer.style.display = 'block';
-      
-      errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (data.details) errorHtml += data.details.map(d => `<div>• ${d}</div>`).join('');
+      document.getElementById('formErrorsMessage').innerHTML = errorHtml;
+      document.getElementById('formErrorsAlert').style.display = 'block';
+      document.getElementById('formErrorsAlert').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   } catch (error) {
-    console.error('Error:', error);
     showToast('An error occurred while processing the request.', 'danger');
   } finally {
     submitBtn.disabled = false;
@@ -1611,813 +1511,287 @@ async function submitNewRequest() {
   }
 }
 
-// Edit request function
 async function editRequest(requestId) {
   try {
     const response = await fetch(`{% url "transfer_request_json" 0 %}`.replace('0', requestId));
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    
-    if (!data.success) {
-      alert('Failed to load request data');
-      return;
-    }
+    if (!data.success) { alert('Failed to load request data'); return; }
     
     const r = data.request;
     currentEditRequestId = r.id;
-    
-    requestItemCounter = 0;
-    totalBaseUnits = 0;
+    requestItemCounter = 0; totalBaseUnits = 0;
     document.getElementById('newRequestForm').reset();
     document.getElementById('requestItemsBody').innerHTML = '';
     document.getElementById('stockAlert').style.display = 'none';
     document.getElementById('formErrorsAlert').style.display = 'none';
-    
     document.getElementById('editRequestId').value = r.id;
     document.getElementById('modalTitle').textContent = 'Edit Transfer Request';
     document.getElementById('submitBtnText').textContent = 'Update Request';
     
     document.getElementById('from_store').value = r.from_store || '';
+    document.getElementById('selectedFromStoreText').textContent = r.from_store_name || 'Select source store';
     document.getElementById('to_store').value = r.to_store || '';
+    document.getElementById('selectedToStoreText').textContent = r.to_store_name || 'Select destination store';
     document.getElementById('priority').value = r.priority || 'normal';
+    document.getElementById('selectedPriorityText').textContent = r.priority_display || 'Normal';
     document.getElementById('required_date').value = r.required_date || '';
     document.getElementById('department').value = r.department || '';
+    document.getElementById('selectedDepartmentText').textContent = r.department_name || 'Select a department';
     document.getElementById('reason').value = r.reason || '';
     
-    await loadProductsFromAPI();
+    if (r.from_store) { const opt = document.querySelector(`#from_storeDropdown .dropdown-search-option[data-value="${r.from_store}"]`); if (opt) opt.setAttribute('data-selected', 'true'); }
+    if (r.to_store) { const opt = document.querySelector(`#to_storeDropdown .dropdown-search-option[data-value="${r.to_store}"]`); if (opt) opt.setAttribute('data-selected', 'true'); }
     
+    await loadProductsFromAPI();
     for (const item of r.items) {
       const idx = addRequestItem();
-      
       const productSelect = document.querySelector(`.product-select[data-item-id="${idx}"]`);
       productSelect.value = item.product_id;
-      
+      document.getElementById(`selectedProductText-${idx}`).textContent = item.product_name || 'Select product...';
+      const productOption = document.querySelector(`#productDropdown-${idx} .dropdown-search-option[data-value="${item.product_id}"]`);
+      if (productOption) productOption.setAttribute('data-selected', 'true');
       await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const unitSelect = document.querySelector(`.unit-select[data-item-id="${idx}"]`);
       if (item.units_id) {
+        const unitSelect = document.querySelector(`.unit-select[data-item-id="${idx}"]`);
         unitSelect.value = item.units_id;
-        await new Promise(resolve => setTimeout(resolve, 100));
+        document.getElementById(`selectedUnitText-${idx}`).textContent = item.unit_name || 'Select unit...';
+        const cfInput = document.getElementById(`conversion-factor-${idx}`);
+        if (cfInput && item.conversion_factor) cfInput.value = item.conversion_factor;
         await handleUnitChange(idx);
       }
-      
-      const qtyInput = document.querySelector(`input[name="items-${idx}-quantity"]`);
-      qtyInput.value = item.quantity;
-      
+      document.querySelector(`input[name="items-${idx}-quantity"]`).value = item.quantity;
       const notesInput = document.querySelector(`input[name="items-${idx}-notes"]`);
-      if (notesInput && item.notes) {
-        notesInput.value = item.notes;
-      }
-      
+      if (notesInput && item.notes) notesInput.value = item.notes;
       await updateStockAvailability(idx);
       await handleQuantityChange(idx);
     }
-    
-    const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
-    modal.show();
-    
+    new bootstrap.Modal(document.getElementById('newRequestModal')).show();
   } catch (error) {
-    console.error('Error loading request JSON:', error);
     alert('Error loading request for edit.');
   }
 }
 
-// Create transfer from approved request - DEBUG VERSION
 async function createTransferFromRequest(requestId) {
-  console.log('🔵 START createTransferFromRequest:', {
-    requestId: requestId,
-    csrfToken: csrftoken ? 'Present' : 'Missing',
-    url: `{% url "create_transfer_from_request" 0 %}`.replace('0', requestId)
-  });
-  
-  if (!confirm('Create stock transfer from this approved request?')) {
-    console.log('❌ User cancelled');
-    return;
-  }
-  
+  if (!confirm('Create stock transfer from this approved request?')) return;
   try {
-    console.log('📡 Sending POST request to create transfer...');
-    
     const response = await fetch(`{% url "create_transfer_from_request" 0 %}`.replace('0', requestId), {
-      method: 'POST',
-      headers: {
-        'X-CSRFToken': csrftoken,
-        'X-Requested-With': 'XMLHttpRequest',
-        'Content-Type': 'application/json'
-      }
+      method: 'POST', headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' }
     });
-    
-    console.log('📥 Response received:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
-    });
-    
-    // Get response text first to debug
-    const responseText = await response.text();
-    console.log('📝 Raw response text:', responseText);
-    
-    // Try to parse as JSON
-    let data;
-    try {
-      data = JSON.parse(responseText);
-      console.log('📊 Parsed JSON data:', data);
-    } catch (jsonError) {
-      console.error('❌ Failed to parse JSON:', jsonError);
-      console.error('Raw response:', responseText);
-      showToast('Server returned invalid response. Check console for details.', 'danger');
-      return;
-    }
-    
+    const data = await response.json();
     if (data.success) {
-      console.log('✅ Transfer created successfully:', {
-        transfer_id: data.transfer_id,
-        message: data.message,
-        total_base_units: data.total_base_units
-      });
-      
       showToast(`Stock transfer #ST${String(data.transfer_id).padStart(4, '0')} created successfully!`, 'success');
-      
-      // Refresh page to show updated status
-      console.log('🔄 Refreshing page in 2 seconds...');
-      setTimeout(() => {
-        location.reload();
-      }, 2000);
+      setTimeout(() => location.reload(), 2000);
     } else {
-      console.error('❌ Server returned error:', data);
       showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
-      
-      // If there's a transfer_id in error, it might already exist
-      if (data.transfer_id) {
-        console.log('ℹ️ Transfer already exists with ID:', data.transfer_id);
-      }
     }
   } catch (error) {
-    console.error('❌ Network error creating transfer:', error);
-    showToast('Network error while creating transfer. Check console for details.', 'danger');
+    showToast('Network error while creating transfer.', 'danger');
   }
 }
 
-// Approve request
 function approveRequest(requestId) {
   document.getElementById('approveRequestId').value = requestId;
   document.getElementById('approveComments').value = '';
-  document.getElementById('approveComments').classList.remove('is-invalid');
-  
-  const modal = new bootstrap.Modal(document.getElementById('approveModal'));
-  modal.show();
+  new bootstrap.Modal(document.getElementById('approveModal')).show();
 }
 
-// Reject request
 function rejectRequest(requestId) {
   document.getElementById('rejectRequestId').value = requestId;
   document.getElementById('rejectComments').value = '';
-  document.getElementById('rejectComments').classList.remove('is-invalid');
-  
-  const modal = new bootstrap.Modal(document.getElementById('rejectModal'));
-  modal.show();
+  new bootstrap.Modal(document.getElementById('rejectModal')).show();
 }
 
-// Updated confirmApprove function
 async function confirmApprove() {
   const requestId = document.getElementById('approveRequestId').value;
   const comments = document.getElementById('approveComments').value;
-  
   const submitBtn = document.getElementById('confirmApproveBtn');
   const spinner = submitBtn.querySelector('.spinner-border');
-  const btnText = document.getElementById('approveBtnText');
-
-  submitBtn.disabled = true;
-  spinner.classList.remove('d-none');
-  btnText.textContent = 'Approving...';
-
+  submitBtn.disabled = true; spinner.classList.remove('d-none');
+  document.getElementById('approveBtnText').textContent = 'Approving...';
   try {
     const formData = new FormData();
     formData.append('csrfmiddlewaretoken', csrftoken);
     formData.append('approve', 'true');
     if (comments) formData.append('comments', comments);
-
-    const response = await fetch(`{% url "approve_transfer_request" 0 %}`.replace('0', requestId), {
-      method: 'POST',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: formData
-    });
-
-    const contentType = response.headers.get('content-type') || '';
-    
+    const response = await fetch(`{% url "approve_transfer_request" 0 %}`.replace('0', requestId), { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: formData });
     if (response.ok) {
+      const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         const data = await response.json();
-        if (data.success) {
-          const modal = bootstrap.Modal.getInstance(document.getElementById('approveModal'));
-          if (modal) modal.hide();
-          
-          showToast(`Request #TR${String(requestId).padStart(4, '0')} approved successfully!`, 'success');
-          setTimeout(() => location.reload(), 1500);
-        } else {
-          showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
-        }
-      } else {
-        // Handle HTML response (server-side validation error)
-        const html = await response.text();
-        console.log('Server returned HTML for validation errors');
-        
-        // Close modal and reload to see server-side messages
-        const modal = bootstrap.Modal.getInstance(document.getElementById('approveModal'));
-        if (modal) modal.hide();
-        
-        // Reload page to show Django messages
-        setTimeout(() => location.reload(), 500);
-      }
-    } else {
-      showToast(`Server error: ${response.status}`, 'danger');
-    }
-  } catch (error) {
-    console.error('Error:', error);
-    showToast('An error occurred while approving the request.', 'danger');
-  } finally {
-    submitBtn.disabled = false;
-    spinner.classList.add('d-none');
-    btnText.textContent = 'Approve Request';
-  }
+        if (data.success) { bootstrap.Modal.getInstance(document.getElementById('approveModal'))?.hide(); showToast(`Request #TR${String(requestId).padStart(4, '0')} approved successfully!`, 'success'); setTimeout(() => location.reload(), 1500); }
+        else showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
+      } else { bootstrap.Modal.getInstance(document.getElementById('approveModal'))?.hide(); setTimeout(() => location.reload(), 500); }
+    } else showToast(`Server error: ${response.status}`, 'danger');
+  } catch (error) { showToast('An error occurred while approving the request.', 'danger'); }
+  finally { submitBtn.disabled = false; spinner.classList.add('d-none'); document.getElementById('approveBtnText').textContent = 'Approve Request'; }
 }
 
-// Updated confirmReject function
 async function confirmReject() {
   const requestId = document.getElementById('rejectRequestId').value;
   const comments = document.getElementById('rejectComments').value;
-  
-  if (!comments.trim()) {
-    document.getElementById('rejectComments').classList.add('is-invalid');
-    return;
-  }
-  
+  if (!comments.trim()) { document.getElementById('rejectComments').classList.add('is-invalid'); return; }
   document.getElementById('rejectComments').classList.remove('is-invalid');
-  
   const submitBtn = document.getElementById('confirmRejectBtn');
   const spinner = submitBtn.querySelector('.spinner-border');
-  const btnText = document.getElementById('rejectBtnText');
-
-  submitBtn.disabled = true;
-  spinner.classList.remove('d-none');
-  btnText.textContent = 'Rejecting...';
-
+  submitBtn.disabled = true; spinner.classList.remove('d-none');
+  document.getElementById('rejectBtnText').textContent = 'Rejecting...';
   try {
     const formData = new FormData();
     formData.append('csrfmiddlewaretoken', csrftoken);
     formData.append('approve', 'false');
     formData.append('comments', comments);
-
-    const response = await fetch(`{% url "approve_transfer_request" 0 %}`.replace('0', requestId), {
-      method: 'POST',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: formData
-    });
-
-    const contentType = response.headers.get('content-type') || '';
-    
+    const response = await fetch(`{% url "approve_transfer_request" 0 %}`.replace('0', requestId), { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: formData });
     if (response.ok) {
+      const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         const data = await response.json();
-        if (data.success) {
-          const modal = bootstrap.Modal.getInstance(document.getElementById('rejectModal'));
-          if (modal) modal.hide();
-          
-          showToast(`Request #TR${String(requestId).padStart(4, '0')} rejected successfully!`, 'success');
-          setTimeout(() => location.reload(), 1500);
-        } else {
-          showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
-        }
-      } else {
-        // Handle HTML response
-        const modal = bootstrap.Modal.getInstance(document.getElementById('rejectModal'));
-        if (modal) modal.hide();
-        
-        setTimeout(() => location.reload(), 500);
-      }
-    } else {
-      showToast(`Server error: ${response.status}`, 'danger');
-    }
-  } catch (error) {
-    console.error('Error:', error);
-    showToast('An error occurred while rejecting the request.', 'danger');
-  } finally {
-    submitBtn.disabled = false;
-    spinner.classList.add('d-none');
-    btnText.textContent = 'Reject Request';
-  }
+        if (data.success) { bootstrap.Modal.getInstance(document.getElementById('rejectModal'))?.hide(); showToast(`Request #TR${String(requestId).padStart(4, '0')} rejected successfully!`, 'success'); setTimeout(() => location.reload(), 1500); }
+        else showToast(`Error: ${data.error || 'Unknown error'}`, 'danger');
+      } else { bootstrap.Modal.getInstance(document.getElementById('rejectModal'))?.hide(); setTimeout(() => location.reload(), 500); }
+    } else showToast(`Server error: ${response.status}`, 'danger');
+  } catch (error) { showToast('An error occurred while rejecting the request.', 'danger'); }
+  finally { submitBtn.disabled = false; spinner.classList.add('d-none'); document.getElementById('rejectBtnText').textContent = 'Reject Request'; }
 }
 
-
-
-// Duplicate request function
 async function duplicateRequest(requestId) {
   try {
     const response = await fetch(`{% url "transfer_request_json" 0 %}`.replace('0', requestId));
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    
-    if (!data.success) {
-      alert('Failed to load request data for duplication');
-      return;
-    }
-    
+    if (!data.success) { alert('Failed to load request data for duplication'); return; }
     const r = data.request;
-    
-    // Show new request modal with copied data
-    requestItemCounter = 0;
-    totalBaseUnits = 0;
+    requestItemCounter = 0; totalBaseUnits = 0;
     document.getElementById('newRequestForm').reset();
     document.getElementById('requestItemsBody').innerHTML = '';
-    document.getElementById('stockAlert').style.display = 'none';
-    document.getElementById('formErrorsAlert').style.display = 'none';
-    
     document.getElementById('editRequestId').value = '';
     document.getElementById('modalTitle').textContent = 'Duplicate Transfer Request';
     document.getElementById('submitBtnText').textContent = 'Create Duplicate';
-    
     document.getElementById('from_store').value = r.from_store || '';
+    document.getElementById('selectedFromStoreText').textContent = r.from_store_name || 'Select source store';
     document.getElementById('to_store').value = r.to_store || '';
+    document.getElementById('selectedToStoreText').textContent = r.to_store_name || 'Select destination store';
     document.getElementById('priority').value = r.priority || 'normal';
+    document.getElementById('selectedPriorityText').textContent = r.priority_display || 'Normal';
     document.getElementById('required_date').value = r.required_date || '';
     document.getElementById('department').value = r.department || '';
+    document.getElementById('selectedDepartmentText').textContent = r.department_name || 'Select a department';
     document.getElementById('reason').value = r.reason ? `${r.reason} (Duplicate of #TR${r.id})` : '';
-    
     await loadProductsFromAPI();
-    
     for (const item of r.items) {
       const idx = addRequestItem();
-      
       const productSelect = document.querySelector(`.product-select[data-item-id="${idx}"]`);
       productSelect.value = item.product_id;
-      
+      document.getElementById(`selectedProductText-${idx}`).textContent = item.product_name || 'Select product...';
       await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const unitSelect = document.querySelector(`.unit-select[data-item-id="${idx}"]`);
       if (item.units_id) {
+        const unitSelect = document.querySelector(`.unit-select[data-item-id="${idx}"]`);
         unitSelect.value = item.units_id;
-        await new Promise(resolve => setTimeout(resolve, 100));
+        document.getElementById(`selectedUnitText-${idx}`).textContent = item.unit_name || 'Select unit...';
+        const cfInput = document.getElementById(`conversion-factor-${idx}`);
+        if (cfInput && item.conversion_factor) cfInput.value = item.conversion_factor;
         await handleUnitChange(idx);
       }
-      
-      const qtyInput = document.querySelector(`input[name="items-${idx}-quantity"]`);
-      qtyInput.value = item.quantity;
-      
+      document.querySelector(`input[name="items-${idx}-quantity"]`).value = item.quantity;
       const notesInput = document.querySelector(`input[name="items-${idx}-notes"]`);
-      if (notesInput && item.notes) {
-        notesInput.value = item.notes;
-      }
-      
+      if (notesInput && item.notes) notesInput.value = item.notes;
       await updateStockAvailability(idx);
       await handleQuantityChange(idx);
     }
-    
-    const modal = new bootstrap.Modal(document.getElementById('newRequestModal'));
-    modal.show();
-    
-  } catch (error) {
-    console.error('Error duplicating request:', error);
-    showToast('Error duplicating request', 'danger');
-  }
+    new bootstrap.Modal(document.getElementById('newRequestModal')).show();
+  } catch (error) { showToast('Error duplicating request', 'danger'); }
 }
 
-// Other functions
 function cancelRequest(requestId) {
   if (confirm('Are you sure you want to cancel this transfer request?')) {
-    console.log('Cancel request:', requestId);
     showToast('Cancel functionality not yet implemented', 'warning');
   }
 }
 
-function refreshRequests() {
-  location.reload();
-}
+function refreshRequests() { location.reload(); }
 
-// Initialize page
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM loaded');
-  
-  if (typeof feather !== 'undefined') {
-    feather.replace();
-  }
-  
-  // Load products on page load
+  if (typeof feather !== 'undefined') feather.replace();
   loadProductsFromAPI();
   
-  const rejectModal = document.getElementById('rejectModal');
-  if (rejectModal) {
-    rejectModal.addEventListener('hidden.bs.modal', function () {
-      document.getElementById('rejectComments').classList.remove('is-invalid');
-    });
-  }
-  
-  const approveModal = document.getElementById('approveModal');
-  if (approveModal) {
-    approveModal.addEventListener('hidden.bs.modal', function () {
-      const approveBtn = document.getElementById('confirmApproveBtn');
-      approveBtn.disabled = false;
-      approveBtn.querySelector('.spinner-border').classList.add('d-none');
-      document.getElementById('approveBtnText').textContent = 'Approve Request';
-    });
-  }
-  
-  // Initialize conversion factor help
-  document.querySelectorAll('.conversion-factor-info').forEach(el => {
-    el.addEventListener('mouseenter', function() {
-      this.style.cursor = 'help';
-    });
+  document.getElementById('rejectModal')?.addEventListener('hidden.bs.modal', function() {
+    document.getElementById('rejectComments').classList.remove('is-invalid');
   });
-  
-  // Debug: Check if URLs are resolving correctly
-  console.log('Product units URL template:', '{% url "product_units" 0 %}');
-  console.log('Create transfer request URL:', '{% url "create_transfer_request" %}');
+  document.getElementById('approveModal')?.addEventListener('hidden.bs.modal', function() {
+    const btn = document.getElementById('confirmApproveBtn');
+    btn.disabled = false;
+    btn.querySelector('.spinner-border').classList.add('d-none');
+    document.getElementById('approveBtnText').textContent = 'Approve Request';
+  });
 });
 </script>
 
-
-
 <style>
-.is-invalid {
-  border-color: #dc3545 !important;
+.dropdown-search-container { position: relative; width: 100%; }
+.dropdown-search-input {
+    width: 100%; height: 38px; padding: 0.375rem 2rem 0.375rem 0.75rem;
+    font-size: 1rem; color: #212529; background-color: #fff;
+    border: 1px solid #dee2e6; border-radius: 0.25rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    white-space: nowrap; overflow: hidden; z-index: 1050;
 }
-
-.is-invalid:focus {
-  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
+.dropdown-search-input:hover { background-color: #f8f9fa; }
+.dropdown-search-input.is-invalid { border-color: #dc3545; }
+.dropdown-selected-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown-arrow { transition: transform 0.2s; }
+.dropdown-search-menu {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    z-index: 1060; min-width: 200px; margin-top: 4px; background-color: #fff;
+    border: 1px solid #dee2e6; border-radius: 0.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-
-.invalid-feedback {
-  display: none;
-  width: 100%;
-  margin-top: 0.25rem;
-  font-size: 0.875em;
-  color: #dc3545;
-}
-
-.is-invalid ~ .invalid-feedback {
-  display: block;
-}
-
-.stock-info {
-  min-height: 40px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.available-stock {
-  font-weight: bold;
-  font-size: 0.9rem;
-  font-family: 'Courier New', monospace;
-}
-
-.available-stock.text-success {
-  color: #198754 !important;
-}
-
-.available-stock.text-warning {
-  color: #ffc107 !important;
-}
-
-.available-stock.text-danger {
-  color: #dc3545 !important;
-}
-
-.available-stock.text-muted {
-  color: #6c757d !important;
-}
-
-.available-stock.text-info {
-  color: #0dcaf0 !important;
-}
-
-.remaining-stock {
-  font-size: 0.75rem;
-  margin-top: 2px;
-}
-
-.conversion-factor-info {
-  font-size: 0.7rem;
-  padding: 0.1rem 0.3rem;
-  border-radius: 0.2rem;
-  display: inline-block;
-}
-
-.conversion-factor-info.text-success {
-  background-color: rgba(25, 135, 84, 0.1);
-  border: 1px solid rgba(25, 135, 84, 0.2);
-}
-
-.conversion-factor-info.text-info {
-  background-color: rgba(13, 202, 240, 0.1);
-  border: 1px solid rgba(13, 202, 240, 0.2);
-}
-
-.unit-info {
-  min-height: 30px;
-}
-
-.cf-display-text {
-  font-size: 0.75rem;
-  display: block;
-  margin-top: 2px;
-}
-
-.cf-display-text.text-success {
-  color: #198754;
-  font-weight: 500;
-}
-
-.cf-display-text.text-info {
-  color: #0dcaf0;
-}
-
-.base-units-display {
-  font-size: 0.9rem;
-  padding: 0.3rem;
-  border-radius: 0.25rem;
-  background-color: #f8f9fa;
-  border: 1px solid #dee2e6;
-}
-
-.base-units-display.text-primary {
-  background-color: rgba(13, 110, 253, 0.1);
-  border-color: rgba(13, 110, 253, 0.2);
-}
-
-.base-units-display.text-danger {
-  background-color: rgba(220, 53, 69, 0.1);
-  border-color: rgba(220, 53, 69, 0.2);
-}
-
-.unit-price-text {
-  font-size: 0.75rem;
-  display: block;
-  margin-top: 2px;
-}
-
-.unit-price-text.text-success {
-  color: #198754;
-  font-weight: 500;
-}
-
-.unit-price-text.text-danger {
-  color: #dc3545;
-}
-
-option[data-is_base_unit="true"] {
-  font-weight: bold;
-  background-color: #e8f4f8;
-}
-
-.modal-body {
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-#requestItemsTable tbody tr:hover {
-  background-color: rgba(0, 0, 0, 0.02);
-}
-
-#requestItemsTable tfoot td {
-  padding: 0.5rem;
-  background-color: #f8f9fa;
-  border-top: 2px solid #dee2e6;
-}
-
-.conversion-summary .dropdown-menu {
-  max-width: 500px !important;
-}
-
-.conversion-summary .dropdown-item {
-  white-space: normal !important;
-}
-
+.dropdown-search-header { padding: 0.5rem; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; gap: 0.5rem; }
+.dropdown-search-header i { color: #6c757d; font-size: 1rem; }
+.dropdown-search-field { width: 100%; padding: 0.25rem; border: none; outline: none; font-size: 0.875rem; }
+.dropdown-search-options { max-height: 250px; overflow-y: auto; }
+.dropdown-search-option { padding: 0.5rem 1rem; cursor: pointer; font-size: 0.875rem; transition: background-color 0.2s; }
+.dropdown-search-option:hover { background-color: #f8f9fa; }
+.dropdown-search-option[data-selected="true"] { background-color: #e7f1ff; color: #0d6efd; font-weight: 500; }
+.dropdown-search-option[data-selected="true"]:hover { background-color: #d4e4ff; }
+.modal { z-index: 1050 !important; }
+.modal-backdrop { z-index: 1040 !important; }
+.is-invalid { border-color: #dc3545 !important; }
+.invalid-feedback { display: none; width: 100%; margin-top: 0.25rem; font-size: 0.875em; color: #dc3545; }
+.is-invalid ~ .invalid-feedback { display: block; }
+.stock-info { min-height: 40px; display: flex; flex-direction: column; justify-content: center; }
+.available-stock { font-weight: bold; font-size: 0.9rem; font-family: 'Courier New', monospace; }
+.conversion-factor-info { font-size: 0.7rem; padding: 0.1rem 0.3rem; border-radius: 0.2rem; display: inline-block; }
+.conversion-factor-info.text-success { background-color: rgba(25,135,84,0.1); border: 1px solid rgba(25,135,84,0.2); }
+.conversion-factor-info.text-info { background-color: rgba(13,202,240,0.1); border: 1px solid rgba(13,202,240,0.2); }
+.unit-info { min-height: 30px; }
+.cf-display-text { font-size: 0.75rem; display: block; margin-top: 2px; }
+.base-units-display { font-size: 0.9rem; padding: 0.3rem; border-radius: 0.25rem; background-color: #f8f9fa; border: 1px solid #dee2e6; }
+.base-units-display.text-primary { background-color: rgba(13,110,253,0.1); border-color: rgba(13,110,253,0.2); }
+.base-units-display.text-danger { background-color: rgba(220,53,69,0.1); border-color: rgba(220,53,69,0.2); }
+.modal-body { max-height: 70vh; overflow-y: auto; }
+.modal-body::-webkit-scrollbar { width: 8px; }
+.modal-body::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+.modal-body::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+#requestItemsTable tfoot td { padding: 0.5rem; background-color: #f8f9fa; border-top: 2px solid #dee2e6; }
+.transfer-route { font-size: 0.875rem; margin-bottom: 2px; }
+.empty-state { padding: 3rem 1rem; }
+.table-warning { --bs-table-bg: rgba(255,193,7,0.1); }
+.table-danger { --bs-table-bg: rgba(220,53,69,0.1); }
+.action-table-data .btn { margin: 0 2px; }
+.feather-48 { width: 48px; height: 48px; }
+.feather-24 { width: 24px; height: 24px; }
+.feather-12 { width: 12px; height: 12px; }
+.badge { transition: all 0.3s ease; }
+.card { transition: box-shadow 0.3s ease; }
+.card:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+#approveModal .modal-header { background-color: #198754; color: white; border-bottom: none; }
+#rejectModal .modal-header { background-color: #dc3545; color: white; border-bottom: none; }
+#approveModal .btn-close, #rejectModal .btn-close { filter: invert(1); }
+#conversionHelpModal .modal-header { background-color: #0d6efd; color: white; border-bottom: none; }
+.toast { margin-bottom: 0.5rem; }
 @media (max-width: 768px) {
-  #requestItemsTable {
-    font-size: 0.75rem;
-  }
-  
-  #requestItemsTable .form-control-sm,
-  #requestItemsTable .form-select-sm {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-  }
-  
-  #requestItemsTable th,
-  #requestItemsTable td {
-    padding: 0.5rem 0.25rem;
-  }
-  
-  .available-stock {
-    font-size: 0.8rem;
-  }
-  
-  .cf-display-text {
-    font-size: 0.7rem;
-  }
-  
-  .conversion-factor-info {
-    font-size: 0.65rem;
-  }
-  
-  .base-units-display {
-    font-size: 0.8rem;
-    padding: 0.2rem;
-  }
-  
-  .conversion-summary .btn-sm {
-    padding: 0.1rem 0.3rem;
-    font-size: 0.7rem;
-  }
-}
-
-.transfer-route {
-  font-size: 0.875rem;
-  margin-bottom: 2px;
-}
-
-.empty-state {
-  padding: 3rem 1rem;
-}
-
-.table-warning {
-  --bs-table-bg: rgba(255, 193, 7, 0.1);
-}
-
-.table-danger {
-  --bs-table-bg: rgba(220, 53, 69, 0.1);
-}
-
-.action-table-data .btn {
-  margin: 0 2px;
-}
-
-.feather-48 {
-  width: 48px;
-  height: 48px;
-}
-
-.feather-24 {
-  width: 24px;
-  height: 24px;
-}
-
-.feather-12 {
-  width: 12px;
-  height: 12px;
-}
-
-.loading {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-}
-
-.badge {
-  transition: all 0.3s ease;
-}
-
-.badge:hover {
-  transform: scale(1.05);
-}
-
-.card {
-  transition: box-shadow 0.3s ease;
-}
-
-.card:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-#approveModal .modal-content,
-#rejectModal .modal-content {
-  border: none;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-}
-
-#approveModal .modal-header {
-  background-color: #198754;
-  color: white;
-  border-bottom: none;
-}
-
-#rejectModal .modal-header {
-  background-color: #dc3545;
-  color: white;
-  border-bottom: none;
-}
-
-#approveModal .btn-close,
-#rejectModal .btn-close {
-  filter: invert(1);
-}
-
-#conversionHelpModal .modal-content {
-  border: none;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
-}
-
-#conversionHelpModal .modal-header {
-  background-color: #0d6efd;
-  color: white;
-  border-bottom: none;
-}
-
-.toast {
-  margin-bottom: 0.5rem;
-}
-
-@media (max-width: 768px) {
-  .table-responsive {
-    font-size: 0.875rem;
-  }
-  
-  .transfer-route {
-    font-size: 0.75rem;
-  }
-  
-  .btn-sm {
-    padding: 0.25rem 0.5rem;
-  }
-  
-  .modal-xl {
-    max-width: 95%;
-  }
-  
-  .action-table-data .edit-delete-action {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-  }
-  
-  #approveModal,
-  #rejectModal,
-  #conversionHelpModal {
-    padding: 0.5rem;
-  }
-}
-
-.fa-info-circle {
-  color: #0dcaf0;
-}
-
-.base-unit-indicator {
-  font-size: 0.7rem;
-  color: #198754;
-  margin-left: 0.25rem;
-}
-
-/* Custom scrollbar for modals */
-.modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* Highlight for conversion calculations */
-.calculation-highlight {
-  background-color: #fff3cd;
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-family: monospace;
-  font-weight: bold;
-  color: #856404;
-}
-
-/* Animation for conversion updates */
-@keyframes highlightUpdate {
-  0% { background-color: #d1ecf1; }
-  100% { background-color: transparent; }
-}
-
-.highlight-update {
-  animation: highlightUpdate 1s ease-out;
+  .modal-xl { max-width: 95%; }
+  .action-table-data .edit-delete-action { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+  #requestItemsTable { font-size: 0.75rem; }
 }
 </style>
 {% endblock %}

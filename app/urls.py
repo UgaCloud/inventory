@@ -41,6 +41,9 @@ urlpatterns = [
     path('accounts/', manage_accounts_view, name='accounts_page'),
     path('under_maintenance/', under_maintenance_view, name='under_maintenance_page'),
     
+    
+    path('app/dashboard/orders-by-date/', orders_by_date, name='orders_by_date_api'),
+    
     # Organization
     path('branches/', manage_branches, name = 'manage_branch_page'),
     path('edit_branch/<int:branch_id>/', edit_branch, name = 'edit_branch_page'),
@@ -276,6 +279,8 @@ urlpatterns = [
     path('reorder-details/', inventory_reports.reorder_details, name='reorder_details'), 
     path('productpricing-details/', inventory_reports.productpricing_details, name='productpricing_details'),
     path('profile-details/', profile_views.profile_view, name='profile_details'),
+    
+    path('inventory-details/export/pdf/', inventory_reports.export_inventory_pdf, name='export_inventory_pdf'),
    
    
      # Sales details report
@@ -284,11 +289,19 @@ urlpatterns = [
     path('sales-details/export/pdf/', inventory_reports.export_sales_pdf, name='export_sales_pdf'),
     path('sales-details/export/excel/', inventory_reports.export_sales_excel, name='export_sales_excel'),
    
-    path('reports/purchase/<str:report_type>/', inventory_reports.purchase_details, name='purchase_report_type'),
-    path('reports/purchase/<str:report_type>/<str:period>/',inventory_reports.purchase_details, name='purchase_report_period'),
+   
     path('reports/purchase/export/csv/', inventory_reports.export_purchase_csv, name='export_purchase_csv'),
     path('reports/purchase/export/pdf/', inventory_reports.export_purchase_pdf, name='export_purchase_pdf'),
     path('reports/purchase/export/excel/', inventory_reports.export_purchase_excel, name='export_purchase_excel'),
+    path('reports/purchase/<str:report_type>/', inventory_reports.purchase_details, name='purchase_report_type'),
+    path('reports/purchase/<str:report_type>/<str:period>/',inventory_reports.purchase_details, name='purchase_report_period'),
+
+    path('stock-adjustment-details/export/pdf/', inventory_reports.export_stockadj_pdf, name='export_stockadj_pdf'),
+    path('transfer-details/export/pdf/', inventory_reports.export_transfer_pdf, name='export_transfer_pdf'),
+    path('productmaster-details/export/pdf/', inventory_reports.export_productmaster_pdf, name='export_productmaster_pdf'),
+    path('stocklocation-details/export/pdf/', inventory_reports.export_stocklocation_pdf, name='export_stocklocation_pdf'),
+    path('reorder-details/export/pdf/', inventory_reports.export_reorder_pdf, name='export_reorder_pdf'),
+
 
 
     path('api/adjustments/<int:adjustment_id>/details/', inventory_reports.adjustment_details_api, name='adjustment_details_api'),

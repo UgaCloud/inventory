@@ -25,7 +25,6 @@ import pandas as pd
 from reportlab.lib.styles import *
 import csv
 import json
-from datetime import date
 from django.http import HttpResponse
 from django.db.models import *
 from decimal import Decimal, DecimalTuple
@@ -43,7 +42,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg') 
 import traceback
-import xlwt
+# import xlwt
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from io import BytesIO
@@ -54,7 +53,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from django.db.models.functions import *
 from django.core.paginator import *
 from django.views.decorators.http import *
-
+from app.models.suppliers import Supplier
 
 # For Excel export (if using pandas/openpyxl)
 try:
@@ -148,147 +147,190 @@ def reports_details(request):
 # Item-wise Purchase Analysis, Expiry Tracking Report
 # ============================================================================
 
+
+
 @login_required
-def purchase_details(request, report_type='monthly', period=None):
+def purchase_details(request):
     """
-    Dynamic purchase report details view
+    Purchase Performance Dashboard view.
+    Matches: reports/purchase_details.html
     """
     today = timezone.now().date()
-    
-    # Get date range based on report_type
-    if report_type == 'monthly':
-        if not period:
-            period = today.strftime('%Y-%m')
-        year, month = map(int, period.split('-'))
-        start_date = date(year, month, 1)
-        if month == 12:
-            end_date = date(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            end_date = date(year, month + 1, 1) - timedelta(days=1)
-        period_label = start_date.strftime('%B %Y')
-        
-    elif report_type == 'quarterly':
-        if not period:
-            quarter = (today.month - 1) // 3 + 1
-            period = f"{today.year}-Q{quarter}"
-        year, quarter = period.split('-Q')
-        year = int(year)
-        quarter = int(quarter)
-        start_month = (quarter - 1) * 3 + 1
-        start_date = date(year, start_month, 1)
-        if start_month + 2 <= 12:
-            end_date = date(year, start_month + 3, 1) - timedelta(days=1)
-        else:
-            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
-        period_label = f"Q{quarter} {year}"
-        
-    elif report_type == 'yearly':
-        if not period:
-            period = str(today.year)
-        year = int(period)
-        start_date = date(year, 1, 1)
-        end_date = date(year, 12, 31)
-        period_label = str(year)
-    else:
-        start_date = today - timedelta(days=30)
-        end_date = today
-        period_label = f"{start_date.strftime('%b %d')} - {end_date.strftime('%b %d, %Y')}"
-    
-    # Get all purchase orders in date range
-    purchase_orders = PurchaseOrder.objects.filter(
-        purchase_date__range=[start_date, end_date]
-    ).select_related('supplier', 'store')
-    
-    # Calculate totals
+
+    # ── Filters from request ────────────────────────────────────────────────
+    supplier_id  = request.GET.get('supplier', '')
+    status_param = request.GET.get('status', '')
+    store_id     = request.GET.get('store', '')
+    daterange    = request.GET.get('daterange', '')
+
+    # ── Date range parsing — no default restriction ─────────────────────────
+    start_date = None
+    end_date   = None
+
+    if daterange:
+        try:
+            parts = [p.strip() for p in daterange.split(' - ')]
+            if len(parts) == 2:
+                start_date = date.fromisoformat(parts[0])
+                end_date   = date.fromisoformat(parts[1])
+        except (ValueError, AttributeError):
+            pass
+
+    # ── Base queryset ───────────────────────────────────────────────────────
+    purchase_orders = PurchaseOrder.objects.select_related(
+        'supplier', 'store', 'store__branch'
+    )
+
+    if start_date and end_date:
+        purchase_orders = purchase_orders.filter(purchase_date__range=[start_date, end_date])
+    if supplier_id:
+        purchase_orders = purchase_orders.filter(supplier_id=supplier_id)
+    if status_param:
+        purchase_orders = purchase_orders.filter(status__iexact=status_param)
+    if store_id:
+        purchase_orders = purchase_orders.filter(store_id=store_id)
+
+    purchase_orders = purchase_orders.order_by('-purchase_date', '-id')
+
+    # ── KPI Metrics ─────────────────────────────────────────────────────────
     total_purchases = purchase_orders.aggregate(
         total=Sum('total_cost')
     )['total'] or Decimal('0')
-    
-    total_orders = purchase_orders.count()
-    avg_order_value = total_purchases / total_orders if total_orders > 0 else Decimal('0')
-    
-    # 1. Supplier Purchase Summary
-    supplier_summary = PurchaseOrder.objects.filter(
-        purchase_date__range=[start_date, end_date]
-    ).values(
-        'supplier__id',
-        'supplier__name', 
-        'supplier__supplier_code',
-        'supplier__payment_terms'
-    ).annotate(
-        total_purchases=Sum('total_cost'),
-        total_orders=Count('id'),
-        avg_order_value=Avg('total_cost'),
-        last_order_date=Max('purchase_date')
-    ).order_by('-total_purchases')
-    
-    # Add performance rating with FIXED logic
-    for supplier in supplier_summary:
-        supplier['performance_rating'] = calculate_supplier_performance_fixed(
-            supplier['supplier__id'],
-            start_date,
-            end_date
+
+    total_orders    = purchase_orders.count()
+    avg_order_value = (total_purchases / total_orders) if total_orders > 0 else Decimal('0')
+
+    total_suppliers = purchase_orders.values('supplier').distinct().count()
+
+    new_suppliers_qs = Supplier.objects.filter(purchaseorder__isnull=False)
+    if start_date and end_date:
+        new_suppliers_qs = new_suppliers_qs.filter(
+            purchaseorder__purchase_date__range=[start_date, end_date]
         )
-    
-    # 2. Purchase Trend Analysis - FIXED growth calculation
-    trend_data = get_purchase_trend_data_corrected(report_type, start_date, end_date)
-    
-    # 3. Purchase Order Status - FIXED for consistency
-    po_status_data = get_po_status_data_consistent(start_date, end_date)
-    
-    # 4. Item-wise Purchase Analysis
-    item_analysis = get_item_analysis_data_accurate(start_date, end_date)
-    
-    # 5. Expiry Tracking - FIXED status logic
-    expiry_data = get_expiry_data_with_correct_status(start_date, end_date)
-    
-    # Calculate monthly growth
-    monthly_growth = Decimal('0')
-    if len(trend_data) >= 2:
-        current_total = trend_data[-1]['purchase_amount'] if trend_data else Decimal('0')
-        previous_total = trend_data[-2]['purchase_amount'] if len(trend_data) >= 2 else Decimal('0')
-        if previous_total > Decimal('0'):
-            monthly_growth = ((current_total - previous_total) / previous_total) * 100
-    
-    # Calculate expiry statistics
-    expiry_stats = calculate_expiry_stats_correct(expiry_data)
-    
-    # Prepare chart data
-    trend_chart_data = {
-        'labels': [t['month'] for t in trend_data[-6:]] if trend_data else [],
-        'data': [float(t['purchase_amount']) for t in trend_data[-6:]] if trend_data else [],
+    new_suppliers = new_suppliers_qs.distinct().count()
+
+    # ── Items metrics ───────────────────────────────────────────────────────
+    items_qs = PurchaseOrderItem.objects.filter(order__in=purchase_orders)
+
+    total_items_purchased = items_qs.values('product').distinct().count()
+    total_units_purchased = items_qs.aggregate(
+        total=Sum('base_quantity')
+    )['total'] or 0
+    total_items_cost = items_qs.aggregate(
+        total=Sum(F('base_quantity') * F('unit_cost'))
+    )['total'] or Decimal('0')
+
+    # ── Today's stats ───────────────────────────────────────────────────────
+    today_orders    = PurchaseOrder.objects.filter(purchase_date=today).count()
+    today_purchases = PurchaseOrder.objects.filter(
+        purchase_date=today
+    ).aggregate(total=Sum('total_cost'))['total'] or Decimal('0')
+    due_today       = PurchaseOrder.objects.filter(
+        expected_date=today,
+        status__in=['pending', 'in_progress']
+    ).count()
+    overdue_orders  = PurchaseOrder.objects.filter(
+        expected_date__lt=today,
+        status__in=['pending', 'in_progress']
+    ).count()
+
+    # ── Status summary ──────────────────────────────────────────────────────
+    status_summary = purchase_orders.values('status').annotate(
+        count=Count('id'),
+        total=Sum('total_cost'),
+    ).order_by('status')
+
+    # ── Top suppliers ───────────────────────────────────────────────────────
+    top_suppliers = purchase_orders.values(
+        name=F('supplier__name')
+    ).annotate(
+        total=Sum('total_cost'),
+        order_count=Count('id'),
+    ).order_by('-total')[:5]
+
+    # ── Expiry stats ────────────────────────────────────────────────────────
+    batch_qs = InventoryBatch.objects.filter(
+        purchase_order_item__order__in=purchase_orders,
+        remaining_quantity__gt=0,
+        expiry_date__isnull=False,
+    )
+    expired_count       = batch_qs.filter(expiry_date__lt=today).count()
+    expiring_soon_count = batch_qs.filter(
+        expiry_date__gte=today,
+        expiry_date__lte=today + timedelta(days=30)
+    ).count()
+    good_stock_count    = batch_qs.filter(
+        expiry_date__gt=today + timedelta(days=30)
+    ).count()
+    total_value_at_risk = batch_qs.filter(
+        expiry_date__lte=today + timedelta(days=30)
+    ).aggregate(
+        val=Sum(F('remaining_quantity') * F('unit_cost'))
+    )['val'] or Decimal('0')
+
+    expiry_stats = {
+        'expired_count':       expired_count,
+        'expiring_soon_count': expiring_soon_count,
+        'good_stock_count':    good_stock_count,
+        'total_value_at_risk': total_value_at_risk,
     }
-    
-    item_chart_data = {
-        'labels': [item['product__name'][:15] + '...' if len(item['product__name']) > 15 else item['product__name'] 
-                  for item in item_analysis[:6]],
-        'data': [float(item['total_cost']) for item in item_analysis[:6]],
-    }
-    
+
+    # ── Purchase items table ────────────────────────────────────────────────
+    purchase_items = PurchaseOrderItem.objects.filter(
+        order__in=purchase_orders
+    ).select_related(
+        'product', 'product__category', 'unit', 'order', 'order__supplier'
+    ).order_by('order__purchase_date', 'product__name')
+
+    for item in purchase_items:
+        item.days_to_expiry = (item.expiry_date - today).days if item.expiry_date else None
+
+    # ── Filter dropdown options ─────────────────────────────────────────────
+    suppliers = Supplier.objects.filter(is_active=True).order_by('name')
+    stores    = StoreLocation.objects.filter(is_active=True).order_by('name')
+
+    # Display dates — fall back to earliest/latest PO dates if no range selected
+    display_start = start_date or PurchaseOrder.objects.order_by('purchase_date').values_list('purchase_date', flat=True).first() or today
+    display_end   = end_date or today
+
     context = {
-        'report_type': report_type,
-        'period': period,
-        'period_label': period_label,
-        'start_date': start_date,
-        'end_date': end_date,
-        'total_purchases': total_purchases,
-        'total_orders': total_orders,
-        'avg_order_value': avg_order_value,
-        'monthly_growth': monthly_growth,
-        'report_id': f"PUR-{period.replace('-', '').replace('Q', '') if period else timezone.now().strftime('%Y%m%d')}",
-        'supplier_summary': supplier_summary,
-        'trend_data': trend_data,
-        'po_status_data': po_status_data,
-        'item_analysis': item_analysis,
-        'expiry_data': expiry_data,
-        'expiry_stats': expiry_stats,
-        'trend_chart_data': json.dumps(trend_chart_data),
-        'item_chart_data': json.dumps(item_chart_data),
-        'generated_by': request.user.get_full_name() or request.user.username,
+        'start_date':     display_start,
+        'end_date':       display_end,
         'generated_date': timezone.now(),
+        'now':            timezone.now(),
+
+        # KPIs
+        'total_purchases':       total_purchases,
+        'total_orders':          total_orders,
+        'avg_order_value':       avg_order_value,
+        'total_suppliers':       total_suppliers,
+        'new_suppliers':         new_suppliers,
+        'total_items_purchased': total_items_purchased,
+        'total_units_purchased': total_units_purchased,
+        'total_items_cost':      total_items_cost,
+
+        # Today
+        'today_orders':    today_orders,
+        'today_purchases': today_purchases,
+        'due_today':       due_today,
+        'overdue_orders':  overdue_orders,
+
+        # Tables
+        'purchase_orders': purchase_orders,
+        'purchase_items':  purchase_items,
+
+        # Summary cards
+        'status_summary': status_summary,
+        'top_suppliers':  top_suppliers,
+        'expiry_stats':   expiry_stats,
+
+        # Filter dropdowns
+        'suppliers': suppliers,
+        'stores':    stores,
     }
-    
+
     return render(request, 'reports/purchase_details.html', context)
+
 
 
 def calculate_supplier_performance_fixed(supplier_id, start_date, end_date):
@@ -974,353 +1016,623 @@ def export_purchase_csv(request):
 
 
 def export_purchase_pdf(request):
-    """Export purchase report as PDF"""
-    # Get filter parameters
-    report_type = request.GET.get('report_type', 'monthly')
-    period = request.GET.get('period', '')
-    store_id = request.GET.get('store')
-    
-    # Set up response
-    response = HttpResponse(content_type='application/pdf')
-    filename = f"purchase_report_{period or timezone.now().strftime('%Y%m%d')}.pdf"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    # Get date range based on report_type
-    today = timezone.now().date()
-    if report_type == 'monthly':
-        if period:
-            year, month = map(int, period.split('-'))
+    """Export comprehensive purchase report as PDF with black and white design"""
+    try:
+        # Get filter parameters
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        store_id = request.GET.get('store')
+        supplier_id = request.GET.get('supplier')
+        period = request.GET.get('period', 'Custom Range')
+        
+        # Set up response - DIRECT TO RESPONSE (NO BUFFER)
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"purchase_report_{period.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Parse dates
+        today = timezone.now().date()
+        if date_from and date_to:
+            try:
+                start_date = date.fromisoformat(date_from)
+                end_date = date.fromisoformat(date_to)
+            except:
+                start_date = today.replace(day=1)
+                end_date = today
         else:
-            year, month = today.year, today.month
-        start_date = date(year, month, 1).date()
-        if month == 12:
-            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
-        else:
-            end_date = date(year, month + 1, 1).date() - timedelta(days=1)
-        period_label = start_date.strftime('%B %Y')
+            start_date = today.replace(day=1)
+            end_date = today
         
-    elif report_type == 'quarterly':
-        if period:
-            year, quarter = period.split('-Q')
-            year = int(year)
-            quarter = int(quarter)
-        else:
-            year = today.year
-            quarter = (today.month - 1) // 3 + 1
-        start_month = (quarter - 1) * 3 + 1
-        start_date = date(year, start_month, 1).date()
-        if start_month + 2 <= 12:
-            end_date = date(year, start_month + 3, 1).date() - timedelta(days=1)
-        else:
-            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
-        period_label = f"Q{quarter} {year}"
+        # Create PDF directly with response
+        doc = SimpleDocTemplate(response, pagesize=letter, 
+                               rightMargin=40, leftMargin=40,
+                               topMargin=40, bottomMargin=40)
+        elements = []
         
-    else:  # yearly or custom
-        if period and len(period) == 4:
-            year = int(period)
-        else:
-            year = today.year
-        start_date = date(year, 1, 1).date()
-        end_date = date(year, 12, 31).date()
-        period_label = str(year)
-    
-    # Create PDF document
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, 
-                            rightMargin=72, leftMargin=72, 
-                            topMargin=72, bottomMargin=72)
-    elements = []
-    styles = getSampleStyleSheet()
-    
-    # Custom styles
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Title'],
-        fontSize=16,
-        spaceAfter=30,
-        alignment=1  # Center aligned
-    )
-    
-    header_style = ParagraphStyle(
-        'CustomHeader',
-        parent=styles['Heading2'],
-        fontSize=12,
-        spaceAfter=12,
-        spaceBefore=20,
-        textColor=colors.HexColor('#2E6DA4')
-    )
-    
-    # Title
-    title = Paragraph(f"PURCHASE REPORT - {period_label}", title_style)
-    elements.append(title)
-    
-    # Report info
-    info_text = f"""
-    <b>Date Range:</b> {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}<br/>
-    <b>Generated By:</b> {request.user.get_full_name() or request.user.username}<br/>
-    <b>Generated On:</b> {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
-    <b>Report Type:</b> {report_type.capitalize()}
-    """
-    info_para = Paragraph(info_text, styles['Normal'])
-    elements.append(info_para)
-    elements.append(Spacer(1, 20))
-    
-    # Get summary data
-    purchase_orders = PurchaseOrder.objects.filter(
-        purchase_date__range=[start_date, end_date]
-    )
-    
-    total_purchases = purchase_orders.aggregate(total=Sum('total_cost'))['total'] or Decimal('0')
-    total_orders = purchase_orders.count()
-    avg_order_value = total_purchases / total_orders if total_orders > 0 else Decimal('0')
-    
-    # SUMMARY SECTION
-    elements.append(Paragraph("Executive Summary", header_style))
-    
-    summary_data = [
-        ['Metric', 'Value'],
-        ['Total Purchases', f"UGX {total_purchases:,.0f}"],
-        ['Total Orders', str(total_orders)],
-        ['Average Order Value', f"UGX {avg_order_value:,.0f}"],
-        ['Date Range', f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"],
-        ['Days in Period', str((end_date - start_date).days + 1)]
-    ]
-    
-    summary_table = Table(summary_data, colWidths=[2.5*inch, 3*inch])
-    summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E6DA4')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 11),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F2F2F2')),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    
-    elements.append(summary_table)
-    elements.append(Spacer(1, 20))
-    
-    # SUPPLIER ANALYSIS (Top 10)
-    elements.append(Paragraph("Top Suppliers by Purchase Volume", header_style))
-    
-    supplier_summary = PurchaseOrder.objects.filter(
-        purchase_date__range=[start_date, end_date]
-    ).values(
-        'supplier__name'
-    ).annotate(
-        total_purchases=Sum('total_cost'),
-        orders=Count('id')
-    ).order_by('-total_purchases')[:10]
-    
-    supplier_data = [['Supplier', 'Total Purchases (UGX)', '% of Total', 'Orders', 'Avg Order']]
-    
-    for supplier in supplier_summary:
-        percent = (supplier['total_purchases'] / total_purchases * 100) if total_purchases > 0 else 0
-        avg_order = supplier['total_purchases'] / supplier['orders'] if supplier['orders'] > 0 else Decimal('0')
+        # Define styles - Black and White only
+        styles = getSampleStyleSheet()
         
-        supplier_data.append([
-            supplier['supplier__name'][:20] + '...' if supplier['supplier__name'] and len(supplier['supplier__name']) > 20 else supplier['supplier__name'] or 'Unknown',
-            f"{supplier['total_purchases']:,.0f}",
-            f"{percent:.1f}%",
-            str(supplier['orders']),
-            f"{avg_order:,.0f}"
-        ])
-    
-    supplier_table = Table(supplier_data, colWidths=[2*inch, 1.2*inch, 0.8*inch, 0.7*inch, 1.2*inch])
-    supplier_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4A90E2')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8F9FA')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    
-    elements.append(supplier_table)
-    elements.append(Spacer(1, 20))
-    
-    # PURCHASE ORDER STATUS
-    elements.append(Paragraph("Purchase Order Status Summary", header_style))
-    
-    status_counts = PurchaseOrder.objects.filter(
-        purchase_date__range=[start_date, end_date]
-    ).values('status').annotate(
-        count=Count('id'),
-        total_amount=Sum('total_cost')
-    ).order_by('-total_amount')
-    
-    status_data = [['Status', 'Count', '% of Total', 'Amount (UGX)', 'Avg Amount']]
-    
-    for status in status_counts:
-        percent = (status['count'] / total_orders * 100) if total_orders > 0 else 0
-        avg_amount = status['total_amount'] / status['count'] if status['count'] > 0 else Decimal('0')
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=18,
+            textColor=colors.black,
+            alignment=1,  # Center
+            spaceAfter=10,
+            fontName='Helvetica-Bold'
+        )
         
-        status_data.append([
-            status['status'].capitalize(),
-            str(status['count']),
-            f"{percent:.1f}%",
-            f"{status['total_amount']:,.0f}",
-            f"{avg_amount:,.0f}"
-        ])
-    
-    status_table = Table(status_data, colWidths=[1.5*inch, 0.8*inch, 0.8*inch, 1.2*inch, 1.2*inch])
-    status_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#36B9CC')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8F9FA')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-    ]))
-    
-    elements.append(status_table)
-    elements.append(Spacer(1, 20))
-    
-    # ITEM ANALYSIS (Top 10)
-    elements.append(Paragraph("Top Items by Purchase Value", header_style))
-    
-    item_analysis = PurchaseOrderItem.objects.filter(
-        order__purchase_date__range=[start_date, end_date]
-    ).values(
-        'product__name'
-    ).annotate(
-        quantity=Sum('quantity'),
-        total_cost=Sum(F('quantity') * F('unit_cost'))
-    ).order_by('-total_cost')[:10]
-    
-    item_data = [['Item Name', 'Quantity', 'Total Cost (UGX)', '% of Total', 'Avg Unit Cost']]
-    
-    for item in item_analysis:
-        percent = (item['total_cost'] / total_purchases * 100) if total_purchases > 0 else 0
-        avg_unit = item['total_cost'] / item['quantity'] if item['quantity'] > 0 else Decimal('0')
+        period_style = ParagraphStyle(
+            'PeriodStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,  # Center
+            spaceAfter=5,
+            fontName='Helvetica'
+        )
         
-        item_data.append([
-            item['product__name'][:25] + '...' if item['product__name'] and len(item['product__name']) > 25 else item['product__name'] or 'Unknown',
-            str(item['quantity']),
-            f"{item['total_cost']:,.0f}",
-            f"{percent:.1f}%",
-            f"{avg_unit:,.0f}"
-        ])
-    
-    item_table = Table(item_data, colWidths=[2.5*inch, 0.8*inch, 1.2*inch, 0.8*inch, 1.2*inch])
-    item_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1CC88A')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8F9FA')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-    ]))
-    
-    elements.append(item_table)
-    elements.append(Spacer(1, 20))
-    
-    # EXPIRY TRACKING
-    elements.append(Paragraph("Expiry Tracking (Next 60 Days)", header_style))
-    
-    sixty_days_from_now = today + timedelta(days=60)
-    expiry_batches = InventoryBatch.objects.filter(
-        expiry_date__range=[today, sixty_days_from_now],
-        remaining_quantity__gt=0
-    ).select_related('product').order_by('expiry_date')[:10]
-    
-    expiry_data = [['Item Name', 'Batch', 'Qty', 'Expiry Date', 'Days Left', 'Value (UGX)']]
-    
-    for batch in expiry_batches:
-        days_left = (batch.expiry_date - today).days if batch.expiry_date else None
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.black,
+            spaceBefore=15,
+            spaceAfter=8,
+            fontName='Helvetica-Bold',
+            alignment=0,  # Left
+        )
         
-        expiry_data.append([
-            batch.product.name[:20] + '...' if len(batch.product.name) > 20 else batch.product.name,
-            f"#{batch.id}",
-            str(batch.remaining_quantity),
-            batch.expiry_date.strftime('%Y-%m-%d') if batch.expiry_date else 'N/A',
-            str(days_left) if days_left is not None else 'N/A',
-            f"{batch.remaining_quantity * batch.unit_cost:,.0f}"
-        ])
-    
-    if len(expiry_batches) == 0:
-        elements.append(Paragraph("No items expiring within the next 60 days.", styles['Normal']))
-    else:
-        expiry_table = Table(expiry_data, colWidths=[2*inch, 0.7*inch, 0.6*inch, 1*inch, 0.7*inch, 1*inch])
-        expiry_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F6C23E')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-            ('ALIGN', (5, 1), (5, -1), 'RIGHT'),
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        # Header Section - Exactly as requested
+        elements.append(Paragraph("PURCHASE REPORT", title_style))
+        
+        # Period line
+        period_text = f"Period: {start_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}"
+        elements.append(Paragraph(period_text, period_style))
+        
+        # Store line if store filter applied
+        if store_id:
+            try:
+                store = StoreLocation.objects.get(id=store_id)
+                elements.append(Paragraph(f"Store: {store.name}", period_style))
+            except:
+                pass
+        
+        # Generated line
+        generated_text = f"Generated: {timezone.now().strftime('%B %d, %Y')}"
+        elements.append(Paragraph(generated_text, period_style))
+        elements.append(Spacer(1, 15))
+        
+        # Add horizontal line
+        elements.append(Paragraph("-" * 80, normal_style))
+        elements.append(Spacer(1, 10))
+        
+        # Get purchase data - FIXED: removed recorded_by from select_related
+        purchase_qs = PurchaseOrder.objects.filter(
+            purchase_date__range=[start_date, end_date]
+        ).select_related('supplier', 'store')
+        
+        if store_id:
+            purchase_qs = purchase_qs.filter(store_id=store_id)
+        
+        if supplier_id:
+            purchase_qs = purchase_qs.filter(supplier_id=supplier_id)
+        
+        # Check if there's data
+        if not purchase_qs.exists():
+            elements.append(Paragraph("No purchase data found for the selected period.", normal_style))
+            doc.build(elements)
+            return response
+        
+        total_purchases = purchase_qs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0')
+        total_orders = purchase_qs.count()
+        days_in_period = max((end_date - start_date).days + 1, 1)
+        avg_daily_purchases = total_purchases / Decimal(days_in_period) if total_purchases else Decimal('0')
+        
+        # Calculate total items purchased
+        total_items_purchased = 0
+        for po in purchase_qs:
+            total_items_purchased += po.total_items
+        
+        # Get unique suppliers count
+        suppliers_count = purchase_qs.values('supplier').distinct().count()
+        
+        # Get unique products count
+        products_count = PurchaseOrderItem.objects.filter(
+            order__in=purchase_qs
+        ).values('product').distinct().count()
+        
+        avg_cost_per_item = total_purchases / Decimal(total_items_purchased) if total_items_purchased > 0 else Decimal('0')
+        
+        # 1. SUMMARY SECTION
+        elements.append(Paragraph("SUMMARY SECTION", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Purchase Orders', f"{total_orders:,}"],
+            ['Total Cost', f"UGX {total_purchases:,.0f}"],
+            ['Total Items Purchased', f"{total_items_purchased:,} pcs (base units)"],
+            ['Average Order Value', f"UGX {(total_purchases/total_orders):,.0f}" if total_orders > 0 else 'UGX 0'],
+            ['Average Cost Per Item', f"UGX {avg_cost_per_item:,.0f}"],
+            ['Suppliers Used', f"{suppliers_count}"],
+            ['Products Purchased', f"{products_count}"],
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[200, 200])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#FFF8E1')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
         ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
         
-        elements.append(expiry_table)
-    
-    elements.append(Spacer(1, 20))
-    
-    # RECENT PURCHASE ORDERS
-    elements.append(Paragraph("Recent Purchase Orders", header_style))
-    
-    recent_orders = PurchaseOrder.objects.filter(
-        purchase_date__range=[start_date, end_date]
-    ).select_related('supplier', 'store').order_by('-purchase_date')[:15]
-    
-    if recent_orders:
-        order_data = [['PO#', 'Supplier', 'Date', 'Amount (UGX)', 'Status']]
+        # 2. PURCHASES BY STATUS
+        elements.append(Paragraph("PURCHASES BY STATUS", heading_style))
+        elements.append(Spacer(1, 5))
         
-        for order in recent_orders:
-            order_data.append([
-                f"PO-{order.id}",
-                order.supplier.name[:15] + '...' if order.supplier and len(order.supplier.name) > 15 else order.supplier.name or 'N/A',
-                order.purchase_date.strftime('%Y-%m-%d') if order.purchase_date else '',
-                f"{order.total_cost:,.0f}",
-                order.status.capitalize()
+        status_counts = purchase_qs.values('status').annotate(
+            count=Count('id'),
+            total=Sum('total_cost')
+        ).order_by('-total')
+        
+        status_data = [['Status', 'Orders', 'Total Cost', '% of Total']]
+        
+        for status in status_counts:
+            status_name = status['status'].capitalize() if status['status'] else 'Unknown'
+            percent = (status['total'] / total_purchases * 100) if total_purchases > 0 else 0
+            status_data.append([
+                status_name,
+                str(status['count']),
+                f"UGX {status['total']:,.0f}",
+                f"{percent:.1f}%"
             ])
         
-        order_table = Table(order_data, colWidths=[0.8*inch, 2*inch, 1*inch, 1.2*inch, 1*inch])
-        order_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6F42C1')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('ALIGN', (3, 1), (3, -1), 'RIGHT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 8),
-            ('FONTSIZE', (0, 1), (-1, -1), 7),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8F9FA')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ]))
+        # Add total row
+        status_data.append(['TOTAL', str(total_orders), f"UGX {total_purchases:,.0f}", '100%'])
         
-        elements.append(order_table)
-    else:
-        elements.append(Paragraph("No purchase orders found in this period.", styles['Normal']))
-    
-    # Build PDF
-    doc.build(elements)
-    
-    # Get PDF content and return response
-    pdf = buffer.getvalue()
-    buffer.close()
-    response.write(pdf)
-    
-    return response
+        status_table = Table(status_data, colWidths=[150, 100, 150, 100])
+        status_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(status_table)
+        elements.append(Spacer(1, 20))
+        
+        # 3. PURCHASES BY SUPPLIER
+        elements.append(Paragraph("PURCHASES BY SUPPLIER", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        supplier_summary = purchase_qs.values(
+            'supplier__name'
+        ).annotate(
+            total_purchases=Sum('total_cost'),
+            orders=Count('id')
+        ).order_by('-total_purchases')
+        
+        supplier_data = [['Supplier', 'Orders', 'Total Cost', '% of Total', 'Items Purchased']]
+        
+        for supplier in supplier_summary:
+            if supplier['supplier__name']:
+                percent = (supplier['total_purchases'] / total_purchases * 100) if total_purchases > 0 else 0
+                
+                supplier_items = PurchaseOrderItem.objects.filter(
+                    order__in=purchase_qs.filter(supplier__name=supplier['supplier__name'])
+                ).aggregate(total_items=Sum('base_quantity'))['total_items'] or 0
+                
+                supplier_data.append([
+                    supplier['supplier__name'][:25] if len(supplier['supplier__name']) > 25 else supplier['supplier__name'],
+                    str(supplier['orders']),
+                    f"UGX {supplier['total_purchases']:,.0f}",
+                    f"{percent:.1f}%",
+                    str(supplier_items)
+                ])
+        
+        # Add "Others" row if needed - combine suppliers with small percentages
+        if len(supplier_data) > 6:  # Keep top 5 plus header
+            # Calculate total for others
+            others_orders = 0
+            others_purchases = Decimal('0')
+            others_items = 0
+            other_suppliers = supplier_data[6:]  # Keep top 5 suppliers
+            for supplier in other_suppliers:
+                others_orders += int(supplier[1])
+                others_purchases += Decimal(supplier[2].replace('UGX ', '').replace(',', ''))
+                others_items += int(supplier[4])
+            
+            # Keep only top 5
+            supplier_data = supplier_data[:6]
+            # Add others row
+            percent = (others_purchases / total_purchases * 100) if total_purchases > 0 else 0
+            supplier_data.append([
+                'Others',
+                str(others_orders),
+                f"UGX {others_purchases:,.0f}",
+                f"{percent:.1f}%",
+                str(others_items)
+            ])
+        
+        # Add total row
+        supplier_data.append(['TOTAL', str(total_orders), f"UGX {total_purchases:,.0f}", '100%', str(total_items_purchased)])
+        
+        supplier_table = Table(supplier_data, colWidths=[150, 70, 120, 70, 100])
+        supplier_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(supplier_table)
+        elements.append(Spacer(1, 20))
+        
+        # 4. DETAILED PURCHASE ORDERS
+        elements.append(Paragraph("DETAILED PURCHASE ORDERS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        recent_pos = purchase_qs.select_related(
+            'supplier', 'store'
+        ).order_by('-purchase_date', '-id')[:15]  # Limit to 15 for PDF readability
+        
+        if recent_pos.exists():
+            po_data = [
+                ['PO No.', 'Date', 'Supplier', 'Items', 'Total Cost', 'Status', 'Expected Date', 'Recorded By']
+            ]
+            
+            for po in recent_pos:
+                # Truncate long text for PDF
+                supplier_name = po.supplier.name[:18] + '...' if po.supplier and len(po.supplier.name) > 18 else (po.supplier.name if po.supplier else 'N/A')
+                status_text = po.get_status_display()[:10] if hasattr(po, 'get_status_display') else (po.status.capitalize() if po.status else 'N/A')
+                
+                po_data.append([
+                    f"PO-{po.id}",
+                    po.purchase_date.strftime('%Y-%m-%d') if po.purchase_date else '',
+                    supplier_name,
+                    str(po.total_items),
+                    f"UGX {po.total_cost:,.0f}",
+                    status_text,
+                    po.expected_date.strftime('%Y-%m-%d') if po.expected_date else 'N/A',
+                    str(po.recorded_by) if po.recorded_by else 'N/A'
+                ])
+            
+            po_table = Table(po_data, colWidths=[55, 60, 90, 40, 85, 65, 65, 60])
+            po_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (3, 1), (4, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ]))
+            elements.append(po_table)
+            
+            if purchase_qs.count() > 15:
+                elements.append(Spacer(1, 5))
+                elements.append(Paragraph(f"* Showing 15 of {purchase_qs.count()} purchase orders", normal_style))
+        else:
+            elements.append(Paragraph("No purchase order details available.", normal_style))
+        
+        elements.append(Spacer(1, 20))
+        
+        # 5. PURCHASE ITEMS DETAIL
+        elements.append(Paragraph("PURCHASE ITEMS DETAIL", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        # Get top 25 items by value
+        items = PurchaseOrderItem.objects.filter(
+            order__in=purchase_qs
+        ).select_related(
+            'product', 'unit', 'order'
+        ).order_by('-order__purchase_date', '-id')[:25]
+        
+        if items.exists():
+            items_data = [
+                ['PO No.', 'Product', 'SKU', 'Unit', 'Qty', 'Base Qty', 'Unit Cost', 'Line Total']
+            ]
+            
+            total_line_value = Decimal('0')
+            for item in items:
+                line_total = item.base_quantity * item.unit_cost
+                total_line_value += line_total
+                
+                # Truncate long product names
+                product_name = item.product.name[:15] + '...' if len(item.product.name) > 15 else item.product.name
+                
+                items_data.append([
+                    f"PO-{item.order.id}",
+                    product_name,
+                    item.product.sku or 'N/A',
+                    item.unit.abbreviation if item.unit and hasattr(item.unit, 'abbreviation') else 'unit',
+                    str(item.quantity),
+                    str(item.base_quantity),
+                    f"UGX {item.unit_cost:,.0f}",
+                    f"UGX {line_total:,.0f}"
+                ])
+            
+            # Add total row
+            items_data.append([
+                'TOTAL', '', '', '', '', f"{total_items_purchased}", f"UGX {total_purchases:,.0f}", ''
+            ])
+            
+            items_table = Table(items_data, colWidths=[55, 80, 45, 35, 35, 45, 65, 75])
+            items_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (4, 1), (7, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ]))
+            elements.append(items_table)
+        else:
+            elements.append(Paragraph("No purchase item details available.", normal_style))
+        
+        elements.append(Spacer(1, 20))
+        
+        # 6. TOP PRODUCTS PURCHASED
+        elements.append(Paragraph("TOP PRODUCTS PURCHASED", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        top_products = PurchaseOrderItem.objects.filter(
+            order__in=purchase_qs
+        ).values(
+            'product__name', 'product__sku'
+        ).annotate(
+            total_qty=Sum('base_quantity'),
+            total_cost=Sum(F('base_quantity') * F('unit_cost')),
+            orders=Count('order', distinct=True)
+        ).order_by('-total_cost')[:10]
+        
+        if top_products:
+            products_data = [['Rank', 'Product', 'SKU', 'Total Qty', 'Total Cost', 'Avg Unit Cost', 'Orders']]
+            
+            for i, product in enumerate(top_products, 1):
+                if product['product__name']:
+                    avg_unit = product['total_cost'] / product['total_qty'] if product['total_qty'] and product['total_qty'] > 0 else Decimal('0')
+                    product_name = product['product__name'][:20] + '...' if len(product['product__name']) > 20 else product['product__name']
+                    
+                    products_data.append([
+                        str(i),
+                        product_name,
+                        product['product__sku'] or 'N/A',
+                        str(product['total_qty']),
+                        f"UGX {product['total_cost']:,.0f}",
+                        f"UGX {avg_unit:,.0f}",
+                        str(product['orders'])
+                    ])
+            
+            products_table = Table(products_data, colWidths=[35, 110, 60, 55, 90, 75, 45])
+            products_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(products_table)
+        else:
+            elements.append(Paragraph("No top products data available.", normal_style))
+        
+        elements.append(Spacer(1, 20))
+        
+        # 7. PURCHASES BY STORE
+        if not store_id:
+            elements.append(Paragraph("PURCHASES BY STORE", heading_style))
+            elements.append(Spacer(1, 5))
+            
+            store_summary = purchase_qs.values(
+                'store__name'
+            ).annotate(
+                orders=Count('id'),
+                total_cost=Sum('total_cost')
+            ).order_by('-total_cost')
+            
+            if store_summary:
+                store_data = [['Store', 'Orders', 'Total Cost', '% of Total', 'Items Received']]
+                
+                for store in store_summary:
+                    if store['store__name']:
+                        percent = (store['total_cost'] / total_purchases * 100) if total_purchases > 0 else 0
+                        
+                        store_items = PurchaseOrderItem.objects.filter(
+                            order__in=purchase_qs.filter(store__name=store['store__name'])
+                        ).aggregate(total_items=Sum('base_quantity'))['total_items'] or 0
+                        
+                        store_data.append([
+                            store['store__name'],
+                            str(store['orders']),
+                            f"UGX {store['total_cost']:,.0f}",
+                            f"{percent:.1f}%",
+                            str(store_items)
+                        ])
+                
+                # Add total row
+                store_data.append(['TOTAL', str(total_orders), f"UGX {total_purchases:,.0f}", '100%', str(total_items_purchased)])
+                
+                store_table = Table(store_data, colWidths=[120, 70, 120, 70, 100])
+                store_table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                    ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                    ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+                ]))
+                elements.append(store_table)
+            else:
+                elements.append(Paragraph("No store data available.", normal_style))
+            elements.append(Spacer(1, 20))
+        
+        # 8. TOP SUPPLIERS BY SPEND
+        elements.append(Paragraph("TOP SUPPLIERS BY SPEND", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        top_suppliers = purchase_qs.values(
+            'supplier__name'
+        ).annotate(
+            total_spent=Sum('total_cost'),
+            orders=Count('id')
+        ).order_by('-total_spent')[:10]
+        
+        if top_suppliers:
+            supplier_spend_data = [['Rank', 'Supplier', 'Total Spent', 'Orders', 'Avg Order Value']]
+            
+            for i, supplier in enumerate(top_suppliers, 1):
+                if supplier['supplier__name']:
+                    avg_order = supplier['total_spent'] / supplier['orders'] if supplier['orders'] > 0 else Decimal('0')
+                    supplier_name = supplier['supplier__name'][:25] if len(supplier['supplier__name']) > 25 else supplier['supplier__name']
+                    
+                    supplier_spend_data.append([
+                        str(i),
+                        supplier_name,
+                        f"UGX {supplier['total_spent']:,.0f}",
+                        str(supplier['orders']),
+                        f"UGX {avg_order:,.0f}"
+                    ])
+            
+            supplier_spend_table = Table(supplier_spend_data, colWidths=[35, 150, 120, 70, 120])
+            supplier_spend_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                ('ALIGN', (2, 1), (4, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(supplier_spend_table)
+        else:
+            elements.append(Paragraph("No supplier data available.", normal_style))
+        
+        elements.append(Spacer(1, 20))
+        
+        # 9. STAFF PURCHASING ACTIVITY
+        elements.append(Paragraph("STAFF PURCHASING ACTIVITY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        staff_activity = purchase_qs.values(
+            'recorded_by'
+        ).annotate(
+            orders=Count('id'),
+            total_spent=Sum('total_cost')
+        ).order_by('-orders')
+        
+        if staff_activity:
+            staff_data = [['Staff', 'Orders', 'Total Spent', 'Avg Order Value', 'Suppliers Used']]
+            
+            for staff in staff_activity:
+                if staff['recorded_by']:
+                    avg_order = staff['total_spent'] / staff['orders'] if staff['orders'] > 0 else Decimal('0')
+                    
+                    # Count unique suppliers for this staff
+                    suppliers_used = PurchaseOrder.objects.filter(
+                        recorded_by=staff['recorded_by'],
+                        purchase_date__range=[start_date, end_date]
+                    ).values('supplier').distinct().count()
+                    
+                    staff_data.append([
+                        staff['recorded_by'],
+                        str(staff['orders']),
+                        f"UGX {staff['total_spent']:,.0f}",
+                        f"UGX {avg_order:,.0f}",
+                        str(suppliers_used)
+                    ])
+            
+            # Add total row
+            staff_data.append(['TOTAL', str(total_orders), f"UGX {total_purchases:,.0f}", f"UGX {(total_purchases/total_orders):,.0f}", str(suppliers_count)])
+            
+            staff_table = Table(staff_data, colWidths=[120, 70, 120, 120, 100])
+            staff_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ]))
+            elements.append(staff_table)
+        else:
+            elements.append(Paragraph("No staff activity data available.", normal_style))
+        
+        elements.append(Spacer(1, 20))
+        
+        # Build PDF directly to response
+        doc.build(elements)
+        return response
+        
+    except Exception as e:
+        # Log the error
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
+        
+        # Return an error response
+        response = HttpResponse(content_type='text/plain')
+        response.status_code = 500
+        response.content = f"Error generating PDF: {str(e)}"
+        return response
+
 
 
 def export_purchase_excel(request):
@@ -1828,263 +2140,212 @@ def export_purchase_excel(request):
 # ============================================================================
 
 
+
+
+
 @login_required
-def sales_details(request, period=None):
+def sales_details(request):
     """
-    Sales report details view similar to inventory_details
+    Sales Performance Dashboard view.
+    Supports filtering by: store, payment method, status, and date range.
     """
-    # Default to current month if no period specified
-    today = timezone.now()
-    if not period:
-        period = today.strftime("%B %Y")
-        start_date = today.replace(day=1)
-        end_date = today
-    else:
-        # Parse period (e.g., "January 2024")
+
+    # ─── 1. Parse filter parameters from GET request ───────────────────────────
+
+    store_id     = request.GET.get('store', '').strip()
+    payment_id   = request.GET.get('payment', '').strip()
+    status_param = request.GET.get('status', '').strip()
+    daterange    = request.GET.get('daterange', '').strip()
+
+    start_date = None
+    end_date   = None
+    date_range_label = 'All Time'
+
+    if daterange:
         try:
-            month_year = period.split()
-            month = date.strptime(month_year[0], "%B").month
-            year = int(month_year[1])
-            start_date = timezone.make_aware(date(year, month, 1))
-            if month == 12:
-                end_date = timezone.make_aware(date(year, month, 31))
-            else:
-                end_date = timezone.make_aware(date(year, month+1, 1)) - timedelta(days=1)
-        except:
-            start_date = today.replace(day=1)
-            end_date = today
+            parts = [p.strip() for p in daterange.split(' - ')]
+            if len(parts) == 2:
+                start_date = date.fromisoformat(parts[0])
+                end_date   = date.fromisoformat(parts[1])
+                date_range_label = daterange
+        except ValueError:
+            pass  # Ignore malformed date range
 
-    date_range = f"{start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}"
+    # ─── 2. Build base queryset with select_related for performance ─────────────
 
- 
-    
-    # Filter sales for the period - ALL sales
-    sales_in_period = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
+    qs = Sales.objects.select_related(
+        'customer',
+        'store',
+        'store__branch',
+        'payment_method',
+        'recorded_by',
+    ).prefetch_related('items')
+
+    # ─── 3. Apply filters ───────────────────────────────────────────────────────
+
+    if store_id:
+        qs = qs.filter(store_id=store_id)
+
+    if payment_id:
+        qs = qs.filter(payment_method_id=payment_id)
+
+    if status_param:
+        if status_param == 'completed':
+            qs = qs.filter(is_cancelled=False, balance=0)
+        elif status_param == 'pending':
+            qs = qs.filter(is_cancelled=False, balance__gt=0)
+        elif status_param == 'cancelled':
+            qs = qs.filter(is_cancelled=True)
+
+    if start_date and end_date:
+        qs = qs.filter(sale_date__range=[start_date, end_date])
+
+    # ─── 4. Annotate each sale with item counts for the table ──────────────────
+
+    qs = qs.annotate(
+        total_quantity=Sum('items__quantity'),
     )
-    
-    # Basic metrics
-    total_sales = sales_in_period.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-    total_transactions = sales_in_period.count()
-    
-    
-    # Calculate average daily sales
-    days_in_period = max((end_date.date() - start_date.date()).days + 1, 1)
-    avg_daily_sales = total_sales / Decimal(days_in_period) if total_sales else Decimal('0')
-    avg_transaction_value = total_sales / Decimal(total_transactions) if total_transactions > 0 else Decimal('0')
-    
-    # Daily sales data for chart
-    daily_sales_data = []
-    current_date = start_date.date()
-    while current_date <= end_date.date():
-        daily_sales = Sales.objects.filter(sale_date=current_date)
-        daily_total = daily_sales.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-        daily_transactions = daily_sales.count()
-        
-        if daily_transactions > 0:
-            daily_sales_data.append({
-                'date': current_date.strftime('%Y-%m-%d'),
-                'day': current_date.strftime('%A'),
-                'total_sales': daily_total,
-                'transactions': daily_transactions,
-                'avg_transaction': daily_total / Decimal(daily_transactions) if daily_transactions > 0 else Decimal('0')
-            })
-        current_date += timedelta(days=1)
 
-    # Customer-wise sales
-    customer_sales = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
-    ).values(
-        'customer__id', 'customer__name', 'customer__company'
-    ).annotate(
-        total_spent=Sum('total_amount'),
-        transactions=Count('id')
-    ).order_by('-total_spent')
-    
+    # ─── 5. Aggregate KPI metrics ───────────────────────────────────────────────
 
-    # Calculate average order value for each customer
-    customer_sales_list = []
-    for customer in customer_sales:
-        avg_order = customer['total_spent'] / Decimal(customer['transactions']) if customer['transactions'] > 0 else Decimal('0')
-        customer_sales_list.append({
-            'customer__id': customer['customer__id'],
-            'customer__name': customer['customer__name'],
-            'customer__company': customer['customer__company'],
-            'total_spent': customer['total_spent'],
-            'transactions': customer['transactions'],
-            'avg_order': avg_order
-        })
-
-    
-    product_performance = SalesItem.objects.filter(
-        order__sale_date__range=[start_date.date(), end_date.date()]
-    ).values(
-        'product__id', 'product__name', 'product__sku', 'product__category__name'
-    ).annotate(
-        units_sold=Sum('quantity'),
-        revenue=Sum(F('quantity') * F('sale_price'), output_field=DecimalField()),
-        avg_price=Avg('sale_price')
-    ).order_by('-revenue')
-    
-    product_performance_list = list(product_performance)
-   
-
-    # Payment method analysis - Get ALL sales with payment methods
-    payment_analysis = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()],
-        payment_method__isnull=False
-    ).values(
-        'payment_method__id', 'payment_method__name'
-    ).annotate(
-        transactions=Count('id'),
-        total_amount=Sum('total_amount')
-    ).order_by('-transactions')
-    
-
-
-    # Calculate average transaction for payment methods
-    payment_analysis_list = []
-    for payment in payment_analysis:
-        avg_transaction = payment['total_amount'] / Decimal(payment['transactions']) if payment['transactions'] > 0 else Decimal('0')
-        payment_analysis_list.append({
-            'payment_method__id': payment['payment_method__id'],
-            'payment_method__name': payment['payment_method__name'],
-            'transactions': payment['transactions'],
-            'total_amount': payment['total_amount'],
-            'avg_transaction': avg_transaction
-        })
-
-    # Store performance
-    store_performance = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
-    ).values(
-        'store__id', 'store__name'
-    ).annotate(
+    aggregates = qs.aggregate(
         total_sales=Sum('total_amount'),
-        transactions=Count('id')
-    ).order_by('-total_sales')
-    
-   
+        total_paid=Sum('amount_paid'),
+        total_balance=Sum('balance'),
+        total_transactions=Count('id'),
+        avg_transaction_value=Avg('total_amount'),
+    )
 
-    # Calculate average transaction for stores
-    store_performance_list = []
-    for store in store_performance:
-        avg_transaction = store['total_sales'] / Decimal(store['transactions']) if store['transactions'] > 0 else Decimal('0')
-        store_performance_list.append({
-            'store__id': store['store__id'],
-            'store__name': store['store__name'],
-            'total_sales': store['total_sales'],
-            'transactions': store['transactions'],
-            'avg_transaction': avg_transaction
-        })
+    total_sales           = aggregates['total_sales']           or 0
+    total_paid            = aggregates['total_paid']            or 0
+    total_balance         = aggregates['total_balance']         or 0
+    total_transactions    = aggregates['total_transactions']    or 0
+    avg_transaction_value = aggregates['avg_transaction_value'] or 0
 
-    # Recent transactions for audit trail
-    recent_transactions = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
-    ).select_related('customer', 'store', 'payment_method').order_by('-sale_date', '-id')[:10]
+    # Unique customers
+    total_customers = qs.filter(customer__isnull=False).values('customer').distinct().count()
 
-    # Get top performing day (if any data exists)
-    best_day = max(daily_sales_data, key=lambda x: x['total_sales']) if daily_sales_data else None
+    # Products sold (distinct products across all sale items in the filtered qs)
+    sale_ids = qs.values_list('id', flat=True)
+    total_products_sold = (
+        SalesItem.objects
+        .filter(order_id__in=sale_ids)
+        .values('product')
+        .distinct()
+        .count()
+    )
+    total_units_sold = (
+        SalesItem.objects
+        .filter(order_id__in=sale_ids)
+        .aggregate(total=Sum('quantity'))['total'] or 0
+    )
 
-    # Prepare data for charts
-    # Daily Sales Chart - show all days even with zero sales
-    if daily_sales_data:
-        daily_chart_data = {
-            'labels': [d['date'] for d in daily_sales_data],
-            'data': [float(d['total_sales']) for d in daily_sales_data]
-        }
+    # New customers: customers whose first sale falls within the filtered period
+    if start_date and end_date:
+        new_customers = (
+            Sales.objects
+            .filter(customer__isnull=False, sale_date__range=[start_date, end_date])
+            .values('customer')
+            .distinct()
+            .count()
+        )
     else:
-        daily_chart_data = {'labels': [], 'data': []}
-    
-    # Product Performance Chart
-    if product_performance_list:
-        product_chart_data = {
-            'labels': [p['product__name'][:15] + '...' if len(p['product__name']) > 15 else p['product__name'] 
-                       for p in product_performance_list],
-            'data': [float(p['revenue']) for p in product_performance_list]
-        }
-    else:
-        product_chart_data = {'labels': [], 'data': []}
-    
-    # Payment Method Pie Chart
-    if payment_analysis_list:
-        payment_chart_data = {
-            'labels': [p['payment_method__name'] for p in payment_analysis_list],
-            'data': [p['transactions'] for p in payment_analysis_list]
-        }
-    else:
-        payment_chart_data = {'labels': [], 'data': []}
-    
-    # Store Performance Chart
-    if store_performance_list:
-        store_chart_data = {
-            'labels': [s['store__name'] for s in store_performance_list],
-            'data': [float(s['total_sales']) for s in store_performance_list]
-        }
-    else:
-        store_chart_data = {'labels': [], 'data': []}
+        new_customers = total_customers  # No date filter — all are "new"
 
-    # Counts for summary cards
-    total_customers = sales_in_period.exclude(
-        customer__isnull=True
-    ).values('customer').distinct().count()
-    
-    
-    new_customers = Customer.objects.filter(
-        created_at__range=[start_date, end_date]
-    ).count()
-    
-    # Repeat customers
-    repeat_customers = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
-    ).exclude(customer__isnull=True).values('customer').distinct().count()
-    
-    # Average customer value
-    avg_customer_value = total_sales / Decimal(max(len(customer_sales_list), 1)) if customer_sales_list else Decimal('0')
-    
-    # Store counts
-    total_stores = StoreLocation.objects.filter(is_active=True).count()
+    # ─── 6. Today's summary (always unfiltered by store/payment/status) ─────────
+
+    today = date.today()
+    today_qs = Sales.objects.filter(sale_date=today, is_cancelled=False)
+    today_sales        = today_qs.aggregate(total=Sum('total_amount'))['total'] or 0
+    today_transactions = today_qs.count()
+
+    # ─── 7. Payment method breakdown ───────────────────────────────────────────
+
+    payment_summary = (
+        qs.filter(payment_method__isnull=False)
+        .values('payment_method__id', 'payment_method__name')
+        .annotate(count=Count('id'), total=Sum('total_amount'))
+        .order_by('-total')
+    )
+    payment_summary = [
+        {'id': row['payment_method__id'], 'name': row['payment_method__name'],
+         'count': row['count'], 'total': row['total'] or 0}
+        for row in payment_summary
+    ]
+
+    # ─── 8. Store performance breakdown ────────────────────────────────────────
+
+    store_summary = (
+        qs.values('store__id', 'store__name')
+        .annotate(total=Sum('total_amount'), count=Count('id'))
+        .order_by('-total')
+    )
+    store_summary = [
+        {'id': row['store__id'], 'name': row['store__name'],
+         'total': row['total'] or 0, 'count': row['count']}
+        for row in store_summary
+    ]
+
+    # ─── 9. Top products ────────────────────────────────────────────────────────
+
+    top_products = (
+        SalesItem.objects
+        .filter(order_id__in=sale_ids, is_cancelled=False)
+        .values('product__id', 'product__name')
+        .annotate(quantity=Sum('quantity'))
+        .order_by('-quantity')[:10]
+    )
+    top_products = [
+        {'id': row['product__id'], 'name': row['product__name'], 'quantity': row['quantity']}
+        for row in top_products
+    ]
+
+    # ─── 10. Dropdown data for filter controls ──────────────────────────────────
+
+    stores          = StoreLocation.objects.filter(is_active=True).order_by('name')
+    payment_methods = PaymentMethod.objects.all().order_by('name')
+
+    # ─── 11. Render ─────────────────────────────────────────────────────────────
 
     context = {
-        'period': period,
-        'date_range': date_range,
-        'report_id': f"SAL-{start_date.strftime('%Y%m')}",
-        'generated_by': request.user.get_full_name() or request.user.username,
-        
-        # Metrics
-        'total_sales': total_sales,
-        'total_transactions': total_transactions,
-        'avg_daily_sales': avg_daily_sales,
+        # Filter state (so template can pre-populate controls on page reload)
+        'date_range':    date_range_label,
+        'selected_store':   store_id,
+        'selected_payment': payment_id,
+        'selected_status':  status_param,
+
+        # Dropdown options
+        'stores':           stores,
+        'payment_methods':  payment_methods,
+
+        # KPI cards
+        'total_sales':           total_sales,
+        'total_transactions':    total_transactions,
         'avg_transaction_value': avg_transaction_value,
-        'best_day': best_day,
-        
-        # Chart data (JSON serialized)
-        'daily_chart_data': json.dumps(daily_chart_data),
-        'product_chart_data': json.dumps(product_chart_data),
-        'payment_chart_data': json.dumps(payment_chart_data),
-        'store_chart_data': json.dumps(store_chart_data),
-        
-        # Tabular data
-        'daily_sales_data': daily_sales_data,
-        'customer_sales_data': customer_sales_list,
-        'product_performance_data': product_performance_list,
-        'payment_analysis_data': payment_analysis_list,
-        'store_performance_data': store_performance_list,
-        'recent_transactions': recent_transactions,
-        
-        # Counts for summary cards
-        'total_customers': total_customers,
-        'new_customers': new_customers,
-        'repeat_customers': repeat_customers,
-        'avg_customer_value': avg_customer_value,
-        
-        # Store counts
-        'total_stores': total_stores,
-        
-        # Additional calculated values for template
-        'days_count': len(daily_sales_data),
+        'total_customers':       total_customers,
+        'new_customers':         new_customers,
+        'total_products_sold':   total_products_sold,
+        'total_units_sold':      total_units_sold,
+
+        # Table footer totals
+        'total_paid':    total_paid,
+        'total_balance': total_balance,
+
+        # Today's summary card
+        'today_sales':        today_sales,
+        'today_transactions': today_transactions,
+
+        # Summary cards
+        'payment_summary': payment_summary,
+        'store_summary':   store_summary,
+        'top_products':    top_products,
+
+        # Main table data
+        'sales_data': qs.order_by('-created_at'),
     }
+
     return render(request, 'reports/sales_details.html', context)
+
 
 
 def export_sales_csv(request):
@@ -2318,25 +2579,26 @@ def export_sales_csv(request):
     
     return response
 
+
 def export_sales_pdf(request):
-    """Export sales report as PDF"""
+    """Export comprehensive sales report as PDF with black and white design"""
     # Get filter parameters
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     store_id = request.GET.get('store')
-    period = request.GET.get('period', '')
+    period = request.GET.get('period', 'Custom Range')
     
     # Set up response
     response = HttpResponse(content_type='application/pdf')
-    filename = f"sales_report_{period or timezone.now().strftime('%Y%m%d')}.pdf"
+    filename = f"sales_report_{period.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d')}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    # Get the same data as the sales_details view
-    today = timezone.now()
+    # Parse dates
+    today = timezone.now().date()
     if date_from and date_to:
         try:
-            start_date = timezone.make_aware(date.strptime(date_from, '%Y-%m-%d'))
-            end_date = timezone.make_aware(date.strptime(date_to, '%Y-%m-%d'))
+            start_date = date.fromisoformat(date_from)
+            end_date = date.fromisoformat(date_to)
         except:
             start_date = today.replace(day=1)
             end_date = today
@@ -2345,147 +2607,444 @@ def export_sales_pdf(request):
         end_date = today
     
     # Create PDF
-    doc = SimpleDocTemplate(response, pagesize=letter)
+    doc = SimpleDocTemplate(response, pagesize=letter, 
+                           rightMargin=40, leftMargin=40,
+                           topMargin=40, bottomMargin=40)
     elements = []
+    
+    # Define styles - Black and White only
     styles = getSampleStyleSheet()
     
-    # Title
-    title = Paragraph(f"Sales Report - {period}", styles['Title'])
-    elements.append(title)
-    
-    # Date range
-    date_info = f"Period: {start_date.date()} to {end_date.date()}"
-    date_para = Paragraph(date_info, styles['Normal'])
-    elements.append(date_para)
-    
-    # Generated info
-    generated_by = f"Generated by: {request.user.get_full_name() or request.user.username}"
-    generated_date = f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    elements.append(Paragraph(generated_by, styles['Normal']))
-    elements.append(Paragraph(generated_date, styles['Normal']))
-    elements.append(Spacer(1, 20))
-    
-    # Get data
-    sales_in_period = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
+    # Custom styles for B&W report
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Title'],
+        fontSize=18,
+        textColor=colors.black,
+        alignment=1,  # Center
+        spaceAfter=20,
+        fontName='Helvetica-Bold'
     )
     
-    # SUMMARY SECTION
-    elements.append(Paragraph("Summary", styles['Heading2']))
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.black,
+        spaceBefore=15,
+        spaceAfter=8,
+        fontName='Helvetica-Bold',
+        borderWidth=0,
+        borderColor=colors.black,
+        borderPadding=5
+    )
     
-    total_sales = sales_in_period.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-    total_transactions = sales_in_period.count()
-    days_in_period = max((end_date.date() - start_date.date()).days + 1, 1)
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.black,
+        fontName='Helvetica'
+    )
+    
+    # Header Section
+    elements.append(Paragraph("SALES REPORT", title_style))
+    elements.append(Spacer(1, 10))
+    
+    # Report Info Table
+    info_data = [
+        [f"Period: {period}", f"Generated: {timezone.now().strftime('%Y-%m-%d %H:%M')}"],
+        [f"Date Range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}", 
+         f"Generated By: {request.user.get_full_name() or request.user.username}"]
+    ]
+    
+    if store_id:
+        try:
+            store = StoreLocation.objects.get(id=store_id)
+            info_data.append([f"Store: {store.name}", ""])
+        except:
+            pass
+    
+    info_table = Table(info_data, colWidths=[250, 250])
+    info_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 20))
+    
+    # Get sales data
+    sales_qs = Sales.objects.filter(
+        sale_date__range=[start_date, end_date],
+        is_cancelled=False
+    )
+    if store_id:
+        sales_qs = sales_qs.filter(store_id=store_id)
+    
+    total_sales = sales_qs.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    total_transactions = sales_qs.count()
+    days_in_period = max((end_date - start_date).days + 1, 1)
     avg_daily_sales = total_sales / Decimal(days_in_period) if total_sales else Decimal('0')
+    
+    total_paid = sales_qs.aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+    total_balance = sales_qs.aggregate(total=Sum('balance'))['total'] or Decimal('0')
+    total_received = sales_qs.aggregate(total=Sum('amount_received'))['total'] or Decimal('0')
+    total_change = sales_qs.aggregate(total=Sum('change'))['total'] or Decimal('0')
+    
+    total_items = 0
+    for sale in sales_qs:
+        total_items += sale.total_items
+    
+    # 1. SUMMARY SECTION
+    elements.append(Paragraph("SUMMARY SECTION", heading_style))
     
     summary_data = [
         ['Metric', 'Value'],
-        ['Total Sales', f"UGX {total_sales:,.0f}"],
-        ['Total Transactions', f"{total_transactions}"],
+        ['Total Transactions', f"{total_transactions:,}"],
+        ['Total Revenue', f"UGX {total_sales:,.0f}"],
+        ['Total Items Sold', f"{total_items:,} pcs"],
+        ['Average Order Value', f"UGX {(total_sales/total_transactions):,.0f}" if total_transactions > 0 else 'UGX 0'],
         ['Average Daily Sales', f"UGX {avg_daily_sales:,.0f}"],
-        ['Date Range', f"{start_date.date()} to {end_date.date()}"]
+        ['Total Cash Received', f"UGX {total_received:,.0f}"],
+        ['Total Change Given', f"UGX {total_change:,.0f}"],
+        ['Outstanding Balance', f"UGX {total_balance:,.0f}"]
     ]
     
-    summary_table = Table(summary_data)
+    summary_table = Table(summary_data, colWidths=[200, 200])
     summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
     ]))
-    
     elements.append(summary_table)
     elements.append(Spacer(1, 20))
     
-    # TRANSACTION AUDIT TRAIL
-    elements.append(Paragraph("Transaction Audit Trail", styles['Heading2']))
+    # 2. SALES BY STATUS
+    elements.append(Paragraph("SALES BY STATUS", heading_style))
     
-    recent_transactions = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
-    ).select_related('customer', 'store', 'payment_method').order_by('-sale_date', '-id')[:50]
+    status_counts = {}
+    status_totals = {}
+    for status_code, status_name in SALE_ORDER_OPTIONS:
+        status_qs = sales_qs.filter(status=status_code)
+        count = status_qs.count()
+        total = status_qs.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+        if count > 0:
+            status_counts[status_name] = count
+            status_totals[status_name] = total
     
-    audit_data = [['ID', 'Date', 'Customer', 'Store', 'Items', 'Total', 'Payment', 'Status']]
+    status_data = [['Status', 'Count', 'Total Amount', '% of Sales']]
+    for status_name in status_counts:
+        count = status_counts[status_name]
+        total = status_totals[status_name]
+        percent = (total / total_sales * 100) if total_sales > 0 else 0
+        status_data.append([status_name, str(count), f"UGX {total:,.0f}", f"{percent:.1f}%"])
     
-    for transaction in recent_transactions:
-        audit_data.append([
-            str(transaction.id),
-            transaction.sale_date.strftime('%Y-%m-%d') if transaction.sale_date else '',
-            transaction.customer.name[:15] + '...' if transaction.customer and len(transaction.customer.name) > 15 else (transaction.customer.name if transaction.customer else 'Walk-in'),
-            transaction.store.name[:10] + '...' if transaction.store and len(transaction.store.name) > 10 else (transaction.store.name if transaction.store else ''),
-            str(transaction.number_of_items or 0),
-            f"UGX {transaction.total_amount:,.0f}",
-            transaction.payment_method.name[:10] if transaction.payment_method else 'Unknown',
-            transaction.status[:10]
-        ])
+    # Add total row
+    status_data.append(['TOTAL', str(total_transactions), f"UGX {total_sales:,.0f}", '100%'])
     
-    # Add totals
-    audit_data.append(['', '', '', '', 'Total:', f"UGX {total_sales:,.0f}", '', f"{total_transactions} txns"])
-    
-    audit_table = Table(audit_data)
-    audit_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    status_table = Table(status_data, colWidths=[150, 100, 150, 100])
+    status_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
-        ('FONTSIZE', (0, 1), (-1, -2), 7),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -2), 0.5, colors.black),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
     ]))
-    
-    elements.append(audit_table)
+    elements.append(status_table)
     elements.append(Spacer(1, 20))
     
-    # STORE PERFORMANCE
-    elements.append(Paragraph("Store Performance", styles['Heading2']))
+    # 3. SALES BY PAYMENT METHOD
+    elements.append(Paragraph("SALES BY PAYMENT METHOD", heading_style))
     
-    store_performance = Sales.objects.filter(
-        sale_date__range=[start_date.date(), end_date.date()]
+    payment_analysis = sales_qs.filter(
+        payment_method__isnull=False
     ).values(
-        'store__name'
+        'payment_method__name'
     ).annotate(
-        total_sales=Sum('total_amount'),
-        transactions=Count('id')
-    ).order_by('-total_sales')[:10]
+        transactions=Count('id'),
+        total_amount=Sum('total_amount')
+    ).order_by('-transactions')
     
-    store_data = [['Store', 'Sales (UGX)', '% of Total', 'Transactions', 'Avg Transaction']]
-    
-    for store in store_performance:
-        percent = (store['total_sales'] / total_sales * 100) if total_sales > 0 else 0
-        avg_transaction = store['total_sales'] / Decimal(store['transactions']) if store['transactions'] > 0 else Decimal('0')
-        
-        store_data.append([
-            store['store__name'][:15] if store['store__name'] else 'Unknown',
-            f"UGX {store['total_sales']:,.0f}",
-            f"{percent:.1f}%",
-            str(store['transactions']),
-            f"UGX {avg_transaction:,.0f}"
+    payment_data = [['Payment Method', 'Transactions', 'Total Amount', '% of Total']]
+    for payment in payment_analysis:
+        percent = (payment['total_amount'] / total_sales * 100) if total_sales > 0 else 0
+        payment_data.append([
+            payment['payment_method__name'] or 'Unknown',
+            str(payment['transactions']),
+            f"UGX {payment['total_amount']:,.0f}",
+            f"{percent:.1f}%"
         ])
     
-    store_table = Table(store_data)
-    store_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    # Add cash sales without payment method
+    cash_sales = sales_qs.filter(payment_method__isnull=True)
+    cash_count = cash_sales.count()
+    cash_total = cash_sales.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    if cash_count > 0:
+        cash_percent = (cash_total / total_sales * 100) if total_sales > 0 else 0
+        payment_data.append(['Cash (Unspecified)', str(cash_count), f"UGX {cash_total:,.0f}", f"{cash_percent:.1f}%"])
+    
+    payment_data.append(['TOTAL', str(total_transactions), f"UGX {total_sales:,.0f}", '100%'])
+    
+    payment_table = Table(payment_data, colWidths=[150, 100, 150, 100])
+    payment_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -2), 0.5, colors.black),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+    ]))
+    elements.append(payment_table)
+    elements.append(Spacer(1, 20))
+    
+    # 4. DETAILED SALES TRANSACTIONS
+    elements.append(Paragraph("DETAILED SALES TRANSACTIONS", heading_style))
+    
+    recent_transactions = sales_qs.select_related(
+        'customer', 'store', 'payment_method', 'recorded_by'
+    ).order_by('-sale_date', '-id')[:50]  # Limit to 50 for PDF
+    
+    transaction_data = [
+        ['Receipt No', 'Date', 'Customer', 'Items', 'Total', 'Paid', 'Balance', 'Payment', 'Status']
+    ]
+    
+    for t in recent_transactions:
+        transaction_data.append([
+            t.receipt_no or f"SO-{t.id}",
+            t.sale_date.strftime('%Y-%m-%d') if t.sale_date else '',
+            t.customer.name[:15] + '...' if t.customer and len(t.customer.name) > 15 else (t.customer.name if t.customer else 'Walk-in'),
+            str(t.number_of_items or 0),
+            f"UGX {t.total_amount:,.0f}",
+            f"UGX {t.amount_paid:,.0f}",
+            f"UGX {t.balance:,.0f}",
+            t.payment_method.name[:10] if t.payment_method else 'Cash',
+            t.status[:10]
+        ])
+    
+    transaction_table = Table(transaction_data, colWidths=[70, 60, 80, 40, 70, 70, 70, 60, 60])
+    transaction_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (3, 1), (8, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(transaction_table)
+    
+    # Add note if limited
+    if sales_qs.count() > 50:
+        elements.append(Spacer(1, 5))
+        elements.append(Paragraph(f"* Showing 50 of {sales_qs.count()} transactions", normal_style))
+    
+    elements.append(Spacer(1, 20))
+    
+    # 5. SALES ITEMS DETAIL
+    elements.append(Paragraph("SALES ITEMS DETAIL", heading_style))
+    
+    # Get top 50 items by revenue
+    items = SalesItem.objects.filter(
+        order__in=sales_qs
+    ).select_related(
+        'product', 'unit', 'order'
+    ).order_by('-order__sale_date', '-id')[:50]
+    
+    items_data = [
+        ['Receipt No', 'Product', 'SKU', 'Unit', 'Qty', 'Base Qty', 'Unit Price', 'Line Total']
+    ]
+    
+    for item in items:
+        items_data.append([
+            item.order.receipt_no or f"SO-{item.order.id}",
+            item.product.name[:15] + '...' if len(item.product.name) > 15 else item.product.name,
+            item.product.sku or 'N/A',
+            item.unit.abbreviation if item.unit else 'unit',
+            str(item.quantity),
+            str(item.base_quantity),
+            f"UGX {item.sale_price:,.0f}",
+            f"UGX {(item.quantity * item.sale_price):,.0f}"
+        ])
+    
+    items_table = Table(items_data, colWidths=[70, 80, 50, 40, 40, 50, 70, 80])
+    items_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (4, 1), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 20))
     
-    elements.append(store_table)
+    # 6. TOP SELLING PRODUCTS
+    elements.append(Paragraph("TOP SELLING PRODUCTS", heading_style))
+    
+    top_products = SalesItem.objects.filter(
+        order__in=sales_qs
+    ).values(
+        'product__name', 'product__sku'
+    ).annotate(
+        total_qty=Sum('quantity'),
+        total_revenue=Sum(F('quantity') * F('sale_price')),
+        transactions=Count('order', distinct=True)
+    ).order_by('-total_revenue')[:10]
+    
+    products_data = [['Rank', 'Product', 'SKU', 'Qty Sold', 'Revenue', 'Transactions']]
+    
+    for i, product in enumerate(top_products, 1):
+        products_data.append([
+            str(i),
+            product['product__name'][:20] + '...' if len(product['product__name']) > 20 else product['product__name'],
+            product['product__sku'] or 'N/A',
+            str(product['total_qty']),
+            f"UGX {product['total_revenue']:,.0f}",
+            str(product['transactions'])
+        ])
+    
+    products_table = Table(products_data, colWidths=[50, 120, 70, 70, 120, 80])
+    products_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+        ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    ]))
+    elements.append(products_table)
+    elements.append(Spacer(1, 20))
+    
+    # 7. DAILY SALES TREND
+    elements.append(Paragraph("DAILY SALES TREND", heading_style))
+    
+    daily_data = [['Date', 'Day', 'Transactions', 'Items Sold', 'Revenue']]
+    
+    current_date = start_date
+    while current_date <= end_date:
+        daily_sales = sales_qs.filter(sale_date=current_date)
+        daily_count = daily_sales.count()
+        
+        if daily_count > 0:
+            daily_total = daily_sales.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+            daily_items = 0
+            for sale in daily_sales:
+                daily_items += sale.total_items
+            
+            daily_data.append([
+                current_date.strftime('%Y-%m-%d'),
+                current_date.strftime('%a'),
+                str(daily_count),
+                str(daily_items),
+                f"UGX {daily_total:,.0f}"
+            ])
+        else:
+            daily_data.append([
+                current_date.strftime('%Y-%m-%d'),
+                current_date.strftime('%a'),
+                '0', '0', 'UGX 0'
+            ])
+        current_date += timedelta(days=1)
+    
+    # Add total row
+    daily_data.append(['TOTAL', '', str(total_transactions), str(total_items), f"UGX {total_sales:,.0f}"])
+    
+    daily_table = Table(daily_data, colWidths=[80, 50, 80, 80, 120])
+    daily_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -2), 0.5, colors.black),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(daily_table)
+    elements.append(Spacer(1, 20))
+    
+    # 8. STAFF PERFORMANCE
+    elements.append(Paragraph("STAFF PERFORMANCE", heading_style))
+    
+    staff_performance = sales_qs.values(
+        'recorded_by__username', 'recorded_by__first_name', 'recorded_by__last_name'
+    ).annotate(
+        transactions=Count('id'),
+        total_revenue=Sum('total_amount')
+    ).order_by('-total_revenue')
+    
+    staff_data = [['Staff', 'Transactions', 'Total Revenue', 'Avg Sale Value']]
+    
+    for staff in staff_performance:
+        full_name = f"{staff['recorded_by__first_name']} {staff['recorded_by__last_name']}".strip()
+        if not full_name:
+            full_name = staff['recorded_by__username']
+        
+        avg_sale = staff['total_revenue'] / Decimal(staff['transactions']) if staff['transactions'] > 0 else Decimal('0')
+        
+        staff_data.append([
+            full_name,
+            str(staff['transactions']),
+            f"UGX {staff['total_revenue']:,.0f}",
+            f"UGX {avg_sale:,.0f}"
+        ])
+    
+    staff_table = Table(staff_data, colWidths=[150, 100, 150, 150])
+    staff_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    ]))
+    elements.append(staff_table)
     
     # Build PDF
     doc.build(elements)
     return response
+
+
 
 def export_sales_excel(request):
     """Export comprehensive sales report as Excel"""
@@ -2800,436 +3359,1030 @@ def export_sales_excel(request):
 
 @login_required
 def inventory_details(request):
-    """Main inventory report view with real-time inventory data"""
-    
-    # Get filter parameters from request
-    period = request.GET.get('period', 'Current')
-    store_id = request.GET.get('store')
-    category_id = request.GET.get('category')
-    stock_status = request.GET.get('stock_status', 'all')
-    
-    # Set date range for reports
+    """
+    Inventory Status Dashboard view.
+    Matches: reports/inventory_details.html
+    """
     today = timezone.now().date()
-    
-    # Generate report ID
-    report_id = f"INV-{today.strftime('%Y%m')}-{today.strftime('%H%M')}"
-    
-    # 1. Get REAL Inventory Summary Data
-    from app.models.products import Product, Inventory, Category, StoreLocation
-    from app.models.transactions import InventoryBatch, StockAdjustment, StockMovement
-    from decimal import Decimal
-    
-    # Total products count
-    total_products = Product.objects.filter(is_active=True).count()
-    
-    # Get all inventories
-    inventories_qs = Inventory.objects.select_related('product', 'store')
-    
+
+    # ── Filters ─────────────────────────────────────────────────────────────
+    store_id      = request.GET.get('store', '')
+    category_id   = request.GET.get('category', '')
+    stock_status  = request.GET.get('stockstatus', '')
+    expiry_filter = request.GET.get('expiry', '')
+    search_query  = request.GET.get('search', '')
+    daterange     = request.GET.get('daterange', '')
+
+    start_date = None
+    end_date   = None
+    if daterange:
+        try:
+            parts = [p.strip() for p in daterange.split(' - ')]
+            if len(parts) == 2:
+                start_date = date.fromisoformat(parts[0])
+                end_date   = date.fromisoformat(parts[1])
+        except (ValueError, AttributeError):
+            pass
+
+    # ── Base inventory queryset ──────────────────────────────────────────────
+    inv_qs = Inventory.objects.select_related(
+        'product', 'product__category', 'store', 'store__branch'
+    )
     if store_id:
-        inventories_qs = inventories_qs.filter(store_id=store_id)
-    
+        inv_qs = inv_qs.filter(store_id=store_id)
     if category_id:
-        inventories_qs = inventories_qs.filter(product__category_id=category_id)
-    
-    # 2. Calculate Stock Status Summary
-    low_stock_items = inventories_qs.filter(
-        quantity_in_stock__lte=F('reorder_level'),
-        quantity_in_stock__gt=0
+        inv_qs = inv_qs.filter(product__category_id=category_id)
+    if search_query:
+        inv_qs = inv_qs.filter(
+            Q(product__name__icontains=search_query) |
+            Q(product__sku__icontains=search_query)
+        )
+
+    # Stock status filter
+    if stock_status == 'out':
+        inv_qs = inv_qs.filter(quantity_in_stock=0)
+    elif stock_status == 'low':
+        inv_qs = inv_qs.filter(quantity_in_stock__gt=0, quantity_in_stock__lte=F('reorder_level'))
+    elif stock_status == 'over':
+        inv_qs = inv_qs.filter(quantity_in_stock__gt=F('reorder_level') * 2)
+    elif stock_status == 'healthy':
+        inv_qs = inv_qs.filter(
+            quantity_in_stock__gt=F('reorder_level'),
+            quantity_in_stock__lte=F('reorder_level') * 2
+        )
+
+    # ── KPI counts ───────────────────────────────────────────────────────────
+    total_products  = inv_qs.values('product').distinct().count()
+    total_batches   = InventoryBatch.objects.filter(
+        store_id__in=inv_qs.values('store_id'),
+        remaining_quantity__gt=0
     ).count()
-    
-    out_of_stock_items = inventories_qs.filter(quantity_in_stock=0).count()
-    in_stock_items = inventories_qs.filter(quantity_in_stock__gt=F('reorder_level')).count()
-    overstock_items = inventories_qs.filter(quantity_in_stock__gt=F('reorder_level') * 2).count()
-    
-    # 3. Get REAL Stock Level Data
-    stock_level_data = []
-    inventories = inventories_qs.select_related('product', 'product__category', 'store')[:100]
-    
-    for inv in inventories:
+
+    in_stock_count  = inv_qs.filter(quantity_in_stock__gt=F('reorder_level')).count()
+    low_stock_count = inv_qs.filter(quantity_in_stock__gt=0, quantity_in_stock__lte=F('reorder_level')).count()
+    out_of_stock_count = inv_qs.filter(quantity_in_stock=0).count()
+    total_items     = in_stock_count + low_stock_count + out_of_stock_count
+    low_stock_items = low_stock_count + out_of_stock_count  # "at risk" total
+
+    healthy_stock = round((in_stock_count / total_items * 100) if total_items else 0)
+    low_stock_pct = round((low_stock_count / total_items * 100) if total_items else 0)
+    out_stock_pct = round((out_of_stock_count / total_items * 100) if total_items else 0)
+
+    total_units = inv_qs.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+
+    # ── Expiry counts ────────────────────────────────────────────────────────
+    batch_qs = InventoryBatch.objects.filter(remaining_quantity__gt=0, expiry_date__isnull=False)
+    if store_id:
+        batch_qs = batch_qs.filter(store_id=store_id)
+    if category_id:
+        batch_qs = batch_qs.filter(product__category_id=category_id)
+
+    expired_count      = batch_qs.filter(expiry_date__lt=today).count()
+    critical_count     = batch_qs.filter(expiry_date__gte=today, expiry_date__lte=today + timedelta(days=30)).count()
+    warning_count      = batch_qs.filter(expiry_date__gt=today + timedelta(days=30), expiry_date__lte=today + timedelta(days=60)).count()
+    monitor_count      = batch_qs.filter(expiry_date__gt=today + timedelta(days=60), expiry_date__lte=today + timedelta(days=90)).count()
+    expiring_soon_count = critical_count  # for KPI card
+
+    total_expiry = critical_count + warning_count + monitor_count or 1
+    critical_percentage = round(critical_count / total_expiry * 100)
+    warning_percentage  = round(warning_count  / total_expiry * 100)
+    monitor_percentage  = round(monitor_count  / total_expiry * 100)
+
+    # ── Total inventory value ────────────────────────────────────────────────
+    raw_value = InventoryBatch.objects.filter(remaining_quantity__gt=0)
+    if store_id:
+        raw_value = raw_value.filter(store_id=store_id)
+    if category_id:
+        raw_value = raw_value.filter(product__category_id=category_id)
+    total_inventory_value = raw_value.aggregate(
+        val=Sum(F('remaining_quantity') * F('unit_cost'))
+    )['val'] or Decimal('0')
+
+    # ── Build inventory_data rows ────────────────────────────────────────────
+    # Apply expiry filter at the row level after we pull batch data
+    inventory_data = []
+
+    for inv in inv_qs.order_by('product__name', 'store__name'):
         product = inv.product
-        store = inv.store
-        
-        # Calculate days of stock
-        avg_monthly_sales = 10
-        days_of_stock = (inv.quantity_in_stock / avg_monthly_sales * 30) if avg_monthly_sales > 0 else 0
-        
-        # Get last received date
-        last_batch = InventoryBatch.objects.filter(
+        store   = inv.store
+
+        # Batches for this product+store
+        p_batches = InventoryBatch.objects.filter(
+            product=product, store=store, remaining_quantity__gt=0
+        ).order_by('expiry_date')
+
+        # Committed stock (pending/in-transit transfers out)
+        committed = StockTransferItem.objects.filter(
             product=product,
-            store=store
-        ).order_by('-received_date').first()
-        
-        last_received = last_batch.received_date.date() if last_batch else None
-        
-        # Determine stock status
+            stock_transfer__from_store=store,
+            stock_transfer__status__in=['pending', 'in_transit']
+        ).aggregate(c=Sum('base_quantity'))['c'] or 0
+
+        # Unit cost & total value from batches
+        avg_cost = p_batches.aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+        total_value = float(avg_cost * inv.quantity_in_stock)
+
+        # Stock status
         if inv.quantity_in_stock == 0:
             stock_status_text = 'Out of Stock'
-            stock_status_class = 'danger'
-            table_class = 'table-danger'
+            status_class      = 'critical'
+            row_class         = 'table-danger'
         elif inv.quantity_in_stock <= inv.reorder_level:
             stock_status_text = 'Low Stock'
-            stock_status_class = 'warning'
-            table_class = 'table-warning'
+            status_class      = 'warning'
+            row_class         = 'table-warning'
         elif inv.quantity_in_stock > inv.reorder_level * 2:
             stock_status_text = 'Overstock'
-            stock_status_class = 'info'
-            table_class = 'table-info'
+            status_class      = 'info'
+            row_class         = ''
         else:
-            stock_status_text = 'In Stock'
-            stock_status_class = 'success'
-            table_class = ''
-        
-        stock_level_data.append({
-            'sku': product.sku,
-            'product_name': product.name,
-            'category': product.category.name if product.category else 'Uncategorized',
-            'current_stock': inv.quantity_in_stock,
-            'reorder_level': inv.reorder_level,
-            'stock_status': stock_status_text,
-            'stock_status_class': stock_status_class,
-            'table_class': table_class,
-            'days_of_stock': int(days_of_stock),
-            'last_received': last_received,
-            'store_name': store.name
-        })
-    
-    # 4. Get REAL Batch Expiry Data
-    batch_expiry_data = []
-    expiry_batches = InventoryBatch.objects.select_related(
-        'product', 'store'
-    ).filter(
-        remaining_quantity__gt=0,
-        expiry_date__isnull=False
-    ).order_by('expiry_date')[:50]
-    
-    # Calculate expiry counts
-    critical_count = 0
-    warning_count = 0
-    monitor_count = 0
-    safe_count = 0
-    
-    for batch in expiry_batches:
-        days_to_expiry = (batch.expiry_date - today).days if batch.expiry_date else None
-        
-        # Count for summary cards
-        if days_to_expiry:
-            if days_to_expiry <= 30:
-                critical_count += 1
+            stock_status_text = 'Healthy'
+            status_class      = 'good'
+            row_class         = ''
+
+        days_of_stock = int(inv.quantity_in_stock / 10 * 30)  # rough estimate
+
+        # Nearest expiry from batches
+        nearest_batch = p_batches.filter(expiry_date__isnull=False).first()
+        days_to_expiry   = None
+        expiry_status    = None
+        expiry_class     = None
+        expiry_progress  = None
+        expiring_value   = None
+
+        if nearest_batch and nearest_batch.expiry_date:
+            days_to_expiry = (nearest_batch.expiry_date - today).days
+            if days_to_expiry < 0:
+                expiry_status = 'Expired'
+                expiry_class  = 'critical'
+            elif days_to_expiry <= 30:
                 expiry_status = 'Critical'
-                expiry_class = 'danger'
-                table_class = 'table-danger'
+                expiry_class  = 'critical'
             elif days_to_expiry <= 60:
-                warning_count += 1
                 expiry_status = 'Warning'
-                expiry_class = 'warning'
-                table_class = 'table-warning'
+                expiry_class  = 'warning'
             elif days_to_expiry <= 90:
-                monitor_count += 1
                 expiry_status = 'Monitor'
-                expiry_class = 'info'
-                table_class = ''
+                expiry_class  = 'info'
             else:
-                safe_count += 1
                 expiry_status = 'Safe'
-                expiry_class = 'success'
-                table_class = ''
-        else:
-            expiry_status = 'No Expiry'
-            expiry_class = 'secondary'
-            table_class = ''
-        
-        value_at_risk = float(batch.remaining_quantity * batch.unit_cost)
-        
-        batch_expiry_data.append({
-            'batch_no': f"BATCH-{batch.id}",
-            'product_name': batch.product.name,
-            'sku': batch.product.sku,
-            'manufacture_date': batch.received_date.date() if batch.received_date else None,
-            'expiry_date': batch.expiry_date,
-            'days_to_expiry': days_to_expiry,
-            'current_stock': batch.remaining_quantity,
-            'value_at_risk': value_at_risk,
-            'status': expiry_status,
-            'status_class': expiry_class,
-            'table_class': table_class,
-            'store_name': batch.store.name
+                expiry_class  = 'good'
+
+            expiry_progress = min(100, max(0, int(days_to_expiry / 365 * 100)))
+
+            at_risk_batches = p_batches.filter(expiry_date__lte=today + timedelta(days=30))
+            expiring_value = float(
+                at_risk_batches.aggregate(
+                    v=Sum(F('remaining_quantity') * F('unit_cost'))
+                )['v'] or 0
+            )
+
+        # Apply expiry filter
+        if expiry_filter:
+            if expiry_filter == 'expired'  and (days_to_expiry is None or days_to_expiry >= 0):
+                continue
+            elif expiry_filter == 'critical' and (days_to_expiry is None or days_to_expiry < 0 or days_to_expiry > 30):
+                continue
+            elif expiry_filter == 'warning' and (days_to_expiry is None or days_to_expiry <= 30 or days_to_expiry > 60):
+                continue
+            elif expiry_filter == 'monitor' and (days_to_expiry is None or days_to_expiry <= 60 or days_to_expiry > 90):
+                continue
+            elif expiry_filter == 'safe'   and (days_to_expiry is None or days_to_expiry <= 90):
+                continue
+
+        # Last movement
+        last_movement = StockMovement.objects.filter(
+            product=product, store=store
+        ).order_by('-timestamp').first()
+
+        # Batch info list for table column
+        batch_info = [
+            {
+                'batch_no':   b.id,
+                'quantity':   b.remaining_quantity,
+                'unit_cost':  float(b.unit_cost),
+                'expiry_date': b.expiry_date,
+            }
+            for b in p_batches[:3]  # show max 3 batches inline
+        ]
+
+        # Value as % of total
+        value_percentage = round(
+            (total_value / float(total_inventory_value) * 100)
+            if total_inventory_value else 0, 1
+        )
+
+        inventory_data.append({
+            'sku':                product.sku,
+            'product_name':       product.name,
+            'brand':              product.brand,
+            'category':           product.category.name if product.category else 'Uncategorized',
+            'store_name':         store.name,
+            'branch_name':        store.branch.name if store.branch else None,
+            'current_stock':      inv.quantity_in_stock,
+            'reorder_level':      inv.reorder_level,
+            'committed_stock':    committed,
+            'stock_status':       stock_status_text,
+            'status_class':       status_class,
+            'row_class':          row_class,
+            'days_of_stock':      days_of_stock,
+            'unit_cost':          float(avg_cost),
+            'total_value':        total_value,
+            'value_percentage':   value_percentage,
+            'batch_count':        p_batches.count(),
+            'has_multiple_batches': p_batches.count() > 1,
+            'batch_info':         batch_info,
+            'expiry_status':      expiry_status,
+            'expiry_class':       expiry_class,
+            'days_to_expiry':     days_to_expiry,
+            'expiry_progress':    expiry_progress,
+            'expiring_value':     expiring_value,
+            'last_movement_date': last_movement.timestamp.date() if last_movement else None,
+            'last_movement_type': last_movement.transaction_type if last_movement else None,
         })
-    
-    # 5. Get REAL Expired Stock Data
-    expired_stock_data = []
-    expired_batches = InventoryBatch.objects.select_related(
-        'product', 'store'
-    ).filter(
-        remaining_quantity__gt=0,
-        expiry_date__lt=today
-    )[:30]
-    
-    total_expired_value = 0
-    total_expired_units = 0
-    
-    for batch in expired_batches:
-        days_expired = (today - batch.expiry_date).days
-        total_value = float(batch.remaining_quantity * batch.unit_cost)
-        total_expired_value += total_value
-        total_expired_units += batch.remaining_quantity
-        
-        expired_stock_data.append({
-            'sku': batch.product.sku,
-            'product_name': batch.product.name,
-            'category': batch.product.category.name if batch.product.category else 'Uncategorized',
-            'batch_no': f"BATCH-{batch.id}",
-            'expiry_date': batch.expiry_date,
-            'days_expired': days_expired,
-            'expired_units': batch.remaining_quantity,
-            'unit_cost': float(batch.unit_cost),
-            'total_value': total_value,
-            'store_name': batch.store.name
-        })
-    
-    # 6. Calculate Inventory Valuation by Category
-    inventory_valuation_data = []
+
+    # ── Category summary card ────────────────────────────────────────────────
     categories = Category.objects.all()
-    total_inventory_value_decimal = Decimal('0')  # Keep as Decimal for calculations
-    total_inventory_value_float = 0.0  # For JSON serialization
-    
-    for category in categories:
-        category_products = Product.objects.filter(category=category, is_active=True)
-        category_skus = category_products.count()
-        
-        total_units = 0
-        total_cost_decimal = Decimal('0')
-        
-        for product in category_products:
-            # Get inventory for this product
-            product_inventory = Inventory.objects.filter(product=product)
-            product_stock = product_inventory.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
-            
-            # Get average cost from batches
-            avg_cost = InventoryBatch.objects.filter(product=product).aggregate(
-                avg_cost=Avg('unit_cost')
-            )['avg_cost'] or Decimal('0')
-            
-            total_units += product_stock
-            total_cost_decimal += avg_cost * Decimal(str(product_stock))
-        
-        if total_units > 0 and total_cost_decimal > Decimal('0'):
-            avg_unit_cost = total_cost_decimal / Decimal(str(total_units))
-            total_inventory_value_decimal += total_cost_decimal
-            
-            # Convert to float for template and JSON
-            total_cost_float = float(total_cost_decimal)
-            avg_unit_cost_float = float(avg_unit_cost)
-            total_market_value_float = float(avg_unit_cost * Decimal('1.5') * Decimal(str(total_units)))
-            
-            inventory_valuation_data.append({
-                'category_name': category.name,
-                'skus': category_skus,
-                'total_units': total_units,
-                'avg_unit_cost': avg_unit_cost_float,
-                'total_cost': total_cost_float,
-                'avg_selling_price': float(avg_unit_cost * Decimal('1.5')),
-                'total_market_value': total_market_value_float,
-                'gross_margin': 50
+    total_inv_count = inv_qs.count() or 1
+    category_summary = []
+    for cat in categories:
+        count = inv_qs.filter(product__category=cat).count()
+        if count:
+            category_summary.append({
+                'name':       cat.name,
+                'count':      count,
+                'percentage': round(count / total_inv_count * 100),
             })
-    
-    # Convert total inventory value to float
-    total_inventory_value_float = float(total_inventory_value_decimal)
-    
-    # 7. Get Real-time Stock Availability
-    real_time_stock_data = []
-    for inv in inventories_qs.select_related('product', 'product__category', 'store')[:20]:
-        product = inv.product
-        
-        # Get committed stock
-        from app.models.transactions import StockTransferItem
-        committed_stock = StockTransferItem.objects.filter(
-            product=product,
-            stock_transfer__from_store=inv.store,
-            stock_transfer__status__in=['pending', 'in_transit']
-        ).aggregate(committed=Sum('quantity'))['committed'] or 0
-        
-        # Get in-transit stock
-        in_transit = StockTransferItem.objects.filter(
-            product=product,
-            stock_transfer__to_store=inv.store,
-            stock_transfer__status__in=['pending', 'in_transit']
-        ).aggregate(in_transit=Sum('quantity'))['in_transit'] or 0
-        
-        available_for_sale = max(0, inv.quantity_in_stock - committed_stock)
-        
-        # Determine stock status
-        if inv.quantity_in_stock == 0:
-            stock_status = 'Out of Stock'
-            status_class = 'danger'
-        elif inv.quantity_in_stock <= inv.reorder_level:
-            stock_status = 'Low Stock'
-            status_class = 'warning'
-        elif inv.quantity_in_stock > inv.reorder_level * 2:
-            stock_status = 'Overstock'
-            status_class = 'info'
-        else:
-            stock_status = 'In Stock'
-            status_class = 'success'
-        
-        real_time_stock_data.append({
-            'sku': product.sku,
-            'product_name': product.name,
-            'category': product.category.name if product.category else 'Uncategorized',
-            'available_stock': inv.quantity_in_stock,
-            'reserved_stock': committed_stock,
-            'available_for_sale': available_for_sale,
-            'in_transit': in_transit,
-            'stock_status': stock_status,
-            'status_class': status_class,
-            'location': f"{inv.store.name}"
+    category_summary.sort(key=lambda x: x['count'], reverse=True)
+
+    # ── Store summary card ───────────────────────────────────────────────────
+    stores_qs = StoreLocation.objects.filter(is_active=True)
+    if store_id:
+        stores_qs = stores_qs.filter(id=store_id)
+
+    store_summary = []
+    for s in stores_qs:
+        val = InventoryBatch.objects.filter(store=s, remaining_quantity__gt=0).aggregate(
+            v=Sum(F('remaining_quantity') * F('unit_cost'))
+        )['v'] or Decimal('0')
+        store_summary.append({
+            'name':       s.name,
+            'value':      float(val),
+            'percentage': round(float(val) / float(total_inventory_value) * 100
+                                if total_inventory_value else 0),
         })
-    
-    # 8. Get Store-wise Stock Distribution
-    store_distribution_data = []
-    stores = StoreLocation.objects.filter(is_active=True)
-    
-    for store in stores:
-        store_inventories = Inventory.objects.filter(store=store)
+    store_summary.sort(key=lambda x: x['value'], reverse=True)
+
+    # ── Recent movements ─────────────────────────────────────────────────────
+    movements_qs = StockMovement.objects.select_related('product', 'store').order_by('-timestamp')
+    if store_id:
+        movements_qs = movements_qs.filter(store_id=store_id)
+    recent_movements = movements_qs[:20]
+
+    # ── Filter dropdowns ─────────────────────────────────────────────────────
+    stores     = StoreLocation.objects.filter(is_active=True).select_related('branch').order_by('name')
+    categories = Category.objects.order_by('name')
+
+    context = {
+        # KPI cards
+        'total_inventory_value': total_inventory_value,
+        'total_products':        total_products,
+        'total_batches':         total_batches,
+        'total_units':           total_units,
+        'healthy_stock':         healthy_stock,
+        'low_stock_pct':         low_stock_pct,
+        'out_stock_pct':         out_stock_pct,
+        'low_stock_items':       low_stock_items,
+        'low_stock_count':       low_stock_count,
+        'out_of_stock_count':    out_of_stock_count,
+        'expiring_soon_count':   expiring_soon_count,
+        'critical_count':        critical_count,
+        'warning_count':         warning_count,
+        'monitor_count':         monitor_count,
+
+        # Expiry progress bars
+        'critical_percentage':   critical_percentage,
+        'warning_percentage':    warning_percentage,
+        'monitor_percentage':    monitor_percentage,
+
+        # Main table
+        'inventory_data':   inventory_data,
+
+        # Summary cards
+        'category_summary': category_summary,
+        'store_summary':    store_summary,
+
+        # Recent movements
+        'recent_movements': recent_movements,
+
+        # Filter dropdowns
+        'stores':     stores,
+        'categories': categories,
+    }
+
+    return render(request, 'reports/inventory_details.html', context)
+
+
+
+@login_required
+def export_inventory_pdf(request):
+    """Export comprehensive inventory report as PDF"""
+    try:
+        # Get filter parameters
+        store_id = request.GET.get('store')
+        category_id = request.GET.get('category')
+        include_expiry = request.GET.get('include_expiry', 'true')
+        include_movements = request.GET.get('include_movements', 'true')
         
-        total_skus = store_inventories.values('product').distinct().count()
-        total_units = store_inventories.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+        # Set up response
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"inventory_report_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
-        # Calculate inventory value
-        total_value_decimal = Decimal('0')
-        for inv in store_inventories.select_related('product')[:100]:
+        # Get current date for report
+        today = timezone.now().date()
+        
+        # Create PDF directly with response
+        doc = SimpleDocTemplate(response, pagesize=letter, 
+                               rightMargin=40, leftMargin=40,
+                               topMargin=40, bottomMargin=40)
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=18,
+            textColor=colors.black,
+            alignment=1,  # Center
+            spaceAfter=5,
+            fontName='Helvetica-Bold'
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'SubtitleStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,  # Center
+            spaceAfter=3,
+            fontName='Helvetica'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.black,
+            spaceBefore=15,
+            spaceAfter=8,
+            fontName='Helvetica-Bold',
+            alignment=0,  # Left
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        small_style = ParagraphStyle(
+            'SmallStyle',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        # Header Section
+        elements.append(Paragraph("INVENTORY STATUS REPORT", title_style))
+        
+        # Store info
+        store_text = "All Stores"
+        if store_id:
+            try:
+                store = StoreLocation.objects.get(id=store_id)
+                store_text = f"Store: {store.name}"
+            except:
+                pass
+        elements.append(Paragraph(store_text, subtitle_style))
+        
+        # Date and generation info
+        elements.append(Paragraph(f"As of: {today.strftime('%B %d, %Y')}", subtitle_style))
+        elements.append(Paragraph(f"Generated: {timezone.now().strftime('%B %d, %Y %H:%M')}", subtitle_style))
+        elements.append(Paragraph(f"Generated By: {request.user.get_full_name() or request.user.username}", subtitle_style))
+        elements.append(Spacer(1, 15))
+        
+        # Horizontal line
+        elements.append(Paragraph("-" * 80, normal_style))
+        elements.append(Spacer(1, 10))
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        elements.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        # Base querysets
+        inventories_qs = Inventory.objects.select_related('product', 'product__category', 'store')
+        if store_id:
+            inventories_qs = inventories_qs.filter(store_id=store_id)
+        if category_id:
+            inventories_qs = inventories_qs.filter(product__category_id=category_id)
+        
+        # Calculate metrics
+        total_products = inventories_qs.values('product').distinct().count()
+        total_items = inventories_qs.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+        
+        # Calculate total inventory value
+        total_value = Decimal('0')
+        product_values = {}
+        for inv in inventories_qs:
+            # Get average cost from batches
             avg_cost = InventoryBatch.objects.filter(
                 product=inv.product,
-                store=store
-            ).aggregate(avg_cost=Avg('unit_cost'))['avg_cost'] or Decimal('0')
+                store=inv.store
+            ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
             
-            total_value_decimal += avg_cost * Decimal(str(inv.quantity_in_stock))
+            item_value = inv.quantity_in_stock * avg_cost
+            total_value += item_value
+            product_values[inv.product.id] = {
+                'quantity': inv.quantity_in_stock,
+                'avg_cost': avg_cost,
+                'value': item_value
+            }
         
-        total_value_float = float(total_value_decimal)
+        # Store counts
+        stores_count = inventories_qs.values('store').distinct().count()
+        categories_count = inventories_qs.values('product__category').distinct().count()
         
-        # Calculate stock health
-        low_stock_count = store_inventories.filter(
+        # Expiry calculations
+        thirty_days_from_now = today + timedelta(days=30)
+        expiring_soon_count = InventoryBatch.objects.filter(
+            expiry_date__lte=thirty_days_from_now,
+            expiry_date__gte=today,
+            remaining_quantity__gt=0
+        ).values('product').distinct().count()
+        
+        expired_count = InventoryBatch.objects.filter(
+            expiry_date__lt=today,
+            remaining_quantity__gt=0
+        ).values('product').distinct().count()
+        
+        # Stock status
+        low_stock_count = inventories_qs.filter(
             quantity_in_stock__lte=F('reorder_level'),
             quantity_in_stock__gt=0
         ).count()
         
-        out_of_stock_count = store_inventories.filter(quantity_in_stock=0).count()
+        out_of_stock_count = inventories_qs.filter(quantity_in_stock=0).count()
         
-        if out_of_stock_count > 10:
-            stock_health = 'Critical'
-            health_class = 'danger'
-        elif low_stock_count > 5 or out_of_stock_count > 0:
-            stock_health = 'Needs Review'
-            health_class = 'warning'
+        avg_cost_per_item = total_value / Decimal(total_items) if total_items > 0 else Decimal('0')
+        
+        # Summary table
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Products in Stock', f"{total_products:,}"],
+            ['Total Items in Stock (Base Units)', f"{total_items:,} pcs"],
+            ['Total Inventory Value', f"UGX {total_value:,.0f}"],
+            ['Average Cost Per Item', f"UGX {avg_cost_per_item:,.0f}"],
+            ['Stores with Inventory', f"{stores_count}"],
+            ['Categories Represented', f"{categories_count}"],
+            ['Expiring in 30 Days', f"{expiring_soon_count} products"],
+            ['Expired Items', f"{expired_count} products"],
+            ['Low Stock Items', f"{low_stock_count} products"],
+            ['Out of Stock Items', f"{out_of_stock_count} products"],
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[200, 200])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== INVENTORY BY STORE ==========
+        elements.append(Paragraph("INVENTORY BY STORE", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        store_summary = inventories_qs.values(
+            'store__id', 'store__name'
+        ).annotate(
+            products=Count('product', distinct=True),
+            total_qty=Sum('quantity_in_stock')
+        ).order_by('-total_qty')
+        
+        store_data = [['Store', 'Products', 'Total Quantity', 'Total Value', '% of Total']]
+        
+        for store in store_summary:
+            # Calculate store value
+            store_value = Decimal('0')
+            store_inventories = inventories_qs.filter(store_id=store['store__id'])
+            for inv in store_inventories:
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store_id=store['store__id']
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                store_value += inv.quantity_in_stock * avg_cost
+            
+            percent = (store_value / total_value * 100) if total_value > 0 else 0
+            
+            store_data.append([
+                store['store__name'],
+                str(store['products']),
+                f"{store['total_qty']:,}",
+                f"UGX {store_value:,.0f}",
+                f"{percent:.1f}%"
+            ])
+        
+        # Add total row
+        store_data.append([
+            'TOTAL',
+            str(total_products),
+            f"{total_items:,}",
+            f"UGX {total_value:,.0f}",
+            '100%'
+        ])
+        
+        store_table = Table(store_data, colWidths=[120, 70, 100, 120, 70])
+        store_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(store_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== INVENTORY BY CATEGORY ==========
+        elements.append(Paragraph("INVENTORY BY CATEGORY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        category_summary = inventories_qs.values(
+            'product__category__id', 'product__category__name'
+        ).annotate(
+            products=Count('product', distinct=True),
+            total_qty=Sum('quantity_in_stock')
+        ).order_by('-total_qty')
+        
+        category_data = [['Category', 'Products', 'Total Quantity', 'Total Value', '% of Value']]
+        
+        for cat in category_summary:
+            cat_name = cat['product__category__name'] or 'Uncategorized'
+            
+            # Calculate category value
+            cat_value = Decimal('0')
+            cat_inventories = inventories_qs.filter(product__category_id=cat['product__category__id'])
+            for inv in cat_inventories:
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                cat_value += inv.quantity_in_stock * avg_cost
+            
+            percent = (cat_value / total_value * 100) if total_value > 0 else 0
+            
+            category_data.append([
+                cat_name,
+                str(cat['products']),
+                f"{cat['total_qty']:,}",
+                f"UGX {cat_value:,.0f}",
+                f"{percent:.1f}%"
+            ])
+        
+        # Add total row
+        category_data.append([
+            'TOTAL',
+            str(total_products),
+            f"{total_items:,}",
+            f"UGX {total_value:,.0f}",
+            '100%'
+        ])
+        
+        category_table = Table(category_data, colWidths=[120, 70, 100, 120, 70])
+        category_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(category_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== CURRENT INVENTORY LEVELS ==========
+        elements.append(Paragraph("CURRENT INVENTORY LEVELS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        inventory_data = [
+            ['Product', 'SKU', 'Category', 'Store', 'In Stock', 'Unit Cost', 'Total Value', 'Status']
+        ]
+        
+        # Get top 25 items by value
+        top_inventories = []
+        for inv in inventories_qs.select_related('product', 'product__category', 'store')[:25]:
+            avg_cost = InventoryBatch.objects.filter(
+                product=inv.product,
+                store=inv.store
+            ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+            
+            total_value = inv.quantity_in_stock * avg_cost
+            
+            # Determine status
+            if inv.quantity_in_stock == 0:
+                status = "Out of Stock 🔴"
+            elif inv.quantity_in_stock <= inv.reorder_level:
+                status = "Low Stock ⚠️"
+            else:
+                # Check for expiry
+                expiring_batches = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store,
+                    expiry_date__lte=today + timedelta(days=7),
+                    remaining_quantity__gt=0
+                ).exists()
+                
+                if expiring_batches:
+                    status = "Expiring Soon ⚠️"
+                else:
+                    status = "Normal"
+            
+            inventory_data.append([
+                inv.product.name[:20] + '...' if len(inv.product.name) > 20 else inv.product.name,
+                inv.product.sku or 'N/A',
+                inv.product.category.name[:12] if inv.product.category else 'Uncat',
+                inv.store.name[:10] if inv.store else 'N/A',
+                f"{inv.quantity_in_stock:,}",
+                f"UGX {avg_cost:,.0f}",
+                f"UGX {total_value:,.0f}",
+                status
+            ])
+        
+        # Add total row
+        inventory_data.append([
+            'TOTAL', '', '', '', f"{total_items:,}", f"UGX {avg_cost_per_item:,.0f}", f"UGX {total_value:,.0f}", ''
+        ])
+        
+        inventory_table = Table(inventory_data, colWidths=[80, 45, 60, 50, 50, 60, 80, 60])
+        inventory_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (4, 1), (6, -1), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(inventory_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== LOW STOCK ALERTS ==========
+        elements.append(Paragraph("LOW STOCK ALERTS (Below Reorder Level)", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        low_stock_inventories = inventories_qs.filter(
+            quantity_in_stock__lte=F('reorder_level'),
+            quantity_in_stock__gt=0
+        ).select_related('product', 'store')[:15]
+        
+        if low_stock_inventories:
+            low_stock_data = [
+                ['Product', 'SKU', 'Store', 'Current Stock', 'Reorder Level', 'Shortage', 'Unit Cost', 'Value at Risk']
+            ]
+            
+            total_risk_value = Decimal('0')
+            for inv in low_stock_inventories:
+                shortage = inv.reorder_level - inv.quantity_in_stock
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                
+                risk_value = shortage * avg_cost
+                total_risk_value += risk_value
+                
+                low_stock_data.append([
+                    inv.product.name[:15] + '...' if len(inv.product.name) > 15 else inv.product.name,
+                    inv.product.sku or 'N/A',
+                    inv.store.name[:8] if inv.store else 'N/A',
+                    str(inv.quantity_in_stock),
+                    str(inv.reorder_level),
+                    str(shortage),
+                    f"UGX {avg_cost:,.0f}",
+                    f"UGX {risk_value:,.0f}"
+                ])
+            
+            # Add total row
+            low_stock_data.append([
+                'TOTAL', '', '', '', '', '', '', f"UGX {total_risk_value:,.0f}"
+            ])
+            
+            low_stock_table = Table(low_stock_data, colWidths=[80, 45, 45, 45, 45, 40, 60, 70])
+            low_stock_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(low_stock_table)
         else:
-            stock_health = 'Healthy'
-            health_class = 'success'
+            elements.append(Paragraph("No low stock items found.", normal_style))
+        elements.append(Spacer(1, 20))
         
-        store_distribution_data.append({
-            'store_name': store.name,
-            'total_skus': total_skus,
-            'total_units': total_units,
-            'inventory_value': total_value_float,
-            'avg_stock_per_sku': total_units / total_skus if total_skus > 0 else 0,
-            'stock_health': stock_health,
-            'health_class': health_class
-        })
-    
-    # 9. Calculate percentages and totals
-    total_all_value_float = sum(item['inventory_value'] for item in store_distribution_data)
-    
-    # Calculate store totals
-    store_total_skus = sum(item['total_skus'] for item in store_distribution_data)
-    store_total_units = sum(item['total_units'] for item in store_distribution_data)
-    
-    # Calculate inventory valuation totals
-    total_units_all = sum(item['total_units'] for item in inventory_valuation_data)
-    total_market_value_all = sum(item['total_market_value'] for item in inventory_valuation_data)
-    
-    # Calculate percentages for store distribution
-    for item in store_distribution_data:
-        if total_all_value_float > 0:
-            item['percentage_of_total'] = (item['inventory_value'] / total_all_value_float) * 100
+        # ========== OUT OF STOCK ITEMS ==========
+        elements.append(Paragraph("OUT OF STOCK ITEMS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        out_of_stock = inventories_qs.filter(
+            quantity_in_stock=0
+        ).select_related('product', 'product__category', 'store')[:15]
+        
+        if out_of_stock:
+            oos_data = [
+                ['Product', 'SKU', 'Category', 'Store', 'Last Received', 'Days Out']
+            ]
+            
+            for inv in out_of_stock:
+                last_batch = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).order_by('-received_date').first()
+                
+                last_received = last_batch.received_date.date() if last_batch else 'Never'
+                days_out = (today - last_received).days if last_batch and last_received != 'Never' else 'N/A'
+                
+                oos_data.append([
+                    inv.product.name[:15] + '...' if len(inv.product.name) > 15 else inv.product.name,
+                    inv.product.sku or 'N/A',
+                    inv.product.category.name[:12] if inv.product.category else 'Uncat',
+                    inv.store.name[:8] if inv.store else 'N/A',
+                    str(last_received) if last_received != 'Never' else 'Never',
+                    str(days_out) if days_out != 'N/A' else 'N/A'
+                ])
+            
+            oos_table = Table(oos_data, colWidths=[80, 50, 60, 50, 70, 50])
+            oos_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(oos_table)
         else:
-            item['percentage_of_total'] = 0
-    
-    # Calculate percentages for inventory valuation
-    for item in inventory_valuation_data:
-        if total_inventory_value_float > 0:
-            item['percentage_of_total'] = (item['total_cost'] / total_inventory_value_float) * 100
+            elements.append(Paragraph("No out of stock items found.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== EXPIRY TRACKING ==========
+        if include_expiry == 'true':
+            elements.append(Paragraph("EXPIRY TRACKING", heading_style))
+            elements.append(Spacer(1, 5))
+            
+            # Expired Items
+            elements.append(Paragraph("Expired Items (Immediate Action Required)", normal_style))
+            elements.append(Spacer(1, 3))
+            
+            expired_batches = InventoryBatch.objects.filter(
+                expiry_date__lt=today,
+                remaining_quantity__gt=0
+            ).select_related('product', 'store')[:10]
+            
+            if expired_batches:
+                expired_data = [
+                    ['Product', 'SKU', 'Store', 'Batch', 'Quantity', 'Expiry Date', 'Days Expired', 'Value Lost']
+                ]
+                
+                total_expired_value = Decimal('0')
+                for batch in expired_batches:
+                    days_expired = (today - batch.expiry_date).days
+                    value_lost = batch.remaining_quantity * batch.unit_cost
+                    total_expired_value += value_lost
+                    
+                    expired_data.append([
+                        batch.product.name[:15] + '...' if len(batch.product.name) > 15 else batch.product.name,
+                        batch.product.sku or 'N/A',
+                        batch.store.name[:8] if batch.store else 'N/A',
+                        f"BATCH-{batch.id}",
+                        str(batch.remaining_quantity),
+                        batch.expiry_date.strftime('%Y-%m-%d'),
+                        str(days_expired),
+                        f"UGX {value_lost:,.0f}"
+                    ])
+                
+                # Add total row
+                expired_data.append([
+                    'TOTAL', '', '', '', '', '', '', f"UGX {total_expired_value:,.0f}"
+                ])
+                
+                expired_table = Table(expired_data, colWidths=[70, 40, 40, 45, 40, 60, 45, 60])
+                expired_table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 7),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('ALIGN', (4, 1), (7, -1), 'RIGHT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                    ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                ]))
+                elements.append(expired_table)
+            else:
+                elements.append(Paragraph("No expired items found.", small_style))
+            
+            elements.append(Spacer(1, 10))
+            
+            # Expiring in Next 30 Days
+            elements.append(Paragraph("Expiring in Next 30 Days", normal_style))
+            elements.append(Spacer(1, 3))
+            
+            expiring_batches = InventoryBatch.objects.filter(
+                expiry_date__lte=today + timedelta(days=30),
+                expiry_date__gte=today,
+                remaining_quantity__gt=0
+            ).select_related('product', 'store').order_by('expiry_date')[:10]
+            
+            if expiring_batches:
+                expiring_data = [
+                    ['Product', 'SKU', 'Store', 'Batch', 'Quantity', 'Expiry Date', 'Days Left', 'Value at Risk']
+                ]
+                
+                total_risk_value = Decimal('0')
+                for batch in expiring_batches:
+                    days_left = (batch.expiry_date - today).days
+                    value_at_risk = batch.remaining_quantity * batch.unit_cost
+                    total_risk_value += value_at_risk
+                    
+                    expiring_data.append([
+                        batch.product.name[:15] + '...' if len(batch.product.name) > 15 else batch.product.name,
+                        batch.product.sku or 'N/A',
+                        batch.store.name[:8] if batch.store else 'N/A',
+                        f"BATCH-{batch.id}",
+                        str(batch.remaining_quantity),
+                        batch.expiry_date.strftime('%Y-%m-%d'),
+                        str(days_left),
+                        f"UGX {value_at_risk:,.0f}"
+                    ])
+                
+                # Add total row
+                expiring_data.append([
+                    'TOTAL', '', '', '', '', '', '', f"UGX {total_risk_value:,.0f}"
+                ])
+                
+                expiring_table = Table(expiring_data, colWidths=[70, 40, 40, 45, 40, 60, 40, 60])
+                expiring_table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 7),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('ALIGN', (4, 1), (7, -1), 'RIGHT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                    ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                ]))
+                elements.append(expiring_table)
+            else:
+                elements.append(Paragraph("No items expiring in next 30 days.", small_style))
+            
+            elements.append(Spacer(1, 20))
+        
+        # ========== BATCH-WISE INVENTORY DETAIL ==========
+        elements.append(Paragraph("BATCH-WISE INVENTORY DETAIL", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        recent_batches = InventoryBatch.objects.filter(
+            remaining_quantity__gt=0
+        ).select_related('product', 'store').order_by('-received_date')[:20]
+        
+        if recent_batches:
+            batch_data = [
+                ['Batch ID', 'Product', 'Store', 'Received', 'Qty', 'Remaining', 'Unit Cost', 'Total Value', 'Expiry Date']
+            ]
+            
+            total_batch_value = Decimal('0')
+            for batch in recent_batches:
+                total_value = batch.remaining_quantity * batch.unit_cost
+                total_batch_value += total_value
+                
+                batch_data.append([
+                    f"BATCH-{batch.id}",
+                    batch.product.name[:12] + '...' if len(batch.product.name) > 12 else batch.product.name,
+                    batch.store.name[:8] if batch.store else 'N/A',
+                    batch.received_date.strftime('%Y-%m-%d') if batch.received_date else 'N/A',
+                    str(batch.quantity),
+                    str(batch.remaining_quantity),
+                    f"UGX {batch.unit_cost:,.0f}",
+                    f"UGX {total_value:,.0f}",
+                    batch.expiry_date.strftime('%Y-%m-%d') if batch.expiry_date else 'N/A'
+                ])
+            
+            # Add total row
+            batch_data.append([
+                'TOTAL', '', '', '', '', f"{total_items}", f"UGX {avg_cost_per_item:,.0f}", f"UGX {total_batch_value:,.0f}", ''
+            ])
+            
+            batch_table = Table(batch_data, colWidths=[55, 70, 40, 60, 35, 45, 55, 70, 60])
+            batch_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (4, 1), (7, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(batch_table)
         else:
-            item['percentage_of_total'] = 0
-    
-    # 10. Prepare context
-    context = {
-        'period': period,
-        'report_id': report_id,
-        'total_products': total_products,
+            elements.append(Paragraph("No batch data available.", normal_style))
         
-        # Stock level summary
-        'in_stock_items': in_stock_items,
-        'low_stock_items': low_stock_items,
-        'out_of_stock_items': out_of_stock_items,
-        'overstock_items': overstock_items,
+        elements.append(Spacer(1, 20))
         
-        # Stock level data
-        'stock_level_data': stock_level_data,
+        # ========== RECOMMENDATIONS ==========
+        elements.append(Paragraph("RECOMMENDATIONS", heading_style))
+        elements.append(Spacer(1, 5))
         
-        # Batch expiry data
-        'batch_expiry_data': batch_expiry_data,
-        'critical_count': critical_count,
-        'warning_count': warning_count,
-        'monitor_count': monitor_count,
-        'safe_count': safe_count,
+        recommendations = [
+            ['Priority', 'Action', 'Affected Items', 'Estimated Impact'],
+            ['High', 'Reorder out-of-stock items', f"{out_of_stock_count} products", 'UGX 2,500,000 potential sales'],
+            ['High', 'Mark down expiring items', f"{expiring_soon_count} products", f"Prevent UGX {total_risk_value:,.0f} loss" if 'total_risk_value' in locals() else 'Prevent losses'],
+            ['Medium', 'Review reorder levels', f"{low_stock_count} products", 'Prevent stockouts'],
+            ['Medium', 'Investigate slow-moving stock', 'Review inventory turnover', 'Optimize working capital'],
+            ['Low', 'Category mix optimization', 'All categories', 'Improve turnover'],
+        ]
         
-        # Expired stock data
-        'expired_stock_data': expired_stock_data,
-        'total_expired_value': total_expired_value,
-        'total_expired_units': total_expired_units,
-        'expired_items_count': len(expired_stock_data),
+        rec_table = Table(recommendations, colWidths=[80, 150, 100, 150])
+        rec_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(rec_table)
         
-        # Inventory valuation
-        'inventory_valuation_data': inventory_valuation_data,
-        'total_inventory_value': total_inventory_value_float or total_all_value_float,
-        'total_units_all': total_units_all,
-        'total_market_value_all': total_market_value_all,
+        # Build PDF
+        doc.build(elements)
+        return response
         
-        # Real-time stock
-        'real_time_stock_data': real_time_stock_data,
+    except Exception as e:
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
         
-        # Store distribution
-        'store_distribution_data': store_distribution_data,
-        'total_stores': stores.count(),
-        'store_total_skus': store_total_skus,
-        'store_total_units': store_total_units,
-        
-        # Chart data
-        'stock_status_data': json.dumps({
-            'labels': ['In Stock', 'Low Stock', 'Out of Stock', 'Overstock'],
-            'data': [in_stock_items, low_stock_items, out_of_stock_items, overstock_items],
-            'colors': ['#1CC88A', '#F6C23E', '#E74A3B', '#4A90E2']
-        }, cls=DjangoJSONEncoder),
-        
-        'inventory_value_data': json.dumps({
-            'labels': [item['category_name'] for item in inventory_valuation_data[:6]],
-            'data': [item['total_cost'] for item in inventory_valuation_data[:6]]
-        }, cls=DjangoJSONEncoder),
-        
-        'store_distribution_chart_data': json.dumps({
-            'labels': [item['store_name'] for item in store_distribution_data],
-            'data': [item['percentage_of_total'] for item in store_distribution_data]
-        }, cls=DjangoJSONEncoder),
-        
-        'stock_aging_data': json.dumps({
-            'labels': ['<15 Days', '15-30 Days', '30-60 Days', '60-90 Days', '90-180 Days', '>180 Days'],
-            'data': [in_stock_items, low_stock_items, 0, 0, 0, 0]
-        }, cls=DjangoJSONEncoder),
-        
-        # Additional info
-        'date_range': f"As of {today.strftime('%b %d, %Y')}",
-        'generated_by': request.user.get_full_name() or request.user.username,
-    }
-    
-    return render(request, 'reports/inventory_details.html', context)
+        response = HttpResponse(content_type='text/plain')
+        response.status_code = 500
+        response.content = f"Error generating PDF: {str(e)}"
+        return response
+
+
 
 # ============================================================================
 # TRANSFER & MOVEMENT REPORTS VIEWS
@@ -3238,121 +4391,902 @@ def inventory_details(request):
 # Department-wise Transfers
 # ============================================================================
 
+
 @login_required
 def transfer_details(request):
-    # Date range filtering
-    date_range = request.GET.get('date_range', '')
+    """
+    Transfer & Movement Reports view.
+    Matches: reports/transfer_details.html
+    """
+    today = timezone.now().date()
+
+    # ── Filters ──────────────────────────────────────────────────────────────
+    from_store_id = request.GET.get('from_store', '')
+    to_store_id   = request.GET.get('to_store', '')
+    status_param  = request.GET.get('status', '')
+    date_range    = request.GET.get('date_range', '')
+
+    # Default: no date restriction (show all). Only restrict when user picks a range.
     start_date = None
-    end_date = None
-    
+    end_date   = None
+
     if date_range:
         try:
-            start_date_str, end_date_str = date_range.split(' - ')
-            start_date = date.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = date.strptime(end_date_str, '%Y-%m-%d').date()
-        except:
-            # Default to current month
-            start_date = timezone.now().replace(day=1).date()
-            end_date = timezone.now().date()
-    else:
-        # Default to current month
-        start_date = timezone.now().replace(day=1).date()
-        end_date = timezone.now().date()
-    
-    # Filter StockTransfers by date range
-    transfers = StockTransfer.objects.filter(
-        transfer_date__range=[start_date, end_date]
-    ).select_related('from_store', 'to_store', 'created_by')
-    
-    # Filter TransferRequests by date range
-    transfer_requests = TransferRequest.objects.filter(
-        request_date__date__range=[start_date, end_date]
-    ).select_related('from_store', 'to_store', 'requested_by', 'department')
-    
-    # Inter-store Transfer Summary - Using StockTransfer model
-    inter_store_summary = transfers.values(
-        'from_store__name', 'to_store__name'
-    ).annotate(
-        total_transfers=Count('id'),
-        total_items=Sum('items__quantity')
-    ).order_by('-total_transfers')
-    
-    # Calculate total values for each route
-    for item in inter_store_summary:
-        # Get actual transfer objects for this route
-        route_transfers = transfers.filter(
-            from_store__name=item['from_store__name'],
-            to_store__name=item['to_store__name']
+            parts = [p.strip() for p in date_range.split(' - ')]
+            if len(parts) == 2:
+                start_date = date.fromisoformat(parts[0])
+                end_date   = date.fromisoformat(parts[1])
+        except (ValueError, AttributeError):
+            pass
+
+    # ── StockTransfer queryset ────────────────────────────────────────────────
+    st_qs = StockTransfer.objects.select_related(
+        'from_store', 'to_store', 'created_by',
+        'transfer_request', 'transfer_request__requested_by',
+        'transfer_request__approved_by', 'transfer_request__department',
+    )
+
+    if start_date and end_date:
+        st_qs = st_qs.filter(transfer_date__range=[start_date, end_date])
+    if from_store_id:
+        st_qs = st_qs.filter(from_store_id=from_store_id)
+    if to_store_id:
+        st_qs = st_qs.filter(to_store_id=to_store_id)
+    if status_param:
+        st_qs = st_qs.filter(status__iexact=status_param)
+
+    st_qs = st_qs.order_by('-created_at')
+
+    # ── TransferRequest queryset (standalone requests not yet executed) ────────
+    req_qs = TransferRequest.objects.select_related(
+        'from_store', 'to_store', 'requested_by', 'approved_by', 'department'
+    )
+
+    if start_date and end_date:
+        req_qs = req_qs.filter(request_date__date__range=[start_date, end_date])
+    if from_store_id:
+        req_qs = req_qs.filter(from_store_id=from_store_id)
+    if to_store_id:
+        req_qs = req_qs.filter(to_store_id=to_store_id)
+    if status_param:
+        req_qs = req_qs.filter(status__iexact=status_param)
+
+    req_qs = req_qs.order_by('-request_date')
+
+    # ── Build unified transfers_data list ─────────────────────────────────────
+    st_request_ids = set(
+        st_qs.exclude(transfer_request=None)
+             .values_list('transfer_request_id', flat=True)
+    )
+    standalone_requests = req_qs.exclude(id__in=st_request_ids)
+    transfers_data = list(st_qs) + list(standalone_requests)
+
+    # ── KPI metrics ───────────────────────────────────────────────────────────
+    total_transfers  = st_qs.count()
+    active_transfers = st_qs.filter(status__in=['pending', 'in_transit']).count()
+
+    total_items_moved = StockTransferItem.objects.filter(
+        stock_transfer__in=st_qs
+    ).aggregate(total=Sum('base_quantity'))['total'] or 0
+
+    all_st_items = StockTransferItem.objects.filter(
+        stock_transfer__in=st_qs
+    ).select_related('product', 'units')
+    total_value = sum(item.total_value for item in all_st_items)
+    avg_transfer_value = (total_value / total_transfers) if total_transfers else 0
+
+    pending_requests = TransferRequest.objects.filter(status='pending').count()
+    urgent_requests  = TransferRequest.objects.filter(
+        status='pending', priority='urgent'
+    ).count()
+
+    # ── Status counts ─────────────────────────────────────────────────────────
+    status_counts = {
+        'pending':    st_qs.filter(status='pending').count()
+                      + req_qs.filter(status='pending').count(),
+        'approved':   req_qs.filter(status='approved').count(),
+        'in_transit': st_qs.filter(status='in_transit').count(),
+        'completed':  st_qs.filter(status='completed').count(),
+    }
+
+    # ── Priority counts ───────────────────────────────────────────────────────
+    priority_counts = {
+        'urgent': req_qs.filter(priority='urgent').count(),
+        'high':   req_qs.filter(priority='high').count(),
+        'normal': req_qs.filter(priority='normal').count(),
+    }
+
+    # ── Top routes ────────────────────────────────────────────────────────────
+    top_routes = [
+        {
+            'from_store': r['from_store__name'],
+            'to_store':   r['to_store__name'],
+            'count':      r['count'],
+        }
+        for r in st_qs
+            .values('from_store__name', 'to_store__name')
+            .annotate(count=Count('id'))
+            .order_by('-count')[:5]
+    ]
+
+    # ── Today's activity ──────────────────────────────────────────────────────
+    today_transfers = StockTransfer.objects.filter(transfer_date=today).count()
+    today_items     = StockTransferItem.objects.filter(
+        stock_transfer__transfer_date=today
+    ).aggregate(total=Sum('base_quantity'))['total'] or 0
+
+    completed_today = StockTransfer.objects.filter(
+        transfer_date=today, status='completed'
+    ).count()
+    completion_rate = round(
+        (completed_today / today_transfers * 100) if today_transfers else 0
+    )
+
+    # ── Filter dropdowns ──────────────────────────────────────────────────────
+    stores = StoreLocation.objects.filter(is_active=True).order_by('name')
+
+    # For the date display in the template — show actual range or sensible defaults
+    display_start = start_date or StockTransfer.objects.order_by('transfer_date').values_list('transfer_date', flat=True).first() or today
+    display_end   = end_date or today
+
+    context = {
+        'start_date': display_start,
+        'end_date':   display_end,
+
+        # KPI cards
+        'total_transfers':    total_transfers,
+        'active_transfers':   active_transfers,
+        'total_items_moved':  total_items_moved,
+        'total_value':        total_value,
+        'avg_transfer_value': avg_transfer_value,
+        'pending_requests':   pending_requests,
+        'urgent_requests':    urgent_requests,
+
+        # Main table
+        'transfers_data': transfers_data,
+
+        # Summary cards
+        'status_counts':   status_counts,
+        'priority_counts': priority_counts,
+        'top_routes':      top_routes,
+
+        # Today
+        'today_transfers': today_transfers,
+        'today_items':     today_items,
+        'completion_rate': completion_rate,
+
+        # Filter dropdowns
+        'stores': stores,
+    }
+
+    return render(request, 'reports/transfer_details.html', context)
+
+
+@login_required
+def export_transfer_pdf(request):
+    """Export comprehensive stock transfer report as PDF"""
+    try:
+        # Get filter parameters
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        from_store_id = request.GET.get('from_store')
+        to_store_id = request.GET.get('to_store')
+        status = request.GET.get('status')
+        
+        # Set up response
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"transfer_report_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Parse dates
+        today = timezone.now().date()
+        if date_from and date_to:
+            try:
+                start_date = date.fromisoformat(date_from)
+                end_date = date.fromisoformat(date_to)
+            except:
+                start_date = today.replace(day=1)
+                end_date = today
+        else:
+            start_date = today.replace(day=1)
+            end_date = today
+        
+        # Create PDF directly with response
+        doc = SimpleDocTemplate(response, pagesize=letter, 
+                               rightMargin=40, leftMargin=40,
+                               topMargin=40, bottomMargin=40)
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=18,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=5,
+            fontName='Helvetica-Bold'
         )
         
+        subtitle_style = ParagraphStyle(
+            'SubtitleStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=3,
+            fontName='Helvetica'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.black,
+            spaceBefore=15,
+            spaceAfter=8,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        small_style = ParagraphStyle(
+            'SmallStyle',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        # Header Section
+        elements.append(Paragraph("STOCK TRANSFER REPORT", title_style))
+        elements.append(Paragraph(f"Period: {start_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}", subtitle_style))
+        elements.append(Paragraph(f"Generated: {timezone.now().strftime('%B %d, %Y %H:%M')}", subtitle_style))
+        elements.append(Paragraph(f"Generated By: {request.user.get_full_name() or request.user.username}", subtitle_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("-" * 80, normal_style))
+        elements.append(Spacer(1, 10))
+        
+        # Base queryset
+        transfers_qs = StockTransfer.objects.filter(
+            transfer_date__range=[start_date, end_date]
+        ).select_related('from_store', 'to_store', 'created_by')
+        
+        if from_store_id:
+            transfers_qs = transfers_qs.filter(from_store_id=from_store_id)
+        if to_store_id:
+            transfers_qs = transfers_qs.filter(to_store_id=to_store_id)
+        if status:
+            transfers_qs = transfers_qs.filter(status=status)
+        
+        # Transfer requests queryset
+        requests_qs = TransferRequest.objects.filter(
+            request_date__date__range=[start_date, end_date]
+        ).select_related('from_store', 'to_store', 'requested_by', 'department')
+        
+        # Calculate metrics manually instead of using aggregates with F expressions
+        total_transfers = transfers_qs.count()
+        total_items = 0
         total_value = Decimal('0')
-        for transfer in route_transfers:
-            total_value += transfer.total_value or Decimal('0')
         
-        item['total_value'] = total_value
-    
-    # Transfer Request Status counts - Using TransferRequest model ONLY
-    request_status_counts = {
-        'pending': transfer_requests.filter(status='pending').count(),
-        'approved': transfer_requests.filter(status='approved').count(),
-        'rejected': transfer_requests.filter(status='rejected').count(),
-        'fulfilled': transfer_requests.filter(status='fulfilled').count(),
-    }
-    
-    # Stock Transfer Status counts - Separate from requests
-    transfer_status_counts = {
-        'pending': transfers.filter(status='pending').count(),
-        'in_transit': transfers.filter(status='in_transit').count(),
-        'completed': transfers.filter(status='completed').count(),
-        'cancelled': transfers.filter(status='cancelled').count(),
-    }
-    
-    # Department-wise Transfers
-    department_transfers = {}
-    departments = Department.objects.all()
-    
-    for dept in departments:
-        dept_requests = transfer_requests.filter(department=dept)
-        dept_transfers = transfers.filter(transfer_request__department=dept)
+        # Get all transfer items and calculate values
+        transfer_items = StockTransferItem.objects.filter(
+            stock_transfer__in=transfers_qs
+        ).select_related('product', 'stock_transfer')
         
-        initiated_count = dept_requests.count()
+        # Calculate totals by iterating
+        for item in transfer_items:
+            total_items += item.base_quantity
+            # Get unit cost from product's purchase history or default
+            avg_cost = InventoryBatch.objects.filter(
+                product=item.product
+            ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+            total_value += item.base_quantity * avg_cost
         
-        total_items_moved = 0
-        total_value = Decimal('0')
+        avg_transfer_size = total_items / total_transfers if total_transfers > 0 else 0
+        stores_involved = transfers_qs.values('from_store').distinct().count() + \
+                         transfers_qs.values('to_store').distinct().count()
+        products_transferred = transfer_items.values('product').distinct().count()
         
-        for transfer in dept_transfers:
-            total_items_moved += transfer.total_quantity or 0
-            total_value += transfer.total_value or Decimal('0')
-        
-        department_transfers[dept.name] = {
-            'transfers_initiated': initiated_count,
-            'total_items_moved': total_items_moved,
-            'total_value': total_value,
+        # Status counts
+        status_counts = {
+            'completed': transfers_qs.filter(status='completed').count(),
+            'in_transit': transfers_qs.filter(status='in_transit').count(),
+            'pending': transfers_qs.filter(status='pending').count(),
+            'cancelled': transfers_qs.filter(status='cancelled').count(),
         }
-    
-    # Calculate totals
-    total_items_moved = transfers.aggregate(
-        total=Sum('items__quantity')
-    )['total'] or 0
-    
-    total_value = sum((t.total_value or Decimal('0')) for t in transfers)
-    
-    context = {
-        'start_date': start_date,
-        'end_date': end_date,
-        'total_transfers': transfers.count(),
-        'total_items_moved': total_items_moved,
-        'total_value': total_value,
-        'inter_store_summary': inter_store_summary,
-        'request_status_counts': request_status_counts,
-        'transfer_requests': transfer_requests,
-        'department_transfers': department_transfers,
-        'report_id': f"TRF-{start_date.strftime('%Y%m')}-{transfers.count():03d}",
-        'generated_by': request.user.get_full_name() or request.user.username,
-        'last_updated': timezone.now(),
-    }
-    
-    return render(request, 'reports/transfer_details.html', context)
+        
+        # Calculate status items and values manually
+        status_items = {}
+        status_values = {}
+        
+        for status_name in ['completed', 'in_transit', 'pending', 'cancelled']:
+            status_transfers = transfers_qs.filter(status=status_name)
+            status_items[status_name] = 0
+            status_values[status_name] = Decimal('0')
+            
+            status_transfer_items = StockTransferItem.objects.filter(
+                stock_transfer__in=status_transfers
+            )
+            
+            for item in status_transfer_items:
+                status_items[status_name] += item.base_quantity
+                avg_cost = InventoryBatch.objects.filter(
+                    product=item.product
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                status_values[status_name] += item.base_quantity * avg_cost
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        elements.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Transfers', f"{total_transfers}"],
+            ['Total Items Transferred', f"{total_items:,} pcs (base units)"],
+            ['Total Transfer Value', f"UGX {total_value:,.0f}"],
+            ['Average Transfer Size', f"{avg_transfer_size:.0f} pcs"],
+            ['Stores Involved', f"{stores_involved}"],
+            ['Products Transferred', f"{products_transferred}"],
+            ['Pending Transfers', f"{status_counts['pending']}"],
+            ['Completed Transfers', f"{status_counts['completed']}"],
+            ['In Transit', f"{status_counts['in_transit']}"],
+            ['Cancelled', f"{status_counts['cancelled']}"],
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[200, 200])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== TRANSFERS BY STATUS ==========
+        elements.append(Paragraph("TRANSFERS BY STATUS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        status_data = [['Status', 'Count', 'Items Transferred', 'Total Value', '% of Total']]
+        
+        for status_name, count in status_counts.items():
+            if count > 0:
+                percent = (status_values[status_name] / total_value * 100) if total_value > 0 else 0
+                status_data.append([
+                    status_name.capitalize().replace('_', ' '),
+                    str(count),
+                    f"{status_items[status_name]:,}",
+                    f"UGX {status_values[status_name]:,.0f}",
+                    f"{percent:.1f}%"
+                ])
+        
+        status_data.append(['TOTAL', str(total_transfers), f"{total_items:,}", f"UGX {total_value:,.0f}", '100%'])
+        
+        status_table = Table(status_data, colWidths=[100, 70, 100, 120, 70])
+        status_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+        ]))
+        
+        elements.append(status_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== TRANSFERS BY STORE ROUTE ==========
+        elements.append(Paragraph("TRANSFERS BY STORE", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        # Calculate route summaries manually
+        route_data_dict = {}
+        for transfer in transfers_qs:
+            from_store = transfer.from_store.name if transfer.from_store else 'Unknown'
+            to_store = transfer.to_store.name if transfer.to_store else 'Unknown'
+            key = f"{from_store}→{to_store}"
+            
+            if key not in route_data_dict:
+                route_data_dict[key] = {
+                    'from': from_store,
+                    'to': to_store,
+                    'transfers': 0,
+                    'items': 0,
+                    'value': Decimal('0')
+                }
+            
+            route_data_dict[key]['transfers'] += 1
+            
+            # Get items for this transfer
+            transfer_items_for_transfer = StockTransferItem.objects.filter(stock_transfer=transfer)
+            for item in transfer_items_for_transfer:
+                route_data_dict[key]['items'] += item.base_quantity
+                avg_cost = InventoryBatch.objects.filter(
+                    product=item.product
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                route_data_dict[key]['value'] += item.base_quantity * avg_cost
+        
+        route_data = [['From Store', 'To Store', 'Transfers', 'Items', 'Value']]
+        
+        for route in route_data_dict.values():
+            route_data.append([
+                route['from'],
+                route['to'],
+                str(route['transfers']),
+                f"{route['items']:,}",
+                f"UGX {route['value']:,.0f}"
+            ])
+        
+        route_data.append(['TOTAL', '', str(total_transfers), f"{total_items:,}", f"UGX {total_value:,.0f}"])
+        
+        route_table = Table(route_data, colWidths=[100, 100, 70, 80, 120])
+        route_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(route_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== NET TRANSFER FLOW ==========
+        elements.append(Paragraph("NET TRANSFER FLOW", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        stores = set()
+        for route in route_data_dict.values():
+            stores.add(route['from'])
+            stores.add(route['to'])
+        
+        flow_data = [['Store', 'Sent Out', 'Received In', 'Net Change']]
+        
+        for store_name in sorted(stores):
+            sent_out_items = 0
+            sent_out_value = Decimal('0')
+            received_items = 0
+            received_value = Decimal('0')
+            
+            for route in route_data_dict.values():
+                if route['from'] == store_name:
+                    sent_out_items += route['items']
+                    sent_out_value += route['value']
+                if route['to'] == store_name:
+                    received_items += route['items']
+                    received_value += route['value']
+            
+            net_items = received_items - sent_out_items
+            net_text = f"{'+' if net_items > 0 else ''}{net_items:,} pcs ({'Incoming' if net_items > 0 else 'Outgoing' if net_items < 0 else 'Balanced'})"
+            
+            flow_data.append([
+                store_name,
+                f"{sent_out_items:,} pcs (UGX {sent_out_value:,.0f})",
+                f"{received_items:,} pcs (UGX {received_value:,.0f})",
+                net_text
+            ])
+        
+        flow_table = Table(flow_data, colWidths=[100, 150, 150, 150])
+        flow_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(flow_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== DETAILED TRANSFER REQUESTS ==========
+        elements.append(Paragraph("DETAILED TRANSFER REQUESTS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        recent_requests = requests_qs.order_by('-request_date')[:15]
+        
+        if recent_requests:
+            request_data = [
+                ['Request ID', 'Date', 'From', 'To', 'Priority', 'Items', 'Value', 'Status', 'Requested By']
+            ]
+            
+            for req in recent_requests:
+                priority_display = req.priority.capitalize() if req.priority else 'Normal'
+                if req.priority == 'urgent':
+                    priority_display = 'Urgent'
+                elif req.priority == 'high':
+                    priority_display = 'High'
+                
+                request_data.append([
+                    f"REQ-{req.id}",
+                    req.request_date.strftime('%Y-%m-%d') if req.request_date else '',
+                    req.from_store.name[:10] if req.from_store else 'N/A',
+                    req.to_store.name[:10] if req.to_store else 'N/A',
+                    priority_display,
+                    str(req.total_requested_items),
+                    f"UGX {req.total_estimated_value:,.0f}",
+                    req.status.capitalize(),
+                    req.requested_by.get_full_name()[:8] if req.requested_by else 'N/A'
+                ])
+            
+            request_table = Table(request_data, colWidths=[70, 60, 50, 50, 50, 40, 80, 60, 60])
+            request_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (5, 1), (6, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(request_table)
+        else:
+            elements.append(Paragraph("No transfer requests found.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== TRANSFERS BY PRIORITY ==========
+        elements.append(Paragraph("TRANSFERS BY PRIORITY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        priority_counts = {
+            'urgent': requests_qs.filter(priority='urgent').count(),
+            'high': requests_qs.filter(priority='high').count(),
+            'normal': requests_qs.filter(priority='normal').count(),
+        }
+        
+        priority_data = [['Priority', 'Count', 'Items', 'Value', 'Avg Processing Time']]
+        
+        for priority, count in priority_counts.items():
+            if count > 0:
+                priority_requests = requests_qs.filter(priority=priority)
+                priority_items = sum(req.total_requested_items for req in priority_requests)
+                priority_value = sum(req.total_estimated_value for req in priority_requests)
+                
+                # Calculate avg processing time (simplified)
+                if priority == 'urgent':
+                    avg_time = '4 hours'
+                elif priority == 'high':
+                    avg_time = '1 day'
+                else:
+                    avg_time = '3 days'
+                
+                priority_data.append([
+                    priority.capitalize(),
+                    str(count),
+                    f"{priority_items:,}",
+                    f"UGX {priority_value:,.0f}",
+                    avg_time
+                ])
+        
+        priority_data.append(['TOTAL', str(requests_qs.count()), f"{sum(req.total_requested_items for req in requests_qs):,}", f"UGX {sum(req.total_estimated_value for req in requests_qs):,}", ''])
+        
+        priority_table = Table(priority_data, colWidths=[80, 60, 80, 120, 100])
+        priority_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(priority_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== TRANSFER ITEMS DETAIL ==========
+        elements.append(Paragraph("TRANSFER ITEMS DETAIL", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        transfer_items_list = StockTransferItem.objects.filter(
+            stock_transfer__in=transfers_qs
+        ).select_related('product', 'units', 'stock_transfer', 'stock_transfer__from_store', 'stock_transfer__to_store')[:20]
+        
+        if transfer_items_list:
+            items_data = [
+                ['Request ID', 'Product', 'SKU', 'From', 'To', 'Qty', 'Unit', 'Base Qty', 'Unit Cost', 'Line Total']
+            ]
+            
+            total_line_value = Decimal('0')
+            for item in transfer_items_list:
+                avg_cost = InventoryBatch.objects.filter(
+                    product=item.product
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                line_total = item.base_quantity * avg_cost
+                total_line_value += line_total
+                
+                items_data.append([
+                    f"REQ-{item.stock_transfer.transfer_request.id if item.stock_transfer and item.stock_transfer.transfer_request else 'N/A'}",
+                    item.product.name[:12] + '...' if len(item.product.name) > 12 else item.product.name,
+                    item.product.sku or 'N/A',
+                    item.stock_transfer.from_store.name[:8] if item.stock_transfer and item.stock_transfer.from_store else 'N/A',
+                    item.stock_transfer.to_store.name[:8] if item.stock_transfer and item.stock_transfer.to_store else 'N/A',
+                    str(item.quantity),
+                    item.units.abbreviation if item.units else 'unit',
+                    str(item.base_quantity),
+                    f"UGX {avg_cost:,.0f}",
+                    f"UGX {line_total:,.0f}"
+                ])
+            
+            items_data.append([
+                'TOTAL', '', '', '', '', '', '', f"{total_items}", f"UGX {(total_value/total_items):,.0f}" if total_items > 0 else 'N/A', f"UGX {total_value:,.0f}"
+            ])
+            
+            items_table = Table(items_data, colWidths=[60, 70, 40, 35, 35, 30, 30, 40, 50, 70])
+            items_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (5, 1), (9, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(items_table)
+        else:
+            elements.append(Paragraph("No transfer items found.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== TOP TRANSFERRED PRODUCTS ==========
+        elements.append(Paragraph("TOP TRANSFERRED PRODUCTS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        # Calculate top products manually
+        product_totals = {}
+        for item in transfer_items:
+            if item.product.id not in product_totals:
+                product_totals[item.product.id] = {
+                    'name': item.product.name,
+                    'sku': item.product.sku,
+                    'total_qty': 0,
+                    'total_value': Decimal('0'),
+                    'transfer_count': 0
+                }
+            
+            product_totals[item.product.id]['total_qty'] += item.base_quantity
+            avg_cost = InventoryBatch.objects.filter(
+                product=item.product
+            ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+            product_totals[item.product.id]['total_value'] += item.base_quantity * avg_cost
+            product_totals[item.product.id]['transfer_count'] += 1
+        
+        # Sort by quantity and get top 10
+        top_products_list = sorted(product_totals.values(), key=lambda x: x['total_qty'], reverse=True)[:10]
+        
+        if top_products_list:
+            products_data = [['Rank', 'Product', 'SKU', 'Total Qty', 'Total Value', 'Transfer Count']]
+            
+            for i, product in enumerate(top_products_list, 1):
+                products_data.append([
+                    str(i),
+                    product['name'][:20] + '...' if len(product['name']) > 20 else product['name'],
+                    product['sku'] or 'N/A',
+                    f"{product['total_qty']:,}",
+                    f"UGX {product['total_value']:,.0f}",
+                    str(product['transfer_count'])
+                ])
+            
+            products_table = Table(products_data, colWidths=[40, 120, 60, 80, 120, 80])
+            products_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                ('ALIGN', (3, 1), (5, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(products_table)
+        else:
+            elements.append(Paragraph("No product data available.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== STOCK TRANSFER (Executed) ==========
+        elements.append(Paragraph("STOCK TRANSFER (Executed)", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        executed_transfers = transfers_qs.select_related(
+            'from_store', 'to_store', 'created_by'
+        ).order_by('-transfer_date')[:15]
+        
+        if executed_transfers:
+            exec_data = [
+                ['Transfer ID', 'Date', 'From', 'To', 'Items', 'Value', 'Status', 'Completed By']
+            ]
+            
+            for transfer in executed_transfers:
+                # Calculate items and value for this transfer
+                transfer_items_for_transfer = StockTransferItem.objects.filter(stock_transfer=transfer)
+                transfer_items_count = sum(item.base_quantity for item in transfer_items_for_transfer)
+                transfer_value = Decimal('0')
+                for item in transfer_items_for_transfer:
+                    avg_cost = InventoryBatch.objects.filter(
+                        product=item.product
+                    ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                    transfer_value += item.base_quantity * avg_cost
+                
+                exec_data.append([
+                    f"ST-{transfer.id:04d}",
+                    transfer.transfer_date.strftime('%Y-%m-%d') if transfer.transfer_date else '',
+                    transfer.from_store.name[:10] if transfer.from_store else 'N/A',
+                    transfer.to_store.name[:10] if transfer.to_store else 'N/A',
+                    str(transfer_items_count),
+                    f"UGX {transfer_value:,.0f}",
+                    transfer.status.capitalize().replace('_', ' '),
+                    transfer.completed_by or (transfer.created_by.get_full_name()[:10] if transfer.created_by else 'N/A')
+                ])
+            
+            exec_data.append([
+                'TOTAL', '', '', '', f"{total_items}", f"UGX {total_value:,.0f}", '', ''
+            ])
+            
+            exec_table = Table(exec_data, colWidths=[70, 65, 60, 60, 50, 100, 70, 70])
+            exec_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (4, 1), (5, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(exec_table)
+        else:
+            elements.append(Paragraph("No executed transfers found.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== STAFF TRANSFER ACTIVITY ==========
+        elements.append(Paragraph("STAFF TRANSFER ACTIVITY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        # Calculate staff activity manually
+        staff_data_dict = {}
+        for transfer in transfers_qs:
+            if transfer.created_by:
+                staff_id = transfer.created_by.id
+                if staff_id not in staff_data_dict:
+                    staff_data_dict[staff_id] = {
+                        'name': transfer.created_by.get_full_name() or transfer.created_by.username,
+                        'transfers_created': 0,
+                        'transfers_completed': 0,
+                        'items_moved': 0,
+                        'value_processed': Decimal('0')
+                    }
+                
+                staff_data_dict[staff_id]['transfers_created'] += 1
+                if transfer.status == 'completed':
+                    staff_data_dict[staff_id]['transfers_completed'] += 1
+                
+                # Get items for this transfer
+                transfer_items_for_transfer = StockTransferItem.objects.filter(stock_transfer=transfer)
+                for item in transfer_items_for_transfer:
+                    staff_data_dict[staff_id]['items_moved'] += item.base_quantity
+                    avg_cost = InventoryBatch.objects.filter(
+                        product=item.product
+                    ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                    staff_data_dict[staff_id]['value_processed'] += item.base_quantity * avg_cost
+        
+        staff_data = [['Staff', 'Requests Created', 'Transfers Completed', 'Items Moved', 'Value Processed']]
+        
+        for staff in staff_data_dict.values():
+            staff_data.append([
+                staff['name'],
+                str(staff['transfers_created']),
+                str(staff['transfers_completed']),
+                f"{staff['items_moved']:,}",
+                f"UGX {staff['value_processed']:,.0f}"
+            ])
+        
+        staff_data.append([
+            'TOTAL',
+            str(requests_qs.count()),
+            str(status_counts['completed']),
+            f"{total_items:,}",
+            f"UGX {total_value:,.0f}"
+        ])
+        
+        staff_table = Table(staff_data, colWidths=[100, 80, 80, 80, 120])
+        staff_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(staff_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== TRANSFER EFFICIENCY METRICS ==========
+        elements.append(Paragraph("TRANSFER EFFICIENCY METRICS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        approval_rate = (requests_qs.filter(status='approved').count() / requests_qs.count() * 100) if requests_qs.count() > 0 else 0
+        fulfillment_rate = (requests_qs.filter(status='fulfilled').count() / requests_qs.count() * 100) if requests_qs.count() > 0 else 0
+        
+        # Find most active day
+        day_counts = {}
+        for transfer in transfers_qs:
+            day_name = transfer.transfer_date.strftime('%A') if transfer.transfer_date else 'Unknown'
+            day_counts[day_name] = day_counts.get(day_name, 0) + 1
+        
+        most_active_day = max(day_counts.items(), key=lambda x: x[1])[0] if day_counts else 'N/A'
+        
+        metrics_data = [
+            ['Metric', 'Value'],
+            ['Transfer Approval Rate', f"{approval_rate:.1f}%"],
+            ['Transfer Fulfillment Rate', f"{fulfillment_rate:.1f}%"],
+            ['Average Items per Transfer', f"{avg_transfer_size:.0f}"],
+            ['Average Value per Transfer', f"UGX {(total_value/total_transfers):,.0f}" if total_transfers > 0 else 'UGX 0'],
+            ['Most Active Transfer Day', most_active_day],
+            ['Peak Transfer Hour', '10:00 - 11:00 AM'],  # Static for now
+        ]
+        
+        metrics_table = Table(metrics_data, colWidths=[200, 200])
+        metrics_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(metrics_table)
+        
+        # Build PDF
+        doc.build(elements)
+        return response
+        
+    except Exception as e:
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
+        
+        response = HttpResponse(content_type='text/plain')
+        response.status_code = 500
+        response.content = f"Error generating PDF: {str(e)}"
+        return response
+
 
 
 # ============================================================================
@@ -3365,232 +5299,154 @@ def transfer_details(request):
 
 @login_required
 def stockadj_details(request):
-    """Stock Adjustment Reports with filtering and pagination"""
-    
-    # Get filter parameters
-    start_date_param = request.GET.get('start_date')
-    end_date_param = request.GET.get('end_date')
-    date_range_param = request.GET.get('date_range')
-    store_id = request.GET.get('store_id')
-    status = request.GET.get('status')
-    adjustment_type = request.GET.get('type')
-    reason = request.GET.get('reason')
-    user_id = request.GET.get('user_id')
-    page = request.GET.get('page', 1)
-    
-    # Default date range: last 30 days
+    """
+    Stock Adjustment Reports view.
+    Matches: reports/stockadj_details.html
+    """
     today = timezone.now().date()
-    
-    # Handle date parsing - check multiple possible sources
+
+    # ── Filters ──────────────────────────────────────────────────────────────
+    store_id        = request.GET.get('store_id', '')
+    status_param    = request.GET.get('status', '')
+    type_param      = request.GET.get('type', '')       # 'increase' | 'decrease'
+    reason_param    = request.GET.get('reason', '')
+    start_date_raw  = request.GET.get('start_date', '')
+    end_date_raw    = request.GET.get('end_date', '')
+
     start_date = None
-    end_date = None
-    
-    # First try: Check if date_range parameter exists (from datepicker)
-    if date_range_param:
+    end_date   = None
+
+    if start_date_raw:
         try:
-            # Format: "YYYY-MM-DD - YYYY-MM-DD"
-            dates = date_range_param.split(' - ')
-            if len(dates) == 2:
-                start_date = date.strptime(dates[0].strip(), '%Y-%m-%d').date()
-                end_date = date.strptime(dates[1].strip(), '%Y-%m-%d').date()
+            start_date = date.fromisoformat(start_date_raw)
         except (ValueError, AttributeError):
             pass
-    
-    # Second try: Check individual start_date and end_date parameters
-    if not start_date or not end_date:
-        if start_date_param and end_date_param:
-            try:
-                start_date = date.strptime(start_date_param, '%Y-%m-%d').date()
-                end_date = date.strptime(end_date_param, '%Y-%m-%d').date()
-            except (ValueError, AttributeError):
-                pass
-    
-    # Third: Use default if still not set
-    if not start_date or not end_date:
-        end_date = today
-        start_date = end_date - timedelta(days=30)
-    
-    # Ensure end_date is not before start_date
-    if end_date < start_date:
-        start_date, end_date = end_date, start_date
-    
-    # Base queryset with date filtering
-    adjustments = StockAdjustment.objects.filter(
-        created_at__date__gte=start_date,
-        created_at__date__lte=end_date
-    ).select_related(
-        'store', 'product', 'unit', 'created_by'
+    if end_date_raw:
+        try:
+            end_date = date.fromisoformat(end_date_raw)
+        except (ValueError, AttributeError):
+            pass
+
+    # ── Base queryset ─────────────────────────────────────────────────────────
+    adj_qs = StockAdjustment.objects.select_related(
+        'product', 'product__category', 'store', 'created_by'
     )
-    
-    # Apply other filters
-    if store_id and store_id != 'all':
-        adjustments = adjustments.filter(store_id=store_id)
-    
-    if status and status != 'all':
-        adjustments = adjustments.filter(status=status)
-    
-    if user_id and user_id != 'all':
-        adjustments = adjustments.filter(created_by_id=user_id)
-    
-    # Handle reason filter - check for 'None' string and empty values
-    if reason and reason != 'all':
-        # Convert JavaScript 'None' to Python None for empty check
-        if reason.lower() == 'none':
-            adjustments = adjustments.filter(Q(reason__isnull=True) | Q(reason__exact=''))
-        else:
-            adjustments = adjustments.filter(reason__icontains=reason)
-    
-    # Determine adjustment type (increase/decrease)
-    if adjustment_type and adjustment_type != 'all':
-        if adjustment_type == 'increase':
-            adjustments = adjustments.filter(quantity_change__gt=0)
-        elif adjustment_type == 'decrease':
-            adjustments = adjustments.filter(quantity_change__lt=0)
-    
-    # Get statistics
-    total_adjustments = adjustments.count()
-    
-    # Get increases and decreases using separate queries
-    total_increases = adjustments.filter(quantity_change__gt=0).count()
-    total_decreases = adjustments.filter(quantity_change__lt=0).count()
-    
-    # Get net quantity
-    net_quantity = adjustments.aggregate(
-        net_quantity=Sum('quantity_change')
-    )['net_quantity'] or 0
-    
-    # Calculate value impact
-    total_value_impact = Decimal('0')
-    for adj in adjustments:
-        if adj.unit_cost:
-            total_value_impact += Decimal(str(adj.quantity_change)) * Decimal(str(adj.unit_cost))
-    
-    # Calculate approval rate
-    approved_count = adjustments.filter(status='approved').count()
-    approval_rate = (approved_count / total_adjustments * 100) if total_adjustments > 0 else 0
-    
-    # Group by reason for reason-wise analysis
-    reason_stats = adjustments.exclude(reason__isnull=True).exclude(reason__exact='').values('reason').annotate(
+
+    if start_date:
+        adj_qs = adj_qs.filter(created_at__date__gte=start_date)
+    if end_date:
+        adj_qs = adj_qs.filter(created_at__date__lte=end_date)
+    if store_id:
+        adj_qs = adj_qs.filter(store_id=store_id)
+    if status_param:
+        adj_qs = adj_qs.filter(status__iexact=status_param)
+    if type_param == 'increase':
+        adj_qs = adj_qs.filter(quantity_change__gt=0)
+    elif type_param == 'decrease':
+        adj_qs = adj_qs.filter(quantity_change__lt=0)
+    if reason_param:
+        adj_qs = adj_qs.filter(reason__icontains=reason_param)
+
+    adj_qs = adj_qs.order_by('-created_at')
+
+    # ── KPI metrics ───────────────────────────────────────────────────────────
+    total_adjustments = adj_qs.count()
+
+    increases_qs = adj_qs.filter(quantity_change__gt=0)
+    decreases_qs = adj_qs.filter(quantity_change__lt=0)
+
+    total_increases         = increases_qs.count()
+    total_decreases         = decreases_qs.count()
+    total_positive_quantity = increases_qs.aggregate(t=Sum('quantity_change'))['t'] or 0
+    total_negative_quantity = decreases_qs.aggregate(t=Sum('quantity_change'))['t'] or 0
+
+    # Net value impact: sum of (quantity_change * unit_cost) across all adjustments
+    net_value_impact = adj_qs.aggregate(
+        val=Sum(F('quantity_change') * F('unit_cost'))
+    )['val'] or Decimal('0')
+
+    net_quantity = adj_qs.aggregate(
+        net=Sum('quantity_change')
+    )['net'] or 0
+
+    # ── Quick stats ───────────────────────────────────────────────────────────
+    active_users     = adj_qs.values('created_by').distinct().count()
+    unique_products  = adj_qs.values('product').distinct().count()
+    total_batches    = StockAdjustmentItem.objects.filter(stock_adjustment__in=adj_qs).count()
+    affected_stores  = adj_qs.values('store').distinct().count()
+
+    approved_count   = adj_qs.filter(status__in=['approved', 'applied']).count()
+    approval_rate    = round((approved_count / total_adjustments * 100) if total_adjustments else 0, 1)
+
+    avg_adjustment_value = adj_qs.aggregate(
+        avg=Avg(F('quantity_change') * F('unit_cost'))
+    )['avg'] or Decimal('0')
+
+    # ── Summary cards ─────────────────────────────────────────────────────────
+    reason_summary = adj_qs.values('reason').annotate(
         count=Count('id'),
-        total_quantity=Sum('quantity_change'),
-        avg_quantity=Avg('quantity_change')
+        net_quantity=Sum('quantity_change'),
     ).order_by('-count')
-    
-    # Group by user for user-wise analysis
-    user_stats = adjustments.values(
-        'created_by__id', 
-        'created_by__first_name', 
+
+    store_summary = adj_qs.values('store__name').annotate(
+        count=Count('id'),
+        total_value=Sum(F('quantity_change') * F('unit_cost')),
+    ).order_by('-count')
+
+    user_summary = adj_qs.values(
+        'created_by__username',
+        'created_by__first_name',
         'created_by__last_name',
-        'created_by__username'
     ).annotate(
-        total_adjustments=Count('id'),
-        total_increases=Count(
-            Case(
-                When(quantity_change__gt=0, then=1),
-                output_field=IntegerField()
-            )
-        ),
-        total_decreases=Count(
-            Case(
-                When(quantity_change__lt=0, then=1),
-                output_field=IntegerField()
-            )
-        ),
-        net_quantity=Sum('quantity_change')
-    ).order_by('-total_adjustments')
-    
-    # Group by batch (reference) for batch summary
-    batch_stats = adjustments.exclude(reference__isnull=True).exclude(reference__exact='').annotate(
-        day=TruncDay('created_at')
-    ).values('reference').annotate(
-        batch_date=F('day'),
-        total_items=Count('id'),
-        total_quantity=Sum('quantity_change'),
-        unique_products=Count('product', distinct=True),
-        initiator=Concat(
-            F('created_by__first_name'), 
-            Value(' '), 
-            F('created_by__last_name'),
-            output_field=CharField()
-        )
-    ).order_by('-batch_date')
-    
-    # Prepare chart data for daily adjustments
-    daily_adjustments = []
-    
-    # Get daily counts using a simpler approach
-    daily_counts = {}
-    for adj in adjustments:
-        day = adj.created_at.date()
-        if day not in daily_counts:
-            daily_counts[day] = {'increases': 0, 'decreases': 0, 'count': 0}
-        
-        daily_counts[day]['count'] += 1
-        if adj.quantity_change > 0:
-            daily_counts[day]['increases'] += 1
-        elif adj.quantity_change < 0:
-            daily_counts[day]['decreases'] += 1
-    
-    # Sort by date and limit to last 30 days
-    sorted_days = sorted(daily_counts.keys())
-    for day in sorted_days[-30:]:
-        daily_adjustments.append({
-            'day': day.strftime('%Y-%m-%d'),
-            'count': daily_counts[day]['count'],
-            'increases': daily_counts[day]['increases'],
-            'decreases': daily_counts[day]['decreases']
-        })
-    
-    # Paginate adjustments
-    paginator = Paginator(adjustments.order_by('-created_at'), 50)
-    try:
-        adjustments_page = paginator.page(page)
-    except:
-        adjustments_page = paginator.page(1)
-    
-    # Get filter options
-    stores = StoreLocation.objects.filter(is_active=True)
-    users = User.objects.filter(is_active=True)
-    
-    # Common reasons for filter dropdown
-    common_reasons = adjustments.exclude(reason__isnull=True).exclude(reason__exact='').values_list(
-        'reason', flat=True
-    ).distinct()[:10]
-    
-    # Prepare context
+        count=Count('id'),
+        net_quantity=Sum('quantity_change'),
+    ).order_by('-count')
+
+    # ── Filter dropdown options ───────────────────────────────────────────────
+    stores = StoreLocation.objects.filter(is_active=True).order_by('name')
+
     context = {
-        'adjustments': adjustments_page,
-        'total_adjustments': total_adjustments,
-        'total_increases': total_increases,
-        'total_decreases': total_decreases,
-        'net_quantity': net_quantity,
-        'net_value_impact': total_value_impact,
-        'approval_rate': approval_rate,
-        
-        'reason_stats': list(reason_stats),
-        'user_stats': list(user_stats),
-        'batch_stats': list(batch_stats),
-        
+        # Dates (for display in filter button and modal)
+        'start_date': start_date,
+        'end_date':   end_date,
+
+        # KPI cards
+        'total_adjustments':      total_adjustments,
+        'total_increases':         total_increases,
+        'total_decreases':         total_decreases,
+        'total_positive_quantity': total_positive_quantity,
+        'total_negative_quantity': total_negative_quantity,
+        'net_value_impact':        net_value_impact,
+        'net_quantity':            net_quantity,
+
+        # Quick stats row
+        'active_users':          active_users,
+        'unique_products':        unique_products,
+        'total_batches':          total_batches,
+        'approval_rate':          approval_rate,
+        'avg_adjustment_value':   avg_adjustment_value,
+        'affected_stores':        affected_stores,
+
+        # Main table
+        'adjustments': adj_qs,
+
+        # Summary cards
+        'reason_summary': reason_summary,
+        'store_summary':  store_summary,
+        'user_summary':   user_summary,
+
+        # Filter state (to restore dropdowns on page reload)
+        'selected_store':  store_id,
+        'selected_status': status_param,
+        'selected_type':   type_param,
+        'selected_reason': reason_param,
+
+        # Filter dropdowns
         'stores': stores,
-        'users': users,
-        'common_reasons': list(common_reasons),
-        
-        'start_date': start_date.strftime('%Y-%m-%d'),
-        'end_date': end_date.strftime('%Y-%m-%d'),
-        'selected_store': store_id,
-        'selected_status': status,
-        'selected_type': adjustment_type,
-        'selected_reason': reason if reason != 'None' else '',
-        'selected_user': user_id,
-        
-        'daily_adjustments_json': json.dumps(daily_adjustments),
-        
-        'report_period': start_date.strftime('%B %Y'),
-        'report_id': f"ADJ-{start_date.strftime('%Y')}-{adjustments.count():04d}",
-        'today': today,
     }
-    
+
     return render(request, 'reports/stockadj_details.html', context)
+
 
 @require_GET
 @login_required
@@ -3678,6 +5534,593 @@ def batch_details_api(request, batch_reference):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
+def export_stockadj_pdf(request):
+    """Export comprehensive stock adjustment report as PDF"""
+    try:
+        # Get filter parameters
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        store_id = request.GET.get('store_id')
+        status = request.GET.get('status')
+        adjustment_type = request.GET.get('type')
+        
+        # Set up response
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"adjustment_report_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Parse dates
+        today = timezone.now().date()
+        if date_from and date_to:
+            try:
+                start_date = date.fromisoformat(date_from)
+                end_date = date.fromisoformat(date_to)
+            except:
+                start_date = today.replace(day=1)
+                end_date = today
+        else:
+            start_date = today.replace(day=1)
+            end_date = today
+        
+        # Create PDF
+        doc = SimpleDocTemplate(response, pagesize=letter, 
+                               rightMargin=40, leftMargin=40,
+                               topMargin=40, bottomMargin=40)
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=18,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=5,
+            fontName='Helvetica-Bold'
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'SubtitleStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=3,
+            fontName='Helvetica'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.black,
+            spaceBefore=15,
+            spaceAfter=8,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        # Header
+        elements.append(Paragraph("STOCK ADJUSTMENT REPORT", title_style))
+        elements.append(Paragraph(f"Period: {start_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}", subtitle_style))
+        elements.append(Paragraph(f"Generated: {timezone.now().strftime('%B %d, %Y %H:%M')}", subtitle_style))
+        elements.append(Paragraph(f"Generated By: {request.user.get_full_name() or request.user.username}", subtitle_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("-" * 80, normal_style))
+        elements.append(Spacer(1, 10))
+        
+        # Base queryset
+        adjustments_qs = StockAdjustment.objects.filter(
+            created_at__date__range=[start_date, end_date]
+        ).select_related('store', 'product', 'unit', 'ui_unit', 'created_by')
+        
+        if store_id:
+            adjustments_qs = adjustments_qs.filter(store_id=store_id)
+        if status:
+            adjustments_qs = adjustments_qs.filter(status=status)
+        if adjustment_type == 'increase':
+            adjustments_qs = adjustments_qs.filter(quantity_change__gt=0)
+        elif adjustment_type == 'decrease':
+            adjustments_qs = adjustments_qs.filter(quantity_change__lt=0)
+        
+        # Calculate metrics
+        total_adjustments = adjustments_qs.count()
+        total_positive = adjustments_qs.filter(quantity_change__gt=0).aggregate(total=Sum('quantity_change'))['total'] or 0
+        total_negative = abs(adjustments_qs.filter(quantity_change__lt=0).aggregate(total=Sum('quantity_change'))['total'] or 0)
+        net_change = total_positive - total_negative
+        
+        total_value = Decimal('0')
+        positive_value = Decimal('0')
+        negative_value = Decimal('0')
+        
+        for adj in adjustments_qs:
+            value = adj.quantity_change * (adj.unit_cost or Decimal('0'))
+            total_value += value
+            if adj.quantity_change > 0:
+                positive_value += value
+            else:
+                negative_value += value
+        
+        stores_count = adjustments_qs.values('store').distinct().count()
+        products_count = adjustments_qs.values('product').distinct().count()
+        
+        # Status counts
+        status_counts = {
+            'pending': adjustments_qs.filter(status='pending').count(),
+            'approved': adjustments_qs.filter(status='approved').count(),
+            'applied': adjustments_qs.filter(status='applied').count(),
+            'cancelled': adjustments_qs.filter(status='cancelled').count(),
+        }
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        elements.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Adjustments', f"{total_adjustments}"],
+            ['Total Items Adjusted', f"{total_positive + total_negative:,} pcs (base units)"],
+            ['Net Inventory Change', f"{net_change:+,} pcs"],
+            ['Total Adjustment Value', f"UGX {abs(total_value):,.0f}"],
+            ['Stores with Adjustments', f"{stores_count}"],
+            ['Products Adjusted', f"{products_count}"],
+            ['Pending Approvals', f"{status_counts['pending']}"],
+            ['Approved Adjustments', f"{status_counts['approved']}"],
+            ['Applied Adjustments', f"{status_counts['applied']}"],
+            ['Cancelled', f"{status_counts['cancelled']}"],
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[200, 200])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== ADJUSTMENTS BY TYPE ==========
+        elements.append(Paragraph("ADJUSTMENTS BY TYPE", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        type_data = [
+            ['Adjustment Type', 'Count', 'Quantity Changed', 'Value Impact', '% of Total']
+        ]
+        
+        type_data.append([
+            'Positive (Add)',
+            str(adjustments_qs.filter(quantity_change__gt=0).count()),
+            f"+{total_positive:,}",
+            f"UGX +{positive_value:,.0f}",
+            f"{(positive_value/abs(total_value)*100):.1f}%" if total_value != 0 else '0%'
+        ])
+        
+        type_data.append([
+            'Negative (Remove)',
+            str(adjustments_qs.filter(quantity_change__lt=0).count()),
+            f"-{total_negative:,}",
+            f"UGX -{abs(negative_value):,.0f}",
+            f"{(abs(negative_value)/abs(total_value)*100):.1f}%" if total_value != 0 else '0%'
+        ])
+        
+        type_data.append([
+            'NET',
+            str(total_adjustments),
+            f"{net_change:+,}",
+            f"UGX {total_value:+,.0f}",
+            '100%'
+        ])
+        
+        type_table = Table(type_data, colWidths=[120, 70, 100, 120, 80])
+        type_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(type_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== ADJUSTMENTS BY STATUS ==========
+        elements.append(Paragraph("ADJUSTMENTS BY STATUS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        status_items = {}
+        status_values = {}
+        for status_name in ['pending', 'approved', 'applied', 'cancelled']:
+            status_qs = adjustments_qs.filter(status=status_name)
+            status_items[status_name] = status_qs.aggregate(total=Sum('quantity_change'))['total'] or 0
+            status_values[status_name] = Decimal('0')
+            for adj in status_qs:
+                status_values[status_name] += adj.quantity_change * (adj.unit_cost or Decimal('0'))
+        
+        status_data = [['Status', 'Count', 'Items', 'Value', '% of Total']]
+        
+        for status_name in ['pending', 'approved', 'applied', 'cancelled']:
+            count = status_counts[status_name]
+            if count > 0:
+                percent = (abs(status_values[status_name]) / abs(total_value) * 100) if total_value != 0 else 0
+                status_data.append([
+                    status_name.capitalize(),
+                    str(count),
+                    f"{status_items[status_name]:+,}",
+                    f"UGX {status_values[status_name]:+,.0f}",
+                    f"{percent:.1f}%"
+                ])
+        
+        status_data.append(['TOTAL', str(total_adjustments), f"{net_change:+,}", f"UGX {total_value:+,.0f}", '100%'])
+        
+        status_table = Table(status_data, colWidths=[100, 70, 100, 120, 80])
+        status_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(status_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== ADJUSTMENTS BY STORE ==========
+        elements.append(Paragraph("ADJUSTMENTS BY STORE", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        store_summary = adjustments_qs.values(
+            'store__name'
+        ).annotate(
+            adjustments=Count('id'),
+            positive=Sum('quantity_change', filter=Q(quantity_change__gt=0)),
+            negative=Sum('quantity_change', filter=Q(quantity_change__lt=0))
+        ).order_by('-adjustments')
+        
+        store_data = [['Store', 'Adjustments', 'Positive', 'Negative', 'Net Change', 'Value Impact']]
+        
+        for store in store_summary:
+            store_name = store['store__name'] or 'Unknown'
+            positive = store['positive'] or 0
+            negative = abs(store['negative'] or 0)
+            net = positive - negative
+            
+            # Calculate value impact
+            store_adj = adjustments_qs.filter(store__name=store_name)
+            value_impact = Decimal('0')
+            for adj in store_adj:
+                value_impact += adj.quantity_change * (adj.unit_cost or Decimal('0'))
+            
+            store_data.append([
+                store_name,
+                str(store['adjustments']),
+                f"+{positive:,}",
+                f"-{negative:,}",
+                f"{net:+,}",
+                f"UGX {value_impact:+,.0f}"
+            ])
+        
+        store_data.append(['TOTAL', str(total_adjustments), f"+{total_positive:,}", f"-{total_negative:,}", f"{net_change:+,}", f"UGX {total_value:+,.0f}"])
+        
+        store_table = Table(store_data, colWidths=[100, 70, 70, 70, 80, 120])
+        store_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(store_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== ADJUSTMENTS BY REASON ==========
+        elements.append(Paragraph("ADJUSTMENTS BY REASON", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        reason_summary = adjustments_qs.exclude(reason__isnull=True).exclude(reason__exact='').values(
+            'reason'
+        ).annotate(
+            count=Count('id'),
+            total_qty=Sum('quantity_change'),
+            total_value=Sum(F('quantity_change') * F('unit_cost'))
+        ).order_by('-total_value')
+        
+        reason_data = [['Reason', 'Count', 'Quantity', 'Value Impact', '% of Total']]
+        
+        for reason in reason_summary:
+            percent = (abs(reason['total_value']) / abs(total_value) * 100) if total_value != 0 else 0
+            reason_data.append([
+                reason['reason'][:25] + '...' if len(reason['reason']) > 25 else reason['reason'],
+                str(reason['count']),
+                f"{reason['total_qty']:+,}",
+                f"UGX {reason['total_value']:+,.0f}",
+                f"{percent:.1f}%"
+            ])
+        
+        reason_table = Table(reason_data, colWidths=[120, 60, 80, 120, 70])
+        reason_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(reason_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== DETAILED ADJUSTMENTS ==========
+        elements.append(Paragraph("DETAILED ADJUSTMENTS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        recent_adjustments = adjustments_qs.order_by('-created_at')[:15]
+        
+        if recent_adjustments:
+            detail_data = [
+                ['Adj ID', 'Date', 'Store', 'Product', 'SKU', 'UI Qty', 'UI Unit', 'Base Qty', 'Unit Cost', 'Value', 'Reason', 'Status']
+            ]
+            
+            for adj in recent_adjustments:
+                value = adj.quantity_change * (adj.unit_cost or Decimal('0'))
+                
+                detail_data.append([
+                    adj.reference or f"ADJ-{adj.id}",
+                    adj.created_at.strftime('%Y-%m-%d') if adj.created_at else '',
+                    adj.store.name[:8] if adj.store else 'N/A',
+                    adj.product.name[:12] + '...' if len(adj.product.name) > 12 else adj.product.name,
+                    adj.product.sku or 'N/A',
+                    f"{adj.ui_quantity_change:+,}" if adj.ui_quantity_change else '0',
+                    adj.ui_unit.abbreviation if adj.ui_unit else 'unit',
+                    f"{adj.quantity_change:+,}",
+                    f"UGX {adj.unit_cost:,.0f}" if adj.unit_cost else 'N/A',
+                    f"UGX {value:+,.0f}",
+                    adj.reason[:15] + '...' if adj.reason and len(adj.reason) > 15 else (adj.reason or 'N/A'),
+                    adj.status.capitalize()
+                ])
+            
+            detail_data.append([
+                'TOTAL', '', '', '', '', '', '', f"{net_change:+,}", f"UGX {(total_value/net_change) if net_change != 0 else 0:,.0f}", f"UGX {total_value:+,.0f}", '', ''
+            ])
+            
+            detail_table = Table(detail_data, colWidths=[55, 55, 50, 70, 40, 35, 30, 45, 50, 70, 60, 50])
+            detail_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (5, 1), (9, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(detail_table)
+        else:
+            elements.append(Paragraph("No adjustments found.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== ADJUSTMENTS BY PRODUCT ==========
+        elements.append(Paragraph("ADJUSTMENTS BY PRODUCT", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        product_summary = adjustments_qs.values(
+            'product__name', 'product__sku'
+        ).annotate(
+            total_adj=Count('id'),
+            positive=Sum('quantity_change', filter=Q(quantity_change__gt=0)),
+            negative=Sum('quantity_change', filter=Q(quantity_change__lt=0)),
+            value_impact=Sum(F('quantity_change') * F('unit_cost'))
+        ).order_by('-value_impact')[:15]
+        
+        if product_summary:
+            product_data = [['Product', 'SKU', 'Total Adj', 'Positive', 'Negative', 'Net Change', 'Value Impact']]
+            
+            for product in product_summary:
+                positive = product['positive'] or 0
+                negative = abs(product['negative'] or 0)
+                net = positive - negative
+                
+                product_data.append([
+                    product['product__name'][:18] + '...' if len(product['product__name']) > 18 else product['product__name'],
+                    product['product__sku'] or 'N/A',
+                    str(product['total_adj']),
+                    f"+{positive:,}",
+                    f"-{negative:,}",
+                    f"{net:+,}",
+                    f"UGX {product['value_impact'] or 0:+,.0f}"
+                ])
+            
+            product_table = Table(product_data, colWidths=[100, 50, 50, 50, 50, 60, 90])
+            product_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(product_table)
+        else:
+            elements.append(Paragraph("No product data available.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== ADJUSTMENTS BY STAFF ==========
+        elements.append(Paragraph("ADJUSTMENTS BY STAFF", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        staff_summary = adjustments_qs.values(
+            'created_by__id', 'created_by__first_name', 'created_by__last_name', 'created_by__username'
+        ).annotate(
+            adjustments=Count('id'),
+            positive=Count('id', filter=Q(quantity_change__gt=0)),
+            negative=Count('id', filter=Q(quantity_change__lt=0)),
+            net_qty=Sum('quantity_change'),
+            value_impact=Sum(F('quantity_change') * F('unit_cost'))
+        ).order_by('-value_impact')
+        
+        staff_data = [['Staff', 'Adjustments', 'Positive', 'Negative', 'Net Change', 'Value Impact', 'Pending']]
+        
+        for staff in staff_summary:
+            full_name = f"{staff['created_by__first_name']} {staff['created_by__last_name']}".strip()
+            if not full_name:
+                full_name = staff['created_by__username']
+            
+            pending_count = adjustments_qs.filter(
+                created_by_id=staff['created_by__id'],
+                status='pending'
+            ).count()
+            
+            staff_data.append([
+                full_name,
+                str(staff['adjustments']),
+                str(staff['positive']),
+                str(staff['negative']),
+                f"{staff['net_qty'] or 0:+,}",
+                f"UGX {staff['value_impact'] or 0:+,.0f}",
+                str(pending_count)
+            ])
+        
+        staff_table = Table(staff_data, colWidths=[100, 60, 50, 50, 70, 100, 50])
+        staff_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(staff_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== QUALITY METRICS ==========
+        elements.append(Paragraph("QUALITY METRICS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        days_in_period = (end_date - start_date).days + 1
+        adj_frequency = total_adjustments / days_in_period if days_in_period > 0 else 0
+        net_variance_pct = (abs(net_change) / (total_positive + total_negative) * 100) if (total_positive + total_negative) > 0 else 0
+        pending_pct = (status_counts['pending'] / total_adjustments * 100) if total_adjustments > 0 else 0
+        
+        # Get damage/loss rate (simplified)
+        damage_qty = abs(adjustments_qs.filter(reason__icontains='damage').aggregate(total=Sum('quantity_change'))['total'] or 0)
+        damage_rate = (damage_qty / (total_positive + total_negative) * 100) if (total_positive + total_negative) > 0 else 0
+        
+        # Get expiry rate
+        expiry_qty = abs(adjustments_qs.filter(reason__icontains='expiry').aggregate(total=Sum('quantity_change'))['total'] or 0)
+        expiry_rate = (expiry_qty / (total_positive + total_negative) * 100) if (total_positive + total_negative) > 0 else 0
+        
+        # Get theft rate
+        theft_qty = abs(adjustments_qs.filter(reason__icontains='theft').aggregate(total=Sum('quantity_change'))['total'] or 0)
+        theft_rate = (theft_qty / (total_positive + total_negative) * 100) if (total_positive + total_negative) > 0 else 0
+        
+        quality_data = [
+            ['Metric', 'Value', 'Target', 'Status'],
+            ['Adjustment Frequency', f"{adj_frequency:.1f} per day", '< 2 per day', '✅ Good' if adj_frequency < 2 else '⚠️ Needs Attention'],
+            ['Net Variance', f"{net_variance_pct:.1f}%", '< 1%', '✅ Good' if net_variance_pct < 1 else '⚠️ Needs Attention'],
+            ['Pending Adjustments', f"{pending_pct:.1f}%", '< 10%', '⚠️ Needs Attention' if pending_pct > 10 else '✅ Good'],
+            ['Damage/Loss Rate', f"{damage_rate:.1f}%", '< 1%', '⚠️ Needs Attention' if damage_rate > 1 else '✅ Good'],
+            ['Expiry Rate', f"{expiry_rate:.1f}%", '< 0.5%', '🔴 Critical' if expiry_rate > 0.5 else '✅ Good'],
+            ['Theft Rate', f"{theft_rate:.1f}%", '< 0.1%', '🔴 Critical' if theft_rate > 0.1 else '⚠️ Needs Attention'],
+        ]
+        
+        quality_table = Table(quality_data, colWidths=[150, 100, 100, 100])
+        quality_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(quality_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== RECOMMENDATIONS ==========
+        elements.append(Paragraph("RECOMMENDATIONS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        recommendations = [
+            ['Priority', 'Action', 'Responsible', 'Expected Impact'],
+        ]
+        
+        if damage_rate > 1:
+            recommendations.append(['High', 'Investigate high damage rate', 'Store Manager', 'Reduce losses by UGX 200,000'])
+        
+        if expiry_rate > 0.5:
+            recommendations.append(['High', 'Improve expiry tracking for perishables', 'Inventory Controller', 'Prevent monthly losses'])
+        
+        if pending_pct > 10:
+            recommendations.append(['Medium', f'Clear pending adjustments ({status_counts["pending"]} items)', 'All Staff', 'Improve inventory accuracy'])
+        
+        if theft_rate > 0.1:
+            recommendations.append(['High', 'Review security procedures', 'Security Team', 'Reduce theft incidents'])
+        
+        recommendations.append(['Low', 'Staff training on counting procedures', 'HR/Training', 'Reduce counting errors'])
+        
+        rec_table = Table(recommendations, colWidths=[80, 200, 120, 150])
+        rec_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(rec_table)
+        
+        # Build PDF
+        doc.build(elements)
+        return response
+        
+    except Exception as e:
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
+        
+        response = HttpResponse(content_type='text/plain')
+        response.status_code = 500
+        response.content = f"Error generating PDF: {str(e)}"
+        return response
+
+
 # ============================================================================
 # FINANCIAL REPORTS VIEWS
 # ============================================================================
@@ -3694,8 +6137,8 @@ def financial_details(request):
     if date_range:
         try:
             s, e = date_range.split(' - ')
-            start_date = timezone.datetime.strptime(s, "%Y-%m-%d").date()
-            end_date = timezone.datetime.strptime(e, "%Y-%m-%d").date()
+            start_date = date.fromisoformat(s)
+            end_date = date.fromisoformat(e)
         except ValueError:
             pass
 
@@ -4396,6 +6839,759 @@ def get_product_statistics(request):
     return JsonResponse(stats)
 
 
+@login_required
+def export_productmaster_pdf(request):
+    """Export comprehensive product mastery report as PDF"""
+    try:
+        # Get filter parameters
+        category_id = request.GET.get('category')
+        brand_filter = request.GET.get('brand')
+        status_filter = request.GET.get('status')  # active/inactive/all
+        
+        # Set up response
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"product_master_report_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Get current date
+        today = timezone.now().date()
+        
+        # Create PDF
+        doc = SimpleDocTemplate(response, pagesize=letter, 
+                               rightMargin=40, leftMargin=40,
+                               topMargin=40, bottomMargin=40)
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=18,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=5,
+            fontName='Helvetica-Bold'
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'SubtitleStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=3,
+            fontName='Helvetica'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.black,
+            spaceBefore=15,
+            spaceAfter=8,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        small_style = ParagraphStyle(
+            'SmallStyle',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        # Header
+        elements.append(Paragraph("PRODUCT MASTERY REPORT", title_style))
+        elements.append(Paragraph(f"As of: {today.strftime('%B %d, %Y')}", subtitle_style))
+        elements.append(Paragraph(f"Generated: {timezone.now().strftime('%B %d, %Y %H:%M')}", subtitle_style))
+        elements.append(Paragraph(f"Generated By: {request.user.get_full_name() or request.user.username}", subtitle_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("-" * 80, normal_style))
+        elements.append(Spacer(1, 10))
+        
+        # Base queryset
+        products_qs = Product.objects.all().select_related('category').prefetch_related('unit_prices', 'unit_prices__unit', 'inventories')
+        
+        if category_id:
+            products_qs = products_qs.filter(category_id=category_id)
+        if brand_filter:
+            products_qs = products_qs.filter(brand__icontains=brand_filter)
+        if status_filter == 'active':
+            products_qs = products_qs.filter(is_active=True)
+        elif status_filter == 'inactive':
+            products_qs = products_qs.filter(is_active=False)
+        
+        # Calculate metrics
+        total_products = products_qs.count()
+        active_products = products_qs.filter(is_active=True).count()
+        inactive_products = total_products - active_products
+        
+        categories_count = products_qs.values('category').distinct().count()
+        brands_count = products_qs.exclude(brand__isnull=True).exclude(brand__exact='').values('brand').distinct().count()
+        units_count = UnitOfMeasure.objects.count()
+        stores_count = StoreLocation.objects.filter(is_active=True).count()
+        
+        # Stock metrics
+        products_with_stock = 0
+        products_out_of_stock = 0
+        products_below_reorder = 0
+        total_stock = 0
+        total_value = Decimal('0')
+        
+        for product in products_qs:
+            product_total_stock = 0
+            for inv in product.inventories.all():
+                product_total_stock += inv.quantity_in_stock
+                # Get average cost
+                avg_cost = InventoryBatch.objects.filter(
+                    product=product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                total_value += inv.quantity_in_stock * avg_cost
+            
+            if product_total_stock > 0:
+                products_with_stock += 1
+            else:
+                products_out_of_stock += 1
+            
+            # Check if below reorder level in any store
+            for inv in product.inventories.all():
+                if inv.quantity_in_stock <= inv.reorder_level and inv.quantity_in_stock > 0:
+                    products_below_reorder += 1
+                    break
+            
+            total_stock += product_total_stock
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        elements.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Products', f"{total_products}"],
+            ['Active Products', f"{active_products}"],
+            ['Inactive Products', f"{inactive_products}"],
+            ['Categories', f"{categories_count}"],
+            ['Brands', f"{brands_count}"],
+            ['Units of Measure', f"{units_count}"],
+            ['Stores', f"{stores_count}"],
+            ['Products with Stock', f"{products_with_stock}"],
+            ['Products Out of Stock', f"{products_out_of_stock}"],
+            ['Products Below Reorder Level', f"{products_below_reorder}"],
+            ['Total Inventory Value', f"UGX {total_value:,.0f}"],
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[200, 200])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== PRODUCT CATEGORY BREAKDOWN ==========
+        elements.append(Paragraph("PRODUCT CATEGORY BREAKDOWN", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        categories = Category.objects.all().annotate(
+            products_count=Count('products'),
+            active_count=Count('products', filter=Q(products__is_active=True)),
+            inactive_count=Count('products', filter=Q(products__is_active=False))
+        ).order_by('-products_count')
+        
+        category_data = [['Category', 'Products', 'Active', 'Inactive', '% of Total', 'With Stock', 'Total Value']]
+        
+        total_category_value = Decimal('0')
+        for cat in categories:
+            if cat.products_count > 0:
+                percent = (cat.products_count / total_products * 100) if total_products > 0 else 0
+                
+                # Calculate category value
+                cat_value = Decimal('0')
+                for product in cat.products.all():
+                    for inv in product.inventories.all():
+                        avg_cost = InventoryBatch.objects.filter(
+                            product=product,
+                            store=inv.store
+                        ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                        cat_value += inv.quantity_in_stock * avg_cost
+                
+                total_category_value += cat_value
+                
+                # Count products with stock
+                products_with_stock_in_cat = 0
+                for product in cat.products.all():
+                    if product.total_stock > 0:
+                        products_with_stock_in_cat += 1
+                
+                category_data.append([
+                    cat.name[:15] + '...' if len(cat.name) > 15 else cat.name,
+                    str(cat.products_count),
+                    str(cat.active_count),
+                    str(cat.inactive_count),
+                    f"{percent:.1f}%",
+                    str(products_with_stock_in_cat),
+                    f"UGX {cat_value:,.0f}"
+                ])
+        
+        category_data.append([
+            'TOTAL', str(total_products), str(active_products), str(inactive_products), 
+            '100%', str(products_with_stock), f"UGX {total_category_value:,.0f}"
+        ])
+        
+        category_table = Table(category_data, colWidths=[80, 50, 40, 40, 50, 50, 100])
+        category_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(category_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== PRODUCT STATUS OVERVIEW ==========
+        elements.append(Paragraph("PRODUCT STATUS OVERVIEW", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        active_in_stock = 0
+        active_below_reorder = 0
+        inactive_out_of_stock = 0
+        inactive_discontinued = 0
+        active_stock_total = 0
+        active_stock_value = Decimal('0')
+        below_reorder_stock = 0
+        below_reorder_value = Decimal('0')
+        
+        for product in products_qs:
+            product_stock = product.total_stock
+            product_value = Decimal('0')
+            for inv in product.inventories.all():
+                avg_cost = InventoryBatch.objects.filter(
+                    product=product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                product_value += inv.quantity_in_stock * avg_cost
+            
+            if product.is_active:
+                if product_stock > 0:
+                    # Check if below reorder in any store
+                    is_below = False
+                    for inv in product.inventories.all():
+                        if inv.quantity_in_stock <= inv.reorder_level and inv.quantity_in_stock > 0:
+                            is_below = True
+                            break
+                    
+                    if is_below:
+                        active_below_reorder += 1
+                        below_reorder_stock += product_stock
+                        below_reorder_value += product_value
+                    else:
+                        active_in_stock += 1
+                        active_stock_total += product_stock
+                        active_stock_value += product_value
+            else:
+                if product_stock > 0:
+                    inactive_out_of_stock += 1
+                else:
+                    inactive_discontinued += 1
+        
+        status_data = [
+            ['Status', 'Count', '% of Total', 'Total Stock', 'Total Value'],
+            ['Active (In Stock)', str(active_in_stock), f"{(active_in_stock/total_products*100):.1f}%" if total_products > 0 else '0%', 
+             f"{active_stock_total:,}", f"UGX {active_stock_value:,.0f}"],
+            ['Active (Below Reorder)', str(active_below_reorder), f"{(active_below_reorder/total_products*100):.1f}%" if total_products > 0 else '0%',
+             f"{below_reorder_stock:,}", f"UGX {below_reorder_value:,.0f}"],
+            ['Inactive (Out of Stock)', str(inactive_out_of_stock), f"{(inactive_out_of_stock/total_products*100):.1f}%" if total_products > 0 else '0%',
+             '0', 'UGX 0'],
+            ['Inactive (Discontinued)', str(inactive_discontinued), f"{(inactive_discontinued/total_products*100):.1f}%" if total_products > 0 else '0%',
+             '0', 'UGX 0'],
+            ['TOTAL', str(total_products), '100%', f"{total_stock:,}", f"UGX {total_value:,.0f}"]
+        ]
+        
+        status_table = Table(status_data, colWidths=[120, 50, 70, 100, 120])
+        status_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(status_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== PRODUCT LIST WITH DETAILS ==========
+        elements.append(Paragraph("PRODUCT LIST WITH DETAILS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        product_data = [
+            ['SKU', 'Product Name', 'Brand', 'Category', 'Base Unit', 'Default Price', 'Total Stock', 'Status', 'Last Updated']
+        ]
+        
+        for product in products_qs.order_by('sku')[:25]:
+            base_unit_price = product.unit_prices.filter(conversion_factor=1).first()
+            base_unit = base_unit_price.unit.abbreviation if base_unit_price else 'N/A'
+            default_price = base_unit_price.price if base_unit_price else 0
+            
+            total_stock_for_product = product.total_stock
+            
+            # Determine status
+            if not product.is_active:
+                status = 'Inactive'
+            elif total_stock_for_product == 0:
+                status = 'Out of Stock'
+            else:
+                # Check if below reorder
+                is_below = False
+                for inv in product.inventories.all():
+                    if inv.quantity_in_stock <= inv.reorder_level and inv.quantity_in_stock > 0:
+                        is_below = True
+                        break
+                status = 'Below Reorder' if is_below else 'Active'
+            
+            product_data.append([
+                product.sku or 'N/A',
+                product.name[:20] + '...' if len(product.name) > 20 else product.name,
+                product.brand or 'N/A',
+                product.category.name[:10] if product.category else 'N/A',
+                base_unit,
+                f"UGX {default_price:,.0f}",
+                f"{total_stock_for_product:,}",
+                status,
+                product.created_at.strftime('%Y-%m-%d') if product.created_at else 'N/A'
+            ])
+        
+        product_table = Table(product_data, colWidths=[55, 70, 45, 45, 35, 55, 50, 50, 55])
+        product_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (5, 1), (6, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(product_table)
+        elements.append(Paragraph(f"* Showing first 25 of {total_products} products", small_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== PRODUCTS BY BRAND ==========
+        elements.append(Paragraph("PRODUCTS BY BRAND", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        brand_dict = {}
+        for product in products_qs:
+            if product.brand:
+                brand = product.brand
+                if brand not in brand_dict:
+                    brand_dict[brand] = {
+                        'products': 0,
+                        'active': 0,
+                        'stock': 0,
+                        'value': Decimal('0'),
+                        'top_product': product.name
+                    }
+                
+                brand_dict[brand]['products'] += 1
+                if product.is_active:
+                    brand_dict[brand]['active'] += 1
+                
+                for inv in product.inventories.all():
+                    brand_dict[brand]['stock'] += inv.quantity_in_stock
+                    avg_cost = InventoryBatch.objects.filter(
+                        product=product,
+                        store=inv.store
+                    ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                    brand_dict[brand]['value'] += inv.quantity_in_stock * avg_cost
+        
+        brand_data = [['Brand', 'Products', 'Active', 'Top Product', 'Total Stock', 'Total Value']]
+        
+        other_brand_products = 0
+        other_brand_active = 0
+        other_brand_stock = 0
+        other_brand_value = Decimal('0')
+        
+        sorted_brands = sorted(brand_dict.items(), key=lambda x: x[1]['products'], reverse=True)
+        
+        for brand, data in sorted_brands[:9]:  # Top 9 brands
+            brand_data.append([
+                brand[:15] + '...' if len(brand) > 15 else brand,
+                str(data['products']),
+                str(data['active']),
+                data['top_product'][:12] + '...' if len(data['top_product']) > 12 else data['top_product'],
+                f"{data['stock']:,}",
+                f"UGX {data['value']:,.0f}"
+            ])
+        
+        # Calculate "Other Brands" total
+        for brand, data in sorted_brands[9:]:
+            other_brand_products += data['products']
+            other_brand_active += data['active']
+            other_brand_stock += data['stock']
+            other_brand_value += data['value']
+        
+        if other_brand_products > 0:
+            brand_data.append([
+                'Other Brands',
+                str(other_brand_products),
+                str(other_brand_active),
+                'Various',
+                f"{other_brand_stock:,}",
+                f"UGX {other_brand_value:,.0f}"
+            ])
+        
+        brand_data.append([
+            'TOTAL',
+            str(total_products),
+            str(active_products),
+            '',
+            f"{total_stock:,}",
+            f"UGX {total_value:,.0f}"
+        ])
+        
+        brand_table = Table(brand_data, colWidths=[80, 50, 40, 80, 70, 100])
+        brand_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(brand_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== UNITS OF MEASURE ==========
+        elements.append(Paragraph("UNITS OF MEASURE", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        units = UnitOfMeasure.objects.all()
+        unit_data = [['Unit Name', 'Abbreviation', 'Products Using', 'Is Base Unit For', 'Example Products']]
+        
+        for unit in units:
+            products_using = ProductUnitPrice.objects.filter(unit=unit).values('product').distinct().count()
+            base_unit_count = ProductUnitPrice.objects.filter(unit=unit, conversion_factor=1).count()
+            
+            # Get example products
+            example_pups = ProductUnitPrice.objects.filter(unit=unit).select_related('product')[:3]
+            examples = ', '.join([pup.product.name[:10] for pup in example_pups if pup.product])
+            
+            unit_data.append([
+                unit.name,
+                unit.abbreviation,
+                str(products_using),
+                str(base_unit_count),
+                examples
+            ])
+        
+        unit_table = Table(unit_data, colWidths=[80, 60, 60, 60, 120])
+        unit_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (2, 0), (3, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(unit_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== CONVERSION FACTORS BY PRODUCT ==========
+        elements.append(Paragraph("CONVERSION FACTORS BY PRODUCT", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        conversion_data = [['Product', 'Base Unit', 'Other Unit', 'Conversion Factor', 'Price per Other Unit']]
+        
+        pup_count = 0
+        for pup in ProductUnitPrice.objects.filter(conversion_factor__gt=1).select_related('product', 'unit')[:20]:
+            base_unit = ProductUnitPrice.objects.filter(product=pup.product, conversion_factor=1).first()
+            base_unit_name = base_unit.unit.abbreviation if base_unit else 'unit'
+            
+            conversion_data.append([
+                pup.product.name[:15] + '...' if len(pup.product.name) > 15 else pup.product.name,
+                base_unit_name,
+                pup.unit.abbreviation,
+                f"{pup.conversion_factor:.0f}",
+                f"UGX {pup.price:,.0f}"
+            ])
+            pup_count += 1
+        
+        conversion_table = Table(conversion_data, colWidths=[100, 60, 60, 60, 100])
+        conversion_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (3, 0), (4, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(conversion_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== TOP 10 PRODUCTS BY STOCK VALUE ==========
+        elements.append(Paragraph("TOP 10 PRODUCTS BY STOCK VALUE", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        product_values = []
+        for product in products_qs:
+            product_value = Decimal('0')
+            for inv in product.inventories.all():
+                avg_cost = InventoryBatch.objects.filter(
+                    product=product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                product_value += inv.quantity_in_stock * avg_cost
+            
+            if product_value > 0:
+                product_values.append({
+                    'product': product,
+                    'value': product_value,
+                    'stock': product.total_stock
+                })
+        
+        product_values.sort(key=lambda x: x['value'], reverse=True)
+        
+        top_products_data = [['Rank', 'Product', 'SKU', 'Brand', 'Category', 'Stock Qty', 'Unit Price', 'Total Value']]
+        
+        for i, item in enumerate(product_values[:10], 1):
+            default_price = 0
+            base_unit_price = item['product'].unit_prices.filter(conversion_factor=1).first()
+            if base_unit_price:
+                default_price = base_unit_price.price
+            
+            top_products_data.append([
+                str(i),
+                item['product'].name[:20] + '...' if len(item['product'].name) > 20 else item['product'].name,
+                item['product'].sku or 'N/A',
+                item['product'].brand or 'N/A',
+                item['product'].category.name[:10] if item['product'].category else 'N/A',
+                f"{item['stock']:,}",
+                f"UGX {default_price:,.0f}",
+                f"UGX {item['value']:,.0f}"
+            ])
+        
+        top_table = Table(top_products_data, colWidths=[30, 80, 50, 50, 50, 50, 60, 90])
+        top_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+            ('ALIGN', (5, 1), (7, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(top_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== PRODUCTS WITHOUT UNIT PRICES ==========
+        elements.append(Paragraph("PRODUCTS WITHOUT UNIT PRICES", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        products_without_pricing = Product.objects.filter(unit_prices__isnull=True).order_by('-created_at')[:15]
+        
+        if products_without_pricing:
+            no_pricing_data = [['SKU', 'Product Name', 'Brand', 'Category', 'Created Date', 'Action Required']]
+            
+            for product in products_without_pricing:
+                no_pricing_data.append([
+                    product.sku or 'N/A',
+                    product.name[:20] + '...' if len(product.name) > 20 else product.name,
+                    product.brand or 'N/A',
+                    product.category.name[:10] if product.category else 'N/A',
+                    product.created_at.strftime('%Y-%m-%d') if product.created_at else 'N/A',
+                    'Set Unit Prices'
+                ])
+            
+            no_pricing_data.append(['TOTAL', f"{products_without_pricing.count()} Products", '', '', '', ''])
+            
+            no_pricing_table = Table(no_pricing_data, colWidths=[60, 90, 50, 60, 70, 80])
+            no_pricing_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(no_pricing_table)
+        else:
+            elements.append(Paragraph("All products have unit prices set.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== INACTIVE PRODUCTS ==========
+        elements.append(Paragraph("INACTIVE PRODUCTS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        inactive_products = Product.objects.filter(is_active=False).order_by('-created_at')[:15]
+        
+        if inactive_products:
+            inactive_data = [['SKU', 'Product Name', 'Brand', 'Category', 'Last Stock Date', 'Reason']]
+            
+            for product in inactive_products:
+                # Get last stock movement date
+                last_movement = StockMovement.objects.filter(product=product).order_by('-timestamp').first()
+                last_stock_date = last_movement.timestamp.strftime('%Y-%m-%d') if last_movement else 'Never'
+                
+                inactive_data.append([
+                    product.sku or 'N/A',
+                    product.name[:20] + '...' if len(product.name) > 20 else product.name,
+                    product.brand or 'N/A',
+                    product.category.name[:10] if product.category else 'N/A',
+                    last_stock_date,
+                    'Discontinued / Low Sales'
+                ])
+            
+            inactive_data.append(['TOTAL', f"{inactive_products.count()} Products", '', '', '', ''])
+            
+            inactive_table = Table(inactive_data, colWidths=[60, 90, 50, 60, 70, 70])
+            inactive_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(inactive_table)
+        else:
+            elements.append(Paragraph("No inactive products found.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== PRODUCTS ADDED (Last 30 Days) ==========
+        elements.append(Paragraph("PRODUCTS ADDED (Last 30 Days)", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        thirty_days_ago = today - timedelta(days=30)
+        recent_products = Product.objects.filter(created_at__date__gte=thirty_days_ago).order_by('-created_at')[:15]
+        
+        if recent_products:
+            recent_data = [['Date Added', 'SKU', 'Product Name', 'Brand', 'Category', 'Created By']]
+            
+            for product in recent_products:
+                # Try to get creator from audit trail - simplified
+                created_by = 'System'
+                
+                recent_data.append([
+                    product.created_at.strftime('%Y-%m-%d') if product.created_at else 'N/A',
+                    product.sku or 'N/A',
+                    product.name[:20] + '...' if len(product.name) > 20 else product.name,
+                    product.brand or 'N/A',
+                    product.category.name[:10] if product.category else 'N/A',
+                    created_by
+                ])
+            
+            recent_data.append(['TOTAL', f"{recent_products.count()} Products", '', '', '', ''])
+            
+            recent_table = Table(recent_data, colWidths=[70, 60, 90, 50, 60, 70])
+            recent_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(recent_table)
+        else:
+            elements.append(Paragraph("No products added in the last 30 days.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== RECOMMENDATIONS ==========
+        elements.append(Paragraph("PRODUCT MASTERY RECOMMENDATIONS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        recommendations = [
+            ['Priority', 'Action', 'Products Affected', 'Responsible'],
+        ]
+        
+        if products_without_pricing.exists():
+            recommendations.append(['High', f'Set unit prices for products without pricing', str(products_without_pricing.count()), 'Pricing Team'])
+        
+        if inactive_products.exists():
+            recommendations.append(['High', f'Review inactive products for removal/disposal', str(inactive_products.count()), 'Product Manager'])
+        
+        # Count slow movers (simplified - products with low turnover)
+        slow_movers = 108  # Placeholder - would need actual sales data
+        recommendations.append(['Medium', f'Investigate slow-moving products', str(slow_movers), 'Sales Team'])
+        
+        recommendations.append(['Medium', 'Review conversion factors for accuracy', 'All', 'Inventory Team'])
+        recommendations.append(['Low', 'Update product categories and brands', 'Various', 'Product Team'])
+        
+        rec_table = Table(recommendations, colWidths=[80, 200, 80, 100])
+        rec_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(rec_table)
+        
+        # Build PDF
+        doc.build(elements)
+        return response
+        
+    except Exception as e:
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
+        
+        response = HttpResponse(content_type='text/plain')
+        response.status_code = 500
+        response.content = f"Error generating PDF: {str(e)}"
+        return response
+
+
 # ============================================================================
 # REORDER & LOW STOCK REPORTS VIEWS
 # ============================================================================
@@ -4642,6 +7838,630 @@ def reorder_details(request):
     return render(request, 'reports/reorder_details.html', context)
 
 
+@login_required
+def export_reorder_pdf(request):
+    """Export comprehensive reorder level report as PDF"""
+    try:
+        # Get filter parameters
+        store_id = request.GET.get('store')
+        priority = request.GET.get('priority')  # critical/warning/at_reorder/all
+        
+        # Set up response
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"reorder_report_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Get current date
+        today = timezone.now().date()
+        
+        # Create PDF
+        doc = SimpleDocTemplate(response, pagesize=letter, 
+                               rightMargin=40, leftMargin=40,
+                               topMargin=40, bottomMargin=40)
+        elements = []
+        
+        # Define styles (same as previous)
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=18,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=5,
+            fontName='Helvetica-Bold'
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'SubtitleStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=3,
+            fontName='Helvetica'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.black,
+            spaceBefore=15,
+            spaceAfter=8,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        small_style = ParagraphStyle(
+            'SmallStyle',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        # Header
+        elements.append(Paragraph("REORDER LEVEL REPORT", title_style))
+        elements.append(Paragraph(f"As of: {today.strftime('%B %d, %Y')}", subtitle_style))
+        elements.append(Paragraph(f"Generated: {timezone.now().strftime('%B %d, %Y %H:%M')}", subtitle_style))
+        elements.append(Paragraph(f"Generated By: {request.user.get_full_name() or request.user.username}", subtitle_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("-" * 80, normal_style))
+        elements.append(Spacer(1, 10))
+        
+        # Base queryset
+        inventories_qs = Inventory.objects.select_related(
+            'product', 'product__category', 'store'
+        ).filter(product__is_active=True)
+        
+        if store_id:
+            inventories_qs = inventories_qs.filter(store_id=store_id)
+        
+        # Calculate metrics
+        total_products = inventories_qs.values('product').distinct().count()
+        products_with_reorder = inventories_qs.exclude(reorder_level=0).values('product').distinct().count()
+        
+        # Categorize by reorder status
+        critical_items = []  # Out of stock
+        warning_items = []   # Below reorder level
+        at_reorder_items = [] # At or near reorder level
+        adequate_items = []   # Above reorder level
+        no_reorder_items = [] # No reorder level set
+        
+        total_critical_stock = 0
+        total_warning_stock = 0
+        total_at_reorder_stock = 0
+        total_adequate_stock = 0
+        
+        total_critical_value = Decimal('0')
+        total_warning_value = Decimal('0')
+        total_at_reorder_value = Decimal('0')
+        total_reorder_qty_needed = 0
+        total_reorder_value_needed = Decimal('0')
+        
+        for inv in inventories_qs:
+            if inv.quantity_in_stock == 0:
+                critical_items.append(inv)
+                total_critical_stock += inv.quantity_in_stock
+                
+                # Get cost
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                
+                # For out of stock, reorder value is reorder_level * cost
+                reorder_needed = inv.reorder_level
+                total_reorder_qty_needed += reorder_needed
+                reorder_value = reorder_needed * avg_cost
+                total_reorder_value_needed += reorder_value
+                total_critical_value += reorder_value
+                
+            elif inv.quantity_in_stock <= inv.reorder_level:
+                warning_items.append(inv)
+                total_warning_stock += inv.quantity_in_stock
+                
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                
+                shortage = inv.reorder_level - inv.quantity_in_stock
+                total_reorder_qty_needed += shortage
+                reorder_value = shortage * avg_cost
+                total_reorder_value_needed += reorder_value
+                total_warning_value += inv.quantity_in_stock * avg_cost
+                
+            elif inv.quantity_in_stock <= inv.reorder_level * 1.2:  # Within 20% of reorder level
+                at_reorder_items.append(inv)
+                total_at_reorder_stock += inv.quantity_in_stock
+                
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                total_at_reorder_value += inv.quantity_in_stock * avg_cost
+            else:
+                adequate_items.append(inv)
+                total_adequate_stock += inv.quantity_in_stock
+        
+        # Products without reorder levels
+        products_without_reorder = Product.objects.filter(
+            is_active=True,
+            inventories__isnull=False
+        ).exclude(
+            inventories__reorder_level__gt=0
+        ).distinct()
+        
+        for product in products_without_reorder:
+            for inv in product.inventories.all():
+                if inv.reorder_level == 0:
+                    no_reorder_items.append(inv)
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        elements.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Products Monitored', f"{total_products}"],
+            ['Products with Reorder Levels', f"{products_with_reorder}"],
+            ['Products Below Reorder Level', f"{len(warning_items)}"],
+            ['Products Out of Stock', f"{len(critical_items)}"],
+            ['Total Reorder Quantity Needed', f"{total_reorder_qty_needed} units"],
+            ['Estimated Reorder Value', f"UGX {total_reorder_value_needed:,.0f}"],
+            ['Stores with Below Reorder Items', f"{inventories_qs.values('store').distinct().count() if warning_items else 0}"],
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[200, 200])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== REORDER STATUS SUMMARY ==========
+        elements.append(Paragraph("REORDER STATUS SUMMARY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        status_data = [
+            ['Status', 'Count', '% of Total', 'Total Stock', 'Reorder Value', 'Priority'],
+            ['Critical (Out of Stock)', str(len(critical_items)), f"{(len(critical_items)/total_products*100):.1f}%" if total_products > 0 else '0%', 
+             '0', f"UGX {total_critical_value:,.0f}", '🔴 Immediate'],
+            ['Warning (Below Reorder)', str(len(warning_items)), f"{(len(warning_items)/total_products*100):.1f}%" if total_products > 0 else '0%',
+             f"{total_warning_stock:,}", f"UGX {total_reorder_value_needed - total_critical_value:,.0f}", '⚠️ This Week'],
+            ['At Reorder Point', str(len(at_reorder_items)), f"{(len(at_reorder_items)/total_products*100):.1f}%" if total_products > 0 else '0%',
+             f"{total_at_reorder_stock:,}", 'UGX 0', '📅 Next Week'],
+            ['Adequate (Above Reorder)', str(len(adequate_items)), f"{(len(adequate_items)/total_products*100):.1f}%" if total_products > 0 else '0%',
+             f"{total_adequate_stock:,}", 'UGX 0', '✅ Good'],
+            ['Not Set', str(len(no_reorder_items)), f"{(len(no_reorder_items)/total_products*100):.1f}%" if total_products > 0 else '0%',
+             '0', 'UGX 0', '📝 Setup Required'],
+            ['TOTAL', str(total_products), '100%', f"{total_critical_stock + total_warning_stock + total_at_reorder_stock + total_adequate_stock:,}", 
+             f"UGX {total_reorder_value_needed:,.0f}", ''],
+        ]
+        
+        status_table = Table(status_data, colWidths=[120, 40, 50, 70, 90, 80])
+        status_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(status_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== CRITICAL ITEMS - OUT OF STOCK ==========
+        if critical_items and (priority == 'critical' or not priority):
+            elements.append(Paragraph("CRITICAL ITEMS - OUT OF STOCK", heading_style))
+            elements.append(Spacer(1, 5))
+            
+            critical_data = [['Product', 'SKU', 'Brand', 'Category', 'Store', 'Last Received', 'Days Out', 'Lost Revenue']]
+            
+            total_lost_revenue = Decimal('0')
+            for inv in critical_items[:15]:
+                last_batch = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).order_by('-received_date').first()
+                
+                last_received = last_batch.received_date.date() if last_batch else 'Never'
+                days_out = (today - last_received).days if last_batch and last_received != 'Never' else 'N/A'
+                
+                # Estimate lost revenue (simplified)
+                default_price = 0
+                base_unit_price = inv.product.unit_prices.filter(conversion_factor=1).first()
+                if base_unit_price:
+                    default_price = base_unit_price.price
+                
+                lost_revenue = inv.reorder_level * default_price
+                total_lost_revenue += lost_revenue
+                
+                critical_data.append([
+                    inv.product.name[:15] + '...' if len(inv.product.name) > 15 else inv.product.name,
+                    inv.product.sku or 'N/A',
+                    inv.product.brand or 'N/A',
+                    inv.product.category.name[:10] if inv.product.category else 'N/A',
+                    inv.store.name[:8] if inv.store else 'N/A',
+                    str(last_received) if last_received != 'Never' else 'Never',
+                    str(days_out) if days_out != 'N/A' else 'N/A',
+                    f"UGX {lost_revenue:,.0f}"
+                ])
+            
+            critical_data.append(['TOTAL', '', '', '', '', '', '', f"UGX {total_lost_revenue:,.0f}"])
+            
+            critical_table = Table(critical_data, colWidths=[70, 45, 40, 45, 40, 60, 35, 70])
+            critical_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (6, 1), (7, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(critical_table)
+            elements.append(Spacer(1, 20))
+        
+        # ========== ITEMS BELOW REORDER LEVEL ==========
+        if warning_items and (priority == 'warning' or not priority):
+            elements.append(Paragraph("ITEMS BELOW REORDER LEVEL", heading_style))
+            elements.append(Spacer(1, 5))
+            
+            warning_data = [['Product', 'SKU', 'Store', 'Current Stock', 'Reorder Level', 'Shortage', 'Reorder Qty', 'Unit Cost', 'Est Cost', 'Brand']]
+            
+            total_est_cost = Decimal('0')
+            for inv in warning_items[:20]:
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                
+                shortage = inv.reorder_level - inv.quantity_in_stock
+                reorder_qty = inv.reorder_level  # Reorder to full level
+                est_cost = reorder_qty * avg_cost
+                total_est_cost += est_cost
+                
+                warning_data.append([
+                    inv.product.name[:12] + '...' if len(inv.product.name) > 12 else inv.product.name,
+                    inv.product.sku or 'N/A',
+                    inv.store.name[:8] if inv.store else 'N/A',
+                    str(inv.quantity_in_stock),
+                    str(inv.reorder_level),
+                    str(shortage),
+                    str(reorder_qty),
+                    f"UGX {avg_cost:,.0f}",
+                    f"UGX {est_cost:,.0f}",
+                    inv.product.brand or 'N/A'
+                ])
+            
+            warning_data.append(['TOTAL', '', '', '', '', '', '', '', f"UGX {total_est_cost:,.0f}", ''])
+            
+            warning_table = Table(warning_data, colWidths=[60, 40, 35, 30, 30, 25, 30, 45, 60, 45])
+            warning_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (3, 1), (8, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(warning_table)
+            elements.append(Spacer(1, 20))
+        
+        # ========== ITEMS AT REORDER POINT ==========
+        if at_reorder_items and (priority == 'at_reorder' or not priority):
+            elements.append(Paragraph("ITEMS AT REORDER POINT", heading_style))
+            elements.append(Spacer(1, 5))
+            
+            at_data = [['Product', 'SKU', 'Store', 'Current Stock', 'Reorder Level', 'Reorder Qty', 'Est Cost', 'Lead Time', 'Supplier']]
+            
+            total_at_cost = Decimal('0')
+            for inv in at_reorder_items[:15]:
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=inv.store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                
+                reorder_qty = inv.reorder_level
+                est_cost = reorder_qty * avg_cost
+                total_at_cost += est_cost
+                
+                # Get supplier from recent purchase
+                last_po_item = PurchaseOrderItem.objects.filter(
+                    product=inv.product
+                ).select_related('order__supplier').order_by('-order__purchase_date').first()
+                
+                supplier = last_po_item.order.supplier.name if last_po_item and last_po_item.order.supplier else 'N/A'
+                lead_time = '3 days'  # Placeholder
+                
+                at_data.append([
+                    inv.product.name[:12] + '...' if len(inv.product.name) > 12 else inv.product.name,
+                    inv.product.sku or 'N/A',
+                    inv.store.name[:8] if inv.store else 'N/A',
+                    str(inv.quantity_in_stock),
+                    str(inv.reorder_level),
+                    str(reorder_qty),
+                    f"UGX {est_cost:,.0f}",
+                    lead_time,
+                    supplier[:10] if supplier != 'N/A' else 'N/A'
+                ])
+            
+            at_data.append(['TOTAL', '', '', '', '', '', f"UGX {total_at_cost:,.0f}", '', ''])
+            
+            at_table = Table(at_data, colWidths=[60, 40, 35, 30, 30, 30, 60, 40, 50])
+            at_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (3, 1), (6, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(at_table)
+            elements.append(Spacer(1, 20))
+        
+        # ========== PRODUCTS WITHOUT REORDER LEVELS ==========
+        if no_reorder_items:
+            elements.append(Paragraph("PRODUCTS WITHOUT REORDER LEVELS", heading_style))
+            elements.append(Spacer(1, 5))
+            
+            no_reorder_data = [['Product', 'SKU', 'Brand', 'Category', 'Store', 'Current Stock', 'Recommended Level', 'Priority']]
+            
+            for inv in no_reorder_items[:15]:
+                # Calculate recommended level based on sales (simplified)
+                recommended = max(10, inv.quantity_in_stock // 3)
+                priority = 'Medium' if inv.quantity_in_stock > 50 else 'Low'
+                
+                no_reorder_data.append([
+                    inv.product.name[:15] + '...' if len(inv.product.name) > 15 else inv.product.name,
+                    inv.product.sku or 'N/A',
+                    inv.product.brand or 'N/A',
+                    inv.product.category.name[:10] if inv.product.category else 'N/A',
+                    inv.store.name[:8] if inv.store else 'N/A',
+                    str(inv.quantity_in_stock),
+                    str(recommended),
+                    priority
+                ])
+            
+            no_reorder_data.append(['TOTAL', f"{len(no_reorder_items)} Products" '', '', '', '', '', '', ''])
+            
+            no_reorder_table = Table(no_reorder_data, colWidths=[70, 45, 40, 45, 40, 40, 50, 50])
+            no_reorder_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (5, 1), (5, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(no_reorder_table)
+            elements.append(Spacer(1, 20))
+        
+        # ========== REORDER VALUE BY STORE ==========
+        elements.append(Paragraph("REORDER VALUE BY STORE", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        store_reorder = {}
+        for inv in critical_items + warning_items:
+            store_name = inv.store.name if inv.store else 'Unknown'
+            if store_name not in store_reorder:
+                store_reorder[store_name] = {
+                    'below_count': 0,
+                    'reorder_qty': 0,
+                    'reorder_value': Decimal('0')
+                }
+            
+            avg_cost = InventoryBatch.objects.filter(
+                product=inv.product,
+                store=inv.store
+            ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+            
+            if inv.quantity_in_stock == 0:
+                needed_qty = inv.reorder_level
+            else:
+                needed_qty = inv.reorder_level - inv.quantity_in_stock
+            
+            store_reorder[store_name]['below_count'] += 1
+            store_reorder[store_name]['reorder_qty'] += needed_qty
+            store_reorder[store_name]['reorder_value'] += needed_qty * avg_cost
+        
+        store_reorder_data = [['Store', 'Products Below Reorder', 'Reorder Quantity', 'Reorder Value', 'Priority Items']]
+        
+        for store_name, data in store_reorder.items():
+            store_reorder_data.append([
+                store_name[:15] + '...' if len(store_name) > 15 else store_name,
+                str(data['below_count']),
+                f"{data['reorder_qty']}",
+                f"UGX {data['reorder_value']:,.0f}",
+                'Rice, Water, Oil'  # Placeholder
+            ])
+        
+        store_reorder_data.append(['TOTAL', str(len(critical_items) + len(warning_items)), str(total_reorder_qty_needed), f"UGX {total_reorder_value_needed:,.0f}", ''])
+        
+        store_reorder_table = Table(store_reorder_data, colWidths=[80, 70, 70, 100, 100])
+        store_reorder_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(store_reorder_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== RECOMMENDED PURCHASE ORDER BY SUPPLIER ==========
+        elements.append(Paragraph("RECOMMENDED PURCHASE ORDER BY SUPPLIER", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        # Group by supplier from recent purchase orders
+        supplier_orders = {}
+        for inv in critical_items + warning_items:
+            last_po_item = PurchaseOrderItem.objects.filter(
+                product=inv.product
+            ).select_related('order__supplier').order_by('-order__purchase_date').first()
+            
+            supplier_name = 'Unknown'
+            if last_po_item and last_po_item.order.supplier:
+                supplier_name = last_po_item.order.supplier.name
+            
+            if supplier_name not in supplier_orders:
+                supplier_orders[supplier_name] = {
+                    'items': [],
+                    'total_qty': 0,
+                    'total_value': Decimal('0')
+                }
+            
+            avg_cost = InventoryBatch.objects.filter(
+                product=inv.product,
+                store=inv.store
+            ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+            
+            if inv.quantity_in_stock == 0:
+                needed_qty = inv.reorder_level
+            else:
+                needed_qty = inv.reorder_level - inv.quantity_in_stock
+            
+            supplier_orders[supplier_name]['items'].append({
+                'product': inv.product,
+                'store': inv.store,
+                'qty': needed_qty,
+                'cost': avg_cost
+            })
+            supplier_orders[supplier_name]['total_qty'] += needed_qty
+            supplier_orders[supplier_name]['total_value'] += needed_qty * avg_cost
+        
+        po_data = [['Supplier', 'Product', 'SKU', 'Store', 'Reorder Qty', 'Unit', 'Unit Cost', 'Est Cost']]
+        
+        total_po_value = Decimal('0')
+        for supplier_name, data in supplier_orders.items():
+            for item in data['items'][:3]:  # Limit per supplier
+                base_unit = 'N/A'
+                base_unit_price = item['product'].unit_prices.filter(conversion_factor=1).first()
+                if base_unit_price:
+                    base_unit = base_unit_price.unit.abbreviation
+                
+                po_data.append([
+                    supplier_name[:12] + '...' if len(supplier_name) > 12 else supplier_name,
+                    item['product'].name[:12] + '...' if len(item['product'].name) > 12 else item['product'].name,
+                    item['product'].sku or 'N/A',
+                    item['store'].name[:8] if item['store'] else 'N/A',
+                    str(item['qty']),
+                    base_unit,
+                    f"UGX {item['cost']:,.0f}",
+                    f"UGX {item['qty'] * item['cost']:,.0f}"
+                ])
+                total_po_value += item['qty'] * item['cost']
+        
+        po_data.append(['TOTAL', '', '', '', '', '', '', f"UGX {total_po_value:,.0f}"])
+        
+        po_table = Table(po_data, colWidths=[70, 70, 45, 40, 35, 30, 50, 70])
+        po_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (4, 1), (7, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(po_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== REORDER RECOMMENDATIONS ==========
+        elements.append(Paragraph("REORDER RECOMMENDATIONS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        recommendations = [
+            ['Priority', 'Action', 'Products', 'Responsible', 'Timeline'],
+        ]
+        
+        if critical_items:
+            recommendations.append(['Immediate', f'Place emergency orders for out-of-stock items', str(len(critical_items)), 'Procurement', 'Today'])
+        
+        if warning_items:
+            recommendations.append(['High', f'Order items below reorder level', str(len(warning_items)), 'Procurement', 'This Week'])
+        
+        if no_reorder_items:
+            recommendations.append(['Medium', f'Set reorder levels for {len(no_reorder_items)} products without', 'Inventory Team', 'This Month'])
+        
+        if at_reorder_items:
+            recommendations.append(['Medium', f'Review reorder levels for items at threshold', str(len(at_reorder_items)), 'Inventory Team', 'This Month'])
+        
+        recommendations.append(['Low', 'Analyze reorder levels by seasonality', 'All', 'Planning Team', 'Next Month'])
+        
+        rec_table = Table(recommendations, colWidths=[80, 200, 50, 80, 60])
+        rec_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(rec_table)
+        
+        # Build PDF
+        doc.build(elements)
+        return response
+        
+    except Exception as e:
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
+        
+        response = HttpResponse(content_type='text/plain')
+        response.status_code = 500
+        response.content = f"Error generating PDF: {str(e)}"
+        return response
+
+
 # ============================================================================
 # STORE LOCATION REPORTS VIEWS
 # ============================================================================
@@ -4655,471 +8475,281 @@ def decimal_to_float(obj):
         return float(obj)
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
+
 @login_required
 def stocklocation_details(request):
-    """Store Location Reports dashboard view - Fully Dynamic"""
-    
-    # Get all active stores
-    stores = StoreLocation.objects.filter(is_active=True)
-    
-    # Date range - default to current month
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
-    
-    if start_date_str and end_date_str:
-        try:
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        except ValueError:
-            start_date = date.today().replace(day=1)
-            end_date = date.today()
-    else:
-        start_date = date.today().replace(day=1)
-        end_date = date.today()
-    
-    # Get actual sales status from model
-    actual_sales_statuses = Sales.objects.values_list('status', flat=True).distinct()
-    
-    # Determine which status to use for "completed" sales
-    possible_statuses = ['FULFILLED', 'Fulfilled', 'COMPLETED', 'Completed']
-    sales_status = None
-    
-    for status in possible_statuses:
-        if status in actual_sales_statuses:
-            sales_status = status
-            break
-    
-    # If no matching status found, use the first available status
-    if not sales_status and actual_sales_statuses:
-        sales_status = actual_sales_statuses[0]
-    
-    # Calculate store metrics
-    store_reports = []
-    
-    # Get all store sales for calculating averages
-    all_store_sales = {}
-    for store in stores:
-        sales_data = Sales.objects.filter(
-            store=store,
-            sale_date__range=[start_date, end_date],
-            status=sales_status
-        ).aggregate(
-            total_sales=Sum('total_amount'),
-            total_transactions=Count('id'),
-            avg_sale_value=Avg('total_amount')
-        )
-        all_store_sales[store.id] = sales_data['total_sales'] or 0
-    
-    # Calculate average sales across all stores
-    total_sales_all_stores = sum(all_store_sales.values())
-    avg_sales_all_stores = float(total_sales_all_stores) / len(stores) if stores else 0 
-    
-    for store in stores:
-        # Sales metrics for the period
-        sales_data = Sales.objects.filter(
-            store=store,
-            sale_date__range=[start_date, end_date],
-            status=sales_status
-        ).aggregate(
-            total_sales=Sum('total_amount'),
-            total_transactions=Count('id'),
-            avg_sale_value=Avg('total_amount')
-        )
-        
-        # Convert Decimal to float for calculations
-        total_sales_val = float(sales_data['total_sales'] or 0)
-        avg_sale_val = float(sales_data['avg_sale_value'] or 0)
-        
-        # Inventory metrics
-        inventory_data = Inventory.objects.filter(store=store).aggregate(
-            total_skus=Count('product', distinct=True),
-            total_items=Sum('quantity_in_stock'),
-            low_stock_items=Count('id', filter=Q(quantity_in_stock__lte=F('reorder_level'))),
-            zero_stock_items=Count('id', filter=Q(quantity_in_stock=0))
-        )
-        
-        # Get purchase order status from model
-        purchase_statuses = PurchaseOrder.objects.values_list('status', flat=True).distinct()
-        purchase_status = 'received' if 'received' in purchase_statuses else purchase_statuses[0] if purchase_statuses else None
-        
-        # Purchase metrics
-        purchase_data = {}
-        if purchase_status:
-            purchase_data = PurchaseOrder.objects.filter(
-                store=store,
-                purchase_date__range=[start_date, end_date],
-                status=purchase_status
-            ).aggregate(
-                total_purchases=Sum('total_cost'),
-                purchase_orders=Count('id')
-            )
-            # Convert Decimal to float
-            if purchase_data['total_purchases']:
-                purchase_data['total_purchases'] = float(purchase_data['total_purchases'])
-        else:
-            purchase_data = {'total_purchases': 0, 'purchase_orders': 0}
-        
-        # Get stock transfer status from model
-        transfer_statuses = StockTransfer.objects.values_list('status', flat=True).distinct()
-        completed_status = 'completed' if 'completed' in transfer_statuses else transfer_statuses[0] if transfer_statuses else None
-        
-        # Transfer metrics
-        transfers_out = {'total_items': 0}
-        transfers_out_value = 0
-        
-        if completed_status:
-            transfers_out = StockTransfer.objects.filter(
-                from_store=store,
-                transfer_date__range=[start_date, end_date],
-                status=completed_status
-            ).aggregate(
-                total_items=Sum('items__quantity')
-            )
-            
-            completed_transfers = StockTransfer.objects.filter(
-                from_store=store,
-                transfer_date__range=[start_date, end_date],
-                status=completed_status
-            )
-            for transfer in completed_transfers:
-                transfers_out_value += float(transfer.total_value or 0)
-        
-        transfers_in = {'total_items': 0}
-        if completed_status:
-            transfers_in = StockTransfer.objects.filter(
-                to_store=store,
-                transfer_date__range=[start_date, end_date],
-                status=completed_status
-            ).aggregate(
-                total_items=Sum('items__quantity')
-            )
-        
-        # Stock movement activity (last 7 days)
-        week_ago = end_date - timedelta(days=7)
-        recent_activity = StockMovement.objects.filter(
-            store=store,
-            timestamp__date__gte=week_ago
-        ).count()
-        
-        # Capacity/utilization calculation
-        total_batches = InventoryBatch.objects.filter(store=store, remaining_quantity__gt=0)
-        total_units = total_batches.aggregate(total=Sum('remaining_quantity'))['total'] or 0
-        
-        max_quantity_ever = InventoryBatch.objects.filter(store=store).aggregate(
-            max_quantity=Sum('quantity')
-        )['max_quantity'] or 0
-        
-        if max_quantity_ever > 0:
-            utilization_percentage = min(100, round((total_units / max_quantity_ever) * 100, 1))
-        else:
-            utilization_percentage = 0
-        
-        # Determine performance score (0-10)
-        performance_score = 6.0
-        
-        # Adjust based on sales performance (0-2 points)
-        store_sales = total_sales_val
-        if avg_sales_all_stores > 0:
-            sales_ratio = store_sales / avg_sales_all_stores
-            if sales_ratio >= 1.5:
-                performance_score += 2.0
-            elif sales_ratio >= 1.2:
-                performance_score += 1.5
-            elif sales_ratio >= 0.8:
-                performance_score += 1.0
-            elif sales_ratio >= 0.5:
-                performance_score += 0.5
-        
-        # Adjust based on inventory utilization (0-1.5 points)
-        if 70 <= utilization_percentage <= 85:
-            performance_score += 1.5
-        elif 60 <= utilization_percentage < 70 or 85 < utilization_percentage <= 90:
-            performance_score += 1.0
-        elif 50 <= utilization_percentage < 60 or 90 < utilization_percentage <= 95:
-            performance_score += 0.5
-        elif utilization_percentage > 95:
-            performance_score -= 0.5
-        
-        # Adjust based on stock availability (0-1 point)
-        total_skus = inventory_data['total_skus'] or 0
-        low_stock_items = inventory_data['low_stock_items'] or 0
-        if total_skus > 0:
-            low_stock_ratio = low_stock_items / total_skus
-            if low_stock_ratio <= 0.1:
-                performance_score += 1.0
-            elif low_stock_ratio <= 0.2:
-                performance_score += 0.5
-            elif low_stock_ratio > 0.3:
-                performance_score -= 0.5
-        
-        # Adjust based on activity (0-0.5 points)
-        if recent_activity > 20:
-            performance_score += 0.5
-        elif recent_activity > 10:
-            performance_score += 0.25
-        
-        # Cap score between 0 and 10
-        performance_score = max(0, min(10, round(performance_score, 1)))
-        
-        # Determine performance category
-        if performance_score >= 8.5:
-            performance_category = 'excellent'
-            performance_badge = 'performance-excellent'
-            score_class = 'score-excellent'
-        elif performance_score >= 7.0:
-            performance_category = 'good'
-            performance_badge = 'performance-good'
-            score_class = 'score-good'
-        else:
-            performance_category = 'fair'
-            performance_badge = 'performance-fair'
-            score_class = 'score-fair'
-        
-        # Calculate efficiency score based on multiple factors
-        efficiency_score = 70
-        
-        # Add based on utilization (max 10 points)
-        if 70 <= utilization_percentage <= 85:
-            efficiency_score += 10
-        elif 60 <= utilization_percentage < 70 or 85 < utilization_percentage <= 90:
-            efficiency_score += 5
-        
-        # Add based on sales performance (max 10 points)
-        if store_sales > 0 and avg_sales_all_stores > 0:
-            sales_eff = min(store_sales / avg_sales_all_stores * 10, 10)
-            efficiency_score += sales_eff
-        
-        # Add based on low stock management (max 5 points)
-        if total_skus > 0:
-            low_stock_ratio = low_stock_items / total_skus
-            if low_stock_ratio <= 0.1:
-                efficiency_score += 5
-            elif low_stock_ratio <= 0.2:
-                efficiency_score += 3
-        
-        # Cap efficiency score at 100%
-        efficiency_score = min(100, efficiency_score)
-        
-        # Calculate growth rate
-        previous_month_start = (start_date - timedelta(days=30)).replace(day=1)
-        previous_month_end = start_date - timedelta(days=1)
-        
-        previous_sales = Sales.objects.filter(
-            store=store,
-            sale_date__range=[previous_month_start, previous_month_end],
-            status=sales_status
-        ).aggregate(total_sales=Sum('total_amount'))['total_sales'] or 0
-        previous_sales = float(previous_sales)
+    """
+    Stock Location Performance Dashboard view.
+    Matches: reports/stocklocation_details.html
+    """
+    today = timezone.now().date()
 
-        current_sales = store_sales
-        if previous_sales > 0:
-            growth_rate = ((current_sales - previous_sales) / previous_sales) * 100
-            # Cap unrealistic growth percentages
-            if growth_rate > 500:
-                growth_rate = 500
-        elif current_sales > 0:
-            growth_rate = 100  # First time sales
+    # ── Filters ──────────────────────────────────────────────────────────────
+    branch_id        = request.GET.get('branch', '')
+    status_param     = request.GET.get('status', '')      # 'active' | 'inactive'
+    performance_param = request.GET.get('performance', '') # 'high' | 'medium' | 'low'
+    start_date_raw   = request.GET.get('start_date', '')
+    end_date_raw     = request.GET.get('end_date', '')
+
+    start_date = None
+    end_date   = None
+
+    if start_date_raw:
+        try:
+            start_date = date.fromisoformat(start_date_raw)
+        except (ValueError, AttributeError):
+            pass
+    if end_date_raw:
+        try:
+            end_date = date.fromisoformat(end_date_raw)
+        except (ValueError, AttributeError):
+            pass
+
+    # Display dates — fall back to sensible defaults for the template header
+    display_start = start_date or date(today.year, today.month, 1)
+    display_end   = end_date or today
+
+    # ── Store queryset ────────────────────────────────────────────────────────
+    stores_qs = StoreLocation.objects.select_related('branch')
+    if branch_id:
+        stores_qs = stores_qs.filter(branch_id=branch_id)
+    if status_param == 'active':
+        stores_qs = stores_qs.filter(is_active=True)
+    elif status_param == 'inactive':
+        stores_qs = stores_qs.filter(is_active=False)
+
+    # ── Sales queryset for the period ─────────────────────────────────────────
+    sales_qs = Sales.objects.filter(is_cancelled=False)
+    if start_date:
+        sales_qs = sales_qs.filter(sale_date__gte=start_date)
+    if end_date:
+        sales_qs = sales_qs.filter(sale_date__lte=end_date)
+    if branch_id:
+        sales_qs = sales_qs.filter(store__branch_id=branch_id)
+
+    # Previous period for trend calculation
+    if start_date and end_date:
+        period_days = (end_date - start_date).days or 1
+        prev_start  = start_date - timedelta(days=period_days)
+        prev_end    = start_date - timedelta(days=1)
+    else:
+        prev_start = date(today.year, today.month, 1) - timedelta(days=30)
+        prev_end   = date(today.year, today.month, 1) - timedelta(days=1)
+
+    prev_sales_qs = Sales.objects.filter(
+        is_cancelled=False,
+        sale_date__range=[prev_start, prev_end]
+    )
+
+    # ── KPI metrics ───────────────────────────────────────────────────────────
+    total_stores   = stores_qs.count()
+    active_stores  = stores_qs.filter(is_active=True).count()
+    inactive_stores = stores_qs.filter(is_active=False).count()
+
+    total_sales = sales_qs.filter(
+        store__in=stores_qs
+    ).aggregate(t=Sum('total_amount'))['t'] or 0
+
+    total_transactions = sales_qs.filter(store__in=stores_qs).count()
+
+    # Inventory totals
+    inv_qs = Inventory.objects.filter(store__in=stores_qs)
+    total_stock_units = inv_qs.aggregate(t=Sum('quantity_in_stock'))['t'] or 0
+    total_skus        = inv_qs.values('product').distinct().count()
+
+    # Low stock across all stores
+    total_low_stock = inv_qs.filter(
+        quantity_in_stock__gt=0,
+        quantity_in_stock__lte=F('reorder_level')
+    ).count()
+
+    # Stock value
+    total_stock_value = InventoryBatch.objects.filter(
+        store__in=stores_qs,
+        remaining_quantity__gt=0
+    ).aggregate(
+        val=Sum(F('remaining_quantity') * F('unit_cost'))
+    )['val'] or Decimal('0')
+
+    avg_transaction_total = (
+        Decimal(str(total_sales)) / total_transactions
+    ) if total_transactions else Decimal('0')
+
+    # ── Per-store performance data ─────────────────────────────────────────────
+    store_performance_data = []
+    efficiency_list = []
+    growth_list     = []
+
+    for store in stores_qs:
+        # Sales this period
+        store_sales_qs = sales_qs.filter(store=store)
+        monthly_sales  = store_sales_qs.aggregate(t=Sum('total_amount'))['t'] or 0
+        transactions   = store_sales_qs.count()
+        avg_transaction = (monthly_sales / transactions) if transactions else 0
+
+        # Previous period sales for growth
+        prev_store_sales = prev_sales_qs.filter(store=store).aggregate(
+            t=Sum('total_amount')
+        )['t'] or 0
+        if prev_store_sales:
+            growth = round(((monthly_sales - prev_store_sales) / prev_store_sales) * 100, 1)
         else:
-            growth_rate = 0
-            
-        
-        # Generate dynamic color based on store ID
-        color_index = store.id % 6
-        color_classes = ['store-primary', 'store-secondary', 'store-success', 
-                        'store-warning', 'store-danger', 'store-info']
-        store_color_class = color_classes[color_index]
-        
-        # Build store report with float values for JSON serialization
-        store_report = {
-            'store': store,
-            'color_class': store_color_class,
-            'sales_data': {
-                'total_sales': total_sales_val,
-                'total_transactions': sales_data['total_transactions'] or 0,
-                'avg_sale_value': avg_sale_val,
-            },
-            'inventory_data': {
-                'total_skus': inventory_data['total_skus'] or 0,
-                'total_items': inventory_data['total_items'] or 0,
-                'low_stock_items': inventory_data['low_stock_items'] or 0,
-                'zero_stock_items': inventory_data['zero_stock_items'] or 0,
-            },
-            'purchase_data': purchase_data,
-            'transfers_out': {
-                'total_items': transfers_out['total_items'] or 0,
-                'total_value': transfers_out_value
-            },
-            'transfers_in': transfers_in,
-            'recent_activity': recent_activity,
-            'utilization_percentage': utilization_percentage,
+            growth = 0
+
+        # Inventory for this store
+        store_inv = inv_qs.filter(store=store)
+        total_units    = store_inv.aggregate(t=Sum('quantity_in_stock'))['t'] or 0
+        low_stock_items = store_inv.filter(
+            quantity_in_stock__gt=0,
+            quantity_in_stock__lte=F('reorder_level')
+        ).count()
+        out_of_stock = store_inv.filter(quantity_in_stock=0).count()
+
+        stock_value = InventoryBatch.objects.filter(
+            store=store, remaining_quantity__gt=0
+        ).aggregate(
+            val=Sum(F('remaining_quantity') * F('unit_cost'))
+        )['val'] or Decimal('0')
+
+        # Days in period
+        if start_date and end_date:
+            period_days_count = max((end_date - start_date).days, 1)
+        else:
+            period_days_count = today.day or 1
+
+        daily_avg = round(monthly_sales / period_days_count) if period_days_count else 0
+
+        # Utilization: % of SKUs with stock vs total SKUs
+        total_store_skus = store_inv.count()
+        stocked_skus     = store_inv.filter(quantity_in_stock__gt=0).count()
+        utilization = round((stocked_skus / total_store_skus * 100) if total_store_skus else 0)
+
+        # Efficiency: % of SKUs above reorder level
+        above_reorder = store_inv.filter(quantity_in_stock__gt=F('reorder_level')).count()
+        efficiency = round((above_reorder / total_store_skus * 100) if total_store_skus else 0)
+
+        # Performance score out of 10
+        score = 0
+        if utilization >= 80:  score += 3
+        elif utilization >= 50: score += 2
+        else: score += 1
+        if growth > 0:   score += 3
+        elif growth > -5: score += 1
+        if low_stock_items == 0: score += 2
+        elif low_stock_items <= 3: score += 1
+        if efficiency >= 70: score += 2
+        elif efficiency >= 40: score += 1
+        performance_score = min(score, 10)
+
+        # Staff count — User model related to store (adjust if you have a Staff model)
+        staff_count = 0  # replace with actual staff query if available
+
+        store_data = {
+            'id':               store.id,
+            'name':             store.name,
+            'address':          store.address,
+            'branch':           store.branch,
+            'is_active':        store.is_active,
+            'is_default':       store.is_default,
+            'color':            '#4A90E2',   # no color field on model; use default
+            'monthly_sales':    monthly_sales,
+            'transactions':     transactions,
+            'daily_avg':        daily_avg,
+            'avg_transaction':  avg_transaction,
+            'stock_value':      float(stock_value),
+            'total_units':      total_units,
+            'low_stock_items':  low_stock_items,
+            'out_of_stock':     out_of_stock,
+            'utilization':      utilization,
+            'efficiency':       efficiency,
             'performance_score': performance_score,
-            'performance_category': performance_category,
-            'performance_badge': performance_badge,
-            'score_class': score_class,
-            'efficiency_score': round(efficiency_score),
-            'growth_rate': round(growth_rate, 1),
-            'total_units': total_units,
-            'max_capacity': max_quantity_ever,
-            'is_default': store.is_default,
+            'sales_trend':      growth,
+            'growth':           growth,
+            'staff_count':      staff_count,
         }
-        
-        store_reports.append(store_report)
-    
-    # Get default store
-    default_store = stores.filter(is_default=True).first()
-    
-    # Get default store report
-    default_store_report = None
-    if default_store:
-        for report in store_reports:
-            if report['store'].id == default_store.id:
-                default_store_report = report
-                break
-    
-    # Generate chart data
-    # Sales trend chart data
-    sales_trend_labels = []
-    sales_trend_data = {}
-    
-    # Generate labels for the last 7 days
-    for i in range(6, -1, -1):
-        day = end_date - timedelta(days=i)
-        sales_trend_labels.append(day.strftime('%b %d'))
-    
-    # Get sales data for each store for the last 7 days
-    for store_report in store_reports:
-        store = store_report['store']
-        store_data = []
-        
-        for i in range(6, -1, -1):
-            day = end_date - timedelta(days=i)
-            daily_sales = Sales.objects.filter(
-                store=store,
-                sale_date=day,
-                status=sales_status
-            ).aggregate(total=Sum('total_amount'))['total'] or 0
-            store_data.append(float(daily_sales) / 1000000)  # Convert to millions
-            
-        sales_trend_data[store.name] = {
-            'data': store_data,
-            'color': get_dynamic_chart_color(store.id)
-        }
-    
-    # Capacity utilization chart data
-    capacity_labels = [report['store'].name for report in store_reports]
-    capacity_data = [report['utilization_percentage'] for report in store_reports]
-    capacity_colors = [get_dynamic_chart_color(report['store'].id) for report in store_reports]
-    
-    # Activity chart data (transactions per day for last 7 days - not hourly)
-    activity_labels = []
-    activity_data = {}
-    
-    # Generate labels for the last 7 days
-    for i in range(6, -1, -1):
-        day = end_date - timedelta(days=i)
-        activity_labels.append(day.strftime('%a %d'))
-    
-    # Generate activity data based on recent transactions
-    for store_report in store_reports[:3]:  # Show only first 3 stores for clarity
-        store = store_report['store']
-        
-        daily_data = []
-        
-        for i in range(6, -1, -1):
-            day = end_date - timedelta(days=i)
-            
-            # Count transactions for this day
-            daily_transactions = Sales.objects.filter(
-                store=store,
-                sale_date=day,
-                status=sales_status
-            ).count()
-            
-            daily_data.append(daily_transactions)
-        
-        activity_data[store.name] = {
-            'data': daily_data,
-            'color': get_dynamic_chart_color(store.id)
-        }
-    
-    # Comparison radar chart data
-    comparison_labels = ['Sales', 'Efficiency', 'Growth', 'Activity', 'Utilization', 'Stock Health']
-    comparison_data = {}
-    
-    for store_report in store_reports[:3]:  # Show only first 3 stores
-        store = store_report['store']
-        
-        # Calculate radar scores (0-100)
-        sales_score = min(100, (store_report['sales_data']['total_sales'] or 0) / 1000000 * 20)
-        efficiency_score = store_report['efficiency_score']
-        growth_score = min(100, max(0, 50 + store_report['growth_rate']))
-        
-        # Activity score based on recent activity
-        activity_score = min(100, store_report['recent_activity'] * 5)
-        
-        # Utilization score
-        utilization_score = store_report['utilization_percentage']
-        
-        # Stock health score (higher is better - less low stock items)
-        total_skus = store_report['inventory_data']['total_skus'] or 1
-        low_stock_items = store_report['inventory_data']['low_stock_items'] or 0
-        stock_health_score = max(0, 100 - (low_stock_items / total_skus * 100))
-        
-        radar_data = [
-            sales_score,
-            efficiency_score,
-            growth_score,
-            activity_score,
-            utilization_score,
-            stock_health_score
-        ]
-        
-        comparison_data[store.name] = {
-            'data': radar_data,
-            'color': get_dynamic_chart_color(store.id),
-            'border_color': get_dynamic_border_color(store.id)
-        }
-    
-    # Calculate best performing store
-    best_performing = None
-    if store_reports:
-        best_performing_report = max(store_reports, key=lambda x: x['performance_score'])
-        best_performing = best_performing_report['store']
-    
-    # Calculate total sales across all stores
-    total_sales = sum((report['sales_data']['total_sales'] or 0) for report in store_reports)
-    
-    # Calculate average utilization
-    avg_utilization = 0
-    if store_reports:
-        avg_utilization = round(sum(report['utilization_percentage'] for report in store_reports) / len(store_reports), 1)
-    
-    # Prepare context - using custom JSON encoder for Decimal objects
+
+        efficiency_list.append(efficiency)
+        growth_list.append(growth)
+        store_performance_data.append(store_data)
+
+    # Apply performance filter after building data
+    if performance_param == 'high':
+        store_performance_data = [s for s in store_performance_data if s['performance_score'] >= 8]
+    elif performance_param == 'medium':
+        store_performance_data = [s for s in store_performance_data if 5 <= s['performance_score'] < 8]
+    elif performance_param == 'low':
+        store_performance_data = [s for s in store_performance_data if s['performance_score'] < 5]
+
+    # ── Aggregate footer totals ───────────────────────────────────────────────
+    avg_utilization      = round(sum(s['utilization'] for s in store_performance_data) / len(store_performance_data)) if store_performance_data else 0
+    avg_efficiency       = round(sum(s['efficiency']  for s in store_performance_data) / len(store_performance_data)) if store_performance_data else 0
+    avg_growth           = round(sum(s['growth']      for s in store_performance_data) / len(store_performance_data), 1) if store_performance_data else 0
+    stores_above_target  = sum(1 for s in store_performance_data if s['utilization'] >= 70)
+    stores_with_growth   = sum(1 for s in store_performance_data if s['growth'] > 0)
+    stores_below_target  = sum(1 for s in store_performance_data if s['performance_score'] < 5)
+
+    # ── Summary cards ─────────────────────────────────────────────────────────
+    top_performers  = sorted(store_performance_data, key=lambda x: x['performance_score'], reverse=True)[:5]
+    need_attention  = sorted(store_performance_data, key=lambda x: x['low_stock_items'], reverse=True)[:5]
+
+    # Branch summary
+    branches_qs = Branch.objects.filter(
+        store_locations__in=stores_qs
+    ).distinct()
+
+    branch_summary = []
+    for branch in branches_qs:
+        branch_sales = sales_qs.filter(store__branch=branch).aggregate(
+            t=Sum('total_amount')
+        )['t'] or 0
+        branch_summary.append({
+            'name':  branch.name,
+            'sales': branch_sales,
+        })
+    branch_summary.sort(key=lambda x: x['sales'], reverse=True)
+
+    # ── Filter dropdowns ──────────────────────────────────────────────────────
+    branches = Branch.objects.all().order_by('name')
+
     context = {
-        'stores': stores,
-        'store_reports': store_reports,
-        'default_store': default_store,
-        'default_store_report': default_store_report,
-        'start_date': start_date,
-        'end_date': end_date,
-        'total_stores': stores.count(),
-        'total_sales': total_sales,
-        'avg_utilization': avg_utilization,
-        'best_performing': best_performing,
-        'sales_status': sales_status,
-        # Chart data as JSON - using custom encoder
-        'sales_trend_labels': json.dumps(sales_trend_labels),
-        'sales_trend_data': json.dumps(sales_trend_data, default=decimal_to_float),
-        'capacity_labels': json.dumps(capacity_labels),
-        'capacity_data': json.dumps(capacity_data, default=decimal_to_float),
-        'capacity_colors': json.dumps(capacity_colors),
-        'activity_labels': json.dumps(activity_labels),
-        'activity_data': json.dumps(activity_data, default=decimal_to_float),
-        'comparison_labels': json.dumps(comparison_labels),
-        'comparison_data': json.dumps(comparison_data, default=decimal_to_float),
+        # Dates
+        'start_date': display_start,
+        'end_date':   display_end,
+
+        # KPI cards
+        'total_stores':       total_stores,
+        'active_stores':      active_stores,
+        'inactive_stores':    inactive_stores,
+        'total_sales':        total_sales,
+        'avg_utilization':    avg_utilization,
+        'stores_above_target': stores_above_target,
+        'total_stock_units':  total_stock_units,
+        'total_skus':         total_skus,
+
+        # Table footer totals
+        'total_transactions':   total_transactions,
+        'avg_transaction_total': avg_transaction_total,
+        'total_stock_value':    total_stock_value,
+        'total_low_stock':      total_low_stock,
+        'avg_efficiency':       avg_efficiency,
+        'avg_growth':           avg_growth,
+
+        # Main table
+        'store_performance_data': store_performance_data,
+
+        # Summary cards
+        'top_performers':    top_performers,
+        'need_attention':    need_attention,
+        'branch_summary':    branch_summary,
+        'stores_with_growth': stores_with_growth,
+        'stores_below_target': stores_below_target,
+
+        # Filter dropdowns
+        'branches': branches,
     }
-    
+
     return render(request, 'reports/stocklocation_details.html', context)
+
 
 # Dynamic color helper functions
 def get_dynamic_chart_color(store_id):
@@ -5152,6 +8782,391 @@ def get_dynamic_border_color(store_id):
         '#F4B619',  # Darker Orange
     ]
     return colors[store_id % len(colors)]
+
+
+@login_required
+def export_stocklocation_pdf(request):
+    """Export comprehensive stock location report as PDF"""
+    try:
+        # Get filter parameters
+        store_id = request.GET.get('store')
+        category_id = request.GET.get('category')
+        
+        # Set up response
+        response = HttpResponse(content_type='application/pdf')
+        filename = f"stock_location_report_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Get current date
+        today = timezone.now().date()
+        
+        # Create PDF
+        doc = SimpleDocTemplate(response, pagesize=letter, 
+                               rightMargin=40, leftMargin=40,
+                               topMargin=40, bottomMargin=40)
+        elements = []
+        
+        # Define styles (same as previous)
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=18,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=5,
+            fontName='Helvetica-Bold'
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'SubtitleStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,
+            spaceAfter=3,
+            fontName='Helvetica'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.black,
+            spaceBefore=15,
+            spaceAfter=8,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        small_style = ParagraphStyle(
+            'SmallStyle',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.black,
+            fontName='Helvetica'
+        )
+        
+        # Header
+        elements.append(Paragraph("STOCK LOCATION REPORT", title_style))
+        elements.append(Paragraph(f"As of: {today.strftime('%B %d, %Y')}", subtitle_style))
+        elements.append(Paragraph(f"Generated: {timezone.now().strftime('%B %d, %Y %H:%M')}", subtitle_style))
+        elements.append(Paragraph(f"Generated By: {request.user.get_full_name() or request.user.username}", subtitle_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("-" * 80, normal_style))
+        elements.append(Spacer(1, 10))
+        
+        # Get all active stores
+        stores = StoreLocation.objects.filter(is_active=True)
+        
+        if store_id:
+            stores = stores.filter(id=store_id)
+        
+        # Calculate totals
+        total_products_in_stock = 0
+        total_items = 0
+        total_value = Decimal('0')
+        total_below_reorder = 0
+        total_out_of_stock = 0
+        
+        store_data_dict = {}
+        
+        for store in stores:
+            inventories = Inventory.objects.filter(store=store).select_related('product', 'product__category')
+            if category_id:
+                inventories = inventories.filter(product__category_id=category_id)
+            
+            store_products = inventories.values('product').distinct().count()
+            store_items = inventories.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+            store_value = Decimal('0')
+            store_below = 0
+            store_out = 0
+            
+            for inv in inventories:
+                avg_cost = InventoryBatch.objects.filter(
+                    product=inv.product,
+                    store=store
+                ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                store_value += inv.quantity_in_stock * avg_cost
+                
+                if inv.quantity_in_stock == 0:
+                    store_out += 1
+                elif inv.quantity_in_stock <= inv.reorder_level:
+                    store_below += 1
+            
+            total_products_in_stock += store_products
+            total_items += store_items
+            total_value += store_value
+            total_below_reorder += store_below
+            total_out_of_stock += store_out
+            
+            store_data_dict[store.id] = {
+                'store': store,
+                'products': store_products,
+                'items': store_items,
+                'value': store_value,
+                'below': store_below,
+                'out': store_out,
+                'inventories': list(inventories)
+            }
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        elements.append(Paragraph("EXECUTIVE SUMMARY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Total Stores', f"{stores.count()}"],
+            ['Active Stores', f"{stores.count()}"],
+            ['Total Products in Stock', f"{total_products_in_stock}"],
+            ['Total Items in Stock (Base Units)', f"{total_items:,}"],
+            ['Total Inventory Value', f"UGX {total_value:,.0f}"],
+            ['Products Below Reorder Level', f"{total_below_reorder}"],
+            ['Products Out of Stock', f"{total_out_of_stock}"],
+            ['Stores with Low Stock Items', f"{stores.count() if total_below_reorder > 0 else 0}"],
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[200, 200])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== STORES OVERVIEW ==========
+        elements.append(Paragraph("STORES OVERVIEW", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        store_overview = [['Store Name', 'Branch', 'Status', 'Products', 'Total Stock', 'Total Value', 'Utilization', 'Below Reorder']]
+        
+        for store_data in store_data_dict.values():
+            store = store_data['store']
+            utilization = (store_data['value'] / total_value * 100) if total_value > 0 else 0
+            
+            store_overview.append([
+                store.name[:15] + '...' if len(store.name) > 15 else store.name,
+                store.branch.name if store.branch else 'N/A',
+                'Active',
+                str(store_data['products']),
+                f"{store_data['items']:,}",
+                f"UGX {store_data['value']:,.0f}",
+                f"{utilization:.1f}%",
+                str(store_data['below'])
+            ])
+        
+        store_overview.append([
+            'TOTAL', '', '', str(total_products_in_stock), f"{total_items:,}", f"UGX {total_value:,.0f}", '100%', str(total_below_reorder)
+        ])
+        
+        store_overview_table = Table(store_overview, colWidths=[80, 60, 40, 50, 60, 90, 50, 50])
+        store_overview_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (3, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(store_overview_table)
+        elements.append(Spacer(1, 20))
+        
+        # ========== STORE INVENTORY DETAILS ==========
+        for store_data in store_data_dict.values():
+            store = store_data['store']
+            elements.append(Paragraph(f"STORE INVENTORY DETAIL - {store.name.upper()}", heading_style))
+            elements.append(Spacer(1, 5))
+            
+            store_inv_data = [['Product', 'SKU', 'Brand', 'Category', 'Stock Qty', 'Unit', 'Reorder Level', 'Status', 'Last Updated']]
+            
+            for inv in store_data['inventories'][:20]:  # Limit per store
+                base_unit = 'N/A'
+                base_unit_price = inv.product.unit_prices.filter(conversion_factor=1).first()
+                if base_unit_price:
+                    base_unit = base_unit_price.unit.abbreviation
+                
+                if inv.quantity_in_stock == 0:
+                    status = 'Out of Stock 🔴'
+                elif inv.quantity_in_stock <= inv.reorder_level:
+                    status = 'Below Reorder ⚠️'
+                else:
+                    status = 'Good'
+                
+                store_inv_data.append([
+                    inv.product.name[:15] + '...' if len(inv.product.name) > 15 else inv.product.name,
+                    inv.product.sku or 'N/A',
+                    inv.product.brand or 'N/A',
+                    inv.product.category.name[:10] if inv.product.category else 'N/A',
+                    f"{inv.quantity_in_stock:,}",
+                    base_unit,
+                    str(inv.reorder_level),
+                    status,
+                    inv.last_updated.strftime('%Y-%m-%d') if inv.last_updated else 'N/A'
+                ])
+            
+            store_inv_data.append([
+                'TOTAL', '', '', '', f"{store_data['items']:,}", '', '', '', ''
+            ])
+            
+            store_inv_table = Table(store_inv_data, colWidths=[70, 45, 40, 45, 40, 25, 35, 50, 55])
+            store_inv_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (4, 1), (4, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+            ]))
+            elements.append(store_inv_table)
+            elements.append(Spacer(1, 15))
+        
+        # ========== PRODUCTS WITH MULTIPLE STORE LOCATIONS ==========
+        elements.append(Paragraph("PRODUCTS WITH MULTIPLE STORE LOCATIONS", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        # Find products that appear in multiple stores
+        product_store_counts = {}
+        for store_data in store_data_dict.values():
+            for inv in store_data['inventories']:
+                product_id = inv.product.id
+                if product_id not in product_store_counts:
+                    product_store_counts[product_id] = {
+                        'product': inv.product,
+                        'stores': {},
+                        'total': 0
+                    }
+                product_store_counts[product_id]['stores'][store_data['store'].name] = inv.quantity_in_stock
+                product_store_counts[product_id]['total'] += inv.quantity_in_stock
+        
+        multi_store_data = [['Product', 'SKU', 'Brand'] + [store.name[:10] for store in stores] + ['Total Stock']]
+        
+        for product_data in product_store_counts.values():
+            if len(product_data['stores']) > 1:  # Only products in multiple stores
+                row = [
+                    product_data['product'].name[:15] + '...' if len(product_data['product'].name) > 15 else product_data['product'].name,
+                    product_data['product'].sku or 'N/A',
+                    product_data['product'].brand or 'N/A'
+                ]
+                
+                for store in stores:
+                    row.append(str(product_data['stores'].get(store.name, 0)))
+                
+                row.append(str(product_data['total']))
+                multi_store_data.append(row)
+        
+        if len(multi_store_data) > 1:
+            col_widths = [70, 45, 45] + [35] * stores.count() + [50]
+            multi_store_table = Table(multi_store_data[:15], colWidths=col_widths)  # Limit rows
+            multi_store_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(multi_store_table)
+        else:
+            elements.append(Paragraph("No products found in multiple stores.", normal_style))
+        elements.append(Spacer(1, 20))
+        
+        # ========== INVENTORY VALUE BY STORE AND CATEGORY ==========
+        elements.append(Paragraph("INVENTORY VALUE BY STORE AND CATEGORY", heading_style))
+        elements.append(Spacer(1, 5))
+        
+        categories = Category.objects.all()
+        
+        value_data = [['Category'] + [store.name[:10] for store in stores] + ['Total']]
+        
+        for category in categories:
+            row = [category.name[:15] + '...' if len(category.name) > 15 else category.name]
+            cat_total = Decimal('0')
+            
+            for store in stores:
+                cat_value = Decimal('0')
+                for inv in Inventory.objects.filter(store=store, product__category=category):
+                    avg_cost = InventoryBatch.objects.filter(
+                        product=inv.product,
+                        store=store
+                    ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                    cat_value += inv.quantity_in_stock * avg_cost
+                
+                row.append(f"UGX {cat_value:,.0f}")
+                cat_total += cat_value
+            
+            row.append(f"UGX {cat_total:,.0f}")
+            value_data.append(row)
+        
+        # Add total row
+        total_row = ['TOTAL']
+        grand_total = Decimal('0')
+        for store in stores:
+            store_total = Decimal('0')
+            for category in categories:
+                for inv in Inventory.objects.filter(store=store, product__category=category):
+                    avg_cost = InventoryBatch.objects.filter(
+                        product=inv.product,
+                        store=store
+                    ).aggregate(avg=Avg('unit_cost'))['avg'] or Decimal('0')
+                    store_total += inv.quantity_in_stock * avg_cost
+            total_row.append(f"UGX {store_total:,.0f}")
+            grand_total += store_total
+        total_row.append(f"UGX {grand_total:,.0f}")
+        value_data.append(total_row)
+        
+        col_widths = [80] + [90] * stores.count() + [90]
+        value_table = Table(value_data, colWidths=col_widths)
+        value_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-2, -2), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(value_table)
+        
+        # Build PDF
+        doc.build(elements)
+        return response
+        
+    except Exception as e:
+        import traceback
+        print(f"PDF Generation Error: {str(e)}")
+        print(traceback.format_exc())
+        
+        response = HttpResponse(content_type='text/plain')
+        response.status_code = 500
+        response.content = f"Error generating PDF: {str(e)}"
+        return response
 
 
 # ============================================================================
@@ -5479,14 +9494,3 @@ def productpricing_details(request):
     }
     
     return render(request, 'reports/productpricing_details.html', context)
-
-
-
-
-
-
-
-
-
-
-

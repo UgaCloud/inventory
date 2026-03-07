@@ -97,12 +97,34 @@ def get_recent_sales(user=None, limit=5):
     return qs[:limit]
 
 
-def get_total_sales(user=None):
-    qs = Sales.objects.filter(is_cancelled=False) 
-    if user:
-        qs = qs.filter(recorded_by=user)
-    return qs.aggregate(total=Sum("total_amount"))["total"] or 0
+def get_total_sales_per_user(user, date=None):
+    """
+    Returns total sales for a specific user on a specific day.
+    User is required.
+    """
 
+    if date is None:
+        date = timezone.now().date()
+
+    total = (
+        Sales.objects
+        .filter(
+            is_cancelled=False,
+            recorded_by=user,
+            sale_date=date
+        )
+        .aggregate(total=Sum("total_amount"))["total"]
+    )
+
+    return total or 0
+
+
+def get_total_sales():
+    return (
+        Sales.objects
+        .filter(is_cancelled=False)
+        .aggregate(total=Sum("total_amount"))["total"] or 0
+    )
 
 
 def get_todays_number_of_sales(user=None):

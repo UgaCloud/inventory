@@ -2,11 +2,14 @@ from django.db.models import Sum, F
 from app.models.transactions import Sales, SalesItem
 
 
-def get_all_sales(user=None):
+def get_all_sales_per_date(user=None):
     qs = Sales.objects.all().order_by("-sale_date")
     if user:
         qs = qs.filter(recorded_by=user)
     return qs
+
+
+
 
 
 def get_sale_by_id(sale_id, user=None):
