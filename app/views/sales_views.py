@@ -532,7 +532,7 @@ def get_product_stock_info(request, product_id):
             order__is_cancelled=False  # Exclude cancelled sales
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
-        committed_stock = committed_transfer_stock + pending_sales_stock
+        committed_stock = committed_transfer_stock
         available_stock = max(0, physical_stock - committed_stock)
         
         # Get unit prices with conversion factors

@@ -1047,7 +1047,7 @@ def products_api(request):
     search_query = request.GET.get('q', '').strip()
     category_id = request.GET.get('category')
     active_only = request.GET.get('active_only', 'true').lower() == 'true'
-    limit = int(request.GET.get('limit', 100))
+    limit = int(request.GET.get('limit', 10000))
     store_id = request.GET.get('store_id')
     
     # Base queryset
