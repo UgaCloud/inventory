@@ -521,7 +521,7 @@ def get_product_stock_info(request, product_id):
         committed_transfer_stock = StockTransferItem.objects.filter(
             product=product,
             stock_transfer__from_store_id=store_id,
-            stock_transfer__status__in=['pending', 'in_transit']
+            stock_transfer__status__in=['in_transit']
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
         # Calculate committed stock from pending sales

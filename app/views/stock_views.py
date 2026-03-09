@@ -157,7 +157,7 @@ def get_product_stock_transfer_info(request):
                 pending_items = StockTransferItem.objects.filter(
                     product_id=product_id,
                     stock_transfer__from_store_id=store_id,
-                    stock_transfer__status__in=['pending', 'in_transit']
+                    stock_transfer__status__in=['in_transit']
                 ).select_related('product', 'units')
                 
                 for item in pending_items:
@@ -365,46 +365,48 @@ def approved_transfer_requests_json(request):
 def create_transfer_from_request(request, request_id):
     """Create a stock transfer from an approved transfer request"""
     transfer_request = get_object_or_404(TransferRequest, id=request_id, status='approved')
+    print(f"Transfer request found: {transfer_request}")
     
     if request.method == 'POST':
-        try:
-            with transaction.atomic():
-                stock_transfer = StockTransfer.objects.create(
-                    transfer_request=transfer_request,
-                    from_store=transfer_request.from_store,
-                    to_store=transfer_request.to_store,
-                    created_by=request.user,
-                    note=f"Created from approved request #{transfer_request.id}",
-                    status='pending'
+        # try:
+        with transaction.atomic():
+            stock_transfer = StockTransfer.objects.create(
+                transfer_request=transfer_request,
+                from_store=transfer_request.from_store,
+                to_store=transfer_request.to_store,
+                created_by=request.user,
+                note=f"Created from approved request #{transfer_request.id}",
+                status='pending'
+            )
+            print(f"Items in transfer request: {transfer_request.items.count()}")
+            for request_item in transfer_request.items.all():
+                # Use base_quantity from the transfer request item (already calculated)
+                print(f"Creating transfer item for product {request_item.product.name} with base quantity {request_item.base_quantity}")
+                StockTransferItem.objects.create(
+                    stock_transfer=stock_transfer,
+                    product=request_item.product,
+                    quantity=request_item.base_quantity,  # Store as base quantity
+                    units=request_item.units,
+                    original_quantity=request_item.quantity,  # Store original for display
+                    base_quantity=request_item.base_quantity,  # Explicitly store base quantity
+                    transfer_request_item=request_item
                 )
-                
-                for request_item in transfer_request.items.all():
-                    # Use base_quantity from the transfer request item (already calculated)
-                    StockTransferItem.objects.create(
-                        stock_transfer=stock_transfer,
-                        product=request_item.product,
-                        quantity=request_item.base_quantity,  # Store as base quantity
-                        units=request_item.units,
-                        original_quantity=request_item.quantity,  # Store original for display
-                        base_quantity=request_item.base_quantity,  # Explicitly store base quantity
-                        transfer_request_item=request_item
-                    )
-                
-                transfer_request.status = 'fulfilled'
-                transfer_request.save()
-                
-                if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
-                    return JsonResponse({'success': True, 'transfer_id': stock_transfer.id}, status=201)
-
-                messages.success(request, f'Stock transfer #{stock_transfer.id} created successfully from request #{transfer_request.id}.')
-                return redirect('stock_transfer_detail', transfer_id=stock_transfer.id)
-                
-        except Exception as e:
+            
+            transfer_request.status = 'fulfilled'
+            transfer_request.save()
+            
             if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
-                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+                return JsonResponse({'success': True, 'transfer_id': stock_transfer.id}, status=201)
 
-            messages.error(request, f'Error creating transfer: {str(e)}')
-            return redirect('transfer_request_detail', request_id=request_id)
+            messages.success(request, f'Stock transfer #{stock_transfer.id} created successfully from request #{transfer_request.id}.')
+            return redirect('stock_transfer_detail', transfer_id=stock_transfer.id)
+                
+        # except Exception as e:
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+        messages.error(request, f'Error creating transfer: {str(e)}')
+        return redirect('transfer_request_detail', request_id=request_id)
     
     return render(request, 'stock/transfer_from_request_confirm.html', {
         'transfer_request': transfer_request
