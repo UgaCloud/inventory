@@ -60,6 +60,19 @@
                 </div>
                 
                 <h5 class="mt-4">Sale Items</h5>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="barcode-input" class="form-label fw-bold">Scan Barcode</label>
+                        <input
+                            type="text"
+                            id="barcode-input"
+                            class="form-control"
+                            placeholder="Scan or type barcode/SKU and press Enter"
+                            autocomplete="off"
+                        >
+                        <small class="text-muted">POS mode: each scan adds item or increases quantity.</small>
+                    </div>
+                </div>
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i> Available stock is shown for the selected store. Items in red indicate insufficient stock.
                 </div>
@@ -453,6 +466,12 @@
         .list-group-item:last-child {
             margin-bottom: 0;
         }
+
+        #barcode-input {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
     </style>
 
     <script>
@@ -801,6 +820,24 @@
             }
         }
 
+        async function lookupProductByBarcode(barcodeValue) {
+            const response = await fetch(`/api/sales/product-by-barcode/?barcode=${encodeURIComponent(barcodeValue)}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            return response.json();
+        }
+
+        function findRowByProductId(productId) {
+            const rows = document.querySelectorAll('.formset-row');
+            for (const row of rows) {
+                const productSelect = row.querySelector('.product-select');
+                if (productSelect && String(productSelect.value) === String(productId)) {
+                    return row;
+                }
+            }
+            return null;
+        }
+
         // Handle product selection
         async function handleProductSelect(event) {
             const productSelect = event.target;
@@ -1015,6 +1052,7 @@
             const maxForms = document.getElementById('id_items-MAX_NUM_FORMS');
             const salesForm = document.getElementById('sales-form');
             const submitBtn = document.getElementById('submit-btn');
+            const barcodeInput = document.getElementById('barcode-input');
             
             // Template for new row
             const emptyRowTemplate = (index) => `
@@ -1255,6 +1293,60 @@
             
             // Initialize payment field listeners
             initPaymentFieldListeners();
+
+            // Barcode scan handler (POS style)
+            if (barcodeInput) {
+                barcodeInput.addEventListener('keydown', async function(event) {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+
+                    const code = this.value.trim();
+                    if (!code) return;
+
+                    const storeSelect = document.getElementById('id_store');
+                    if (!storeSelect || !storeSelect.value) {
+                        alert('Please select store first before scanning.');
+                        return;
+                    }
+
+                    try {
+                        const payload = await lookupProductByBarcode(code);
+                        if (!payload.success || !payload.product) {
+                            alert(payload.error || 'Barcode not found.');
+                            this.select();
+                            return;
+                        }
+
+                        const existingRow = findRowByProductId(payload.product.id);
+                        if (existingRow) {
+                            const qtyInput = existingRow.querySelector('.quantity-input');
+                            if (qtyInput) {
+                                qtyInput.value = String((parseFloat(qtyInput.value) || 0) + 1);
+                                qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        } else {
+                            if (addBtn) addBtn.click();
+                            const lastRow = formsetBody.querySelector('.formset-row:last-child');
+                            if (lastRow) {
+                                const productSelect = lastRow.querySelector('.product-select');
+                                if (productSelect) {
+                                    productSelect.value = String(payload.product.id);
+                                    if (window.jQuery && jQuery().select2) {
+                                        $(productSelect).trigger('change');
+                                    }
+                                    await handleProductSelect({ target: productSelect });
+                                }
+                            }
+                        }
+
+                        this.value = '';
+                        this.focus();
+                    } catch (error) {
+                        console.error('Barcode scan error:', error);
+                        alert('Failed to process barcode.');
+                    }
+                });
+            }
             
             // Initialize calculations
             setTimeout(() => {

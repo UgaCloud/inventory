@@ -39,6 +39,24 @@ from app.utils.utils import convert_to_base_units, convert_from_base_units, vali
 logger = logging.getLogger(__name__)
 
 
+def sync_transfer_request_statuses_with_transfers():
+    """Keep linked transfer requests aligned with their stock transfer status."""
+    linked_transfers = StockTransfer.objects.select_related('transfer_request').filter(
+        transfer_request__isnull=False
+    )
+    requests_to_update = []
+    for transfer in linked_transfers:
+        tr = transfer.transfer_request
+        if tr and tr.status != transfer.status:
+            tr.status = transfer.status
+            if transfer.status == 'completed' and not tr.fulfilled_date:
+                tr.fulfilled_date = timezone.now()
+            requests_to_update.append(tr)
+
+    if requests_to_update:
+        TransferRequest.objects.bulk_update(requests_to_update, ['status', 'fulfilled_date'])
+
+
 @login_required
 def stock_transfer_list(request):
     status_filter = request.GET.get('status', 'all')
@@ -233,7 +251,11 @@ def update_transfer_status(request, transfer_id):
         if transfer.transfer_request:
             tr = transfer.transfer_request
             tr.status = new_status  # mirror exactly: in_transit, completed, cancelled
-            tr.save(update_fields=['status'])
+            update_fields = ['status']
+            if new_status == 'completed':
+                tr.fulfilled_date = now
+                update_fields.append('fulfilled_date')
+            tr.save(update_fields=update_fields)
 
         if new_status == 'completed' and old_status != 'completed':
             with transaction.atomic():
@@ -244,7 +266,8 @@ def update_transfer_status(request, transfer_id):
         return JsonResponse({
             'success': True,
             'message': f'Transfer status updated to {new_status}',
-            'new_status': new_status
+            'new_status': new_status,
+            'transfer_request_id': transfer.transfer_request_id,
         })
 
     except Exception as e:
@@ -487,6 +510,7 @@ def stock_transfer_update(request, transfer_id):
 
 @login_required
 def transfer_request_list(request):
+    sync_transfer_request_statuses_with_transfers()
     requests = get_all_transfer_requests()
     departments = Department.objects.filter(is_active=True)
     stores = StoreLocation.objects.filter(is_active=True)
@@ -494,7 +518,10 @@ def transfer_request_list(request):
     status_counts = {
         'pending': requests.filter(status='pending').count(),
         'approved': requests.filter(status='approved').count(),
+        'in_transit': requests.filter(status='in_transit').count(),
+        'completed': requests.filter(status='completed').count(),
         'rejected': requests.filter(status='rejected').count(),
+        'cancelled': requests.filter(status='cancelled').count(),
         'fulfilled': requests.filter(status='fulfilled').count(),
     }
 
@@ -532,6 +559,25 @@ def transfer_request_list(request):
         'request_summaries': request_summaries,
     }
     return render(request, 'transfers/transfer_request_list.html', context)
+
+
+@login_required
+def transfer_request_statuses(request):
+    sync_transfer_request_statuses_with_transfers()
+    ids_param = request.GET.get('ids', '')
+    ids = []
+    if ids_param:
+        for raw_id in ids_param.split(','):
+            raw_id = raw_id.strip()
+            if raw_id.isdigit():
+                ids.append(int(raw_id))
+
+    status_map = {}
+    if ids:
+        rows = TransferRequest.objects.filter(id__in=ids).values('id', 'status')
+        status_map = {str(row['id']): row['status'] for row in rows}
+
+    return JsonResponse({'success': True, 'statuses': status_map})
 
 
 @login_required
@@ -1078,9 +1124,8 @@ def create_stock_transfer(request):
                         created_by=request.user,
                         status='pending'
                     )
-                    
-                    tr.status = 'fulfilled'
-                    tr.save()
+                    tr.status = st.status
+                    tr.save(update_fields=['status'])
                 else:
                     st = StockTransfer.objects.create(
                         from_store_id=data['from_store'],
@@ -1348,8 +1393,8 @@ def create_transfer_from_request(request, request_id):
                     units=request_item.units,
                 )
             
-            tr.status = 'fulfilled'
-            tr.save()
+            tr.status = st.status
+            tr.save(update_fields=['status'])
         
         try:
             transfer_url = reverse('stock_transfer_detail', kwargs={'transfer_id': st.id})

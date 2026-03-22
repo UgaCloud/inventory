@@ -2353,6 +2353,7 @@ def export_sales_csv(request):
     # Get filter parameters from request
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
+    daterange = request.GET.get('daterange')
     store_id = request.GET.get('store')
     period = request.GET.get('period', '')
     
@@ -2372,14 +2373,25 @@ def export_sales_csv(request):
     
     # Get the same data as the sales_details view
     today = timezone.now()
+    start_date = None
+    end_date = None
     if date_from and date_to:
         try:
-            start_date = timezone.make_aware(date.strptime(date_from, '%Y-%m-%d'))
-            end_date = timezone.make_aware(date.strptime(date_to, '%Y-%m-%d'))
-        except:
-            start_date = today.replace(day=1)
-            end_date = today
-    else:
+            start_date = timezone.make_aware(datetime.strptime(date_from, '%Y-%m-%d'))
+            end_date = timezone.make_aware(datetime.strptime(date_to, '%Y-%m-%d'))
+        except Exception:
+            start_date = None
+            end_date = None
+    if (not start_date or not end_date) and daterange:
+        try:
+            parts = [p.strip() for p in daterange.split(' - ')]
+            if len(parts) == 2:
+                start_date = timezone.make_aware(datetime.strptime(parts[0], '%Y-%m-%d'))
+                end_date = timezone.make_aware(datetime.strptime(parts[1], '%Y-%m-%d'))
+        except Exception:
+            start_date = None
+            end_date = None
+    if not start_date or not end_date:
         start_date = today.replace(day=1)
         end_date = today
     
@@ -6588,9 +6600,23 @@ def export_financial_report(request, format):
 @login_required
 def productmaster_details(request):
     """Product Master Reports - REAL production view using EXISTING models"""
-    
     # Get all data using your existing models
     all_products = Product.objects.select_related('category').prefetch_related('inventories').all()
+
+    # Optional date range filter (created_at)
+    daterange = request.GET.get('daterange', '').strip()
+    start_date = None
+    end_date = None
+    if daterange:
+        try:
+            parts = [p.strip() for p in daterange.split(' - ')]
+            if len(parts) == 2:
+                start_date = date.fromisoformat(parts[0])
+                end_date = date.fromisoformat(parts[1])
+                all_products = all_products.filter(created_at__date__range=[start_date, end_date])
+        except ValueError:
+            start_date = None
+            end_date = None
     
     # 1. Basic Statistics
     total_products = all_products.count()
@@ -6706,6 +6732,9 @@ def productmaster_details(request):
     
     context = {
         'current_date': timezone.now(),
+        'start_date': start_date,
+        'end_date': end_date,
+        'date_range': daterange if start_date and end_date else 'Select Date Range',
         
         # Statistics
         'total_products': total_products,

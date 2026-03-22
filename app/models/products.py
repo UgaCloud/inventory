@@ -191,7 +191,18 @@ class Product(models.Model):
                         max_num = num
             next_num = max_num + 1
             self.sku = f"{prefix}-{next_num:04d}"
+
+        if not self.barcode:
+            self.barcode = self._generate_unique_barcode()
         super().save(*args, **kwargs)
+
+    def _generate_unique_barcode(self):
+        # Generate a numeric POS-friendly barcode-like value (13 digits).
+        # It is not EAN validated, but works for scanner/lookup operations.
+        while True:
+            candidate = str(uuid.uuid4().int)[:13]
+            if not Product.objects.filter(barcode=candidate).exclude(pk=self.pk).exists():
+                return candidate
 
 
 class ProductUnitPrice(models.Model):

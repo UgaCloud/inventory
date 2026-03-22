@@ -219,7 +219,7 @@
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post" action="" id="purchaseOrderForm">
+                        <form method="post" action="{% url 'create_purchase_order' %}" id="purchaseOrderForm" novalidate>
                             {% csrf_token %}
                             <input type="hidden" name="order_id" id="order_id" value="">
                             <input type="hidden" name="total_cost" id="id_total_cost" value="0">
@@ -1018,6 +1018,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const purchaseOrderForm = document.getElementById('purchaseOrderForm');
     const modalTitle = document.getElementById('modal-title');
     const submitBtn = document.getElementById('submit-form');
+    // Ensure submit button always triggers form submission flow explicitly.
+    if (submitBtn && purchaseOrderForm) {
+        submitBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            purchaseOrderForm.requestSubmit();
+        });
+    }
+
     const orderIdInput = document.getElementById('order_id');
     
     let formIndex = totalForms ? parseInt(totalForms.value) : 1;

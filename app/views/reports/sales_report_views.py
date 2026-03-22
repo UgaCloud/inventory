@@ -86,14 +86,14 @@ def branch_sales_report(request):
         ).order_by('sale_date')
     elif period == 'weekly':
         sales_by_period = sales.annotate(
-            period=TruncWeek('date')
+            period=TruncWeek('sale_date')
         ).values('period').annotate(
             total=Sum('total_amount'),
             transactions=Count('id')
         ).order_by('period')
     else:  # monthly
         sales_by_period = sales.annotate(
-            period=TruncMonth('date')
+            period=TruncMonth('sale_date')
         ).values('period').annotate(
             total=Sum('total_amount'),
             transactions=Count('id')
@@ -187,29 +187,29 @@ def branch_sales_report_api(request):
     if date_from:
         try:
             date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
-            sales = sales.filter(date__gte=date_from_obj)
+            sales = sales.filter(sale_date__gte=date_from_obj)
         except ValueError:
             pass
     
     if date_to:
         try:
             date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
-            sales = sales.filter(date__lte=date_to_obj)
+            sales = sales.filter(sale_date__lte=date_to_obj)
         except ValueError:
             pass
     
     # Get chart data based on period
     if period == 'daily':
-        chart_data = sales.values('date').annotate(
+        chart_data = sales.values('sale_date').annotate(
             total=Sum('total_amount'),
             transactions=Count('id')
-        ).order_by('date')
+        ).order_by('sale_date')
         
-        chart_labels = [item['date'].strftime('%Y-%m-%d') for item in chart_data]
+        chart_labels = [item['sale_date'].strftime('%Y-%m-%d') for item in chart_data]
         
     elif period == 'weekly':
         chart_data = sales.annotate(
-            week=TruncWeek('date')
+            week=TruncWeek('sale_date')
         ).values('week').annotate(
             total=Sum('total_amount'),
             transactions=Count('id')
@@ -219,7 +219,7 @@ def branch_sales_report_api(request):
         
     else:  # monthly
         chart_data = sales.annotate(
-            month=TruncMonth('date')
+            month=TruncMonth('sale_date')
         ).values('month').annotate(
             total=Sum('total_amount'),
             transactions=Count('id')
@@ -277,14 +277,14 @@ def export_branch_sales_csv(request):
     if date_from:
         try:
             date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
-            sales = sales.filter(date__gte=date_from_obj)
+            sales = sales.filter(sale_date__gte=date_from_obj)
         except ValueError:
             date_from = "N/A"
     
     if date_to:
         try:
             date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
-            sales = sales.filter(date__lte=date_to_obj)
+            sales = sales.filter(sale_date__lte=date_to_obj)
         except ValueError:
             date_to = "N/A"
     
@@ -358,14 +358,14 @@ def export_branch_sales_pdf(request):
     if date_from:
         try:
             date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
-            sales = sales.filter(date__gte=date_from_obj)
+            sales = sales.filter(sale_date__gte=date_from_obj)
         except ValueError:
             date_from = "N/A"
     
     if date_to:
         try:
             date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
-            sales = sales.filter(date__lte=date_to_obj)
+            sales = sales.filter(sale_date__lte=date_to_obj)
         except ValueError:
             date_to = "N/A"
     

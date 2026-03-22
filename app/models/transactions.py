@@ -299,6 +299,9 @@ class TransferRequest(models.Model):
     REQUEST_STATUS_CHOICES = [
         ("pending", "Pending"),
         ("approved", "Approved"),
+        ("in_transit", "In Transit"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
         ("rejected", "Rejected"),
         ("fulfilled", "Fulfilled"),
     ]

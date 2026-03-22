@@ -573,6 +573,33 @@ def get_product_stock_info(request, product_id):
             'unit_prices': []
         }, status=500)
 
+
+@login_required
+@require_GET
+def get_product_by_barcode(request):
+    barcode = request.GET.get('barcode', '').strip()
+    if not barcode:
+        return JsonResponse({'success': False, 'error': 'Barcode is required'}, status=400)
+
+    product = Product.objects.filter(
+        is_active=True
+    ).filter(
+        Q(barcode=barcode) | Q(sku=barcode)
+    ).first()
+
+    if not product:
+        return JsonResponse({'success': False, 'error': 'No product found for this barcode'}, status=404)
+
+    return JsonResponse({
+        'success': True,
+        'product': {
+            'id': product.id,
+            'name': product.name,
+            'sku': product.sku,
+            'barcode': product.barcode,
+        }
+    })
+
 # API endpoint for product autocomplete
 @login_required
 @require_GET

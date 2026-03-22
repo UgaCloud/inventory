@@ -365,6 +365,10 @@
                     <i class="ti ti-refresh me-1"></i>
                     Refresh
                 </button>
+                <button class="btn btn-outline-secondary me-2" onclick="window.print()">
+                    <i class="ti ti-printer me-1"></i>
+                    Print
+                </button>
                 <div class="btn-group">
                     <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
                         <i class="ti ti-download me-1"></i>
@@ -414,7 +418,7 @@
         <!-- Filter Section with Searchable Dropdowns -->
         <div class="filter-section">
             <div class="row align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Category</label>
                     <div class="dropdown-search-container">
                         <div class="dropdown-search-input" data-filter="category" onclick="toggleDropdown(this, event)">
@@ -493,7 +497,14 @@
                         </select>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label class="form-label">Date Range</label>
+                    <button class="btn btn-outline-secondary w-100 text-start" onclick="openDateRangeModal()">
+                        <i class="ti ti-calendar me-1"></i>
+                        <span id="selectedDateRange">{% if request.GET.daterange %}{{ request.GET.daterange }}{% else %}Select Date Range{% endif %}</span>
+                    </button>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label">Search</label>
                     <input type="text" class="form-control" id="productSearch" placeholder="Name, SKU, barcode...">
                 </div>
@@ -502,6 +513,34 @@
                         <i class="ti ti-filter me-1"></i>
                         Apply Filters
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date Range Modal -->
+        <div class="modal fade" id="dateRangeModal" tabindex="-1" aria-labelledby="dateRangeModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="dateRangeModalLabel">Select Date Range</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label for="startDate" class="form-label">Start Date</label>
+                                <input type="date" id="startDate" class="form-control">
+                            </div>
+                            <div class="col-6">
+                                <label for="endDate" class="form-label">End Date</label>
+                                <input type="date" id="endDate" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearDateRange()">Clear</button>
+                        <button type="button" class="btn btn-primary" onclick="applyDateRange()">Apply</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -899,6 +938,8 @@ document.addEventListener('keydown', function(e) {
 let selectedCategoryValue = '';
 let selectedStatusValue = '';
 let selectedStockValue = '';
+let startDateValue = '';
+let endDateValue = '';
 
 $(document).ready(function() {
     // Initialize DataTable
@@ -1052,6 +1093,45 @@ function initFromUrlParams() {
             selectDropdownOption(stockOption, 'stock', null);
         }
     }
+
+    const dateRangeParam = urlParams.get('daterange');
+    if (dateRangeParam) {
+        document.getElementById('selectedDateRange').textContent = dateRangeParam;
+        const dates = dateRangeParam.split(' - ');
+        if (dates.length === 2) {
+            startDateValue = dates[0];
+            endDateValue = dates[1];
+        }
+    }
+}
+
+function openDateRangeModal() {
+    const modal = new bootstrap.Modal(document.getElementById('dateRangeModal'));
+    if (startDateValue) document.getElementById('startDate').value = startDateValue;
+    if (endDateValue) document.getElementById('endDate').value = endDateValue;
+    modal.show();
+}
+
+function applyDateRange() {
+    startDateValue = document.getElementById('startDate').value;
+    endDateValue = document.getElementById('endDate').value;
+    if (startDateValue && endDateValue) {
+        document.getElementById('selectedDateRange').textContent = startDateValue + ' - ' + endDateValue;
+    } else {
+        document.getElementById('selectedDateRange').textContent = 'Select Date Range';
+    }
+    const modal = bootstrap.Modal.getInstance(document.getElementById('dateRangeModal'));
+    if (modal) modal.hide();
+}
+
+function clearDateRange() {
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    startDateValue = '';
+    endDateValue = '';
+    document.getElementById('selectedDateRange').textContent = 'Select Date Range';
+    const modal = bootstrap.Modal.getInstance(document.getElementById('dateRangeModal'));
+    if (modal) modal.hide();
 }
 
 function applyFilters() {
@@ -1072,6 +1152,10 @@ function applyFilters() {
     
     if (stockSelect && stockSelect.value) {
         params.push('stock=' + encodeURIComponent(stockSelect.value));
+    }
+
+    if (startDateValue && endDateValue) {
+        params.push('daterange=' + encodeURIComponent(startDateValue + ' - ' + endDateValue));
     }
     
     url += params.join('&');

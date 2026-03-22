@@ -106,6 +106,7 @@ urlpatterns = [
     # path('transfer_requests/<int:request_id>/approve-and-create/', approve_and_create_transfer, name='approve_and_create_transfer'),
     path('transfer_requests/<int:request_id>/print/', print_transfer_request, name='print_transfer_request'),
     path('transfer_requests/<int:request_id>/conversion-debug/', conversion_factor_debug, name='conversion_factor_debug'),
+    path('transfer_requests/statuses/', transfer_request_statuses, name='transfer_request_statuses'),
     path('transfer_request_for_approval/', pending_transfer_requests_for_approval, name='transfer_request_for_approval'),
     
     # -------------------------------------------------------------------
@@ -165,6 +166,7 @@ urlpatterns = [
     # API endpoints
     path('api/products/autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('api/products/<int:product_id>/stock-info/', get_product_stock_info, name='product_stock_info'),
+    path('api/sales/product-by-barcode/', get_product_by_barcode, name='product_by_barcode'),
     path('api/products/list/', get_products_list, name='get_products_list'),
     path('api/units/list/', get_units_list, name='get_units_list'),
     path('api/sales/validate-stock/', validate_sale_stock, name='validate_sale_stock'),

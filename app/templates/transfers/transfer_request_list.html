@@ -32,6 +32,9 @@
               <li><a class="dropdown-item" style="width: 200px; border: 0;" href="?status=all">All Requests</a></li>
               <li><a class="dropdown-item" style="width: 200px; border: 0;" href="?status=pending">Pending</a></li>
               <li><a class="dropdown-item" style="width: 200px; border: 0;" href="?status=approved">Approved</a></li>
+              <li><a class="dropdown-item" style="width: 200px; border: 0;" href="?status=in_transit">In Transit</a></li>
+              <li><a class="dropdown-item" style="width: 200px; border: 0;" href="?status=completed">Completed</a></li>
+              <li><a class="dropdown-item" style="width: 200px; border: 0;" href="?status=cancelled">Cancelled</a></li>
               <li><a class="dropdown-item" style="width: 200px;border: 0;" href="?status=rejected">Rejected</a></li>
               <li><a class="dropdown-item" style="width: 200px; border: 0;" href="?status=fulfilled">Fulfilled</a></li>
             </ul>
@@ -77,9 +80,9 @@
             <div class="mb-2">
               <i data-feather="truck" class="feather-24 text-info"></i>
             </div>
-            <h3 class="text-info">{{ status_counts.rejected }}</h3>
-            <p class="mb-0">Rejected</p>
-            <small class="text-info">Not Approved</small>
+            <h3 class="text-info">{{ status_counts.in_transit }}</h3>
+            <p class="mb-0">In Transit</p>
+            <small class="text-info">Transfer Started</small>
           </div>
         </div>
       </div>
@@ -89,9 +92,9 @@
             <div class="mb-2">
               <i data-feather="package" class="feather-24 text-primary"></i>
             </div>
-            <h3 class="text-primary">{{ status_counts.fulfilled }}</h3>
-            <p class="mb-0">Fulfilled</p>
-            <small class="text-primary">Transfers Created</small>
+            <h3 class="text-primary">{{ status_counts.completed|add:status_counts.fulfilled }}</h3>
+            <p class="mb-0">Completed</p>
+            <small class="text-primary">Transfer Finished</small>
           </div>
         </div>
       </div>
@@ -212,7 +215,7 @@
                     {% endif %}
                   </div>
                 </td>
-                <td>
+                <td class="request-status-cell">
                   {% if request.status == 'pending' %}
                     <span class="badge bg-warning">
                       <i data-feather="clock" class="feather-12 me-1"></i>Pending
@@ -1710,9 +1713,51 @@ function cancelRequest(requestId) {
 
 function refreshRequests() { location.reload(); }
 
+function getRequestStatusBadge(status) {
+  if (status === 'pending') return '<span class="badge bg-warning"><i data-feather="clock" class="feather-12 me-1"></i>Pending</span>';
+  if (status === 'approved' || status === 'in_transit') return '<span class="badge bg-info"><i data-feather="truck" class="feather-12 me-1"></i>Approved</span>';
+  if (status === 'completed' || status === 'fulfilled') return '<span class="badge bg-success"><i data-feather="check-circle" class="feather-12 me-1"></i>Completed</span>';
+  if (status === 'rejected' || status === 'cancelled') return '<span class="badge bg-danger"><i data-feather="x-circle" class="feather-12 me-1"></i>Cancelled</span>';
+  return '<span class="badge bg-secondary">Unknown</span>';
+}
+
+async function syncRequestStatuses() {
+  const rows = Array.from(document.querySelectorAll('tr[data-request-id]'));
+  if (!rows.length) return;
+
+  const ids = rows.map(row => row.dataset.requestId).filter(Boolean);
+  if (!ids.length) return;
+
+  try {
+    const response = await fetch(`/transfer_requests/statuses/?ids=${ids.join(',')}`);
+    if (!response.ok) return;
+
+    const data = await response.json();
+    if (!data.success || !data.statuses) return;
+
+    rows.forEach(row => {
+      const id = row.dataset.requestId;
+      const status = data.statuses[id];
+      if (!status || row.dataset.status === status) return;
+
+      row.dataset.status = status;
+      const statusCell = row.querySelector('.request-status-cell');
+      if (statusCell) {
+        statusCell.innerHTML = getRequestStatusBadge(status);
+      }
+    });
+
+    if (typeof feather !== 'undefined') feather.replace();
+  } catch (error) {
+    // Keep polling silent to avoid noisy UI for intermittent network errors.
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   if (typeof feather !== 'undefined') feather.replace();
   loadProductsFromAPI();
+  syncRequestStatuses();
+  setInterval(syncRequestStatuses, 5000);
   
   document.getElementById('rejectModal')?.addEventListener('hidden.bs.modal', function() {
     document.getElementById('rejectComments').classList.remove('is-invalid');

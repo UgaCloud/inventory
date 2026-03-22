@@ -31,14 +31,7 @@
             </ul>
           </div>
         </li>
-        <li>
-          <button class="btn btn-outline-info btn-sm d-flex align-items-center">
-            <a href="{% url 'transfer_request_list' %}?status=approved">
-              <i data-feather="list" class="feather-16"></i>
-              <span>View Approved Requests</span>
-            </a>
-          </button>
-        </li>
+        
         <li>
           <div class="dropdown">
             <button class="btn btn-primary btn-sm dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -435,10 +428,10 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
+        <!-- <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
           <i data-feather="truck" class="feather-16 me-1"></i>
           Create Selected Transfers
-        </button>
+        </button> -->
       </div>
     </div>
   </div>

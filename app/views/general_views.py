@@ -306,6 +306,20 @@ def index_view(request):
             for name, template in DASHBOARD_TEMPLATE_MAP.items()
         ]
 
+    # Enforce admin dashboard visibility restriction:
+    # Only superusers should see the admin dashboard template.
+    if not user.is_superuser and dashboard_templates:
+        filtered_templates = []
+        filtered_info = []
+        for info in dashboard_info:
+            template_path = info.get("template") or ""
+            if "dashboards/admin.html" in template_path:
+                continue
+            filtered_templates.append(template_path)
+            filtered_info.append(info)
+        dashboard_templates = filtered_templates
+        dashboard_info = filtered_info
+
     context.update({
         "dashboard_templates": dashboard_templates,
         "dashboard_info": dashboard_info,

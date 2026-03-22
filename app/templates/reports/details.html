@@ -47,12 +47,38 @@
                     </div>
                 </li>
                 <li>
+                    <button class="btn btn-outline-secondary" onclick="window.print()">
+                        <i data-feather="printer" class="feather-16 me-1"></i>
+                        Print
+                    </button>
+                </li>
+                <li>
                     <button class="btn btn-primary" onclick="goBack()">
                         <i data-feather="arrow-left" class="feather-16 me-1"></i>
                         Back to Dashboard
                     </button>
                 </li>
             </ul>
+        </div>
+
+        <!-- Date Range Filter -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <form id="reportFilters" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="date_from" class="form-label">From Date</label>
+                        <input type="date" id="date_from" name="date_from" class="form-control" value="{{ request.GET.date_from|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="date_to" class="form-label">To Date</label>
+                        <input type="date" id="date_to" name="date_to" class="form-control" value="{{ request.GET.date_to|default:'' }}">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end gap-2">
+                        <button type="button" class="btn btn-primary" onclick="applyFilters()">Apply Date Range</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">Clear</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- Report Header Info -->
@@ -724,6 +750,20 @@ function exportReport(format) {
     
     // Show success message
     showToast(`${format.toUpperCase()} export started!`, 'info');
+}
+
+function applyFilters() {
+    const form = document.getElementById('reportFilters');
+    if (!form) return;
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    window.location.href = window.location.pathname + '?' + params.toString();
+}
+
+function clearFilters() {
+    const form = document.getElementById('reportFilters');
+    if (form) form.reset();
+    window.location.href = window.location.pathname;
 }
 
 function goBack() {
