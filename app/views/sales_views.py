@@ -524,19 +524,8 @@ def get_product_stock_info(request, product_id):
             stock_transfer__status__in=['in_transit']
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
-        # Calculate committed stock from pending sales
-        # pending_sales_stock = SalesItem.objects.filter(
-        #     product=product,
-        #     order__store_id=store_id,
-        #     order__status__in=['PENDING', 'PARTIALLY_PAID'],
-        #     order__is_cancelled=False  # Exclude cancelled sales
-        # ).aggregate(committed=Sum('quantity'))['committed'] or 0
-        
-<<<<<<< Updated upstream
         committed_stock = committed_transfer_stock
-=======
-        committed_stock = committed_transfer_stock # + pending_sales_stock
->>>>>>> Stashed changes
+
         available_stock = max(0, physical_stock - committed_stock)
         
         # Get unit prices with conversion factors
