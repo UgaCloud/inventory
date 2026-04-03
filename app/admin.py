@@ -61,6 +61,7 @@ admin.site.register(Payment, get_admin_for_model(Payment))
 admin.site.register(InventoryBatch, get_admin_for_model(InventoryBatch))
 admin.site.register(Employee, EmployeeAdmin)
 admin.site.register(StockAdjustmentItem, get_admin_for_model(StockAdjustmentItem))
+admin.site.register(Automotive, get_admin_for_model(Automotive))
 
 
 

@@ -9,6 +9,9 @@ class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ['name']
+
     def __str__(self):
         return self.name
     
@@ -25,6 +28,21 @@ class UnitOfMeasure(models.Model):
         return self.name
 
 
+class Automotive(models.Model):
+    brand = models.CharField(max_length=100)  # E.g., "Toyota"
+    model = models.CharField(max_length=100)  # E.g., "Corolla"
+    year_from = models.IntegerField()
+    year_to = models.IntegerField(blank=True, null=True)
+    engine_type = models.CharField(max_length=50, blank=True)
+
+    def __str__(self):
+        return f"{self.brand} {self.model} ({self.year_from}-{self.year_to or 'Present'})"
+
+    def clean(self):
+        if self.year_to and self.year_from > self.year_to:
+            raise ValidationError("Year from cannot be greater than year to.")
+
+
 class Product(models.Model):
     name = models.CharField(max_length=255)
     sku = models.CharField(max_length=100, unique=True, blank=True)  
@@ -32,6 +50,7 @@ class Product(models.Model):
     description = models.TextField(blank=True, null=True)
     barcode = models.CharField(max_length=100, unique=True, blank=True, null=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    compatible_vehicles = models.ManyToManyField(Automotive, blank=True, related_name='products', verbose_name='Compatibility')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
