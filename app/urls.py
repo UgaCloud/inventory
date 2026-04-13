@@ -1,3 +1,5 @@
+from app.views.reports.customer_report_views import customer_balance_report
+    
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -41,7 +43,7 @@ urlpatterns = [
     path('accounts/', manage_accounts_view, name='accounts_page'),
     path('under_maintenance/', under_maintenance_view, name='under_maintenance_page'),
     
-    
+   
     path('app/dashboard/orders-by-date/', orders_by_date, name='orders_by_date_api'),
     
     # Organization
@@ -269,7 +271,7 @@ urlpatterns = [
     # Inventory Reports
     path('reports/', inventory_reports.reports_dashboard, name='reports_dashboard'),   
     path('reports-details/', inventory_reports.reports_details, name='reports_details'),
-    
+    path('reports/customer-balance/', customer_balance_report, name='customer_balance_report'),
     path('purchase-details/', inventory_reports.purchase_details, name='purchase_details'), 
     # path('sales-details/', inventory_reports.sales_details, name='sales_details'),
     path('inventory-details/', inventory_reports.inventory_details, name='inventory_details'),

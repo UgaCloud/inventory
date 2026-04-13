@@ -19,27 +19,22 @@ from app.models.customers import *
 def sales_list_view(request):
     # Get filter parameter - default to False (show active sales)
     show_cancelled = request.GET.get('show_cancelled', 'false') == 'true'
-    
-    # Get sales based on filter
-    if show_cancelled:
-        # Show only cancelled sales
-        sales = get_all_sales().filter(is_cancelled=True)
-    else:
-        # Show only active sales (default)
-        sales = get_all_sales().filter(is_cancelled=False)
-    
+
+    # Use improved selector logic
+    sales = get_all_sales(is_cancelled=show_cancelled)
+
     # Get counts for statistics
     active_count = Sales.objects.filter(is_cancelled=False).count()
     cancelled_count = Sales.objects.filter(is_cancelled=True).count()
-    
+
     # Calculate statistics for current view
     total_sales_amount = sales.aggregate(total=Sum('total_amount'))['total'] or 0
-    
+
     if not show_cancelled:
         fulfilled_count = sales.filter(status='FULFILLED').count()
     else:
         fulfilled_count = 0
-    
+
     # Add pagination
     paginator = Paginator(sales, 25)  # Show 25 sales per page
     page_number = request.GET.get('page')

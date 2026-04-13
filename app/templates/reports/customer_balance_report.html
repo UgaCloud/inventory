@@ -1,0 +1,53 @@
+{% extends 'basic/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h4 class="fw-bold">Customer Balance Report</h4>
+        <h6>Summary of all customers and their balances</h6>
+    </div>
+</div>
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Company</th>
+                        <th>Total Sales</th>
+                        <th>Total Payments</th>
+                        <th>Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in customers %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ c.name }}</td>
+                        <td>{{ c.email|default:"-" }}</td>
+                        <td>{{ c.phone|default:"-" }}</td>
+                        <td>{{ c.company|default:"-" }}</td>
+                        <td>{{ c.total_sales|intcomma }}/-</td>
+                        <td>{{ c.total_payments|intcomma }}/-</td>
+                        <td>
+                            {% if c.balance > 0 %}
+                                <span class="text-danger">{{ c.balance|intcomma }}/-</span>
+                            {% else %}
+                                <span class="text-success">0/-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="8" class="text-center">No customers found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

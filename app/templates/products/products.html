@@ -61,7 +61,37 @@
                     </span>
                 </div>
                 
-                <!-- Category Filter with Search -->
+                <!-- Automotive Filter with Search -->
+                <div class="dropdown-search-container" style="max-width: 220px; position: relative;">
+                    <div class="dropdown-search-input" data-filter="automotive" onclick="toggleDropdown(this)">
+                        <span class="dropdown-selected-value" id="selectedAutomotiveText">
+                            All Automotives
+                        </span>
+                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                    </div>
+                    <div class="dropdown-search-menu" id="automotiveDropdown" style="display: none;">
+                        <div class="dropdown-search-header">
+                            <i class="ti ti-search"></i>
+                            <input type="text" class="dropdown-search-field" placeholder="Search automotive..." onkeyup="filterDropdownOptions(this, 'automotive')">
+                        </div>
+                        <div class="dropdown-search-options">
+                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'automotive')">
+                                All Automotives
+                            </div>
+                            {% for auto in automotives %}
+                            <div class="dropdown-search-option" data-value="{{ auto.id }}" onclick="selectDropdownOption(this, 'automotive')">
+                                {{ auto.brand }} {{ auto.model }} ({{ auto.year_from }}{% if auto.year_to %}-{{ auto.year_to }}{% else %}-Present{% endif %})
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <select id="automotiveFilter" class="form-select form-select-sm" style="display: none;">
+                        <option value="">All Automotives</option>
+                        {% for auto in automotives %}
+                        <option value="{{ auto.id }}">{{ auto.brand }} {{ auto.model }} ({{ auto.year_from }}{% if auto.year_to %}-{{ auto.year_to }}{% else %}-Present{% endif %})</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="dropdown-search-container" style="max-width: 180px; position: relative;">
                     <div class="dropdown-search-input" data-filter="category" onclick="toggleDropdown(this)">
                         <span class="dropdown-selected-value" id="selectedCategoryText">
@@ -480,34 +510,38 @@ function filterProducts() {
     const category = document.getElementById('categoryFilter').value;
     const brand = document.getElementById('brandFilter').value;
     const status = document.getElementById('statusFilter').value;
-    
+    const automotive = document.getElementById('automotiveFilter') ? document.getElementById('automotiveFilter').value : '';
+
     filteredProducts = allProducts.filter(product => {
         // Search filter
         const matchesSearch = searchTerm === '' || 
             (product.name && product.name.toLowerCase().includes(searchTerm)) ||
             (product.sku && product.sku.toLowerCase().includes(searchTerm)) ||
             (product.brand && product.brand.toLowerCase().includes(searchTerm));
-        
+
         // Category filter
         const matchesCategory = category === '' || 
             (product.category_id && product.category_id.toString() === category);
-        
+
         // Brand filter
         const matchesBrand = brand === '' || product.brand === brand;
-        
+
         // Status filter
         const matchesStatus = status === '' || 
             (status === 'active' ? product.is_active : !product.is_active);
-        
-        return matchesSearch && matchesCategory && matchesBrand && matchesStatus;
+
+        // Automotive filter
+        const matchesAutomotive = automotive === '' || (product.automotives && product.automotives.includes(parseInt(automotive)));
+
+        return matchesSearch && matchesCategory && matchesBrand && matchesStatus && matchesAutomotive;
     });
-    
+
     // Reset to first page
     currentPage = 1;
-    
+
     // Update table
     displayCurrentPage();
-    
+
     // Update clear filters button visibility
     toggleClearFiltersButton();
 }
