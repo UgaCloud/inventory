@@ -1,0 +1,38 @@
+{% extends 'basic/base.html' %}
+{% block title %}Sales Returns{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Sales Returns</h2>
+    <table class="table table-bordered table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Return ID</th>
+                <th>Sale</th>
+                <th>Customer</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for return in sales_returns %}
+            <tr>
+                <td>{{ return.id }}</td>
+                <td>{{ return.sale.receipt_no }}</td>
+                <td>{{ return.sale.customer }}</td>
+                <td>{{ return.created_at|date:'Y-m-d H:i' }}</td>
+                <td>{{ return.amount }}</td>
+                <td>{{ return.status }}</td>
+                <td>
+                    <a href="{% url 'sales_return_detail' return.id %}" class="btn btn-sm btn-info">View</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7">No sales returns found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

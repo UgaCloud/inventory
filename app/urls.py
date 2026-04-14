@@ -18,6 +18,8 @@ from .views.stock_views import *
 from .views.transfer_views import *
 from .views.transfers import *
 from .views.sales_views import *
+from .views.sales_returns_views import sales_returns_list_view, sales_return_detail_view
+    
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
@@ -164,6 +166,10 @@ urlpatterns = [
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('product_autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('sales/<int:pk>/cancel/', cancel_sale_view, name='cancel_sale'),
+
+    # Sales Returns
+    path('sales/returns/', sales_returns_list_view, name='sales_returns_list'),
+    path('sales/returns/<int:pk>/', sales_return_detail_view, name='sales_return_detail'),
 
     # API endpoints
     path('api/products/autocomplete/', product_autocomplete, name='product_autocomplete'),

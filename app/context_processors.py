@@ -100,13 +100,13 @@ def app_menu(request):
             'children': [
                 {'label': 'Record Sale', 'url_name': 'record_sale'},
                 {'label': 'Sales List', 'url_name': 'sales_list'},
-                {'label': 'Sales Return', 'url_name': 'under_maintenance_page'},
+                {'label': 'Sales Returns', 'url_name': 'sales_returns_list'},
                 # {'label': 'Quotation', 'url_name': 'under_maintenance_page'},
                 {
                     'label': 'Customer',
                     'children': [
                         {'label': 'Manage Customers', 'url_name': 'customer_list'},
-                        {'label': 'Payments', 'url_name': None},
+                        # {'label': 'Payments', 'url_name': None},
                         {'label': 'Customer Ledgers', 'url_name': 'customer_ledger_list'},
                     ],
                 },
