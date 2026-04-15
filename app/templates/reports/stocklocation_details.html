@@ -419,6 +419,114 @@
         .quick-stats { flex-wrap: wrap; }
         .store-avatar { width: 30px; height: 30px; font-size: 12px; }
     }
+
+    @media print {
+
+    body {
+        background: white !important;
+    }
+
+    .btn,
+    .filter-section,
+    .page-header,
+    .dataTables_filter,
+    .dt-buttons {
+        display: none !important;
+    }
+
+    .table-container {
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    table {
+        font-size: 12px;
+    }
+
+    th {
+        background: #000 !important;
+        color: #fff !important;
+    }
+}
+
+.print-report {
+    font-family: 'Segoe UI', sans-serif;
+    padding: 40px;
+    color: #2b2f32;
+}
+
+.report-header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.report-header h2 {
+    margin: 10px 0 5px;
+    font-weight: 700;
+}
+
+.report-header p {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.logo {
+    height: 60px;
+    margin-bottom: 10px;
+}
+
+.report-meta {
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.report-table thead {
+    background: #4361ee;
+    color: #fff;
+}
+
+.report-table th,
+.report-table td {
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    font-size: 12px;
+}
+
+.report-table tbody tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.report-footer {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+/* Hide everything else when printing */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .print-report, .print-report * {
+        visibility: visible;
+    }
+
+    .print-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+}
+
 </style>
 
 <div class="page-wrapper">
@@ -434,7 +542,12 @@
                     <i data-feather="refresh-cw" class="feather-16 me-1"></i>
                     Refresh
                 </button>
-                <div class="btn-group">
+
+                <button class="btn btn-outline-primary" onclick="printStorePerformanceReportInline()">
+                    <i data-feather="printer" class="feather-14 me-2"></i>Print
+                </button>
+
+                <!-- <div class="btn-group">
                     <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
                         <i data-feather="download" class="feather-16 me-1"></i>
                         Export
@@ -446,7 +559,7 @@
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" onclick="window.print()">Print</a></li>
                     </ul>
-                </div>
+                </div> -->
             </div>
         </div>
 
@@ -845,7 +958,7 @@
     </div>
 </div>
 
-
+<div id="printReportContainer" style="display:none;"></div>
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -1263,19 +1376,120 @@ function refreshReport() {
     window.location.reload();
 }
 
-function exportReport(format) {
-    const table = $('#storePerformanceTable').DataTable();
+// function exportReport(format) {
+//     const table = $('#storePerformanceTable').DataTable();
     
-    if (format === 'csv') {
-        table.button('.buttons-csv').trigger();
-    } else if (format === 'excel') {
-        table.button('.buttons-excel').trigger();
-    } else if (format === 'pdf') {
-        table.button('.buttons-pdf').trigger();
-    }
+//     if (format === 'csv') {
+//         table.button('.buttons-csv').trigger();
+//     } else if (format === 'excel') {
+//         table.button('.buttons-excel').trigger();
+//     } else if (format === 'pdf') {
+//         table.button('.buttons-pdf').trigger();
+//     }
+// }
+
+
+function printStorePerformanceReportInline() {
+    const table = document.getElementById("storePerformanceTable");
+    const rows = table.querySelectorAll("tbody tr");
+
+    let reportRows = "";
+
+    rows.forEach(row => {
+        const cols = row.querySelectorAll("td");
+
+        // skip empty table message row
+        if (cols.length < 10) return;
+
+        reportRows += `
+            <tr>
+                <td>${cols[0].innerText}</td> <!-- Store -->
+                <td>${cols[1].innerText}</td> <!-- Branch -->
+                <td>${cols[2].innerText}</td> <!-- Status -->
+                <td>${cols[3].innerText}</td> <!-- Performance -->
+                <td>${cols[4].innerText}</td> <!-- Utilization -->
+                <td>${cols[5].innerText}</td> <!-- Monthly Sales -->
+                <td>${cols[6].innerText}</td> <!-- Transactions -->
+                <td>${cols[7].innerText}</td> <!-- Avg Transaction -->
+                <td>${cols[8].innerText}</td> <!-- Stock Value -->
+                <td>${cols[9].innerText}</td> <!-- Low Stock -->
+                <td>${cols[10].innerText}</td> <!-- Efficiency -->
+                <td>${cols[11].innerText}</td> <!-- Growth -->
+            </tr>
+        `;
+    });
+
+    const container = document.getElementById("printReportContainer");
+
+    container.innerHTML = `
+        <div class="print-report">
+
+            <div class="report-header text-center">
+                <img src="/static/logo.png" class="logo">
+                <h2>Store Performance Report</h2>
+                <p>Generated on ${new Date().toLocaleString()}</p>
+                <p>
+                    <strong>Date Range:</strong> 
+                    ${document.getElementById("headerDateRange")?.innerText || "-"}
+                </p>
+            </div>
+
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Store</th>
+                        <th>Branch</th>
+                        <th>Status</th>
+                        <th>Performance</th>
+                        <th>Utilization</th>
+                        <th>Sales</th>
+                        <th>Transactions</th>
+                        <th>Avg Tx</th>
+                        <th>Stock Value</th>
+                        <th>Low Stock</th>
+                        <th>Efficiency</th>
+                        <th>Growth</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    ${reportRows}
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <th colspan="5" class="text-end">Totals / Averages:</th>
+                        <th>${document.querySelector("#storePerformanceTable tfoot th:nth-child(6)")?.innerText || "-"}</th>
+                        <th>${document.querySelector("#storePerformanceTable tfoot th:nth-child(7)")?.innerText || "-"}</th>
+                        <th>${document.querySelector("#storePerformanceTable tfoot th:nth-child(8)")?.innerText || "-"}</th>
+                        <th>${document.querySelector("#storePerformanceTable tfoot th:nth-child(9)")?.innerText || "-"}</th>
+                        <th>${document.querySelector("#storePerformanceTable tfoot th:nth-child(10)")?.innerText || "-"}</th>
+                        <th>${document.querySelector("#storePerformanceTable tfoot th:nth-child(11)")?.innerText || "-"}</th>
+                        <th>${document.querySelector("#storePerformanceTable tfoot th:nth-child(12)")?.innerText || "-"}</th>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="report-footer text-center">
+                Confidential • Store Performance Report
+            </div>
+
+        </div>
+    `;
+
+    container.style.display = "block";
+
+    setTimeout(() => {
+        window.print();
+        container.style.display = "none";
+    }, 200);
 }
 
+
+
 // Show toast notification
+
+
 function showToast(message, type = 'info') {
     const toastHTML = `
         <div class="toast align-items-center text-bg-${type} border-0" role="alert">
@@ -1300,5 +1514,9 @@ function showToast(message, type = 'info') {
     const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
     toast.show();
 }
+
+
+
+
 </script>
 {% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'basic/base.html' %}
+{% block content %}
+<h1>Expenses Report</h1>
+<table border="1" cellpadding="5" cellspacing="0">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for expense in expenses %}
+        <tr>
+            <td>{{ expense.id }}</td>
+            <td>{{ expense.date }}</td>
+            <td>{{ expense.description }}</td>
+            <td>{{ expense.amount }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No expenses found.</td></tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="3" style="text-align:right;"><strong>Total:</strong></td>
+            <td><strong>{{ total }}</strong></td>
+        </tr>
+    </tfoot>
+</table>
+{% endblock %}

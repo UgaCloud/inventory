@@ -23,6 +23,7 @@ from .views.sales_returns_views import sales_returns_list_view, sales_return_det
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
 from app.views.expense_views import *
+from app.views.expenses_report_view import expenses_report
 from app.views.finance_views import *
 from app.views.product_views import bulk_add_categories_view, download_category_template_view
 from .views.reports import sales_report_views, inventory_reports
@@ -47,6 +48,7 @@ urlpatterns = [
     
    
     path('app/dashboard/orders-by-date/', orders_by_date, name='orders_by_date_api'),
+    path('expenses-report/', expenses_report, name='expenses_report'),
     
     # Organization
     path('branches/', manage_branches, name = 'manage_branch_page'),
