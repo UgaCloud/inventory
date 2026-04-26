@@ -555,9 +555,8 @@
           <div class="row mb-4">
             <div class="col-12">
               <div class="mb-3">
-                <label for="reason" class="form-label">Reason for Transfer <span class="text-danger">*</span></label>
-                <textarea id="reason" name="reason" class="form-control" rows="3" placeholder="Explain why this transfer is needed..." required></textarea>
-                <div class="invalid-feedback">Please provide a reason for the transfer</div>
+                <label for="reason" class="form-label">Reason for Transfer</label>
+                <textarea id="reason" name="reason" class="form-control" rows="3" placeholder="Explain why this transfer is needed (optional)..."></textarea>
               </div>
             </div>
           </div>
@@ -1395,7 +1394,7 @@ function validateForm() {
   }
   if (!fromStore) { errors.push('Source store is required'); document.getElementById('from_store').classList.add('is-invalid'); isValid = false; }
   if (!toStore) { errors.push('Destination store is required'); document.getElementById('to_store').classList.add('is-invalid'); isValid = false; }
-  if (!document.getElementById('reason').value.trim()) { errors.push('Reason for transfer is required'); document.getElementById('reason').classList.add('is-invalid'); isValid = false; } else { document.getElementById('reason').classList.remove('is-invalid'); }
+  document.getElementById('reason').classList.remove('is-invalid');
   
   const tbody = document.getElementById('requestItemsBody');
   if (tbody.children.length === 0) { errors.push('Please add at least one item to request.'); isValid = false; }

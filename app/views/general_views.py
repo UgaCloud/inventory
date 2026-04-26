@@ -219,8 +219,8 @@ def index_view(request):
 
     # Prepare customer chart data
     customer_chart_data = {
-        'first_time': 5500,  # Replace with actual data
-        'return': 3500,       # Replace with actual data
+        "labels": ["First Time", "Return"],
+        "data": [6500, 4500],
     }
 
     context = {
@@ -273,7 +273,8 @@ def index_view(request):
         "sales_chart_data_json": json.dumps(sales_chart_data),
         "revenue_chart_data_json": json.dumps(revenue_chart_data),
         "top_categories_chart_json": json.dumps(top_categories_chart),
-        "customer_chart_data_json": json.dumps(customer_chart_data),
+        "customer_chart_data_json": customer_chart_data,
+        # "customer_chart_data_json": json.dumps(customer_chart_data),
 
         # Recent Transactions
         "recent_sales_transactions": recent_sales_transactions,

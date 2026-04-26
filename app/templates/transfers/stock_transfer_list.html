@@ -314,7 +314,7 @@
                         </button>
                         <ul class="dropdown-menu">
                           <li>
-                            <a class="dropdown-item" href="#">
+                            <a class="dropdown-item" href="{% url 'stock_transfer_detail' transfer.id %}?print=1" target="_blank">
                               <i data-feather="printer" class="feather-14 me-2"></i>Print Slip
                             </a>
                           </li>
@@ -428,10 +428,10 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <!-- <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
+        <button type="button" class="btn btn-primary" data-action="createBulkTransfers">
           <i data-feather="truck" class="feather-16 me-1"></i>
           Create Selected Transfers
-        </button> -->
+        </button>
       </div>
     </div>
   </div>

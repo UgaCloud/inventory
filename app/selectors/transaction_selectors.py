@@ -58,8 +58,8 @@ from app.models.expense import Expense
 # SALES
 # ===========================
 
-def get_all_sales(user=None):
-    qs = Sales.objects.filter(is_cancelled=False)
+def get_all_sales(user=None, is_cancelled=False):
+    qs = Sales.objects.filter(is_cancelled=is_cancelled)
     if user:
         qs = qs.filter(recorded_by=user)
     return qs.order_by("-sale_date")

@@ -230,8 +230,8 @@ class TransferRequestForm(forms.ModelForm):
     
     reason = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Explain why this transfer is needed...'}),
-        required=True,
-        help_text="Required: Please provide a reason for this transfer"
+        required=False,
+        help_text="Optional: Provide a reason for this transfer"
     )
 
     class Meta:

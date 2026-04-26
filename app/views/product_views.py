@@ -114,18 +114,25 @@ def manage_product_view(request):
             'total_committed_stock': item['total_committed_stock']
         })
     
+    automotives = Automotive.objects.all()
     context = {
         'form': product_form,
         'products': enhanced_products,  # For edit modals
         'products_json': json.dumps(products_json),  # For client-side pagination
         'categories': categories,
         'brands': brands,
+        'automotives': automotives,
         'selected_category': category_id,
         'selected_brand': brand_filter,
         'search_query': search_query,
         'selected_status': status_filter,
     }
     return render(request, 'products/products.html', context)
+
+
+
+
+
 
 @login_required
 def add_product_view(request):

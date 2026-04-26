@@ -46,7 +46,11 @@
                         <div class="col-lg-5 mx-auto">
                             <div class="login-content user-login">
                                 <div class="login-logo">
-                                    <img src="{% static '{assets/img/logo-1.png' %}" alt="img">
+                                    {% if organization.organization_logo %}
+                                        <img src="{{ organization.organization_logo.url }}" alt="Img" />
+                                    {% else %}
+                                        <img src="{% static 'assets/img/default_logo.png' %}" alt="Img"/>
+                                    {% endif %}
                                     <a href="index.html" class="login-logo logo-white">
                                         <img src="{% static 'assets/img/logo-white.svg' %}"  alt="Img">
                                     </a>

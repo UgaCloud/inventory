@@ -468,6 +468,126 @@
     .mt-4 {
         margin-top: 25px !important;
     }
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    @media print {
+
+    body {
+        background: white !important;
+    }
+
+    .btn,
+    .filter-section,
+    .page-header,
+    .dataTables_filter,
+    .dt-buttons {
+        display: none !important;
+    }
+
+    .table-container {
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    table {
+        font-size: 12px;
+    }
+
+    th {
+        background: #000 !important;
+        color: #fff !important;
+    }
+}
+
+.print-report {
+    font-family: 'Segoe UI', sans-serif;
+    padding: 40px;
+    color: #2b2f32;
+}
+
+.report-header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.report-header h2 {
+    margin: 10px 0 5px;
+    font-weight: 700;
+}
+
+.report-header p {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.logo {
+    height: 60px;
+    margin-bottom: 10px;
+}
+
+.report-meta {
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.report-table thead {
+    background: #4361ee;
+    color: #fff;
+}
+
+.report-table th,
+.report-table td {
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    font-size: 12px;
+}
+
+.report-table tbody tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.report-footer {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+/* Hide everything else when printing */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .print-report, .print-report * {
+        visibility: visible;
+    }
+
+    .print-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+}
+
 </style>
 
 <div class="page-wrapper">
@@ -483,7 +603,12 @@
                     <i class="ti ti-refresh me-1"></i>
                     Refresh
                 </button>
-                <div class="btn-group">
+ 
+                <button class="btn btn-outline-primary" onclick="printPurchaseReportInline()">
+                    <i data-feather="printer" class="feather-14 me-2"></i>Print
+                </button>
+
+                <!-- <div class="btn-group">
                     <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
                         <i class="ti ti-download me-1"></i>
                         Export
@@ -493,9 +618,11 @@
                         <li><a class="dropdown-item" href="#" onclick="exportReport('excel')">Excel</a></li>
                         <li><a class="dropdown-item" href="#" onclick="exportReport('pdf')">PDF</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" onclick="window.print()">Print</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="window.print()"><i data-feather='printer' class='feather-14 me-2'></i>Print</a></li>
                     </ul>
-                </div>
+                </div> -->
+
+
             </div>
         </div>
 
@@ -992,6 +1119,9 @@
     </div>
 </div>
 
+<div id="printReportContainer" style="display:none;"></div>
+
+
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
@@ -1441,21 +1571,22 @@ function refreshReport() {
     window.location.reload();
 }
 
-function exportReport(format) {
-    try {
-        var table = $('#purchaseTable').DataTable();
-        if (format === 'csv') {
-            table.button('.buttons-csv').trigger();
-        } else if (format === 'excel') {
-            table.button('.buttons-excel').trigger();
-        } else if (format === 'pdf') {
-            table.button('.buttons-pdf').trigger();
-        }
-    } catch (e) {
-        console.log('Export error:', e);
-        alert('Unable to export. Please try again.');
-    }
-}
+// function exportReport(format) {
+//     try {
+//         var table = $('#purchaseTable').DataTable();
+//         if (format === 'csv') {
+//             table.button('.buttons-csv').trigger();
+//         } else if (format === 'excel') {
+//             table.button('.buttons-excel').trigger();
+//         } else if (format === 'pdf') {
+//             table.button('.buttons-pdf').trigger();
+//         }
+//     } catch (e) {
+//         console.log('Export error:', e);
+//         alert('Unable to export. Please try again.');
+//     }
+// }
+
 
 function viewPO(poId) {
     if (poId) {
@@ -1468,5 +1599,83 @@ function printPO(poId) {
         window.open(`/purchase-orders/${poId}/print/`, '_blank');
     }
 }
+
+
+function printPurchaseReportInline() {
+    const table = document.getElementById("purchaseTable");
+    const rows = table.querySelectorAll("tbody tr");
+
+    let reportRows = "";
+
+    rows.forEach(row => {
+        const cols = row.querySelectorAll("td");
+
+        // skip empty rows (like "No purchase orders available")
+        if (cols.length < 10) return;
+
+        reportRows += `
+            <tr>
+                <td>${cols[0].innerText}</td> <!-- PO Number -->
+                <td>${cols[1].innerText}</td> <!-- Date -->
+                <td>${cols[2].innerText}</td> <!-- Supplier -->
+                <td>${cols[3].innerText}</td> <!-- Store -->
+                <td class="text-center">${cols[4].innerText}</td> <!-- Items -->
+                <td>${cols[5].innerText}</td> <!-- Total Cost -->
+                <td>${cols[6].innerText}</td> <!-- Status -->
+                <td>${cols[7].innerText}</td> <!-- Payment Status -->
+                <td>${cols[8].innerText}</td> <!-- Expected Date -->
+                <td>${cols[9].innerText}</td> <!-- Delay -->
+                <td>${cols[10].innerText}</td> <!-- Recorded By -->
+            </tr>
+        `;
+    });
+
+    const container = document.getElementById("printReportContainer");
+
+    container.innerHTML = `
+        <div class="print-report">
+
+            <div class="report-header text-center">
+                <img src="/static/logo.png" class="logo">
+                <h2>Purchase Order Report</h2>
+                <p>Generated on ${new Date().toLocaleString()}</p>
+            </div>
+
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>PO Number</th>
+                        <th>Date</th>
+                        <th>Supplier</th>
+                        <th>Store</th>
+                        <th>Items</th>
+                        <th>Total Cost</th>
+                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Expected</th>
+                        <th>Delay</th>
+                        <th>Recorded By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${reportRows}
+                </tbody>
+            </table>
+
+            <div class="report-footer text-center">
+                Confidential • Internal Use Only
+            </div>
+
+        </div>
+    `;
+
+    container.style.display = "block";
+
+    window.print();
+
+    container.style.display = "none";
+}
+
+
 </script>
 {% endblock %}

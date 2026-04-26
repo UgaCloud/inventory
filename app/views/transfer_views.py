@@ -591,7 +591,7 @@ def create_transfer_request(request):
         if data.get('from_store') == data.get('to_store'):
             return JsonResponse({'success': False, 'error': 'Cannot transfer stock to the same store'}, status=400)
         
-        required_fields = ['from_store', 'to_store', 'reason']
+        required_fields = ['from_store', 'to_store']
         for field in required_fields:
             if not data.get(field):
                 return JsonResponse({'success': False, 'error': f'{field} is required'}, status=400)
@@ -733,7 +733,7 @@ def update_transfer_request(request, request_id):
                 'error': 'Cannot transfer stock to the same store'
             }, status=400)
         
-        required_fields = ['from_store', 'to_store', 'reason']
+        required_fields = ['from_store', 'to_store']
         for field in required_fields:
             if not data.get(field):
                 return JsonResponse({

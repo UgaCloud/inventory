@@ -30,6 +30,7 @@ class EmployeeAdmin(admin.ModelAdmin):
 
 # Register all models with a custom admin except Employee
 admin.site.register(Product, get_admin_for_model(Product))
+admin.site.register(Automotive, get_admin_for_model(Automotive))
 admin.site.register(Category, get_admin_for_model(Category))
 admin.site.register(UnitOfMeasure, get_admin_for_model(UnitOfMeasure))
 admin.site.register(ProductUnitPrice, get_admin_for_model(ProductUnitPrice))

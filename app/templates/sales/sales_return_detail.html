@@ -1,0 +1,20 @@
+{% extends 'basic/base.html' %}
+{% block title %}Sales Return Detail{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Sales Return Detail</h2>
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5>Return ID: {{ sales_return.id }}</h5>
+            <p><strong>Sale:</strong> {{ sales_return.sale.receipt_no }}</p>
+            <p><strong>Customer:</strong> {{ sales_return.sale.customer }}</p>
+            <p><strong>Date:</strong> {{ sales_return.created_at|date:'Y-m-d H:i' }}</p>
+            <p><strong>Amount:</strong> {{ sales_return.amount }}</p>
+            <p><strong>Status:</strong> {{ sales_return.status }}</p>
+            <p><strong>Reason:</strong> {{ sales_return.reason }}</p>
+        </div>
+    </div>
+    <a href="{% url 'sales_returns_list' %}" class="btn btn-secondary">Back to Sales Returns</a>
+</div>
+{% endblock %}

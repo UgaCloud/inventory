@@ -60,14 +60,15 @@ def app_menu(request):
             'label': 'Main Menu',
             'icon': 'ti ti-layout-grid fs-16 me-2',
             'children': [
-                {
-                    'label': 'Dashboard',
-                    'children': [
-                        {'label': 'Dashboard', 'url_name': 'index_page'},
-                        # {'label': 'Admin Dashboard 2', 'url_name': 'index_page'},
-                        # {'label': 'Sales Dashboard', 'url_name': 'under_maintenance_page'},
-                    ],
-                }
+                {'label': 'Dashboard', 'url_name': 'index_page'}
+                # {
+                #     'label': 'Dashboard',
+                #     'children': [
+                #         {'label': 'Dashboard', 'url_name': 'index_page'},
+                #         # {'label': 'Admin Dashboard 2', 'url_name': 'index_page'},
+                #         # {'label': 'Sales Dashboard', 'url_name': 'under_maintenance_page'},
+                #     ],
+                # }
             ],
         },
         {
@@ -87,7 +88,7 @@ def app_menu(request):
             'children': [
                 {'label': 'Manage Stock', 'url_name': 'purchase_order_list'},
                 {'label': 'Request Stock', 'url_name': 'transfer_request_list'},
-                {'label': 'Manage Requisitions', 'url_name': 'transfer_request_for_approval'},
+                # {'label': 'Manage Requisitions', 'url_name': 'transfer_request_for_approval'},
                 {'label': 'Stock Transfer', 'url_name': 'stock_transfer_list'},
                 {'label': 'Stock Adjustment', 'url_name': 'stock_adjustment_list'},
                 {'label': 'Supplier', 'url_name': 'supplier_page'},
@@ -99,13 +100,13 @@ def app_menu(request):
             'children': [
                 {'label': 'Record Sale', 'url_name': 'record_sale'},
                 {'label': 'Sales List', 'url_name': 'sales_list'},
-                {'label': 'Sales Return', 'url_name': 'under_maintenance_page'},
-                {'label': 'Quotation', 'url_name': 'under_maintenance_page'},
+                {'label': 'Sales Returns', 'url_name': 'sales_returns_list'},
+                # {'label': 'Quotation', 'url_name': 'under_maintenance_page'},
                 {
                     'label': 'Customer',
                     'children': [
                         {'label': 'Manage Customers', 'url_name': 'customer_list'},
-                        {'label': 'Payments', 'url_name': None},
+                        # {'label': 'Payments', 'url_name': None},
                         {'label': 'Customer Ledgers', 'url_name': 'customer_ledger_list'},
                     ],
                 },
@@ -149,9 +150,11 @@ def app_menu(request):
             'icon': 'ti ti-chart-bar fs-16 me-2',
             'children': [
                 
-                # {'label': 'Report Dashboard', 'url_name': 'reports_dashboard'}, 
+                # {'label': 'Report Dashboard', 'url_name': 'reports_dashboard'},  
                 # {'label': 'Report details', 'url_name': 'reports_details'},
                 {'label': 'Sales Report', 'url_name': 'sales_details'},
+                {'label': 'Balance Report', 'url_name': 'customer_balance_report'},
+                {'label': 'Expenses Report', 'url_name': 'expenses_report'},
                 {'label': 'Purchase Report', 'url_name': 'purchase_details'},
                 {'label': 'Inventory Report', 'url_name': 'inventory_details'},
                 {'label': 'Transfer Report', 'url_name': 'transfer_details'},
