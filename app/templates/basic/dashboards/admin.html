@@ -713,7 +713,7 @@
                 <tbody>
                   {% for sale in recent_sales_transactions %}
                   <tr>
-                    <td>{{ sale.sale_date }}</td>
+                    <td>{{ sale.sale_date|date:"M d, Y" }}</td>
                     <td>
                       <div class="d-flex align-items-center file-name-icon">
                         <a href="javascript:void(0);" class="avatar avatar-md">
@@ -758,7 +758,7 @@
                 <tbody>
                   {% for purchase in recent_purchase_orders %}
                   <tr>
-                    <td>{{ purchase.purchase_date }}</td>
+                    <td>{{ purchase.purchase_date|date:"M d, Y" }}</td>
                     <td>
                       <a href="javascript:void(0);" class="fw-semibold">{{ purchase.supplier}}</a>
                     </td>
@@ -791,7 +791,7 @@
                 <tbody>
                   {% for expense in recent_expenses %}
                   <tr>
-                    <td>{{ expense.date }}</td>
+                    <td>{{ expense.date| date:"M d, Y" }}</td>
                     <td>
                       <h6 class="fw-medium">
                         <a href="javascript:void(0);">{{ expense.description|truncatechars:30 }}</a>

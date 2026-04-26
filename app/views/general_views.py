@@ -94,7 +94,8 @@ def index_view(request):
             'quantity_change': adj.quantity_change,
             'ui_quantity_change': adj.ui_quantity_change,
             'status': adj.status,
-            'created_at': adj.created_at.isoformat(),
+            'created_at': adj.created_at,
+            # 'created_at': adj.created_at.isoformat(),
             'created_by': {
                 'id': adj.created_by.id,
                 'username': adj.created_by.username,
@@ -112,7 +113,8 @@ def index_view(request):
         recent_sales_transactions.append({
             'id': sale.id,
             'receipt_no': sale.receipt_no,
-            'sale_date': sale.sale_date.isoformat(),
+            'sale_date': sale.sale_date,
+            # 'sale_date': sale.sale_date.isoformat(),
             'customer': sale.customer.name if sale.customer else 'Walk-in',
             'customer_id': sale.customer.id if sale.customer else None,
             'status': sale.status,
@@ -128,7 +130,8 @@ def index_view(request):
     for purchase in recent_purchases_qs:
         recent_purchase_orders.append({
             'id': purchase.id,
-            'purchase_date': purchase.purchase_date.isoformat(),
+            'purchase_date': purchase.purchase_date,
+            # 'purchase_date': purchase.purchase_date.isoformat(),
             'supplier': purchase.supplier.name,
             'supplier_id': purchase.supplier.id,
             'status': purchase.status,
@@ -142,7 +145,8 @@ def index_view(request):
     for expense in recent_expenses_qs:
         recent_expenses.append({
             'id': expense.id,
-            'date': expense.date.isoformat(),
+            'date': expense.date,
+            # 'date': expense.date.isoformat(),
             'amount': decimal_to_float(expense.amount),
             'description': expense.description,
             'category': expense.category.name if expense.category else None,
