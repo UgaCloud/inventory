@@ -472,14 +472,14 @@ def get_available_stock_for_product(product_id, store_id):
         ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
         # Calculate committed stock from pending sales (excluding current sale)
-        pending_sales_stock = SalesItem.objects.filter(
-            product_id=product_id,
-            order__store_id=store_id,
-            order__status__in=['PENDING', 'PARTIALLY_PAID'],
-            order__is_cancelled=False  # Exclude cancelled sales
-        ).aggregate(committed=Sum('quantity'))['committed'] or 0
+        # pending_sales_stock = SalesItem.objects.filter(
+        #     product_id=product_id,
+        #     order__store_id=store_id,
+        #     order__status__in=['PENDING', 'PARTIALLY_PAID'],
+        #     order__is_cancelled=False  # Exclude cancelled sales
+        # ).aggregate(committed=Sum('quantity'))['committed'] or 0
         
-        available_stock = max(0, physical_stock - committed_stock - pending_sales_stock)
+        available_stock = max(0, physical_stock - committed_stock)
         
         return available_stock
         
