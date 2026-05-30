@@ -23,6 +23,9 @@ MODULE_CHOICES = [
     (16, 'Accounting'),
 ]
 
+# Module ID for Admin Dashboard access
+ADMIN_DASHBOARD_MODULE_ID = 10
+
 class RoleCreateForm(ModelForm):
     """Form for creating a new role"""
     modules = forms.MultipleChoiceField(
@@ -46,17 +49,33 @@ class RoleCreateForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.current_user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         # Set initial modules if editing
         if self.instance and self.instance.pk:
             module_ids = list(self.instance.modules.values_list('module_id', flat=True))
             self.fields['modules'].initial = [str(mid) for mid in module_ids]
+        # Non-superusers cannot assign the Dashboard module (Admin Dashboard)
+        if self.current_user and not self.current_user.is_superuser:
+            self.fields['modules'].choices = [
+                c for c in MODULE_CHOICES if c[0] != ADMIN_DASHBOARD_MODULE_ID
+            ]
     
     def save(self, commit=True):
         role = super().save(commit=commit)
         if commit:
             # Get selected module IDs
             module_ids = [int(mid) for mid in self.cleaned_data.get('modules', [])]
+            # Non-superusers cannot assign the Dashboard module
+            if self.current_user and not self.current_user.is_superuser:
+                module_ids = [m for m in module_ids if m != ADMIN_DASHBOARD_MODULE_ID]
+                # Preserve existing Dashboard access when editing
+                if self.instance and self.instance.pk:
+                    has_dashboard = self.instance.modules.filter(
+                        module_id=ADMIN_DASHBOARD_MODULE_ID
+                    ).exists()
+                    if has_dashboard and ADMIN_DASHBOARD_MODULE_ID not in module_ids:
+                        module_ids.append(ADMIN_DASHBOARD_MODULE_ID)
             # Set modules for the role
             role.set_modules(module_ids)
         return role

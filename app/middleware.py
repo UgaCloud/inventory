@@ -82,7 +82,7 @@ class InactivityTimeoutMiddleware:
                 # Calculate inactivity duration
                 if last_activity:
                     inactive_duration = now - last_activity
-                    max_inactive_time = timedelta(seconds=getattr(settings, 'SESSION_COOKIE_AGE', 300))
+                    max_inactive_time = timedelta(seconds=getattr(settings, 'SESSION_COOKIE_AGE', 600))
                     
                     # Check if user has been inactive too long
                     if inactive_duration > max_inactive_time:

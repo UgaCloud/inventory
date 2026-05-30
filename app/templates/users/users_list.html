@@ -154,10 +154,16 @@
 								</td>
 								<td>
 									<div class="dropdown">
-										<a href="#" class="action-icon border-0" data-bs-toggle="dropdown">
+										<!-- <a href="#" class="action-icon border-0" data-bs-toggle="dropdown">
 											<i class="ti ti-dots-vertical"></i>
-										</a>
-										<ul class="dropdown-menu dropdown-menu-end">
+										</a> -->
+										<a class="action-icon border-0" href="{% url 'user_detail_page' user.id %}"><i class="ti ti-eye me-2"></i></a>
+										<a class="action-icon border-0" href="{% url 'user_edit_page' user.id %}"><i class="ti ti-edit me-2"></i></a>
+										<a class="action-icon border-0" href="{% url 'user_assign_role_page' user.id %}"><i class="ti ti-shield me-2"></i></a>
+										{% if user != request.user %}
+											<a class="action-icon border-0 text-danger" href="{% url 'user_delete_page' user.id %}"><i class="ti ti-trash me-2"></i></a>
+										{% endif %}
+										<!-- <ul class="dropdown-menu dropdown-menu-end">
 											<li><a class="dropdown-item" href="{% url 'user_detail_page' user.id %}"><i class="ti ti-eye me-2"></i>View</a></li>
 											<li><a class="dropdown-item" href="{% url 'user_edit_page' user.id %}"><i class="ti ti-edit me-2"></i>Edit</a></li>
 											<li><a class="dropdown-item" href="{% url 'user_assign_role_page' user.id %}"><i class="ti ti-shield me-2"></i>Assign Role</a></li>
@@ -165,7 +171,7 @@
 											<li><hr class="dropdown-divider"></li>
 											<li><a class="dropdown-item text-danger" href="{% url 'user_delete_page' user.id %}"><i class="ti ti-trash me-2"></i>Delete</a></li>
 											{% endif %}
-										</ul>
+										</ul> -->
 									</div>
 								</td>
 							</tr>

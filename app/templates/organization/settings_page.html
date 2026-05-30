@@ -1,34 +1,468 @@
 {% extends 'basic/base.html' %}
 {% load static %}
-{% load crispy_forms_tags %}
 
+{% block title %}Organization Settings | Inventory Management{% endblock %}
 
 {% block content %}
-    
-<div class="page-header">
-        <div class="add-item d-flex">
-            <div class="page-title">
-                <h4 class="fw-bold">Organization Settings</h4>
-                <h6>Manage Organization Details</h6>
-            </div>
-        </div>	
+
+<div class="container-fluid px-4">
+    <!-- Page Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+        <div>
+            <h4 class="mb-1 fw-semibold text-dark">Organization Settings</h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'index_page' %}" class="text-muted">Dashboard</a></li>
+                    <li class="breadcrumb-item active text-primary" aria-current="page">Organization Settings</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="mt-2 mt-md-0">
+            <button type="button" class="btn btn-outline-secondary btn-md me-2" id="resetFormBtn">
+                <i class="ti ti-refresh me-1"></i>Reset
+            </button>
+            <button type="submit" form="orgSettingsForm" class="btn btn-primary btn-md">
+                <i class="ti ti-device-floppy me-1"></i>Save Changes
+            </button>
+        </div>
     </div>
 
-    <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-            <div class="search-set">
-                <div class="search-input">
-                    <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <div class="avatar avatar-lg bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                <i class="ti ti-building-store text-primary fs-3"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <h5 class="fw-semibold mb-1">Company Information</h5>
+                            <p class="text-muted small mb-0">Manage your organization's basic details and contact information</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" action="{% url 'update_settings_page' %}" enctype="multipart/form-data" id="orgSettingsForm">
+                        {% csrf_token %}
+                        
+                        <!-- Logo and Basic Info Row -->
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        {% if organization.organization_logo %}
+                                            <img src="{{ organization.organization_logo.url }}" alt="Organization Logo" id="logoPreview" class="rounded-3 border p-2" style="width: 150px; height: 150px; object-fit: contain; background: #f8f9fa;">
+                                        {% else %}
+                                            <div id="logoPreview" class="rounded-3 border bg-light d-flex align-items-center justify-content-center" style="width: 150px; height: 150px; margin: 0 auto;">
+                                                <i class="ti ti-building-store text-muted fs-1"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <label for="id_organization_logo" class="btn btn-outline-primary btn-sm">
+                                        <i class="ti ti-upload me-1"></i>Upload Logo
+                                    </label>
+                                    <input type="file" name="organization_logo" id="id_organization_logo" class="d-none" accept="image/*">
+                                    <p class="text-muted small mt-2">Recommended: 200x200px<br>PNG, JPG up to 2MB</p>
+                                </div>
+                            </div>
+                            <div class="col-md-9">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Organization Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="organization_name" id="id_organization_name" class="form-control" value="{{ organization.organization_name|default:'' }}" placeholder="Enter organization name">
+                                        <div class="invalid-feedback">Organization name is required</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Application Name</label>
+                                        <input type="text" name="app_name" id="id_app_name" class="form-control" value="{{ organization.app_name|default:'Inventory' }}" placeholder="App name">
+                                        <small class="text-muted">Display name for your application</small>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold">Organization Motto / Tagline</label>
+                                        <input type="text" name="organization_motto" id="id_organization_motto" class="form-control" value="{{ organization.organization_motto|default:'' }}" placeholder="Your company slogan or mission">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Contact Information -->
+                        <div class="mb-4">
+                            <h6 class="fw-semibold mb-3 d-flex align-items-center">
+                                <i class="ti ti-phone-call me-2 text-primary"></i>Contact Details
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Mobile Number</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="ti ti-phone"></i></span>
+                                        <input type="tel" name="mobile" id="id_mobile" class="form-control" value="{{ organization.mobile|default:'' }}" placeholder="+256 XXX XXX XXX">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Office Phone 1</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="ti ti-phone-call"></i></span>
+                                        <input type="tel" name="office_phone_number1" id="id_office_phone_number1" class="form-control" value="{{ organization.office_phone_number1|default:'' }}" placeholder="Office line 1">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Office Phone 2</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="ti ti-phone-call"></i></span>
+                                        <input type="tel" name="office_phone_number2" id="id_office_phone_number2" class="form-control" value="{{ organization.office_phone_number2|default:'' }}" placeholder="Office line 2 (optional)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Address Information -->
+                        <div class="mb-4">
+                            <h6 class="fw-semibold mb-3 d-flex align-items-center">
+                                <i class="ti ti-map-pin me-2 text-primary"></i>Address & Location
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Country</label>
+                                    <select name="country" id="id_country" class="form-select">
+                                        <option value="">Select Country</option>
+                                        <option value="Uganda" {% if organization.country == 'Uganda' %}selected{% endif %}>Uganda</option>
+                                        <option value="Kenya" {% if organization.country == 'Kenya' %}selected{% endif %}>Kenya</option>
+                                        <option value="Tanzania" {% if organization.country == 'Tanzania' %}selected{% endif %}>Tanzania</option>
+                                        <option value="Rwanda" {% if organization.country == 'Rwanda' %}selected{% endif %}>Rwanda</option>
+                                        <option value="Burundi" {% if organization.country == 'Burundi' %}selected{% endif %}>Burundi</option>
+                                        <option value="South Sudan" {% if organization.country == 'South Sudan' %}selected{% endif %}>South Sudan</option>
+                                        <option value="DRC" {% if organization.country == 'DRC' %}selected{% endif %}>DR Congo</option>
+                                        <option value="Nigeria" {% if organization.country == 'Nigeria' %}selected{% endif %}>Nigeria</option>
+                                        <option value="Ghana" {% if organization.country == 'Ghana' %}selected{% endif %}>Ghana</option>
+                                        <option value="South Africa" {% if organization.country == 'South Africa' %}selected{% endif %}>South Africa</option>
+                                        <option value="Other" {% if organization.country == 'Other' %}selected{% endif %}>Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">City</label>
+                                    <input type="text" name="city" id="id_city" class="form-control" value="{{ organization.city|default:'Kampala' }}" placeholder="City name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Street Address</label>
+                                    <input type="text" name="address" id="id_address" class="form-control" value="{{ organization.address|default:'' }}" placeholder="Building, street, area">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Postal / ZIP Code</label>
+                                    <input type="text" name="postal" id="id_postal" class="form-control" value="{{ organization.postal|default:'' }}" placeholder="Postal code">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Web & Currency -->
+                        <div class="mb-4">
+                            <h6 class="fw-semibold mb-3 d-flex align-items-center">
+                                <i class="ti ti-world-www me-2 text-primary"></i>Web & Financial Settings
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Website URL</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="ti ti-link"></i></span>
+                                        <input type="url" name="website" id="id_website" class="form-control" value="{{ organization.website|default:'' }}" placeholder="https://yourcompany.com">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Default Currency</label>
+                                    <select name="currency" id="id_currency" class="form-select">
+                                        <option value="UGX" {% if organization.currency == 'UGX' %}selected{% endif %}>UGX - Ugandan Shilling</option>
+                                        <option value="KES" {% if organization.currency == 'KES' %}selected{% endif %}>KES - Kenyan Shilling</option>
+                                        <option value="TZS" {% if organization.currency == 'TZS' %}selected{% endif %}>TZS - Tanzanian Shilling</option>
+                                        <option value="RWF" {% if organization.currency == 'RWF' %}selected{% endif %}>RWF - Rwandan Franc</option>
+                                        <option value="USD" {% if organization.currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
+                                        <option value="EUR" {% if organization.currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+                                        <option value="GBP" {% if organization.currency == 'GBP' %}selected{% endif %}>GBP - British Pound</option>
+                                    </select>
+                                    <small class="text-muted">Currency used for all financial transactions</small>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-white border-top-0 px-4 pb-4">
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-light px-4" onclick="window.location.href='{% url 'index_page' %}'">
+                            <i class="ti ti-x me-1"></i>Cancel
+                        </button>
+                        <button type="submit" form="orgSettingsForm" class="btn btn-primary px-4">
+                            <i class="ti ti-device-floppy me-1"></i>Save Organization Settings
+                        </button>
+                    </div>
                 </div>
             </div>
-            
-        </div>
-        <div class="modal-body">
-            <form method="post" action="{% url 'update_settings_page' %}" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    {{ organization_settings_form| crispy}}
-                    <input type="submit" class="btn btn-danger" value="Submit">
-            </form>
         </div>
     </div>
-{% endblock content%}
+</div>
+
+<style>
+    /* Enhanced styling for settings form */
+    .form-label {
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+        color: #2c3e50;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.1);
+    }
+    
+    .form-control, .form-select {
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        padding: 0.6rem 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control:hover, .form-select:hover {
+        border-color: #cbd5e1;
+    }
+    
+    .input-group-text {
+        border-radius: 0.5rem 0 0 0.5rem;
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .card:hover {
+        box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    .avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .bg-primary-subtle {
+        background-color: rgba(13, 110, 253, 0.1);
+    }
+    
+    hr {
+        opacity: 0.5;
+    }
+    
+    /* Logo preview hover effect */
+    #logoPreview {
+        transition: transform 0.2s ease;
+        cursor: pointer;
+    }
+    
+    #logoPreview:hover {
+        transform: scale(1.02);
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .card-body {
+            padding: 1.5rem !important;
+        }
+        
+        .btn {
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        
+        .d-flex.justify-content-end {
+            flex-direction: column;
+        }
+    }
+    
+    /* Custom file input styling */
+    .btn-outline-primary {
+        border-radius: 2rem;
+        padding: 0.4rem 1.2rem;
+    }
+    
+    /* Success/error message animations */
+    .alert {
+        border-radius: 0.75rem;
+        animation: slideInDown 0.3s ease;
+    }
+    
+    @keyframes slideInDown {
+        from {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+</style>
+
+<script>
+    // Logo preview functionality
+    (function() {
+        const logoInput = document.getElementById('id_organization_logo');
+        const logoPreview = document.getElementById('logoPreview');
+        
+        if (logoInput) {
+            logoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        if (logoPreview) {
+                            if (logoPreview.tagName === 'IMG') {
+                                logoPreview.src = event.target.result;
+                            } else {
+                                // If preview is a div, replace with img
+                                const newImg = document.createElement('img');
+                                newImg.id = 'logoPreview';
+                                newImg.src = event.target.result;
+                                newImg.className = 'rounded-3 border p-2';
+                                newImg.style.width = '150px';
+                                newImg.style.height = '150px';
+                                newImg.style.objectFit = 'contain';
+                                newImg.style.backgroundColor = '#f8f9fa';
+                                logoPreview.parentNode.replaceChild(newImg, logoPreview);
+                            }
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        
+        // Click on preview to trigger file upload
+        if (logoPreview) {
+            logoPreview.addEventListener('click', function() {
+                if (logoInput) logoInput.click();
+            });
+        }
+    })();
+    
+    // Form validation before submit
+    function validateForm() {
+        const orgName = document.getElementById('id_organization_name');
+        if (orgName && !orgName.value.trim()) {
+            showError('Organization name is required');
+            orgName.classList.add('is-invalid');
+            return false;
+        }
+        if (orgName) orgName.classList.remove('is-invalid');
+        return true;
+    }
+    
+    function showError(message) {
+        // Check if error alert already exists
+        let alertDiv = document.querySelector('.alert-danger');
+        if (!alertDiv) {
+            alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = '<strong><i class="ti ti-alert-circle me-1"></i> Error!</strong> ' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            const form = document.getElementById('orgSettingsForm');
+            if (form && form.parentNode) {
+                form.parentNode.insertBefore(alertDiv, form);
+            }
+        } else {
+            alertDiv.innerHTML = '<strong><i class="ti ti-alert-circle me-1"></i> Error!</strong> ' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+        }
+        
+        // Auto hide after 5 seconds
+        setTimeout(function() {
+            const alert = document.querySelector('.alert-danger');
+            if (alert) alert.remove();
+        }, 5000);
+    }
+    
+    function showSuccess(message) {
+        let alertDiv = document.querySelector('.alert-success');
+        if (!alertDiv) {
+            alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+            const form = document.getElementById('orgSettingsForm');
+            if (form && form.parentNode) {
+                form.parentNode.insertBefore(alertDiv, form);
+            }
+        }
+        alertDiv.innerHTML = '<strong><i class="ti ti-check-circle me-1"></i> Success!</strong> ' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+        setTimeout(function() {
+            if (alertDiv) alertDiv.remove();
+        }, 5000);
+    }
+    
+    function resetForm() {
+        if (confirm('Reset all changes? Any unsaved changes will be lost.')) {
+            const form = document.getElementById('orgSettingsForm');
+            if (form) form.reset();
+            // Reset logo preview to original
+            const originalLogoSrc = "{% if organization.organization_logo %}{{ organization.organization_logo.url }}{% endif %}";
+            const logoPreview = document.getElementById('logoPreview');
+            if (logoPreview && logoPreview.tagName === 'IMG' && originalLogoSrc) {
+                logoPreview.src = originalLogoSrc;
+            }
+            showSuccess('Form has been reset');
+        }
+    }
+    
+    // Attach validation to form submit
+    const orgForm = document.getElementById('orgSettingsForm');
+    if (orgForm) {
+        orgForm.addEventListener('submit', function(e) {
+            if (!validateForm()) {
+                e.preventDefault();
+            }
+        });
+    }
+    
+    // Real-time validation for organization name
+    const orgNameField = document.getElementById('id_organization_name');
+    if (orgNameField) {
+        orgNameField.addEventListener('input', function() {
+            if (this.value.trim()) {
+                this.classList.remove('is-invalid');
+            } else {
+                this.classList.add('is-invalid');
+            }
+        });
+    }
+    
+    // Reset button handler
+    const resetBtn = document.getElementById('resetFormBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetForm);
+    }
+    
+    // Initialize default values for empty fields
+    document.addEventListener('DOMContentLoaded', function() {
+        const cityField = document.getElementById('id_city');
+        if (cityField && !cityField.value) {
+            cityField.value = 'Kampala';
+        }
+    });
+</script>
+
+{% if messages %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% for message in messages %}
+            {% if message.tags == 'success' %}
+                showSuccess('{{ message|escapejs }}');
+            {% elif message.tags == 'error' %}
+                showError('{{ message|escapejs }}');
+            {% endif %}
+        {% endfor %}
+    });
+</script>
+{% endif %}
+
+{% endblock content %}

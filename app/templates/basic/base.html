@@ -121,13 +121,17 @@
           <div class="header-left active">
          
             <a href="{% url 'index_page' %}" class="logo logo-normal">
-              <img src="{{organization.logo.url}}" alt="Img" />
+              {% if organization.organization_logo %}
+                <img src="{{ organization.organization_logo.url }}" alt="Img" style="width: 50px; height: 50px;" />
+              {% else %} 
+                <img src="{% static 'assets/img/default_logo.png' %}" alt="Img" style="width: 50px; height: 50px;" />
+              {% endif %}
             </a>
             <a href="{% url 'index_page' %}" class="logo logo-white">
-              <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" />
+              <img src="{% static 'assets/img/logo-white.svg' %}" alt="Img" style="width: 50px; height: 50px;" />
             </a>
             <a href="{% url 'index_page' %}" class="logo-small">
-              <img src="{% static 'assets/img/logo-small.png' %}" alt="Img" />
+              <img src="{% static 'assets/img/logo-small.png' %}" alt="Img" style="width: 50px; height: 50px;" />
             </a>
           </div>
           <!-- /Logo -->
@@ -148,14 +152,14 @@
                 <a href="javascript:void(0);" class="responsive-search">
                   <i class="fa fa-search"></i>
                 </a>
-                <form action="#" class="dropdown">
+                <form action="#" class="dropdown" id="globalSearchForm" autocomplete="off">
                   <div
                     class="searchinputs input-group dropdown-toggle"
                     id="dropdownMenuClickable"
                     data-bs-toggle="dropdown"
                     data-bs-auto-close="outside"
                   >
-                    <input type="text" placeholder="Search" />
+                    <input type="text" placeholder="Search products, customers, suppliers..." id="globalSearchInput" />
                     <div class="search-addon">
                       <span><i class="ti ti-search"></i></span>
                     </div>
@@ -172,70 +176,16 @@
                   <div
                     class="dropdown-menu search-dropdown"
                     aria-labelledby="dropdownMenuClickable"
+                    id="globalSearchResults"
                   >
-                    <div class="search-info">
+                    <div class="search-info" id="searchPlaceholder">
                       <h6>
-                        <span
-                          ><i
-                            data-feather="search"
-                            class="feather-16"
-                          ></i></span
-                        >Recent Searches
+                        <span><i data-feather="search" class="feather-16"></i></span>
+                        Type to search...
                       </h6>
-                      <ul class="search-tags">
-                        <li><a href="javascript:void(0);">Products</a></li>
-                        <li><a href="javascript:void(0);">Sales</a></li>
-                        <li><a href="javascript:void(0);">Applications</a></li>
-                      </ul>
+                      <p class="text-muted">Search across products, customers, suppliers, and automotives</p>
                     </div>
-                    <div class="search-info">
-                      <h6>
-                        <span
-                          ><i
-                            data-feather="help-circle"
-                            class="feather-16"
-                          ></i></span
-                        >Help
-                      </h6>
-                      <p>
-                        How to Change Product Volume from 0 to 200 on Inventory
-                        management
-                      </p>
-                      <p>Change Product Name</p>
-                    </div>
-                    <div class="search-info">
-                      <h6>
-                        <span
-                          ><i data-feather="user" class="feather-16"></i></span
-                        >Customers
-                      </h6>
-                      <ul class="customers">
-                        <li>
-                          <a href="javascript:void(0);"
-                            >Aron Varu<img
-                              src="{% static 'assets/img/profiles/avator1.jpg' %}"
-                              alt="Img"
-                              class="img-fluid"
-                          /></a>
-                        </li>
-                        <li>
-                          <a href="javascript:void(0);"
-                            >Jonita<img
-                              src="{% static 'assets/img/profiles/avatar-01.jpg' %}"
-                              alt="Img"
-                              class="img-fluid"
-                          /></a>
-                        </li>
-                        <li>
-                          <a href="javascript:void(0);"
-                            >Aaron<img
-                              src="{% static 'assets/img/profiles/avatar-10.jpg' %}"
-                              alt="Img"
-                              class="img-fluid"
-                          /></a>
-                        </li>
-                      </ul>
-                    </div>
+                    <div id="searchResultsContainer"></div>
                   </div>
                 </form>
               </div>
@@ -447,49 +397,26 @@
                 href="javascript:void(0);"
                 class="dropdown-toggle nav-link"
                 data-bs-toggle="dropdown"
+                id="notificationBell"
               >
                 <i class="ti ti-bell"></i>
+                <span class="badge rounded-pill bg-danger notification-badge" id="notifBadge" style="display:none;">0</span>
               </a>
               <div class="dropdown-menu notifications">
                 <div class="topnav-dropdown-header">
                   <h5 class="notification-title">Notifications</h5>
-                  <a href="javascript:void(0)" class="clear-noti"
-                    >Mark all as read</a
-                  >
+                  <a href="javascript:void(0)" class="clear-noti" id="markAllReadBtn">Mark all as read</a>
                 </div>
                 <div class="noti-content">
-                  <ul class="notification-list">
-                    <li class="notification-message">
-                      <a href="{% url 'under_maintenance_page' %}">
-                        <div class="media d-flex">
-                          <span class="avatar flex-shrink-0">
-                            <img
-                              alt="Img"
-                              src="{% static 'assets/img/profiles/avatar-13.jpg' %}"
-                            />
-                          </span>
-                          {% comment %} <div class="flex-grow-1">
-                            <p class="noti-details">
-                              <span class="noti-title">James Kirwin</span>
-                              confirmed his order. Order No: #78901.Estimated
-                              delivery: 2 days
-                            </p>
-                            <p class="noti-time">4 mins ago</p>
-                          </div> {% endcomment %}
-                        </div>
-                      </a>
+                  <ul class="notification-list" id="notificationDropdownList">
+                    <li class="notification-message text-center py-3">
+                      <span class="text-muted">Loading...</span>
                     </li>
                   </ul>
                 </div>
-                <div
-                  class="topnav-dropdown-footer d-flex align-items-center gap-3"
-                >
-                  <a href="#" class="btn btn-secondary btn-md w-100">Cancel</a>
-                  <a
-                    href="{% url 'under_maintenance_page' %}"
-                    class="btn btn-primary btn-md w-100"
-                    >View all</a
-                  >
+                <div class="topnav-dropdown-footer d-flex align-items-center gap-3">
+                  <a href="#" class="btn btn-secondary btn-md w-100" data-bs-toggle="dropdown">Cancel</a>
+                  <a href="{% url 'notifications_list' %}" class="btn btn-primary btn-md w-100">View all</a>
                 </div>
               </div>
             </li>
@@ -508,13 +435,13 @@
                 data-bs-toggle="dropdown"
               >
                 <span class="user-info p-0">
-                  <span class="user-letter">
+                  <!-- <span class="user-letter">
                     <img
                       src="{% static 'assets/img/profiles/avator1.jpg' %}"
                       alt="Img"
                       class="img-fluid"
                     />
-                  </span>
+                  </span> -->
                   <span class="user-detail d-none d-lg-flex flex-column text-start ms-2">
                     <span class="user-name fw-semibold text-dark">
                       {{ user.get_full_name|default:user.username }}
@@ -531,12 +458,12 @@
               </a>
               <div class="dropdown-menu menu-drop-user">
                 <div class="profileset d-flex align-items-center">
-                  <span class="user-img me-2">
+                  <!-- <span class="user-img me-2">
                     <img
                       src="{% static 'assets/img/profiles/avator1.jpg' %}"
                       alt="Img"
                     />
-                  </span>
+                  </span> -->
                   <div>
                     <h6 class="fw-medium">{{user.first_name}}</h6>
                     <p>{{user.username}}</p>
@@ -557,11 +484,6 @@
                   class="dropdown-item"
                   href="{% url 'profile_details' %}"
                   ><i class="ti ti-user-circle me-2"></i>MyProfile</a
-                >
-                <a
-                  class="dropdown-item"
-                  href="{% url 'reports_dashboard' %}"
-                  ><i class="ti ti-file-text me-2"></i>Reports</a
                 >
                 <a
                   class="dropdown-item"
@@ -698,6 +620,18 @@
 
           {% endfor %} {% endif %}
           <!-- /Messages -->
+          <!-- Toast for Django messages -->
+          {% if messages %}
+          <script>
+          document.addEventListener('DOMContentLoaded', function(){
+              {% for message in messages %}
+              if(window.showToast){
+                  window.showToast("{{ message|escapejs }}", "{% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}error{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %}");
+              }
+              {% endfor %}
+          });
+          </script>
+          {% endif %}
 
           {% block content %}{% endblock content %}
         </div>
@@ -909,6 +843,152 @@
 </script>
 
 
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
+
+<script>
+// ── HTML escape utility ──
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str || ''));
+    return div.innerHTML;
+}
+function sanitizeUrl(url) {
+    if (!url || typeof url !== 'string') return '#';
+    url = url.trim();
+    if (url.startsWith('/')) return url;
+    return '#';
+}
+
+// ── Global Search System ──
+(function(){
+    var searchInput = document.getElementById('globalSearchInput');
+    var resultsContainer = document.getElementById('searchResultsContainer');
+    var placeholder = document.getElementById('searchPlaceholder');
+    var searchTimer = null;
+
+    if(searchInput){
+        searchInput.addEventListener('input', function(){
+            var query = this.value.trim();
+            if(searchTimer) clearTimeout(searchTimer);
+            if(query.length < 2){
+                if(resultsContainer) resultsContainer.innerHTML = '';
+                if(placeholder) placeholder.style.display = 'block';
+                return;
+            }
+            searchTimer = setTimeout(function(){
+                fetch('/api/global-search/?q=' + encodeURIComponent(query))
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if(placeholder) placeholder.style.display = 'none';
+                    if(!resultsContainer) return;
+                    if(!data.results || data.results.length === 0){
+                        resultsContainer.innerHTML = '<div class="search-info"><p class="text-muted text-center py-2">No results found for "'+escapeHtml(query)+'"</p></div>';
+                        return;
+                    }
+                    var grouped = {};
+                    data.results.forEach(function(r){
+                        if(!grouped[r.category]) grouped[r.category] = [];
+                        grouped[r.category].push(r);
+                    });
+                    var html = '';
+                    for(var cat in grouped){
+                        html += '<div class="search-info"><h6><span><i class="ti '+escapeHtml(grouped[cat][0].icon)+' me-1"></i></span>'+escapeHtml(cat)+'</h6>';
+                        html += '<ul class="search-tags" style="list-style:none;padding:0;">';
+                        grouped[cat].forEach(function(item){
+                            html += '<li style="margin-bottom:6px;"><a href="'+sanitizeUrl(item.url)+'" style="display:block;padding:6px 8px;border-radius:4px;text-decoration:none;color:#333;" onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'transparent\'"><strong>'+escapeHtml(item.title)+'</strong><br><small class="text-muted">'+escapeHtml(item.subtitle)+'</small></a></li>';
+                        });
+                        html += '</ul></div>';
+                    }
+                    resultsContainer.innerHTML = html;
+                }).catch(function(){
+                    if(resultsContainer) resultsContainer.innerHTML = '<div class="search-info"><p class="text-muted text-center py-2">Search error</p></div>';
+                });
+            }, 300);
+        });
+    }
+})();
+
+// ── Toast Notification System ──
+window.showToast = function(message, type, title) {
+    type = type || 'info';
+    title = title || type.charAt(0).toUpperCase() + type.slice(1);
+    var bgMap = {success:'bg-success',error:'bg-danger',warning:'bg-warning text-dark',info:'bg-primary'};
+    var iconMap = {success:'ti-check',error:'ti-x',warning:'ti-alert-triangle',info:'ti-info-circle'};
+    var toastId = 'toast-' + Date.now();
+    var html = '<div id="'+toastId+'" class="toast show align-items-center text-white border-0 '+
+        (bgMap[type]||'bg-primary')+'" role="alert" aria-live="assertive" aria-atomic="true">'+
+        '<div class="d-flex"><div class="toast-body"><i class="ti '+(iconMap[type]||'ti-info-circle')+
+        ' me-2"></i><strong>'+escapeHtml(title)+'</strong>: '+escapeHtml(message)+'</div>'+
+        '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div></div>';
+    var container = document.getElementById('toastContainer');
+    if (container) {
+        container.insertAdjacentHTML('beforeend', html);
+        setTimeout(function(){ var el=document.getElementById(toastId); if(el) el.remove(); }, 5000);
+    }
+};
+
+// ── Notification Bell System ──
+{% if user.is_authenticated %}
+(function(){
+    function loadNotifications(){
+        fetch('{% url "notifications_api" %}')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            var badge = document.getElementById('notifBadge');
+            if(badge){
+                if(data.unread_count > 0){
+                    badge.textContent = data.unread_count;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+            var list = document.getElementById('notificationDropdownList');
+            if(!list) return;
+            if(data.notifications.length === 0){
+                list.innerHTML = '<li class="notification-message text-center py-3"><span class="text-muted">No notifications</span></li>';
+                return;
+            }
+            var html = '';
+            data.notifications.forEach(function(n){
+                var iconClass = {success:'ti-check text-success',error:'ti-x text-danger',warning:'ti-alert-triangle text-warning',info:'ti-info-circle text-info'}[n.type] || 'ti-info-circle text-info';
+                var nLink = n.link ? sanitizeUrl(n.link) : 'javascript:void(0);';
+                html += '<li class="notification-message'+(n.is_read?'':' bg-light')+'">'+
+                    '<a href="'+nLink+'">'+
+                    '<div class="media d-flex"><span class="avatar flex-shrink-0 d-flex align-items-center justify-content-center" style="width:36px;height:36px;"><i class="ti '+escapeHtml(iconClass)+'" style="font-size:18px;"></i></span>'+
+                    '<div class="flex-grow-1 ms-2"><p class="noti-details mb-0"><span class="noti-title fw-semibold">'+escapeHtml(n.title)+'</span> '+escapeHtml(n.message)+'</p>'+
+                    '<p class="noti-time text-muted" style="font-size:11px;">'+escapeHtml(n.created_at)+'</p></div></div></a></li>';
+            });
+            list.innerHTML = html;
+        }).catch(function(){});
+    }
+    // Load on page ready
+    document.addEventListener('DOMContentLoaded', function(){
+        loadNotifications();
+        // Poll every 30 seconds
+        setInterval(loadNotifications, 30000);
+    });
+    // Mark all read
+    var markBtn = document.getElementById('markAllReadBtn');
+    if(markBtn){
+        markBtn.addEventListener('click', function(){
+            fetch('{% url "notification_mark_all_read" %}',{
+                method:'POST',
+                headers:{'X-CSRFToken':'{{ csrf_token }}','X-Requested-With':'XMLHttpRequest'}
+            }).then(function(r){return r.json();}).then(function(data){
+                if(data.success){
+                    var badge = document.getElementById('notifBadge');
+                    if(badge) badge.style.display='none';
+                    loadNotifications();
+                }
+            });
+        });
+    }
+})();
+{% endif %}
+</script>
 
 </body>
 

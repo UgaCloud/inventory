@@ -23,7 +23,7 @@ def get_all_products():
     return Product.objects.select_related('category').all()
 
 def get_product_by_id(product_id):
-    return Product.objects.select_related('category').get(id = product_id)
+    return Product.objects.select_related('category').prefetch_related('compatible_vehicles').get(id=product_id)
 
 #category selectors
 def get_category_by_id(category_id):

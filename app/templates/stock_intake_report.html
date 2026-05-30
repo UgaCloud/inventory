@@ -1,0 +1,221 @@
+{% extends 'basic/base.html' %}
+{% load humanize %}
+
+{% block content %}
+
+
+<style>
+    @media print {
+
+    body {
+        background: white !important;
+    }
+
+    .btn,
+    .filter-section,
+    .page-header,
+    .dataTables_filter,
+    .dt-buttons {
+        display: none !important;
+    }
+
+    .table-container {
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    table {
+        font-size: 12px;
+    }
+
+    th {
+        background: #000 !important;
+        color: #fff !important;
+    }
+}
+
+.print-report {
+    font-family: 'Segoe UI', sans-serif;
+    padding: 40px;
+    color: #2b2f32;
+}
+
+.report-header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.report-header h2 {
+    margin: 10px 0 5px;
+    font-weight: 700;
+}
+
+.report-header p {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.logo {
+    height: 60px;
+    margin-bottom: 10px;
+}
+
+.report-meta {
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.report-table thead {
+    background: #4361ee;
+    color: #fff;
+}
+
+.report-table th,
+.report-table td {
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    font-size: 12px;
+}
+
+.report-table tbody tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.report-footer {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+/* Hide everything else when printing */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .print-report, .print-report * {
+        visibility: visible;
+    }
+
+    .print-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+}
+</style>
+
+
+<div class="page-header">
+    <div class="page-title">
+        <h4 class="fw-bold">Stock Intake Report</h4>
+        <h6>Summary of all stock received via purchase orders</h6>
+    </div>
+</div>
+<div class="d-flex justify-content-end mb-2">
+    <button class="btn btn-outline-primary" onclick="printReportInline()">
+        <i data-feather="printer" class="feather-14 me-2"></i>Print
+    </button>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>PO #</th>
+                        <th>Supplier</th>
+                        <th>Product</th>
+                        <th>Unit</th>
+                        <th>Qty Received</th>
+                        <th>Store</th>
+                        <th>Unit Cost</th>
+                        <th>Actual Stock</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ item.order.purchase_date }}</td>
+                        <td>PO-{{ item.order.id }}</td>
+                        <td>{{ item.order.supplier|default:"-" }}</td>
+                        <td>{{ item.product.name|default:"-" }}</td>
+                        <td>{{ item.unit|default:"-" }}</td>
+                        <td>{{ item.quantity|intcomma }}</td>
+                        <td>{{ item.order.store|default:"-" }}</td>
+                        <td>{{ item.unit_cost|intcomma }}/-</td>
+                        <td class="actual-stock-cell">
+                            {{ item.product.total_stock|intcomma }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="10" class="text-center">No stock intake records found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="printReportContainer" style="display:none;"></div>
+
+<script>
+    function printReportInline() {
+    // Get the existing report section (the card containing the table)
+    const reportSection = document.querySelector(".card");
+
+    if (!reportSection) {
+        alert("Report not found!");
+        return;
+    }
+
+    // Clone the report content
+    const clonedReport = reportSection.cloneNode(true);
+
+    // Create print container
+    const container = document.getElementById("printReportContainer");
+
+    container.innerHTML = `
+        <div class="print-report">
+
+            <div class="report-header text-center">
+                <img src="/static/logo.png" class="logo">
+                <h2>Stock Intake Report</h2>
+                <p>Generated on ${new Date().toLocaleString()}</p>
+            </div>
+
+            <div class="report-content">
+                ${clonedReport.innerHTML}
+            </div>
+
+            <div class="report-footer text-center">
+                Confidential • Internal Use Only
+            </div>
+
+        </div>
+    `;
+
+    // Show container
+    container.style.display = "block";
+
+    // Print
+    window.print();
+
+    // Hide after printing
+    container.style.display = "none";
+}
+</script>
+
+{% endblock %}

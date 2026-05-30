@@ -109,23 +109,31 @@ def manage_product_view(request):
             'category_name': product.category.name if product.category else None,
             'category_id': product.category.id if product.category else None,
             'total_available_stock': item['total_available_stock'],
-            'unit_count': 0,  # You can calculate this if needed
+            'unit_count': 0,
             'total_physical_stock': item['total_physical_stock'],
-            'total_committed_stock': item['total_committed_stock']
+            'total_committed_stock': item['total_committed_stock'],
+            'automotives': [a.id for a in product.compatible_vehicles.all()]
         })
     
+    automotives = Automotive.objects.all()
     context = {
         'form': product_form,
         'products': enhanced_products,  # For edit modals
         'products_json': json.dumps(products_json),  # For client-side pagination
         'categories': categories,
         'brands': brands,
+        'automotives': automotives,
         'selected_category': category_id,
         'selected_brand': brand_filter,
         'search_query': search_query,
         'selected_status': status_filter,
     }
     return render(request, 'products/products.html', context)
+
+
+
+
+
 
 @login_required
 def add_product_view(request):

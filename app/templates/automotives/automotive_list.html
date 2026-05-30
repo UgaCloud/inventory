@@ -1,0 +1,102 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h4 class="fw-bold">Automotive Management</h4>
+        <h6>Manage vehicle records ({{ total_count }} total)</h6>
+    </div>
+    <div class="page-btn">
+        <a href="{% url 'automotive_create' %}" class="btn btn-primary">
+            <i data-feather="plus-circle" class="feather-14 me-1"></i>Add Automotive
+        </a>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <form method="get" class="row g-3 align-items-center">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="ti ti-search"></i></span>
+                    <input type="text" name="search" class="form-control" placeholder="Search by brand, model or engine type..." value="{{ search }}">
+                </div>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <a href="{% url 'automotive_list' %}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Brand</th>
+                        <th>Model</th>
+                        <th>Year From</th>
+                        <th>Year To</th>
+                        <th>Engine Type</th>
+                        <th>Compatible Products</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for auto in automotives %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ auto.brand }}</td>
+                        <td>{{ auto.model }}</td>
+                        <td>{{ auto.year_from }}</td>
+                        <td>{{ auto.year_to|default:"Present" }}</td>
+                        <td>{{ auto.engine_type|default:"-" }}</td>
+                        <td>{{ auto.products.count }}</td>
+                        <td>
+                            <a href="{% url 'automotive_edit' auto.id %}" class="btn btn-sm btn-outline-primary me-1" title="Edit">
+                                <i class="ti ti-edit"></i>
+                            </a>
+                            <a href="{% url 'automotive_delete' auto.id %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="ti ti-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="ti ti-car-off" style="font-size: 32px;"></i>
+                            <p class="mt-2">No automotives found.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <nav class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}">Previous</a></li>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                    <a class="page-link" href="?page={{ num }}&search={{ search }}">{{ num }}</a>
+                </li>
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

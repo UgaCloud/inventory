@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'api',
     'crispy_forms',
     'crispy_bootstrap5',
+    'widget_tweaks',
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap5'
@@ -83,6 +84,7 @@ TEMPLATES = [
                 'app.context_processors.app_menu',
                 'app.context_processors.transfer_notifications',
                 'app.context_processors.stock_transfer_forms',
+                'app.context_processors.notification_context',
             ],
         },
     },

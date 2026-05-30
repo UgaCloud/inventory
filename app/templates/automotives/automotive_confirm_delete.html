@@ -1,0 +1,53 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h4 class="fw-bold">Delete Automotive</h4>
+        <h6>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'automotive_list' %}">Automotives</a></li>
+                    <li class="breadcrumb-item active">Delete</li>
+                </ol>
+            </nav>
+        </h6>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="alert alert-warning">
+            <i class="ti ti-alert-triangle me-2"></i>
+            Are you sure you want to delete the following automotive?
+        </div>
+
+        <table class="table table-bordered mb-4">
+            <tr><th style="width:150px;">Brand</th><td>{{ automotive.brand }}</td></tr>
+            <tr><th>Model</th><td>{{ automotive.model }}</td></tr>
+            <tr><th>Year Range</th><td>{{ automotive.year_from }} - {{ automotive.year_to|default:"Present" }}</td></tr>
+            <tr><th>Engine Type</th><td>{{ automotive.engine_type|default:"-" }}</td></tr>
+            <tr><th>Compatible Products</th><td>{{ automotive.products.count }}</td></tr>
+        </table>
+
+        {% if automotive.products.count > 0 %}
+        <div class="alert alert-info">
+            <i class="ti ti-info-circle me-2"></i>
+            This automotive has {{ automotive.products.count }} compatible product(s). 
+            Deleting it will remove the compatibility link from those products.
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-danger">
+                    <i class="ti ti-trash me-1"></i>Delete
+                </button>
+                <a href="{% url 'automotive_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

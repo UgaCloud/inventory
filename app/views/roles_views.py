@@ -53,7 +53,7 @@ def roles_list_view(request):
 def role_create_view(request):
     """Create a new role"""
     if request.method == 'POST':
-        form = RoleCreateForm(request.POST)
+        form = RoleCreateForm(request.POST, user=request.user)
         if form.is_valid():
             role = form.save()
             messages.success(request, f'Role "{role.name}" has been created successfully.')
@@ -61,7 +61,7 @@ def role_create_view(request):
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
-        form = RoleCreateForm()
+        form = RoleCreateForm(user=request.user)
     
     context = {
         'form': form,
@@ -76,7 +76,7 @@ def role_edit_view(request, role_id):
     role = get_object_or_404(Role, id=role_id)
     
     if request.method == 'POST':
-        form = RoleEditForm(request.POST, instance=role)
+        form = RoleEditForm(request.POST, instance=role, user=request.user)
         if form.is_valid():
             role = form.save()
             messages.success(request, f'Role "{role.name}" has been updated successfully.')
@@ -84,7 +84,7 @@ def role_edit_view(request, role_id):
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
-        form = RoleEditForm(instance=role)
+        form = RoleEditForm(instance=role, user=request.user)
     
     context = {
         'form': form,

@@ -61,7 +61,39 @@
                     </span>
                 </div>
                 
-                <!-- Category Filter with Search -->
+                <!-- Automotive Filter with Search -->
+                <div class="dropdown-search-container" style="max-width: 220px; position: relative;">
+                    <div class="dropdown-search-input" data-filter="automotive" onclick="toggleDropdown(this)">
+                        <span class="dropdown-selected-value" id="selectedAutomotiveText">
+                            All Automotives
+                        </span>
+                        <i class="ti ti-chevron-down dropdown-arrow"></i>
+                    </div>
+                    <div class="dropdown-search-menu" id="automotiveDropdown" style="display: none;">
+                        <div class="dropdown-search-header">
+                            <i class="ti ti-search"></i>
+                            <input type="text" class="dropdown-search-field" placeholder="Search automotive..." onkeyup="filterDropdownOptions(this, 'automotive')">
+                        </div>
+                        <div class="dropdown-search-options">
+                            <div class="dropdown-search-option" data-value="" onclick="selectDropdownOption(this, 'automotive')">
+                                All Automotives
+                            </div>
+                            {% for auto in automotives %}
+                            <div class="dropdown-search-option" data-value="{{ auto.id }}" onclick="selectDropdownOption(this, 'automotive')">
+                                {{ auto.brand }} {{ auto.model }} ({{ auto.year_from }}{% if auto.year_to %}-{{ auto.year_to }}{% else %}-Present{% endif %})
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <select id="automotiveFilter" class="form-select form-select-sm" style="display: none;">
+                        <option value="">All Automotives</option>
+                        {% for auto in automotives %}
+                        <option value="{{ auto.id }}">{{ auto.brand }} {{ auto.model }} ({{ auto.year_from }}{% if auto.year_to %}-{{ auto.year_to }}{% else %}-Present{% endif %})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                
                 <div class="dropdown-search-container" style="max-width: 180px; position: relative;">
                     <div class="dropdown-search-input" data-filter="category" onclick="toggleDropdown(this)">
                         <span class="dropdown-selected-value" id="selectedCategoryText">
@@ -480,37 +512,93 @@ function filterProducts() {
     const category = document.getElementById('categoryFilter').value;
     const brand = document.getElementById('brandFilter').value;
     const status = document.getElementById('statusFilter').value;
-    
+    const automotive = document.getElementById('automotiveFilter')
+        ? document.getElementById('automotiveFilter').value
+        : '';
+
     filteredProducts = allProducts.filter(product => {
+
         // Search filter
-        const matchesSearch = searchTerm === '' || 
+        const matchesSearch =
+            searchTerm === '' ||
             (product.name && product.name.toLowerCase().includes(searchTerm)) ||
             (product.sku && product.sku.toLowerCase().includes(searchTerm)) ||
             (product.brand && product.brand.toLowerCase().includes(searchTerm));
-        
+
         // Category filter
-        const matchesCategory = category === '' || 
-            (product.category_id && product.category_id.toString() === category);
-        
+        const matchesCategory =
+            category === '' ||
+            (
+                product.category_id &&
+                product.category_id.toString() === category
+            );
+
         // Brand filter
-        const matchesBrand = brand === '' || product.brand === brand;
-        
+        const matchesBrand =
+            brand === '' ||
+            product.brand === brand;
+
         // Status filter
-        const matchesStatus = status === '' || 
-            (status === 'active' ? product.is_active : !product.is_active);
-        
-        return matchesSearch && matchesCategory && matchesBrand && matchesStatus;
+        const matchesStatus =
+            status === '' ||
+            (status === 'active'
+                ? product.is_active
+                : !product.is_active);
+
+        // Automotive filter
+        let matchesAutomotive = true;
+
+        if (automotive !== '') {
+
+            // Handles:
+            // [1,2]
+            // ["1","2"]
+            // [{id:1},{id:2}]
+            // "1,2"
+
+            if (Array.isArray(product.automotives)) {
+
+                const automotiveIds = product.automotives.map(item => {
+                    if (typeof item === 'object' && item !== null) {
+                        return String(item.id);
+                    }
+                    return String(item);
+                });
+
+                matchesAutomotive = automotiveIds.includes(String(automotive));
+
+            } else if (typeof product.automotives === 'string') {
+
+                const automotiveIds = product.automotives
+                    .split(',')
+                    .map(id => id.trim());
+
+                matchesAutomotive = automotiveIds.includes(String(automotive));
+
+            } else {
+                matchesAutomotive = false;
+            }
+        }
+
+        return (
+            matchesSearch &&
+            matchesCategory &&
+            matchesBrand &&
+            matchesStatus &&
+            matchesAutomotive
+        );
     });
-    
-    // Reset to first page
+
     currentPage = 1;
-    
-    // Update table
+
     displayCurrentPage();
-    
-    // Update clear filters button visibility
+
     toggleClearFiltersButton();
 }
+
+
+
+
 
 // Display current page of filtered products
 function displayCurrentPage() {
@@ -717,46 +805,69 @@ function handleItemsPerPageChange() {
 
 // Clear all filters
 function clearAllFilters() {
+
     document.getElementById('searchInput').value = '';
-    
-    // Reset searchable dropdowns
+
+    // Reset filters
     document.getElementById('categoryFilter').value = '';
     document.getElementById('brandFilter').value = '';
     document.getElementById('statusFilter').value = '';
-    
-    // Update displayed text
+
+    if (document.getElementById('automotiveFilter')) {
+        document.getElementById('automotiveFilter').value = '';
+    }
+
+    // Reset displayed text
     document.getElementById('selectedCategoryText').textContent = 'All Categories';
     document.getElementById('selectedBrandText').textContent = 'All Brands';
     document.getElementById('selectedStatusText').textContent = 'All Status';
-    
-    // Remove selected attributes from options
-    document.querySelectorAll('#categoryDropdown .dropdown-search-option').forEach(opt => {
-        opt.removeAttribute('data-selected');
+
+    if (document.getElementById('selectedAutomotiveText')) {
+        document.getElementById('selectedAutomotiveText').textContent = 'All Automotives';
+    }
+
+    // Reset selected states
+    [
+        'category',
+        'brand',
+        'status',
+        'automotive'
+    ].forEach(filter => {
+
+        const dropdown = document.getElementById(filter + 'Dropdown');
+
+        if (!dropdown) return;
+
+        dropdown.querySelectorAll('.dropdown-search-option').forEach(opt => {
+            opt.removeAttribute('data-selected');
+        });
+
+        dropdown.querySelector('.dropdown-search-option[data-value=""]')
+            ?.setAttribute('data-selected', 'true');
     });
-    document.querySelector('#categoryDropdown .dropdown-search-option[data-value=""]')?.setAttribute('data-selected', 'true');
-    
-    document.querySelectorAll('#brandDropdown .dropdown-search-option').forEach(opt => {
-        opt.removeAttribute('data-selected');
-    });
-    document.querySelector('#brandDropdown .dropdown-search-option[data-value=""]')?.setAttribute('data-selected', 'true');
-    
-    document.querySelectorAll('#statusDropdown .dropdown-search-option').forEach(opt => {
-        opt.removeAttribute('data-selected');
-    });
-    document.querySelector('#statusDropdown .dropdown-search-option[data-value=""]')?.setAttribute('data-selected', 'true');
-    
+
     filterProducts();
 }
 
+
 // Toggle clear filters button
 function toggleClearFiltersButton() {
+
     const search = document.getElementById('searchInput').value;
     const category = document.getElementById('categoryFilter').value;
     const brand = document.getElementById('brandFilter').value;
     const status = document.getElementById('statusFilter').value;
-    
+
+    const automotive = document.getElementById('automotiveFilter')
+        ? document.getElementById('automotiveFilter').value
+        : '';
+
     const clearBtn = document.getElementById('clearFiltersBtn');
-    clearBtn.style.display = search || category || brand || status ? 'flex' : 'none';
+
+    clearBtn.style.display =
+        (search || category || brand || status || automotive)
+            ? 'flex'
+            : 'none';
 }
 
 // Debounced filter function

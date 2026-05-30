@@ -23,6 +23,12 @@ MENU_MODULE_MAP = {
     'store_page': 2,
     'edit_store_page': 2,
     
+    # Automotive Management - Module 2
+    'automotive_list': 2,
+    'automotive_create': 2,
+    'automotive_edit': 2,
+    'automotive_delete': 2,
+
     # Stock - Module 3
     'purchase_order_list': 3,
     'purchase_order_detail': 3,
@@ -104,8 +110,15 @@ MENU_MODULE_MAP = {
     'user_assign_role_page': 7,
     'user_unassign_role_page': 7,
     
+    # Sales Returns
+    'sales_returns_list': 4,
+    'sales_returns_report': 8,
+    
     # Reports - Module 8
     'branch_sales_report': 8,
+    'expenses_report': 8,
+    'sales_returns_report': 8,
+    'stock_intake_report': 8,
     'branch_comparison_report': 8,
     'sales_item_unit_report': 8,
     'export_branch_sales_csv': 8,

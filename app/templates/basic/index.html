@@ -13,14 +13,8 @@
             {% if dashboard_info %}
               {% for info in dashboard_info %}
                 <li class="nav-item" role="presentation">
-                  <button 
-                    class="nav-link {% if forloop.first %}active{% endif %}" 
-                    id="dashboard-tab-{{ forloop.counter0 }}" 
-                    data-bs-toggle="tab" 
-                    data-bs-target="#dashboard-pane-{{ forloop.counter0 }}" 
-                    type="button" 
-                    role="tab"
-                  >
+                  <button class="nav-link {% if forloop.first %}active{% endif %}" id="dashboard-tab-{{ forloop.counter0 }}" 
+                    data-bs-toggle="tab" data-bs-target="#dashboard-pane-{{ forloop.counter0 }}" type="button" role="tab">
                     {% if 'Admin' in info.name %}
                       <i class="ti ti-shield me-1"></i>{{ info.name }}
                     {% elif 'Sales' in info.name %}
@@ -36,14 +30,8 @@
             {% else %}
               {% for dashboard in dashboard_templates %}
                 <li class="nav-item" role="presentation">
-                  <button 
-                    class="nav-link {% if forloop.first %}active{% endif %}" 
-                    id="dashboard-tab-{{ forloop.counter0 }}" 
-                    data-bs-toggle="tab" 
-                    data-bs-target="#dashboard-pane-{{ forloop.counter0 }}" 
-                    type="button" 
-                    role="tab"
-                  >
+                  <button class="nav-link {% if forloop.first %}active{% endif %}" 
+                    id="dashboard-tab-{{ forloop.counter0 }}" data-bs-toggle="tab" data-bs-target="#dashboard-pane-{{ forloop.counter0 }}" type="button" role="tab">
                     {% if 'admin' in dashboard|lower %}
                       <i class="ti ti-shield me-1"></i>Admin Dashboard
                     {% elif 'sales' in dashboard|lower %}

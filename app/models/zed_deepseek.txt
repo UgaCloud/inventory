@@ -1,0 +1,39 @@
+## User
+
+hello
+
+## Assistant
+
+Hello! How can I assist you with your programming or software development queries today?
+
+
+## User
+
+i am using zed text editor and i am getting these yellow underlinings in my code throwing such warnings. '`from app.constants import *` used; unable to detect undefined names'
+
+## Assistant
+
+The error you are seeing is related to the `pycodestyle` tool that comes with Zed, a text editor for Python programming files (among other things). The warning 'unable to detect undefined names', specifically because it can't find anything in your code. This usually happens when there isn't any import statement at top of file or if you have wrongfully added the missing imported module(s) using from <module_name>, without a proper `import` somewhere else before that line / function call (if needed).
+
+The solution for this error is:
+1. Make sure all your necessary modules are properly defined and being used throughout each file where they're required or if you have circular dependencies then imports need to be sorted correctly in the codebase with 'import ... from ..'. It could look something like `from .modules_a import var, func` as opposed for a simple one-line use.
+2. If there is an unused module defined and that's causing error due to absence of proper file inclusion or circular reference then delete those lines so it won’t throw the warning anymore after updating PyCodeStyle in Zed itself by using `pycodestyle --show All` command which will show all warnings/errors.
+    - If you just want a simple way than simply deleting these unnecessarily written line, please follow step 1 above but remove unnecessary imports and also delete lines where there is no use for variables or functions without proper assignment before usage in the file otherwise this warning can pop up again after adding those modules to your codebase.
+   - This error arises due missing variable / function definition so make sure all required details are declared either at module level, within a class etc and declare them correctly like `var_name: type = None` or even if you want the use of some method inside another file then it should be imported properly in first place.
+   - If there is no need for such warning on whole project/all files which are not written by any one person, this issue could lead to unnoticed bugs and errors too hence deletion won't have effect unless you want the warnings about missing module imports only when certain conditions met like in a multi-developer work.
+3. Also make sure no misspelling or typos are done anywhere else (like 'impt', rather than just using `import`).  It helps Zed to understand what're we trying too do, and it might throw some unexpected errors otherwise while writing code in such editors/IDEs mainly for the sake of preventing "typo" mistakes.
+4. Make sure there is no unused variable or methods inside your files (either used within a function call like `func(var)` but not defined before), as well, because these can cause warnings by Zed itself due to missing imports/definitions for the variables and functions they might be using in other parts of code.
+    - The deletion mentioned above will also fix any undetected name errors you get from that particular line or block since it'll flag all variable references there which are not defined elsewhere, making this warning disappear too without needing to delete corresponding lines manually later on after changes have been made in the project due using 'pycodestyle --show All'.
+    - The `--disable-all` option can be used instead if you want Zed and PyCodeStyle (or pyls) only check files that aren't specifically ignored. It will ignore all warnings by default but it is useful to avoid undetected name errors in those specific pieces of code where the error messages are actually helpful for understanding what might have gone wrong, like `pycodestyle --disable-all my_pythonfile`
+    - If you only want PyCodeStyle and not Zed at all then simply use a one liner option:  `set pyls.styleGuideFile = .editorconfig ; set pyls enableAllSyntaxes false 2> /dev/null & disown ` from terminal, it will disable both of them but the syntax check won't work for you files which are not written by your IDE and only support Zed style guide at a time.
+    - This method is also useful if there were any misspelled module names in past due to typos or mistakes while typing on some code snippets, these will still be detected when using pycodestyle (as long as they are not used anywhere else) and won't cause warning messages even with deletion of those lines.
+    - If the above solutions don’t meet your needs then you may need to use a different python-based IDE that is more suitable for Python development, such VS Code or PyCharm which provide better support in terms of coding style guide and linting errors etc., apart from pycodestyle.
+
+
+## User
+
+alright
+
+## Assistant
+
+Great! If you have any other questions related to Zed Text Editor (ZT) for Python, feel free to ask away

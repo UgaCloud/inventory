@@ -5,7 +5,7 @@ from typing import Iterable, List, Dict, Set
 
 # 1. Map dashboard names to sets of module IDs (future-proof)
 DASHBOARD_MODULE_MAP: Dict[str, Set[int]] = {
-    "Admin Dashboard": {1, 5, 6, 9, 10, 15, 16},  # Main Menu, Staff, Finance, Settings, Dashboard, Role Management, Accounting
+    "Admin Dashboard": {1, 5, 6, 9, 15, 16},  # Main Menu, Staff, Finance, Settings, Dashboard, Role Management, Accounting
     "Sales Dashboard": {4, 7, 11, 13},            # Sales, User Management, Batch Management, Customer Management
     "Stores Dashboard": {2, 3, 12},               # Inventory, Stock, Supplier Management
     # Add new dashboards here as needed

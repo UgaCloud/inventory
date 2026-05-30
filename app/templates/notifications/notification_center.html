@@ -1,0 +1,114 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h4 class="fw-bold">Notification Center</h4>
+        <h6>View and manage all your notifications</h6>
+    </div>
+    <div class="page-btn">
+        <button class="btn btn-outline-primary" id="markAllRead">
+            <i data-feather="check-circle" class="feather-14 me-1"></i>Mark All Read
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if notifications %}
+        <div class="list-group">
+            {% for notification in notifications %}
+            <div class="list-group-item list-group-item-action d-flex align-items-start {% if not notification.is_read %}bg-light{% endif %}" data-notification-id="{{ notification.id }}">
+                <div class="me-3 mt-1">
+                    {% if notification.notification_type == 'success' %}
+                        <span class="badge bg-success rounded-circle p-2"><i class="ti ti-check"></i></span>
+                    {% elif notification.notification_type == 'error' %}
+                        <span class="badge bg-danger rounded-circle p-2"><i class="ti ti-x"></i></span>
+                    {% elif notification.notification_type == 'warning' %}
+                        <span class="badge bg-warning rounded-circle p-2"><i class="ti ti-alert-triangle"></i></span>
+                    {% else %}
+                        <span class="badge bg-info rounded-circle p-2"><i class="ti ti-info-circle"></i></span>
+                    {% endif %}
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-1 {% if not notification.is_read %}fw-bold{% endif %}">{{ notification.title }}</h6>
+                        <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                    </div>
+                    <p class="mb-1 text-muted">{{ notification.message }}</p>
+                    {% if notification.link %}
+                    <a href="{{ notification.link }}" class="btn btn-sm btn-outline-primary mt-1">View Details</a>
+                    {% endif %}
+                </div>
+                {% if not notification.is_read %}
+                <button class="btn btn-sm btn-link text-muted mark-read-btn ms-2" data-id="{{ notification.id }}" title="Mark as read">
+                    <i class="ti ti-check"></i>
+                </button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="ti ti-bell-off" style="font-size: 48px; color: #ccc;"></i>
+            <p class="text-muted mt-3">No notifications yet</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mark single notification as read
+    document.querySelectorAll('.mark-read-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var id = this.getAttribute('data-id');
+            fetch('/notifications/' + id + '/mark-read/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }).then(function(resp) { return resp.json(); })
+              .then(function(data) {
+                if (data.success) {
+                    var item = document.querySelector('[data-notification-id="' + id + '"]');
+                    if (item) {
+                        item.classList.remove('bg-light');
+                        item.querySelector('h6').classList.remove('fw-bold');
+                    }
+                    btn.remove();
+                }
+            });
+        });
+    });
+
+    // Mark all read
+    var markAllBtn = document.getElementById('markAllRead');
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function() {
+            fetch('/notifications/mark-all-read/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }).then(function(resp) { return resp.json(); })
+              .then(function(data) {
+                if (data.success) {
+                    document.querySelectorAll('.list-group-item').forEach(function(item) {
+                        item.classList.remove('bg-light');
+                        var h6 = item.querySelector('h6');
+                        if (h6) h6.classList.remove('fw-bold');
+                    });
+                    document.querySelectorAll('.mark-read-btn').forEach(function(btn) { btn.remove(); });
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

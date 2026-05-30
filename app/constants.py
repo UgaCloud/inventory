@@ -1,11 +1,16 @@
 
 COUNTRIES = (
-        ("UG", "Uganda"),
-        ("KE", "Kenya"),
-        ("TZ", "Tanzania"),
-        ("RD", "Rwanda"),
-        ("BD", "Burundi"),
-        ("SD", "South Sudan")
+        ("Uganda", "Uganda"),
+        ("Kenya", "Kenya"),
+        ("Tanzania", "Tanzania"),
+        ("Rwanda", "Rwanda"),
+        ("Burundi", "Burundi"),
+        ("South Sudan", "South Sudan"),
+        ("DRC", "DR Congo"),
+        ("Nigeria", "Nigeria"),
+        ("Ghana", "Ghana"),
+        ("South Africa", "South Africa"),
+        ("Other", "Other"),
     )
 
 
@@ -82,7 +87,12 @@ TRANSACTION_TYPES = [
 
 CURRENCY_CHOICES = [
     ('UGX', 'Ugandan Shilling'),
-    ('KSH', 'Kenyan Shilling'),
+    ('KES', 'Kenyan Shilling'),
+    ('TZS', 'Tanzanian Shilling'),
+    ('RWF', 'Rwandan Franc'),
+    ('USD', 'US Dollar'),
+    ('EUR', 'Euro'),
+    ('GBP', 'British Pound'),
 ]
 
 SUCCESS_ADD_MESSAGE = "Record Saved!"
