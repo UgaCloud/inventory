@@ -1,0 +1,14 @@
+{% comment %}Record counters of a settings tab. Usage: {% include 'settings/_cards.html' with cards=cards %}{% endcomment %}
+{% if cards %}
+<div class="app-stat-grid mb-4">
+    {% for card in cards %}
+    <a class="app-stat-card" href="{% url card.url_name %}">
+        <span class="app-stat-icon"><i class="{{ card.icon }}"></i></span>
+        <span>
+            <span class="app-stat-value d-block">{{ card.count }}</span>
+            <span class="app-stat-label">{{ card.label }}</span>
+        </span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}

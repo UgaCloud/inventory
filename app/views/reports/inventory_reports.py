@@ -150,10 +150,13 @@ def reports_details(request):
 
 
 @login_required
-def purchase_details(request):
+def purchase_details(request, report_type=None, period=None):
     """
     Purchase Performance Dashboard view.
     Matches: reports/purchase_details.html
+
+    ``report_type`` / ``period`` come from the URL; filters themselves are
+    read from GET params below.
     """
     today = timezone.now().date()
 
@@ -704,11 +707,11 @@ def export_purchase_csv(request):
             year, month = map(int, period.split('-'))
         else:
             year, month = today.year, today.month
-        start_date = date(year, month, 1).date()
+        start_date = date(year, month, 1)
         if month == 12:
-            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
         else:
-            end_date = date(year, month + 1, 1).date() - timedelta(days=1)
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
         period_label = start_date.strftime('%B %Y')
         
     elif report_type == 'quarterly':
@@ -720,11 +723,11 @@ def export_purchase_csv(request):
             year = today.year
             quarter = (today.month - 1) // 3 + 1
         start_month = (quarter - 1) * 3 + 1
-        start_date = date(year, start_month, 1).date()
+        start_date = date(year, start_month, 1)
         if start_month + 2 <= 12:
-            end_date = date(year, start_month + 3, 1).date() - timedelta(days=1)
+            end_date = date(year, start_month + 3, 1) - timedelta(days=1)
         else:
-            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
         period_label = f"Q{quarter} {year}"
         
     else:  # yearly or custom
@@ -732,8 +735,8 @@ def export_purchase_csv(request):
             year = int(period)
         else:
             year = today.year
-        start_date = date(year, 1, 1).date()
-        end_date = date(year, 12, 31).date()
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
         period_label = str(year)
     
     # Write header information
@@ -814,11 +817,11 @@ def export_purchase_csv(request):
         # Get last 6 months including current
         for i in range(6, 0, -1):
             month_date = end_date - timedelta(days=30*i)
-            month_start = date(month_date.year, month_date.month, 1).date()
+            month_start = date(month_date.year, month_date.month, 1)
             if month_start.month == 12:
-                month_end = date(month_start.year + 1, 1, 1).date() - timedelta(days=1)
+                month_end = date(month_start.year + 1, 1, 1) - timedelta(days=1)
             else:
-                month_end = date(month_start.year, month_start.month + 1, 1).date() - timedelta(days=1)
+                month_end = date(month_start.year, month_start.month + 1, 1) - timedelta(days=1)
             
             month_orders = PurchaseOrder.objects.filter(
                 purchase_date__range=[month_start, month_end]
@@ -1011,6 +1014,15 @@ def export_purchase_csv(request):
             f"{category['avg_item_cost']:,.0f}",
             'Stable'  # Simplified trend
         ])
+    
+    # Every export leaves the building: record who took the data out.
+    from app.services.audit_service import log_event
+    log_event(
+        'export',
+        category='data',
+        description=f'Exported the purchase report ({period or "current period"})',
+        request=request,
+    )
     
     return response
 
@@ -1649,11 +1661,11 @@ def export_purchase_excel(request):
             year, month = map(int, period.split('-'))
         else:
             year, month = today.year, today.month
-        start_date = date(year, month, 1).date()
+        start_date = date(year, month, 1)
         if month == 12:
-            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
         else:
-            end_date = date(year, month + 1, 1).date() - timedelta(days=1)
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
         period_label = start_date.strftime('%B %Y')
         
     elif report_type == 'quarterly':
@@ -1665,11 +1677,11 @@ def export_purchase_excel(request):
             year = today.year
             quarter = (today.month - 1) // 3 + 1
         start_month = (quarter - 1) * 3 + 1
-        start_date = date(year, start_month, 1).date()
+        start_date = date(year, start_month, 1)
         if start_month + 2 <= 12:
-            end_date = date(year, start_month + 3, 1).date() - timedelta(days=1)
+            end_date = date(year, start_month + 3, 1) - timedelta(days=1)
         else:
-            end_date = date(year + 1, 1, 1).date() - timedelta(days=1)
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
         period_label = f"Q{quarter} {year}"
         
     else:  # yearly or custom
@@ -1677,8 +1689,8 @@ def export_purchase_excel(request):
             year = int(period)
         else:
             year = today.year
-        start_date = date(year, 1, 1).date()
-        end_date = date(year, 12, 31).date()
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
         period_label = str(year)
     
     # Create Excel workbook
@@ -2588,6 +2600,15 @@ def export_sales_csv(request):
             transaction.status,
             transaction.receipt_no or 'N/A'
         ])
+    
+    # Every export leaves the building: record who took the data out.
+    from app.services.audit_service import log_event
+    log_event(
+        'export',
+        category='data',
+        description=f'Exported the sales report ({period or "current period"})',
+        request=request,
+    )
     
     return response
 
@@ -5867,12 +5888,14 @@ def export_stockadj_pdf(request):
         reason_data = [['Reason', 'Count', 'Quantity', 'Value Impact', '% of Total']]
         
         for reason in reason_summary:
-            percent = (abs(reason['total_value']) / abs(total_value) * 100) if total_value != 0 else 0
+            reason_value = reason['total_value'] or 0
+            reason_qty = reason['total_qty'] or 0
+            percent = (abs(reason_value) / abs(total_value) * 100) if total_value != 0 else 0
             reason_data.append([
                 reason['reason'][:25] + '...' if len(reason['reason']) > 25 else reason['reason'],
                 str(reason['count']),
-                f"{reason['total_qty']:+,}",
-                f"UGX {reason['total_value']:+,.0f}",
+                f"{reason_qty:+,}",
+                f"UGX {reason_value:+,.0f}",
                 f"{percent:.1f}%"
             ])
         

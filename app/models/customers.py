@@ -1,6 +1,14 @@
 from django.db import models
+from app.managers import TenantManager
 
 class Customer(models.Model):
+
+    objects = TenantManager()
+
+    business = models.ForeignKey(
+        "app.Business", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="customers",
+    )
     name = models.CharField(max_length=255, unique=True)
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=30, blank=True, null=True)
@@ -20,6 +28,9 @@ class Customer(models.Model):
         return self.name
 
 class CustomerLedger(models.Model):
+
+    objects = TenantManager()
+
     TRANSACTION_TYPES = [
         ('SALE', 'Sale'),
         ('PAYMENT', 'Payment'),
@@ -43,6 +54,9 @@ class CustomerLedger(models.Model):
         return f"{self.customer.name} | {self.date.date()} | {self.transaction_type} | Debit: {self.debit} | Credit: {self.credit}"
 
 class Payment(models.Model):
+
+    objects = TenantManager()
+
     customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateTimeField(auto_now_add=True)
@@ -59,6 +73,9 @@ class Payment(models.Model):
         return f"{self.customer.name} | {self.amount} | {self.payment_date.date()}"
 
 class PaymentAllocation(models.Model):
+
+    objects = TenantManager()
+
     payment = models.ForeignKey('Payment', on_delete=models.CASCADE, related_name='allocations')
     sale = models.ForeignKey('app.Sales', on_delete=models.CASCADE, related_name='payment_allocations')
     amount = models.DecimalField(max_digits=12, decimal_places=2)

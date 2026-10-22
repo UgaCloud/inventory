@@ -1,0 +1,74 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Purchase Orders | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Purchase Orders</h4>
+            <h6>Create a purchase order</h6>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">New Purchase Order</h5></div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <div class="mb-3">
+                                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                            </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="ti ti-device-floppy me-1"></i>Save
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">All Purchase Orders</h5></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Supplier</th>
+                                    <th>Store</th>
+                                    <th>Purchase Date</th>
+                                    <th>Status</th>
+                                    <th>Total Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr>
+                                    <td><a href="{% url 'purchase_order_detail' order.id %}">#{{ order.id }}</a></td>
+                                    <td>{{ order.supplier }}</td>
+                                    <td>{{ order.store }}</td>
+                                    <td>{{ order.purchase_date }}</td>
+                                    <td>{{ order.status }}</td>
+                                    <td>{{ order.total_cost }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="6" class="text-center text-muted py-3">No purchase orders yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

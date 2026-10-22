@@ -1,3 +1,14 @@
+from .views.platform_views import (
+    platform_dashboard,
+    platform_business_list,
+    platform_business_create,
+    platform_business_detail,
+    platform_business_set_status,
+    platform_provision_admin,
+)
+from .views.audit_views import (
+    audit_log_view, audit_log_detail, audit_log_export, audit_log_purge,
+)
 from app.views.reports.customer_report_views import customer_balance_report
     
 from django.contrib import admin
@@ -19,6 +30,7 @@ from .views.transfer_views import *
 from .views.transfers import *
 from .views.sales_views import *
 from .views.sales_returns_views import sales_returns_list_view, sales_return_detail_view
+from .views.perfume_views import record_perfume_sale_view, perfume_stock_info
     
 from .views.human_resource_views import *
 from app.views.product_autocomplete import product_autocomplete
@@ -44,11 +56,13 @@ from .views.user_views import *
 from .views.employee_role_views import employee_manage_roles_view
 from app.views.dashboard_api import order_stats_api, recent_sales_api
 from app.views import profile_views
+from app.views.settings_views import settings_home, settings_tab
 
 
 urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     path('', index_view, name = 'index_page'),
+    path('landing/', landing_view, name = 'landing_page'),
     path('login/', login_view, name = 'login_page'),
     path('reset-password/', reset_password_view, name='reset_password'),
     path('sign_up/', sign_up_view, name = 'sign_up_page'),
@@ -80,7 +94,10 @@ urlpatterns = [
     path('branches/', manage_branches, name = 'manage_branch_page'),
     path('edit_branch/<int:branch_id>/', edit_branch, name = 'edit_branch_page'),
     path('delete_branch/<int:branch_id>/', delete_branch, name = 'delete_branch_page'),
-    path('settings/', settings_page,name="settings_page"),
+    # Settings workspace (one page, ten tabs)
+    path('settings/', settings_home, name="settings_page"),
+    path('settings/company/', company_settings_page, name="company_settings_page"),
+    path('settings/tab/<slug:slug>/', settings_tab, name="settings_tab"),
     path('update_settings/', update_organization_settings, name="update_settings_page"),
 
     # Product
@@ -191,6 +208,8 @@ urlpatterns = [
     path('sales/<int:pk>/detail/', sales_detail_view, name='sales_detail'),
     path('sales/<int:pk>/delete/', sales_delete_view, name='sales_delete_view'),
     path('sales/record_sale/', record_sales_view, name='record_sale'),  
+    path('sales/record_perfume_sale/', record_perfume_sale_view, name='record_perfume_sale'),
+    path('api/perfume-stock-info/', perfume_stock_info, name='perfume_stock_info'),
     path('product-autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('product_autocomplete/', product_autocomplete, name='product_autocomplete'),
     path('sales/<int:pk>/cancel/', cancel_sale_view, name='cancel_sale'),
@@ -285,8 +304,6 @@ urlpatterns = [
     path('api/products/category/<int:category_id>/', products_by_category_api, name='products_by_category_api'),
     path('api/products/suggestions/', product_suggestions_api, name='product_suggestions_api'),
 
-
-
     
     # Sales Report URLs
     path('reports/branch-sales/', sales_report_views.branch_sales_report, name='branch_sales_report'),
@@ -377,6 +394,18 @@ urlpatterns = [
     path('employees/<int:employee_id>/manage-roles/', employee_manage_roles_view, name='employee_manage_roles_page'),
     path('dashboard/order-stats/', order_stats_api, name='order_stats_api'),
     path('dashboard/recent-sales/', recent_sales_api, name='recent_sales_api'),
+
+    # Platform Super Administrator area (multi-tenancy)
+    path('platform/', platform_dashboard, name='platform_dashboard'),
+    path('platform/businesses/', platform_business_list, name='platform_business_list'),
+    path('platform/businesses/create/', platform_business_create, name='platform_business_create'),
+    path('platform/businesses/<int:business_id>/', platform_business_detail, name='platform_business_detail'),
+    path('platform/businesses/<int:business_id>/status/', platform_business_set_status, name='platform_business_set_status'),
+    path('platform/businesses/<int:business_id>/provision-admin/', platform_provision_admin, name='platform_provision_admin'),
+    path('audit/', audit_log_view, name='audit_log_page'),
+    path('audit/export/', audit_log_export, name='audit_log_export'),
+    path('audit/purge/', audit_log_purge, name='audit_log_purge'),
+    path('audit/<int:pk>/', audit_log_detail, name='audit_log_detail'),
 ]
 
 if settings.DEBUG:

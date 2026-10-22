@@ -60,8 +60,32 @@ class RoleCreateForm(ModelForm):
             self.fields['modules'].choices = [
                 c for c in MODULE_CHOICES if c[0] != ADMIN_DASHBOARD_MODULE_ID
             ]
+
+        # The role belongs to the business of the person creating it, so the
+        # per-business name uniqueness is validated against the right tenant.
+        if self.current_user and not self.is_platform_admin:
+            from app.models.tenancy import current_business
+            business = current_business(self.current_user)
+            if business is not None and not self.instance.business_id:
+                self.instance.business = business
+
+        # A business administrator must never be able to mint a superuser
+        # role (it would escalate every employee holding it).
+        if not self.is_platform_admin:
+            self.fields['is_superuser'].disabled = True
+            self.fields['is_superuser'].help_text = (
+                'Only a platform administrator can grant superuser access.'
+            )
+
+    @property
+    def is_platform_admin(self):
+        from app.models.tenancy import user_is_platform_admin
+        return user_is_platform_admin(self.current_user)
     
     def save(self, commit=True):
+        if not self.is_platform_admin:
+            # Never let a business administrator escalate a role.
+            self.instance.is_superuser = False
         role = super().save(commit=commit)
         if commit:
             # Get selected module IDs

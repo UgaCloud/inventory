@@ -1,0 +1,144 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}{{ business.name }} | Platform Administration{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>{{ business.name }}</h4>
+            <h6>
+                Registered {{ business.created_at|date:'Y-m-d' }} ·
+                {% if business.is_active %}
+                    <span class="badge bg-success">Active</span>
+                {% else %}
+                    <span class="badge bg-danger">Suspended</span>
+                {% endif %}
+            </h6>
+        </div>
+        <div class="page-btn">
+            {% if business.is_active %}
+                <form method="post" action="{% url 'platform_business_set_status' business.pk %}"
+                      class="d-inline" onsubmit="return confirm('Suspend {{ business.name }}? Its users will lose access.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="suspend">
+                    <button type="submit" class="btn btn-warning me-2">
+                        <i class="ti ti-ban me-1"></i>Suspend
+                    </button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'platform_business_set_status' business.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="activate">
+                    <button type="submit" class="btn btn-success me-2">
+                        <i class="ti ti-circle-check me-1"></i>Activate
+                    </button>
+                </form>
+            {% endif %}
+            <a href="{% url 'platform_business_list' %}" class="btn btn-secondary">Back to list</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">Users</h5></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr><th>Username</th><th>Email</th><th>Roles</th><th>Active</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for u in business_users %}
+                                <tr>
+                                    <td>{{ u.username }}</td>
+                                    <td>{{ u.email|default:'—' }}</td>
+                                    <td>
+                                        {% for role in u.profile.roles.all %}
+                                            <span class="badge bg-light text-dark border me-1">{{ role.name }}</span>
+                                        {% empty %}—{% endfor %}
+                                    </td>
+                                    <td>
+                                        {% if u.is_active %}
+                                            <span class="badge bg-success">Yes</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted py-3">No users in this business yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 rounded-3 mt-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">Roles</h5></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr><th>Role</th><th>Users</th><th>System</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for role in roles %}
+                                <tr>
+                                    <td>{{ role.name }}</td>
+                                    <td>{{ role.user_count }}</td>
+                                    <td>{% if role.is_system_role %}<span class="badge bg-info">Yes</span>{% else %}—{% endif %}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center text-muted py-3">No roles yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">Business details</h5></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Slug</dt><dd class="col-sm-8"><code>{{ business.slug }}</code></dd>
+                        <dt class="col-sm-4">Contact</dt><dd class="col-sm-8">{{ business.contact_email|default:'—' }}</dd>
+                        <dt class="col-sm-4">Phone</dt><dd class="col-sm-8">{{ business.contact_phone|default:'—' }}</dd>
+                        <dt class="col-sm-4">Created by</dt><dd class="col-sm-8">{{ business.created_by|default:'—' }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 rounded-3 mt-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">Provision another administrator</h5></div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'platform_provision_admin' business.pk %}" novalidate>
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label" for="pa_username">Username *</label>
+                            <input type="text" name="admin_username" id="pa_username" class="form-control" required autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="pa_email">Email</label>
+                            <input type="email" name="admin_email" id="pa_email" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="pa_password">Password * (min 8 chars)</label>
+                            <input type="password" name="admin_password" id="pa_password" class="form-control" required autocomplete="new-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="ti ti-user-plus me-1"></i>Provision Administrator
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

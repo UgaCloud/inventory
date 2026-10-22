@@ -1,0 +1,66 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Register Business | Platform Administration{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Register Business</h4>
+            <h6>Create a business and its initial administrator</h6>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <h6 class="mb-3">Business</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="name">Business name *</label>
+                        <input type="text" name="name" id="name" class="form-control"
+                               value="{{ form_values.name }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="contact_email">Contact email</label>
+                        <input type="email" name="contact_email" id="contact_email" class="form-control"
+                               value="{{ form_values.contact_email }}">
+                    </div>
+                </div>
+
+                <h6 class="mb-3 mt-2">Initial Business Administrator</h6>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="admin_username">Username *</label>
+                        <input type="text" name="admin_username" id="admin_username" class="form-control"
+                               value="{{ form_values.admin_username }}" required autocomplete="off">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="admin_email">Email</label>
+                        <input type="email" name="admin_email" id="admin_email" class="form-control"
+                               value="{{ form_values.admin_email }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="admin_password">Password * (min 8 chars)</label>
+                        <input type="password" name="admin_password" id="admin_password"
+                               class="form-control" required autocomplete="new-password">
+                    </div>
+                </div>
+
+                <p class="text-muted small">
+                    The administrator receives the “Business Administrator” role with access to every
+                    business module, scoped to this business only.
+                </p>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="ti ti-building me-1"></i>Register Business
+                </button>
+                <a href="{% url 'platform_business_list' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

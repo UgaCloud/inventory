@@ -1,0 +1,61 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Transfer Request #{{ request.id }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        .meta { margin-bottom: 16px; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        th, td { border: 1px solid #999; padding: 6px 8px; font-size: 13px; text-align: left; }
+        th { background: #f0f0f0; }
+        .totals { font-weight: bold; }
+        .no-print { margin-bottom: 16px; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">Print</button>
+    </div>
+
+    <h1>Stock Transfer Request #{{ request.id }}</h1>
+    <div class="meta">
+        <div>From: {{ request.from_store }} &nbsp;|&nbsp; To: {{ request.to_store }}</div>
+        <div>Date: {{ request.request_date|date:'Y-m-d' }} &nbsp;|&nbsp; Status: {{ request.get_status_display|default:request.status }}</div>
+        <div>Requested by: {{ request.requested_by|default:'-' }}</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>Requested Qty</th>
+                <th>Unit</th>
+                <th>Base Qty</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.units|default:'-' }}</td>
+                <td>{{ item.base_quantity }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">No items on this request.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        Total base units: {{ total_base_units }}<br>
+        Estimated value: {{ total_estimated_value }}
+    </div>
+</body>
+</html>

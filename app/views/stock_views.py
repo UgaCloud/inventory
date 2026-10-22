@@ -388,8 +388,7 @@ def create_transfer_from_request(request, request_id):
                     quantity=request_item.base_quantity,  # Store as base quantity
                     units=request_item.units,
                     original_quantity=request_item.quantity,  # Store original for display
-                    base_quantity=request_item.base_quantity,  # Explicitly store base quantity
-                    transfer_request_item=request_item
+                    base_quantity=request_item.base_quantity  # Explicitly store base quantity
                 )
             
             transfer_request.status = 'fulfilled'
@@ -454,8 +453,7 @@ def create_bulk_transfers(request):
                             quantity=request_item.base_quantity,  # Store as base quantity
                             units=request_item.units,
                             original_quantity=request_item.quantity,  # Store original for display
-                            base_quantity=request_item.base_quantity,  # Explicitly store base quantity
-                            transfer_request_item=request_item
+                            base_quantity=request_item.base_quantity  # Explicitly store base quantity
                         )
                     
                     transfer_request.status = 'fulfilled'
@@ -822,7 +820,7 @@ def update_transfer_request(request, request_id):
 def pending_transfer_requests_for_approval(request):
     """Show pending transfer requests for approval"""
     pending_requests = TransferRequest.objects.filter(status='pending').order_by('-request_date')
-    return render(request, 'stock/pending_transfer_requests.html', {'pending_requests': pending_requests})
+    return render(request, 'transfers/pending_transfer_requests.html', {'pending_requests': pending_requests})
 
 # Purchase Order Functions
 @login_required
@@ -850,7 +848,7 @@ def purchase_order_list(request):
 def purchase_order_detail(request, order_id):
     """View purchase order details"""
     order = get_order_by_id(order_id)
-    return render(request, 'purchase_order_detail.html', {'order': order})
+    return render(request, 'stock/purchase_order_detail.html', {'order': order})
 
 @login_required
 def create_purchase_order(request):
@@ -1198,7 +1196,7 @@ def edit_purchase_order_item(request, item_id):
             return redirect('purchase_order_item_list', order_id=order.id)
     else:
         form = PurchaseOrderItemForm(instance=item)
-    return render(request, 'purchase_order_item_form.html', {'form': form, 'order': order, 'item': item})
+    return render(request, 'stock/purchase_order_item_form.html', {'form': form, 'order': order, 'item': item})
 
 
 @login_required
@@ -1210,7 +1208,7 @@ def delete_purchase_order_item(request, item_id):
         item.delete()
         messages.success(request, 'Purchase order item deleted successfully.')
         return redirect('purchase_order_item_list', order_id=order.id)
-    return render(request, 'purchase_order_item_confirm_delete.html', {'item': item, 'order': order})
+    return render(request, 'stock/purchase_order_item_confirm_delete.html', {'item': item, 'order': order})
 
 # Stock Adjustment Functions
 @login_required

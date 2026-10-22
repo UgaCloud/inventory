@@ -109,9 +109,7 @@
           <p class="text-white mb-1">Total Sales</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
             <h4 class="text-white">UGX {{ total_sales|intcomma }}</h4>
-            <span class="badge badge-soft-primary"
-              ><i class="ti ti-arrow-up me-1"></i>+22%</span
-            >
+            {% include "includes/app_change_badge.html" with change=sales_change_pct tone="primary" %}
           </div>
         </div>
       </div>
@@ -127,9 +125,7 @@
           <p class="text-white mb-1">Total Purchases</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
             <h4 class="text-white">UGX {{ total_purchases|intcomma }}</h4>
-            <span class="badge badge-soft-danger"
-              ><i class="ti ti-arrow-down me-1"></i>-22%</span
-            >
+            {% include "includes/app_change_badge.html" with change=purchases_change_pct tone="danger" %}
           </div>
         </div>
       </div>
@@ -145,9 +141,7 @@
           <p class="text-white mb-1">Total Expenses</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
             <h4 class="text-white">UGX {{ total_expenses|intcomma }}</h4>
-            <span class="badge badge-soft-success"
-              ><i class="ti ti-arrow-up me-1"></i>+22%</span
-            >
+            {% include "includes/app_change_badge.html" with change=expenses_change_pct tone="success" %}
           </div>
         </div>
       </div>
@@ -163,9 +157,7 @@
           <p class="text-white mb-1">Net Profit</p>
           <div class="d-inline-flex align-items-center flex-wrap gap-2">
             <h4 class="text-white">UGX {{ net_profit|intcomma}}</h4>
-            <span class="badge badge-soft-success"
-              ><i class="ti ti-arrow-up me-1"></i>+22%</span
-            >
+            {% include "includes/app_change_badge.html" with change=net_profit_change_pct tone="success" %}
           </div>
         </div>
       </div>
@@ -191,7 +183,7 @@
         </div>
         <div class="d-flex align-items-center justify-content-between">
           <p class="mb-0">
-            <span class="fs-13 fw-bold text-success">+35%</span> vs Last Month
+            {% include "includes/app_change_badge.html" with change=net_profit_change_pct %}
           </p>
           <a href="#" class="text-decoration-underline fs-13 fw-medium"
             >View All</a
@@ -210,7 +202,7 @@
           class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom"
         >
           <div>
-            <h4 class="mb-1">UGX 0</h4>
+            <h4 class="mb-1">UGX {{ total_outstanding_balances|intcomma }}</h4>
             <p>Invoice Due</p>
           </div>
           <span class="revenue-icon bg-teal-transparent text-teal">
@@ -219,9 +211,12 @@
         </div>
         <div class="d-flex align-items-center justify-content-between">
           <p class="mb-0">
-            <span class="fs-13 fw-bold text-success">+35%</span> vs Last Month
+            <span class="fs-13 fw-bold text-warning"
+              >{{ customers_with_balance|default:0 }} customer{{ customers_with_balance|pluralize }}
+            </span>
+            still owe money
           </p>
-          <a href="#" class="text-decoration-underline fs-13 fw-medium"
+          <a href="{% url 'customer_list' %}" class="text-decoration-underline fs-13 fw-medium"
             >View All</a
           >
         </div>
@@ -247,7 +242,7 @@
         </div>
         <div class="d-flex align-items-center justify-content-between">
           <p class="mb-0">
-            <span class="fs-13 fw-bold text-success">+41%</span> vs Last Month
+            {% include "includes/app_change_badge.html" with change=expenses_change_pct %}
           </p>
           <a href="#" class="text-decoration-underline fs-13 fw-medium"
             >View All</a
@@ -266,7 +261,7 @@
           class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom"
         >
           <div>
-            <h4 class="mb-1">0</h4>
+            <h4 class="mb-1">UGX {{ returns_total|intcomma }}</h4>
             <p>Total Payment Returns</p>
           </div>
           <span class="revenue-icon bg-indigo-transparent text-indigo">
@@ -275,7 +270,8 @@
         </div>
         <div class="d-flex align-items-center justify-content-between">
           <p class="mb-0">
-            <span class="fs-13 fw-bold text-danger">-20%</span> vs Last Month
+            <span class="fs-13 fw-bold text-default">All time</span>
+            sales returns recorded
           </p>
           <a href="#" class="text-decoration-underline fs-13 fw-medium"
             >View All</a
@@ -530,10 +526,10 @@
             </a>
             <div class="ms-2">
               <h6 class="fw-bold mb-1">
-                <a href="javascript:void(0);">{{product.product.name}}</a>
+                <a href="javascript:void(0);">{{product.name}}</a>
               </h6>
-              <p class="fs-13">ID : #{{product.product.sku}}</p>
-              <p class="fs-13 text-muted">{{product.store.name}}</p>
+              <p class="fs-13">SKU : {{product.sku|default:"-"}}</p>
+              <p class="fs-13 text-muted">{{product.store}}</p>
             </div>
           </div>
           <div class="text-end">
@@ -583,7 +579,49 @@
         </div>
       </div>
       <div class="card-body">
-        <div id="recent-sales-list"></div>
+        {% comment %}
+          Rendered on the server: the panel used to be an empty <div> that
+          nothing ever filled, so "Recent Sales" always looked empty.
+        {% endcomment %}
+        <div id="recent-sales-list">
+          {% for sale in recent_sales|slice:":5" %}
+          <div class="d-flex align-items-center justify-content-between border-bottom py-3{% if not forloop.last %} mb-1{% endif %}">
+            <div class="d-flex align-items-center">
+              <div class="avatar avatar-sm me-2">
+                <span class="avatar-title bg-primary text-white">
+                  {{ sale.customer|slice:":1"|upper|default:"G" }}
+                </span>
+              </div>
+              <div>
+                <h6 class="fw-medium mb-1">
+                  <a href="{% url 'sales_detail' sale.id %}">{{ sale.customer|default:"Walk-in" }}</a>
+                </h6>
+                <p class="fs-13 text-muted mb-0">
+                  #{{ sale.receipt_no }} &middot; {{ sale.sale_date|date:"M d, Y" }}
+                </p>
+              </div>
+            </div>
+            <div class="text-end">
+              <p class="fs-14 fw-bold mb-1 text-gray-9">UGX {{ sale.total_amount|intcomma }}</p>
+              {% if sale.balance > 0 %}
+                <span class="badge bg-warning">Partial</span>
+              {% elif sale.balance == 0 and sale.amount_paid > 0 %}
+                <span class="badge bg-success">Paid</span>
+              {% else %}
+                <span class="badge bg-secondary">Pending</span>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-center text-muted py-4">
+            <i class="ti ti-receipt fs-24 mb-2"></i>
+            <p class="mb-2">No sales recorded yet</p>
+            <a href="{% url 'record_sale' %}" class="btn btn-primary btn-sm">
+              <i class="ti ti-plus me-1"></i>Record a Sale
+            </a>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>
@@ -626,23 +664,17 @@
         </div> -->
       </div>
       <div class="card-body pb-0">
-        <div class="d-flex align-items-center flex-wrap gap-2">
-          <div class="border p-2 br-8">
+        <div class="d-flex align-items-center flex-wrap gap-2">          <div class="border p-2 br-8">
             <h5 class="d-inline-flex align-items-center text-teal">
-              UGX {{ total_revenue|floatformat:0 }}<span
-                class="badge badge-success badge-xs d-inline-flex align-items-center ms-2"
-                ><i class="ti ti-arrow-up-left me-1"></i>25%</span
-              >
-          
+              UGX {{ total_revenue|floatformat:0 }}
+              {% include "includes/app_change_badge.html" with change=sales_change_pct tone="success" %}
             </h5>
             <p>Revenue</p>
           </div>
           <div class="border p-2 br-8">
             <h5 class="d-inline-flex align-items-center text-orange">
-              UGX {{ total_expenses|floatformat:0 }}<span
-                class="badge badge-danger badge-xs d-inline-flex align-items-center ms-2"
-                ><i class="ti ti-arrow-down-right me-1"></i>25%</span
-              >
+              UGX {{ total_expenses|floatformat:0 }}
+              {% include "includes/app_change_badge.html" with change=expenses_change_pct tone="danger" %}
             </h5>
             <p>Expense</p>
           </div>
@@ -650,6 +682,10 @@
         
         <div class="mt-5">
            <canvas id="salesStatisticsChart" height="400px"></canvas>
+        </div>
+        <div class="mt-4">
+          <h6 class="mb-2">Monthly trend (last 12 months)</h6>
+          <canvas id="revenueTrendChart" height="260px"></canvas>
         </div>
          
       </div>
@@ -713,7 +749,7 @@
                 <tbody>
                   {% for sale in recent_sales_transactions %}
                   <tr>
-                    <td>{{ sale.sale_date }}</td>
+                    <td>{{ sale.sale_date|date:"M d, Y" }}</td>
                     <td>
                       <div class="d-flex align-items-center file-name-icon">
                         <a href="javascript:void(0);" class="avatar avatar-md">
@@ -1619,11 +1655,18 @@ document.addEventListener("DOMContentLoaded", function () {
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-  const chartData = JSON.parse(
-  document.getElementById("customer-chart-data").textContent
-  );
+  // The customer chart markup can be commented out in this template;
+  // skip initialization when the canvas is absent to avoid a console error.
+  const customerCanvas = document.getElementById("customerChart");
+  if (!customerCanvas) return;
 
-  const ctx = document.getElementById("customerChart").getContext("2d");
+  const chartDataEl = document.getElementById("customer-chart-data");
+  let chartData = { labels: [], data: [] };
+  try {
+    chartData = JSON.parse(chartDataEl ? chartDataEl.textContent : "null") || chartData;
+  } catch (e) { /* keep empty defaults */ }
+
+  const ctx = customerCanvas.getContext("2d");
 
   new Chart(ctx, {
     type: "doughnut",
@@ -1707,3 +1750,111 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 </style>
+
+<!-- Real-data charts: 30-day sales vs purchases, and the 12-month trend. -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (!window.Chart) return;
+
+    function readSeries(id) {
+      var node = document.getElementById(id);
+      if (!node) return null;
+      try {
+        return JSON.parse(node.textContent);
+      } catch (err) {
+        console.error("Could not parse " + id, err);
+        return null;
+      }
+    }
+
+    var dailyCanvas = document.getElementById("salesDayChart");
+    var daily = readSeries("sales-chart-data");
+    if (dailyCanvas && daily && daily.labels && daily.labels.length) {
+      if (!Chart.getChart(dailyCanvas)) {
+        new Chart(dailyCanvas, {
+          type: "line",
+          data: {
+            labels: daily.labels,
+            datasets: [
+              {
+                label: "Sales",
+                data: daily.sales,
+                borderColor: "#3b82f6",
+                backgroundColor: "rgba(59, 130, 246, 0.12)",
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+                borderWidth: 2
+              },
+              {
+                label: "Purchases",
+                data: daily.purchases,
+                borderColor: "#f59e0b",
+                backgroundColor: "rgba(245, 158, 11, 0.12)",
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+                borderWidth: 2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: { legend: { position: "bottom" } },
+            scales: {
+              y: { beginAtZero: true },
+              x: { ticks: { maxTicksLimit: 10 } }
+            }
+          }
+        });
+      }
+    }
+
+    var trendCanvas = document.getElementById("revenueTrendChart");
+    var trend = readSeries("revenue-chart-data");
+    if (trendCanvas && trend && trend.labels && trend.labels.length) {
+      if (!Chart.getChart(trendCanvas)) {
+        new Chart(trendCanvas, {
+          type: "line",
+          data: {
+            labels: trend.labels,
+            datasets: [
+              {
+                label: "Revenue",
+                data: trend.revenue,
+                borderColor: "#20c997",
+                backgroundColor: "rgba(32, 201, 151, 0.12)",
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+                borderWidth: 2
+              },
+              {
+                label: "Expenses",
+                data: trend.expenses,
+                borderColor: "#fd7e14",
+                backgroundColor: "rgba(253, 126, 20, 0.12)",
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+                borderWidth: 2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: { legend: { position: "bottom" } },
+            scales: {
+              y: { beginAtZero: true },
+              x: { ticks: { maxTicksLimit: 12 } }
+            }
+          }
+        });
+      }
+    }
+  });
+</script>

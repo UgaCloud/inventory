@@ -1490,7 +1490,7 @@ def print_transfer_request(request, request_id):
 
 @login_required
 def conversion_help(request):
-    return render(request, 'conversion/help.html', {
+    return render(request, 'transfers/help.html', {
         'title': 'Conversion Factor Help',
         'examples': [
             {

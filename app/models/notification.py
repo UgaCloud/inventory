@@ -11,10 +11,22 @@ class Notification(models.Model):
         ('info', 'Info'),
     ]
 
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('normal', 'Normal'),
+        ('high', 'High'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     title = models.CharField(max_length=255)
     message = models.TextField()
     notification_type = models.CharField(max_length=10, choices=NOTIFICATION_TYPES, default='info')
+    # How urgent the event is. The bell shows the high priority ones first.
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal',
+                                db_index=True)
+    # A key that identifies "the same event". Two notifications with the same
+    # key for the same user are the same event, not two events.
+    dedupe_key = models.CharField(max_length=120, blank=True, default='', db_index=True)
     is_read = models.BooleanField(default=False)
     link = models.CharField(max_length=500, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

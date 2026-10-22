@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.db import connection
 from django.db.models.functions import TruncDate, Cast
 from django.db.models import DateField
+from django.shortcuts import get_object_or_404
 from datetime import timedelta
 
 
@@ -62,7 +63,7 @@ def get_all_sales(user=None, is_cancelled=False):
     qs = Sales.objects.filter(is_cancelled=is_cancelled)
     if user:
         qs = qs.filter(recorded_by=user)
-    return qs.order_by("-sale_date")
+    return qs.prefetch_related('perfume_lines').order_by("-sale_date")
 
 
 def get_sale_by_id(sale_id, user=None):
@@ -112,6 +113,29 @@ def get_total_sales_per_user(user, date=None):
             is_cancelled=False,
             recorded_by=user,
             sale_date=date
+        )
+        .aggregate(total=Sum("total_amount"))["total"]
+    )
+
+    return total or 0
+
+
+def get_total_sales_today(date=None):
+    """
+    Today's sales of the whole business.
+
+    The tenant-aware manager already limits the rows to the business of the
+    signed-in user, so this describes the business and not one person's book.
+    """
+
+    if date is None:
+        date = timezone.now().date()
+
+    total = (
+        Sales.objects
+        .filter(
+            is_cancelled=False,
+            sale_date=date,
         )
         .aggregate(total=Sum("total_amount"))["total"]
     )
@@ -258,7 +282,8 @@ def get_total_purchases():
 
 
 def get_order_by_id(order_id):
-    return PurchaseOrder.objects.filter(id=order_id).first()
+    # 404 (not None) for unknown or cross-tenant orders.
+    return get_object_or_404(PurchaseOrder, id=order_id)
 
 
 def get_items_by_order(order):

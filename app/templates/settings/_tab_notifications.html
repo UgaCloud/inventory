@@ -1,0 +1,98 @@
+{% comment %}Notifications: which events raise a notification for this user.{% endcomment %}
+<form method="post" action="{% url 'settings_tab' slug='notifications' %}">
+    {% csrf_token %}
+    <input type="hidden" name="tab" value="notifications">
+
+    <div class="card">
+        <div class="card-body">
+            <h6 class="fw-semibold mb-1">
+                <i class="ti ti-bell me-1 text-primary"></i>Events that notify you
+            </h6>
+            <p class="text-muted small mb-0">
+                Choose what lands in your notification panel. Nothing is sent to anyone else.
+            </p>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="app-switch-row">
+                <div>
+                    <div class="app-switch-label">Sales</div>
+                    <div class="app-switch-text">A sale was recorded or edited.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="notify_sales" id="notify_sales"
+                           {% if preference.notify_sales %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="app-switch-row">
+                <div>
+                    <div class="app-switch-label">Purchasing</div>
+                    <div class="app-switch-text">A purchase order was created, received or changed.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="notify_purchasing" id="notify_purchasing"
+                           {% if preference.notify_purchasing %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="app-switch-row">
+                <div>
+                    <div class="app-switch-label">Low stock</div>
+                    <div class="app-switch-text">A product fell below its reorder level.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="notify_low_stock" id="notify_low_stock"
+                           {% if preference.notify_low_stock %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="app-switch-row">
+                <div>
+                    <div class="app-switch-label">Transfers</div>
+                    <div class="app-switch-text">A transfer request was raised, approved or completed.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="notify_transfers" id="notify_transfers"
+                           {% if preference.notify_transfers %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="app-switch-row">
+                <div>
+                    <div class="app-switch-label">Roles and permissions</div>
+                    <div class="app-switch-text">A role was granted, changed or revoked.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="notify_roles" id="notify_roles"
+                           {% if preference.notify_roles %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="app-switch-row">
+                <div>
+                    <div class="app-switch-label">Business</div>
+                    <div class="app-switch-text">A business was registered, suspended or reactivated.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="notify_business" id="notify_business"
+                           {% if preference.notify_business %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="app-switch-row">
+                <div>
+                    <div class="app-switch-label">Daily digest by email</div>
+                    <div class="app-switch-text">A summary of the day in your inbox.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="digest_email" id="digest_email"
+                           {% if preference.digest_email %}checked{% endif %}>
+                </div>
+            </div>
+
+            <div class="app-form-actions">
+                <a href="{% url 'settings_tab' slug='notifications' %}" class="btn btn-outline-secondary">Reset</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="ti ti-device-floppy me-1"></i>Save preferences
+                </button>
+            </div>
+        </div>
+    </div>
+</form>

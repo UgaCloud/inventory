@@ -11,9 +11,13 @@ from django.contrib.auth.models import User
 from app.constants import PURCHASE_ORDER_OPTIONS, SALE_ORDER_OPTIONS, STOCK_MOVEMENT_OPTIONS
 from app.models.products import *
 from app.utils.utils import *
+from app.managers import TenantManager
 
 
 class PurchaseOrder(models.Model):
+
+    objects = TenantManager()
+
     supplier = models.ForeignKey("app.Supplier", on_delete=models.CASCADE)
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     purchase_date = models.DateField(auto_now_add=True)
@@ -38,6 +42,9 @@ class PurchaseOrder(models.Model):
 
 
 class PurchaseOrderItem(models.Model):
+
+    objects = TenantManager()
+
     order = models.ForeignKey("app.PurchaseOrder", related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     unit = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
@@ -79,6 +86,9 @@ class PurchaseOrderItem(models.Model):
 
 
 class InventoryBatch(models.Model):
+
+    objects = TenantManager()
+
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="batches")
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()  # TOTAL quantity in BASE UNITS
@@ -126,6 +136,9 @@ class InventoryBatch(models.Model):
 
 
 class Sales(models.Model):
+
+    objects = TenantManager()
+
     receipt_no = models.CharField(max_length=50, unique=True, blank=True)
     customer = models.ForeignKey("app.Customer", on_delete=models.SET_NULL, null=True, blank=True)
     sale_date = models.DateField(auto_now_add=True)
@@ -210,12 +223,25 @@ class Sales(models.Model):
         return sum(item.base_quantity for item in self.items.all())  # FIXED: base_quantity
 
     def update_total_amount(self):
-        self.total_amount = sum(item.amount() for item in self.items.all())
+        items_total = sum(item.amount() for item in self.items.all())
+        # Include perfume (ml) sale lines so mixture amounts are preserved
+        # if the sale is later edited in the POS.
+        perfume_total = sum(line.selling_price for line in self.perfume_lines.all())
+        self.total_amount = items_total + perfume_total
         self.save(update_fields=["total_amount"])
 
     @property
     def number_of_items(self):
         return self.items.count()
+
+    @property
+    def perfume_total_ml(self):
+        """Total millilitres across all perfume (single/mixture) lines."""
+        return sum(line.total_quantity_ml for line in self.perfume_lines.all())
+
+    @property
+    def perfume_line_count(self):
+        return len(self.perfume_lines.all())
     
     def cancel_sale(self, user, reason=""):
         """Cancel the sale and return stock"""
@@ -239,7 +265,31 @@ class Sales(models.Model):
                 
                 # Return stock to inventory (must use base_quantity in return_stock_to_inventory)
                 return_stock_to_inventory(self)
-                
+
+                # Reverse the customer-facing ledger so a cancelled sale no
+                # longer counts towards what the customer owes. Payments made
+                # against this sale are removed as well (the Payment delete
+                # signal removes their ledger credits); allocations tied to
+                # this sale are dropped so multi-sale payments keep the rest.
+                if self.customer:
+                    from app.models.customers import (
+                        CustomerLedger, Payment, PaymentAllocation,
+                    )
+                    from app.signals.customers_signals import (
+                        update_customer_balance,
+                    )
+                    CustomerLedger.objects.filter(
+                        customer=self.customer,
+                        transaction_type='SALE',
+                        description__contains=self.receipt_no,
+                    ).delete()
+                    PaymentAllocation.objects.filter(sale=self).delete()
+                    Payment.objects.filter(
+                        customer=self.customer,
+                        reference=self.receipt_no,
+                    ).delete()
+                    update_customer_balance(self.customer)
+
                 return True, "Sale cancelled successfully"
                 
         except Exception as e:
@@ -247,6 +297,9 @@ class Sales(models.Model):
 
 
 class SalesItem(models.Model):
+
+    objects = TenantManager()
+
     order = models.ForeignKey("app.Sales", related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE)
     unit = models.ForeignKey("app.UnitOfMeasure", on_delete=models.CASCADE)
@@ -296,6 +349,9 @@ class SalesItem(models.Model):
 
 
 class TransferRequest(models.Model):
+
+    objects = TenantManager()
+
     REQUEST_STATUS_CHOICES = [
         ("pending", "Pending"),
         ("approved", "Approved"),
@@ -565,7 +621,6 @@ class TransferRequest(models.Model):
                     product=request_item.product,
                     quantity=request_item.quantity,
                     units=request_item.units,
-                    transfer_request_item=request_item,
                     base_quantity=request_item.base_quantity,
                     original_quantity=request_item.quantity
                 )
@@ -585,6 +640,9 @@ class TransferRequest(models.Model):
         
         
 class TransferRequestItem(models.Model):
+
+    objects = TenantManager()
+
     transfer_request = models.ForeignKey('TransferRequest', on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()  # User-entered quantity in selected unit
@@ -778,6 +836,9 @@ class TransferRequestItem(models.Model):
 
 
 class StockTransfer(models.Model):
+
+    objects = TenantManager()
+
     TRANSFER_STATUS_CHOICES = [
         ("pending", "Pending"),
         ("in_transit", "In Transit"),
@@ -944,6 +1005,9 @@ class StockTransfer(models.Model):
 
 
 class StockTransferItem(models.Model):
+
+    objects = TenantManager()
+
     stock_transfer=models.ForeignKey(
         StockTransfer,on_delete=models.CASCADE,related_name="items"
     )
@@ -992,6 +1056,9 @@ class StockTransferItem(models.Model):
 
 
 class StockAdjustment(models.Model):
+
+    objects = TenantManager()
+
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -1098,17 +1165,52 @@ class StockAdjustment(models.Model):
                 user=self.created_by
             )
 
-            # If positive change and unit_cost provided, create a batch for traceability
-            if self.quantity_change > 0 and self.unit_cost:
+            # Keep the FIFO batch ledger aligned with inventory:
+            # - positive change with a cost  -> new batch at that cost
+            # - positive change without a cost -> new batch at the current
+            #   weighted-average cost of existing batches (so
+            #   SUM(batch.remaining_quantity) still equals quantity_in_stock)
+            # - negative change -> consume batches FIFO, exactly like a
+            #   stock-out, so shrinkage is reflected in both ledgers
+            if self.quantity_change > 0:
+                unit_cost = self.unit_cost
+                if not unit_cost:
+                    active = InventoryBatch.objects.filter(
+                        product=self.product, store=store,
+                        remaining_quantity__gt=0,
+                    )
+                    tot = sum(b.remaining_quantity for b in active)
+                    unit_cost = (
+                        int(
+                            sum(b.remaining_quantity * b.unit_cost for b in active)
+                            / tot
+                        )
+                        if tot
+                        else 0
+                    )
                 InventoryBatch.objects.create(
                     product=self.product,
                     store=store,
                     quantity=self.quantity_change,
-                    unit_cost=self.unit_cost,
+                    unit_cost=unit_cost,
                     remaining_quantity=self.quantity_change,
                     expiry_date=None,
                     purchase_order_item=None
                 )
+            elif self.quantity_change < 0:
+                shrink = -int(self.quantity_change)
+                batches = InventoryBatch.objects.select_for_update().filter(
+                    product=self.product,
+                    store=store,
+                    remaining_quantity__gt=0,
+                ).order_by("expiry_date", "received_date")
+                for batch in batches:
+                    if shrink <= 0:
+                        break
+                    take = min(batch.remaining_quantity, shrink)
+                    batch.remaining_quantity -= take
+                    batch.save(update_fields=["remaining_quantity"])
+                    shrink -= take
 
     def apply(self, applied_by=None):
         """
@@ -1139,6 +1241,9 @@ class StockAdjustment(models.Model):
 
 
 class StockMovement(models.Model):
+
+    objects = TenantManager()
+
     product = models.ForeignKey("app.Product", on_delete=models.CASCADE, related_name="stock_movements")
     store = models.ForeignKey("app.StoreLocation", on_delete=models.CASCADE)
     transaction_type = models.CharField(max_length=50, choices=STOCK_MOVEMENT_OPTIONS)
@@ -1154,6 +1259,9 @@ class StockMovement(models.Model):
 
 
 class StockAdjustmentItem(models.Model):
+
+    objects = TenantManager()
+
     stock_adjustment = models.ForeignKey('StockAdjustment', on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey('app.Product', on_delete=models.CASCADE)
     unit = models.ForeignKey('app.UnitOfMeasure', on_delete=models.SET_NULL, null=True, blank=True)

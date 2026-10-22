@@ -1,0 +1,44 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}{{ active_tab.label }} | Settings | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-wrapper p-0 m-0">
+    <div class="content">
+        <div class="page-header">
+            <div class="add-item d-flex">
+                <div class="page-title">
+                    <h4>Settings</h4>
+                    <h6>{{ active_tab.description }}</h6>
+                </div>
+            </div>
+            <div class="page-btn d-flex gap-2">
+                <span class="badge bg-soft-primary text-primary px-3 py-2">
+                    <i class="ti ti-building me-1"></i>{{ business.name }}
+                </span>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body p-0">
+                <nav class="app-tabs app-tabs-wrap px-2" aria-label="Settings sections">
+                    {% for item in tabs %}
+                    <a class="app-tab {% if item.slug == active_tab.slug %}is-active{% endif %}"
+                       href="{% url 'settings_tab' item.slug %}"
+                       {% if item.slug == active_tab.slug %}aria-current="page"{% endif %}>
+                        <i class="{{ item.icon }}"></i>{{ item.label }}
+                    </a>
+                    {% endfor %}
+                </nav>
+            </div>
+        </div>
+
+        <div class="card app-tab-panel">
+            <div class="card-body">
+                {% include active_tab.template %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -29,8 +29,11 @@ def add_bankaccount_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Bank account added successfully.')
-            
-        return redirect(bankaccount_list_view)
+            return redirect('bankaccount_list')
+        messages.error(request, 'Please correct the errors below.')
+        return render(request, 'finance/bankaccount_form.html', {'form': form})
+
+    return render(request, 'finance/bankaccount_form.html', {'form': BankAccountForm()})
 
 
 def update_bankaccount_view(request, pk):
@@ -77,8 +80,11 @@ def add_banktransaction_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Bank transaction added successfully.')
-            
-        return redirect('banktransaction_list')
+            return redirect('banktransaction_list')
+        messages.error(request, 'Please correct the errors below.')
+        return render(request, 'finance/banktransaction_form.html', {'form': form})
+
+    return render(request, 'finance/banktransaction_form.html', {'form': BankTransactionForm()})
 
 def update_banktransaction_view(request, pk):
     transaction = get_object_or_404(BankTransaction, pk=pk)

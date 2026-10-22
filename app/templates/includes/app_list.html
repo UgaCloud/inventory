@@ -1,0 +1,135 @@
+{% comment %}
+Shared renderer for the compact record lists used across the app.
+
+The view builds a list of row dictionaries:
+    {
+        'icon': 'user',                 # feather icon name
+        'category': 'customer',          # app-cat-* accent
+        'title': 'ACME Ltd',
+        'meta': 'acme@example.com · 0700 000 000',
+        'href': '/customers/3/',         # optional — makes the row clickable
+        'badges': [{'label': 'Active', 'tone': 'success'}],
+        'fields': [{'label': 'Balance', 'value': '12,400'}],
+        'actions': [{'label': 'View', 'icon': 'eye', 'href': '/customers/3/'}],
+        'panel': {                       # optional slide-up detail sheet
+            'title': 'ACME Ltd',
+            'subtitle': 'Customer since 2024',
+            'fields': [{'label': 'Balance', 'value': '12,400'}],
+            'note': 'Anything extra worth saying about this record.',
+            'href': '/customers/3/',
+        },
+        'panel_id': 'app-panel-customer-3',
+    }
+
+An action may carry ``'panel': '<panel_id>'`` instead of ``'href'``; it then
+renders as a button that slides the sheet up (see assets/js/app-ui.js).
+{% endcomment %}
+<div class="app-list">
+    {% for row in rows %}
+    <div class="app-list-row {% if row.href %}app-hoverable{% else %}app-list-row-static{% endif %}"
+         {% if row.href %}data-href="{{ row.href }}" role="link" tabindex="0"{% endif %}>
+        <div class="app-list-icon app-cat-{{ row.category|default:'data' }}">
+            <i data-feather="{{ row.icon|default:'file-text' }}"></i>
+        </div>
+
+        <div class="app-list-main">
+            <div class="app-list-title">{{ row.title }}</div>
+            {% if row.meta %}
+            <div class="app-list-meta">{{ row.meta }}</div>
+            {% endif %}
+            {% if row.badges %}
+            <div class="app-list-badges">
+                {% for badge in row.badges %}
+                <span class="app-chip app-chip-{{ badge.tone|default:'default' }}">{{ badge.label }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% for field in row.fields %}
+        <div class="app-list-field">
+            <span class="app-list-field-label">{{ field.label }}</span>
+            <span class="app-list-field-value">{{ field.value }}</span>
+        </div>
+        {% endfor %}
+
+        {% if row.actions %}
+        <div class="app-list-actions">
+            {% for action in row.actions %}
+                {% if action.panel %}
+                <button type="button" class="btn btn-sm btn-light"
+                        data-panel-open="{{ action.panel }}" title="{{ action.label }}" aria-label="{{ action.label }}">
+                    <i data-feather="{{ action.icon|default:'info' }}"></i>
+                </button>
+                {% else %}
+                <a class="btn btn-sm btn-light{% if action.attrs.class %} {{ action.attrs.class }}{% endif %}"
+                   href="{{ action.href }}" title="{{ action.label }}" aria-label="{{ action.label }}"
+                   {% for key, value in action.attrs.items %}{% if key != 'class' %} {{ key }}="{{ value }}"{% endif %}{% endfor %}>
+                    <i data-feather="{{ action.icon|default:'more-horizontal' }}"></i>
+                </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div class="app-empty-state">
+        <span class="app-empty-icon"><i data-feather="{{ empty_icon|default:'inbox' }}"></i></span>
+        <span class="app-empty-title">{{ empty_title|default:"Nothing here yet" }}</span>
+        <span class="app-empty-text">{{ empty_text|default:"Records will appear here as soon as they exist." }}</span>
+        {% if empty_action_href %}
+        <a class="btn btn-primary btn-sm mt-2" href="{{ empty_action_href }}"
+           {% if empty_action_target %}data-bs-toggle="modal" data-bs-target="{{ empty_action_target }}"{% endif %}>
+            <i data-feather="plus" class="feather-14 me-1"></i>{{ empty_action_label|default:"Create" }}
+        </a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+{% comment %}
+Slide-up detail sheets. They are always in the DOM and revealed by the
+"Details" action of a row; the shared backdrop below dims the page.
+{% endcomment %}
+{% for row in rows %}
+{% if row.panel %}
+<div class="app-panel" id="{{ row.panel_id }}" role="dialog" aria-modal="true"
+     aria-hidden="true" tabindex="-1" aria-labelledby="{{ row.panel_id }}-title">
+    <div class="app-panel-header">
+        <div class="app-panel-heading">
+            <h2 class="app-panel-title" id="{{ row.panel_id }}-title">{{ row.panel.title|default:row.title }}</h2>
+            {% if row.panel.subtitle %}
+            <p class="app-panel-subtitle">{{ row.panel.subtitle }}</p>
+            {% endif %}
+        </div>
+        <button type="button" class="btn btn-light btn-sm" data-panel-close aria-label="Close details">
+            <i data-feather="x"></i>
+        </button>
+    </div>
+    <div class="app-panel-body">
+        {% if row.panel.fields %}
+        <div class="app-field-grid">
+            {% for field in row.panel.fields %}
+            <div class="app-field">
+                <span class="app-field-label">{{ field.label }}</span>
+                <span class="app-field-value">{{ field.value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if row.panel.note %}
+        <p class="text-muted small mt-3 mb-0">{{ row.panel.note }}</p>
+        {% endif %}
+    </div>
+    {% if row.panel.href %}
+    <div class="app-panel-footer">
+        <a class="btn btn-primary w-100" href="{{ row.panel.href }}">
+            <i data-feather="external-link" class="feather-14 me-1"></i>Open full record
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+
+<div class="app-panel-backdrop" data-panel-close></div>

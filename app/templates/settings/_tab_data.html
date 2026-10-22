@@ -1,0 +1,29 @@
+{% comment %}Data management: what this business holds and how to take it out.{% endcomment %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        {% include 'settings/_cards.html' with cards=cards %}
+
+        <h6 class="fw-semibold mb-3">
+            <i class="ti ti-download me-1 text-primary"></i>Export your data
+        </h6>
+        {% include 'settings/_links.html' with links=exports %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3">
+                    <i class="ti ti-shield-check me-1 text-primary"></i>Data handling
+                </h6>
+                <p class="small text-muted">
+                    Every record of this workspace belongs to
+                    <strong>{{ business.name|default:"the platform" }}</strong>. Exports contain the same
+                    records you see on screen.
+                </p>
+                <p class="small text-muted mb-0">
+                    The audit trail records every change made to these records and cannot be edited.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

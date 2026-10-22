@@ -51,10 +51,8 @@ def edit_employee_view(request, employee_id):
             messages.success(request, 'Employee successfully edited')
         else:
             messages.error(request, 'An error occured, unable to update the employee')
-    else:
-        form = EmployeeForm(instance=employee)
 
-    return render(request, 'human_resource/employee_grid.html')
+    return redirect('employee_page')
 
 @login_required
 def department_grid_view(request):

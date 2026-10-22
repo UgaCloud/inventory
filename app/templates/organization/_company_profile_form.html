@@ -1,0 +1,240 @@
+{% load static %}
+
+<div id="companyFormMessages"></div>
+
+<form method="post" action="{% url 'update_settings_page' %}" enctype="multipart/form-data" id="orgSettingsForm">
+    {% csrf_token %}
+
+    <!-- Logo and Basic Info Row -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="text-center">
+                <div class="mb-3">
+                    {% if organization.organization_logo %}
+                        <img src="{{ organization.organization_logo.url }}" alt="Organization Logo" id="logoPreview" class="rounded-3 border p-2" style="width: 150px; height: 150px; object-fit: contain; background: #f8f9fa;">
+                    {% else %}
+                        <div id="logoPreview" class="rounded-3 border bg-light d-flex align-items-center justify-content-center" style="width: 150px; height: 150px; margin: 0 auto;">
+                            <i class="ti ti-building-store text-muted fs-1"></i>
+                        </div>
+                    {% endif %}
+                </div>
+                <label for="id_organization_logo" class="btn btn-outline-primary btn-sm">
+                    <i class="ti ti-upload me-1"></i>Upload Logo
+                </label>
+                <input type="file" name="organization_logo" id="id_organization_logo" class="d-none" accept="image/*">
+                <p class="text-muted small mt-2">Recommended: 200x200px<br>PNG, JPG up to 2MB</p>
+            </div>
+        </div>
+        <div class="col-md-9">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold" for="id_organization_name">Organization Name <span class="text-danger">*</span></label>
+                    <input type="text" name="organization_name" id="id_organization_name" class="form-control" value="{{ organization.organization_name|default:'' }}" placeholder="Enter organization name">
+                    <div class="invalid-feedback">Organization name is required</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold" for="id_app_name">Application Name</label>
+                    <input type="text" name="app_name" id="id_app_name" class="form-control" value="{{ organization.app_name|default:'Inventory' }}" placeholder="App name">
+                    <small class="text-muted">Display name for your application</small>
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold" for="id_organization_motto">Organization Motto / Tagline</label>
+                    <input type="text" name="organization_motto" id="id_organization_motto" class="form-control" value="{{ organization.organization_motto|default:'' }}" placeholder="Your company slogan or mission">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4">
+
+    <!-- Contact Information -->
+    <div class="mb-4">
+        <h6 class="fw-semibold mb-3 d-flex align-items-center">
+            <i class="ti ti-phone-call me-2 text-primary"></i>Contact Details
+        </h6>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold" for="id_mobile">Mobile Number</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="ti ti-phone"></i></span>
+                    <input type="tel" name="mobile" id="id_mobile" class="form-control" value="{{ organization.mobile|default:'' }}" placeholder="+256 XXX XXX XXX">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold" for="id_office_phone_number1">Office Phone 1</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="ti ti-phone-call"></i></span>
+                    <input type="tel" name="office_phone_number1" id="id_office_phone_number1" class="form-control" value="{{ organization.office_phone_number1|default:'' }}" placeholder="Office line 1">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold" for="id_office_phone_number2">Office Phone 2</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="ti ti-phone-call"></i></span>
+                    <input type="tel" name="office_phone_number2" id="id_office_phone_number2" class="form-control" value="{{ organization.office_phone_number2|default:'' }}" placeholder="Office line 2 (optional)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4">
+
+    <!-- Address Information -->
+    <div class="mb-4">
+        <h6 class="fw-semibold mb-3 d-flex align-items-center">
+            <i class="ti ti-map-pin me-2 text-primary"></i>Address &amp; Location
+        </h6>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_country">Country</label>
+                <select name="country" id="id_country" class="form-select">
+                    <option value="">Select Country</option>
+                    <option value="Uganda" {% if organization.country == 'Uganda' %}selected{% endif %}>Uganda</option>
+                    <option value="Kenya" {% if organization.country == 'Kenya' %}selected{% endif %}>Kenya</option>
+                    <option value="Tanzania" {% if organization.country == 'Tanzania' %}selected{% endif %}>Tanzania</option>
+                    <option value="Rwanda" {% if organization.country == 'Rwanda' %}selected{% endif %}>Rwanda</option>
+                    <option value="Burundi" {% if organization.country == 'Burundi' %}selected{% endif %}>Burundi</option>
+                    <option value="South Sudan" {% if organization.country == 'South Sudan' %}selected{% endif %}>South Sudan</option>
+                    <option value="DRC" {% if organization.country == 'DRC' %}selected{% endif %}>DR Congo</option>
+                    <option value="Nigeria" {% if organization.country == 'Nigeria' %}selected{% endif %}>Nigeria</option>
+                    <option value="Ghana" {% if organization.country == 'Ghana' %}selected{% endif %}>Ghana</option>
+                    <option value="South Africa" {% if organization.country == 'South Africa' %}selected{% endif %}>South Africa</option>
+                    <option value="Other" {% if organization.country == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_city">City</label>
+                <input type="text" name="city" id="id_city" class="form-control" value="{{ organization.city|default:'Kampala' }}" placeholder="City name">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_address">Street Address</label>
+                <input type="text" name="address" id="id_address" class="form-control" value="{{ organization.address|default:'' }}" placeholder="Building, street, area">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_postal">Postal / ZIP Code</label>
+                <input type="text" name="postal" id="id_postal" class="form-control" value="{{ organization.postal|default:'' }}" placeholder="Postal code">
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4">
+
+    <!-- Web & Currency -->
+    <div class="mb-4">
+        <h6 class="fw-semibold mb-3 d-flex align-items-center">
+            <i class="ti ti-world-www me-2 text-primary"></i>Web &amp; Financial Settings
+        </h6>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_website">Website URL</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="ti ti-link"></i></span>
+                    <input type="url" name="website" id="id_website" class="form-control" value="{{ organization.website|default:'' }}" placeholder="https://yourcompany.com">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_currency">Default Currency</label>
+                <select name="currency" id="id_currency" class="form-select">
+                    <option value="UGX" {% if organization.currency == 'UGX' %}selected{% endif %}>UGX - Ugandan Shilling</option>
+                    <option value="KES" {% if organization.currency == 'KES' %}selected{% endif %}>KES - Kenyan Shilling</option>
+                    <option value="TZS" {% if organization.currency == 'TZS' %}selected{% endif %}>TZS - Tanzanian Shilling</option>
+                    <option value="RWF" {% if organization.currency == 'RWF' %}selected{% endif %}>RWF - Rwandan Franc</option>
+                    <option value="USD" {% if organization.currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
+                    <option value="EUR" {% if organization.currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+                    <option value="GBP" {% if organization.currency == 'GBP' %}selected{% endif %}>GBP - British Pound</option>
+                </select>
+                <small class="text-muted">Currency used for all financial transactions</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+        <button type="submit" form="orgSettingsForm" class="btn btn-primary px-4">
+            <i class="ti ti-device-floppy me-1"></i>Save Company Profile
+        </button>
+    </div>
+</form>
+
+<script>
+    // Logo preview functionality
+    (function() {
+        const logoInput = document.getElementById('id_organization_logo');
+        const logoPreview = document.getElementById('logoPreview');
+
+        if (logoInput) {
+            logoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        if (logoPreview) {
+                            if (logoPreview.tagName === 'IMG') {
+                                logoPreview.src = event.target.result;
+                            } else {
+                                const newImg = document.createElement('img');
+                                newImg.id = 'logoPreview';
+                                newImg.src = event.target.result;
+                                newImg.className = 'rounded-3 border p-2';
+                                newImg.style.width = '150px';
+                                newImg.style.height = '150px';
+                                newImg.style.objectFit = 'contain';
+                                newImg.style.backgroundColor = '#f8f9fa';
+                                logoPreview.parentNode.replaceChild(newImg, logoPreview);
+                            }
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        if (logoPreview) {
+            logoPreview.addEventListener('click', function() {
+                if (logoInput) logoInput.click();
+            });
+        }
+    })();
+
+    function validateCompanyForm() {
+        const orgName = document.getElementById('id_organization_name');
+        if (orgName && !orgName.value.trim()) {
+            showCompanyMessage('Organization name is required', 'danger');
+            orgName.classList.add('is-invalid');
+            return false;
+        }
+        if (orgName) orgName.classList.remove('is-invalid');
+        return true;
+    }
+
+    function showCompanyMessage(message, level) {
+        const holder = document.getElementById('companyFormMessages');
+        if (!holder) return;
+        holder.innerHTML = '<div class="alert alert-' + level + ' alert-dismissible fade show mt-3">' +
+            message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
+        setTimeout(function() {
+            const alert = holder.querySelector('.alert');
+            if (alert) alert.remove();
+        }, 5000);
+    }
+
+    (function() {
+        const orgForm = document.getElementById('orgSettingsForm');
+        if (orgForm) {
+            orgForm.addEventListener('submit', function(e) {
+                if (!validateCompanyForm()) {
+                    e.preventDefault();
+                }
+            });
+        }
+        const orgNameField = document.getElementById('id_organization_name');
+        if (orgNameField) {
+            orgNameField.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    this.classList.remove('is-invalid');
+                } else {
+                    this.classList.add('is-invalid');
+                }
+            });
+        }
+    })();
+</script>

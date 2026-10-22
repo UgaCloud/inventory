@@ -1,0 +1,165 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Audit Trail | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-wrapper p-0 m-0">
+    <div class="content">
+        <div class="page-header">
+            <div class="add-item d-flex">
+                <div class="page-title">
+                    <h4>Audit Trail</h4>
+                    <h6>
+                        {% if is_platform_admin %}
+                            Every recorded action across all businesses
+                        {% else %}
+                            Recorded activity for your business
+                        {% endif %}
+                    </h6>
+                </div>
+            </div>
+            <div class="page-btn d-flex gap-2">
+                <a href="{% url 'audit_log_export' %}{% if audit_query_prefix %}?{{ audit_query_prefix }}{% endif %}"
+                   class="btn btn-outline-secondary">
+                    <i class="ti ti-download me-1"></i>Export CSV
+                </a>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <form method="get" id="auditFilterForm" class="row g-2 align-items-end">
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label" for="auditSearch">Search</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="ti ti-search"></i></span>
+                            <input type="search" name="q" id="auditSearch" class="form-control"
+                                   value="{{ search_query }}" placeholder="Description, actor or record…"
+                                   autocomplete="off" data-live-search="#auditFilterForm">
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label" for="auditCategory">Category</label>
+                        <select name="category" id="auditCategory" class="form-select" data-auto-submit>
+                            <option value="">All</option>
+                            {% for value, label in categories %}
+                                <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label" for="auditAction">Action</label>
+                        <select name="action" id="auditAction" class="form-select" data-auto-submit>
+                            <option value="">All</option>
+                            {% for value, label in actions %}
+                                <option value="{{ value }}" {% if selected_action == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label" for="auditActor">Actor</label>
+                        <select name="actor" id="auditActor" class="form-select" data-auto-submit>
+                            <option value="">Everyone</option>
+                            {% for actor in actors %}
+                                <option value="{{ actor.actor_id }}" {% if selected_actor == actor.actor_id|stringformat:'s' %}selected{% endif %}>{{ actor.actor_name|default:actor.actor_id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-lg-1">
+                        <label class="form-label" for="auditFrom">From</label>
+                        <input type="date" name="from" id="auditFrom" class="form-control" value="{{ date_from }}" data-auto-submit>
+                    </div>
+                    <div class="col-6 col-lg-1">
+                        <label class="form-label" for="auditTo">To</label>
+                        <input type="date" name="to" id="auditTo" class="form-control" value="{{ date_to }}" data-auto-submit>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="ti ti-filter me-1"></i>Apply
+                        </button>
+                        <a href="{% url 'audit_log_page' %}" class="btn btn-light btn-sm">Reset</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Entries -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="app-list" id="auditList">
+                    {% for entry in logs %}
+                        <a class="app-list-row" href="{% url 'audit_log_detail' entry.pk %}">
+                            <span class="app-list-icon app-cat-{{ entry.category }}">
+                                <i class="ti {% if entry.category == 'auth' %}ti-login{% elif entry.category == 'product' %}ti-package{% elif entry.category == 'inventory' %}ti-layers{% elif entry.category == 'sales' %}ti-receipt{% elif entry.category == 'purchase' %}ti-truck-delivery{% elif entry.category == 'customer' %}ti-users{% elif entry.category == 'finance' %}ti-cash{% elif entry.category == 'user' %}ti-user-cog{% elif entry.category == 'role' %}ti-shield{% elif entry.category == 'platform' %}ti-building-skyscraper{% else %}ti-settings{% endif %}"></i>
+                            </span>
+                            <span class="app-list-main">
+                                <span class="app-list-title">{{ entry.description }}</span>
+                                <span class="app-list-meta">
+                                    {{ entry.actor_name|default:'System' }}
+                                    &middot; {{ entry.timestamp|date:"d M Y, H:i" }}
+                                    {% if entry.target %}&middot; {{ entry.target }}{% endif %}
+                                    {% if is_platform_admin and entry.business %}&middot; {{ entry.business.name }}{% endif %}
+                                </span>
+                            </span>
+                            <span class="app-list-side">
+                                <span class="badge app-badge-{{ entry.action }}">{{ entry.get_action_display }}</span>
+                                {% if entry.outcome == 'failure' %}
+                                    <span class="badge app-badge-failure ms-1">Failed</span>
+                                {% endif %}
+                            </span>
+                        </a>
+                    {% empty %}
+                        <div class="app-empty-state m-3">
+                            <span class="app-empty-icon"><i class="ti ti-history"></i></span>
+                            <span class="app-empty-title">
+                                {% if search_query or selected_category or selected_action or date_from or date_to %}
+                                    No activity matches these filters
+                                {% else %}
+                                    No activity recorded yet
+                                {% endif %}
+                            </span>
+                            <span class="app-empty-text">
+                                {% if search_query or selected_category or selected_action or date_from or date_to %}
+                                    Try widening the date range or clearing the filters.
+                                {% else %}
+                                    Actions such as sign-ins, record changes and approvals will appear here.
+                                {% endif %}
+                            </span>
+                            {% if search_query or selected_category or selected_action or date_from or date_to %}
+                                <a href="{% url 'audit_log_page' %}" class="btn btn-sm btn-outline-primary mt-2">Clear filters</a>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if page_obj.paginator.num_pages > 1 %}
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">
+                        {{ total_logs }} event{{ total_logs|pluralize }} &middot; page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </span>
+                    <nav aria-label="Audit log pages">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                                {% if page_obj.has_previous %}
+                                    <a class="page-link" href="?{{ audit_query_prefix }}page={{ page_obj.previous_page_number }}">Prev</a>
+                                {% else %}
+                                    <span class="page-link">Prev</span>
+                                {% endif %}
+                            </li>
+                            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                                {% if page_obj.has_next %}
+                                    <a class="page-link" href="?{{ audit_query_prefix }}page={{ page_obj.next_page_number }}">Next</a>
+                                {% else %}
+                                    <span class="page-link">Next</span>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock content %}

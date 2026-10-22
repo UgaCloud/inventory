@@ -1,0 +1,180 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A multi-business inventory and sales platform: stock, purchasing, sales, finance and staff in one place.">
+    <meta name="robots" content="index, follow">
+    <title>{% block title %}Inventory Platform{% endblock %}</title>
+
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'assets/img/favicon.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'assets/img/apple-touch-icon.png' %}">
+
+    <link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/plugins/tabler-icons/tabler-icons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/public.css' %}">
+</head>
+<body class="public-page">
+
+{% block body %}
+<!-- Top bar -->
+<header class="landing-topbar">
+    <div class="container d-flex align-items-center justify-content-between py-3">
+        <a class="public-logo text-dark" href="{% url 'landing_page' %}">
+            {% if organization.organization_logo %}
+                <img src="{{ organization.organization_logo.url }}" alt="{{ organization.organization_name|default:'Inventory' }}">
+            {% else %}
+                <span class="public-logo-mark"><i class="ti ti-package"></i></span>
+            {% endif %}
+            <span>{{ organization.organization_name|default:"Inventory Platform" }}</span>
+        </a>
+        <a class="btn btn-sm btn-primary px-3" href="{% url 'login_page' %}">
+            <i class="ti ti-login me-1"></i>Sign in
+        </a>
+    </div>
+</header>
+
+<!-- Hero -->
+<section class="landing-hero">
+    <div class="landing-hero-inner">
+        <span class="landing-eyebrow">
+            <i class="ti ti-shield-check"></i> Multi-business platform
+        </span>
+        <h1>Every business runs on the same system, with its own books.</h1>
+        <p>
+            Stock, purchasing, sales, finance, staff and permissions in one place.
+            Each registered business keeps its own data, its own branches and its own
+            audit trail &mdash; you only ever see what belongs to you.
+        </p>
+        <div class="landing-cta">
+            <a class="landing-btn landing-btn-primary" href="{% url 'login_page' %}">
+                <i class="ti ti-login"></i> Sign in to your account
+            </a>
+            <a class="landing-btn landing-btn-ghost" href="#how-it-works">
+                <i class="ti ti-compass"></i> How access works
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- What it does -->
+<section class="landing-section" id="features">
+    <div class="landing-section-inner">
+        <div class="landing-section-head">
+            <h2>What the platform covers</h2>
+            <p>
+                The whole day-to-day of running a trading business, from the goods
+                arriving in the store to the invoice leaving the counter.
+            </p>
+        </div>
+
+        <div class="landing-cards">
+            <article class="landing-card">
+                <span class="landing-card-icon"><i class="ti ti-package"></i></span>
+                <h3>Stock &amp; inventory</h3>
+                <p>
+                    Live quantities per branch, reorder levels that warn you before you
+                    run out, batch tracking, adjustments and transfers between stores.
+                </p>
+            </article>
+
+            <article class="landing-card">
+                <span class="landing-card-icon"><i class="ti ti-shopping-cart"></i></span>
+                <h3>Sales &amp; purchasing</h3>
+                <p>
+                    Record a sale in seconds, raise purchase orders against a supplier
+                    and keep every receipt, invoice and return in one ledger.
+                </p>
+            </article>
+
+            <article class="landing-card">
+                <span class="landing-card-icon"><i class="ti ti-wallet"></i></span>
+                <h3>Finance</h3>
+                <p>
+                    Expenses, bank accounts, cash flow and customer credit &mdash; with
+                    figures that match the stock movement behind them.
+                </p>
+            </article>
+
+            <article class="landing-card">
+                <span class="landing-card-icon"><i class="ti ti-users"></i></span>
+                <h3>Staff &amp; permissions</h3>
+                <p>
+                    Roles decide what each person can open. Nobody sees a menu item
+                    they are not allowed to use, and every change is written down.
+                </p>
+            </article>
+
+            <article class="landing-card">
+                <span class="landing-card-icon"><i class="ti ti-building-store"></i></span>
+                <h3>Multi-branch</h3>
+                <p>
+                    Branches, stores and departments share one catalogue while keeping
+                    their own stock, staff and cost picture.
+                </p>
+            </article>
+
+            <article class="landing-card">
+                <span class="landing-card-icon"><i class="ti ti-history"></i></span>
+                <h3>Audit trail</h3>
+                <p>
+                    Every record change, sign-in and export is recorded with who did
+                    it, when, and what changed. Entries can never be edited away.
+                </p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<!-- How access works -->
+<section class="landing-section landing-section-alt" id="how-it-works">
+    <div class="landing-section-inner">
+        <div class="landing-section-head">
+            <h2>How access works</h2>
+            <p>
+                Accounts are created by your platform administrator, so your data never
+                ends up in the wrong business.
+            </p>
+        </div>
+
+        <div class="landing-steps">
+            <div class="landing-step">
+                <h3>Ask your administrator</h3>
+                <p>Your platform administrator registers the business and creates your first account.</p>
+            </div>
+            <div class="landing-step">
+                <h3>You get a role</h3>
+                <p>Your administrator assigns you a role, which decides the modules you can open.</p>
+            </div>
+            <div class="landing-step">
+                <h3>You sign in</h3>
+                <p>Sign in with your own username. Your branch, business and permissions are applied for you.</p>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <p class="landing-note">
+                <strong>Need an account?</strong>
+                Accounts are not self-service &mdash; contact the platform administrator for
+                your business and they will create one for you and set your role.
+            </p>
+        </div>
+    </div>
+</section>
+
+<footer class="landing-foot">
+    <div class="container">
+        <p class="mb-1">
+            &copy; {% now "Y" %} {{ organization.organization_name|default:"Inventory Platform" }}
+        </p>
+        <p class="mb-0">Stock, sales, finance and staff management.</p>
+    </div>
+</footer>
+{% endblock %}
+
+<script src="{% static 'assets/js/jquery-3.7.1.min.js' %}"></script>
+<script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

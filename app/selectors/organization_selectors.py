@@ -1,7 +1,8 @@
 from app.models.organization import *
 
-def get_organization_settings():
-    return OrganizationSetting.load()
+def get_organization_settings(business=None):
+    """The company profile of a business (the platform wide row without one)."""
+    return OrganizationSetting.load_for(business)
 
 def get_branches():
     return Branch.objects.all()

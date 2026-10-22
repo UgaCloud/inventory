@@ -7,6 +7,41 @@ from datetime import timedelta
 import time
 
 
+class TenantMiddleware:
+    """
+    Attach the authenticated user's business (tenant) to the request so views,
+    context processors and services can scope queries consistently.
+
+    request.business is None for anonymous users and for platform Super
+    Administrators viewing platform-wide data; business users always get their
+    own business (falling back to the Default Business for legacy accounts).
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        request.business = None
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated:
+            from app.models.tenancy import current_business, user_is_platform_admin
+            if not user_is_platform_admin(user):
+                request.business = current_business(user)
+            else:
+                # Platform admins act platform-wide unless they explicitly
+                # scope themselves to a business in a given view.
+                request.business = None
+
+        # Publish the acting user so tenant-aware managers can scope every
+        # queryset of this request (views, selectors and services included).
+        from app.managers import clear_tenant_actor, set_tenant_actor
+        set_tenant_actor(user)
+        try:
+            return self.get_response(request)
+        finally:
+            clear_tenant_actor()
+
+
 class SessionTimeoutMiddleware:
     """
     Middleware to handle session timeout and provide warnings to users.

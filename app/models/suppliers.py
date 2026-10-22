@@ -3,8 +3,16 @@ from django.db import models
 
 # app/models/__init__.py or create supplier.py
 from django.db import models
+from app.managers import TenantManager
 
 class Supplier(models.Model):
+
+    objects = TenantManager()
+
+    business = models.ForeignKey(
+        "app.Business", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="suppliers",
+    )
     name = models.CharField(max_length=255, unique=True)
     supplier_code = models.CharField(max_length=50, unique=True, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)

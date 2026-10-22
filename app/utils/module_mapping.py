@@ -128,7 +128,12 @@ MENU_MODULE_MAP = {
     
     # Settings - Module 9
     'settings_page': 9,
+    'settings_tab': 9,
+    'company_settings_page': 9,
     'update_settings_page': 9,
+    'audit_log_page': 9,
+    'audit_log_detail': 9,
+    'audit_log_export': 9,
     
     # Dashboard - Module 10 (same as Main Menu, but separate for clarity)
     'index_page': 10,
@@ -218,4 +223,56 @@ def user_has_url_access(user, url_name):
         # If URL is not in map, allow access (backward compatibility)
         return True
     return user_has_module_access(user, module_id)
+
+
+# ---------------------------------------------------------------------------
+# Dashboard quick actions
+# ---------------------------------------------------------------------------
+# Shortcuts shown on the dashboard. Each entry names the target URL and the
+# module that grants access to it, so the dashboard only ever offers a
+# shortcut the signed-in user can actually open.
+QUICK_ACTIONS = [
+    {'label': 'Record a sale', 'icon': 'ti-shopping-cart', 'url_name': 'record_sale', 'module': 4, 'tone': 'primary'},
+    {'label': 'Add a customer', 'icon': 'ti-users', 'url_name': 'customer_create', 'module': 13, 'tone': 'success'},
+    {'label': 'Add a product', 'icon': 'ti-package', 'url_name': 'add_products_page', 'module': 2, 'tone': 'warning'},
+    {'label': 'Record an expense', 'icon': 'ti-receipt', 'url_name': 'add_expense_page', 'module': 14, 'tone': 'danger'},
+    {'label': 'New purchase order', 'icon': 'ti-truck-delivery', 'url_name': 'create_purchase_order', 'module': 3, 'tone': 'primary'},
+    {'label': 'Adjust stock', 'icon': 'ti-layers', 'url_name': 'create_stock_adjustment', 'module': 3, 'tone': 'secondary'},
+    {'label': 'Stock transfer', 'icon': 'ti-exchange', 'url_name': 'stock_transfer_list', 'module': 3, 'tone': 'secondary'},
+    {'label': 'Manage staff', 'icon': 'ti-users-group', 'url_name': 'employee_page', 'module': 5, 'tone': 'info'},
+    {'label': 'Team members', 'icon': 'ti-user-cog', 'url_name': 'users_list_page', 'module': 7, 'tone': 'info'},
+    {'label': 'Roles & permissions', 'icon': 'ti-shield', 'url_name': 'roles_list_page', 'module': 15, 'tone': 'warning'},
+    {'label': 'Bank accounts', 'icon': 'ti-wallet', 'url_name': 'bankaccount_list', 'module': 6, 'tone': 'secondary'},
+    {'label': 'Close the day', 'icon': 'ti-clock-check', 'url_name': 'close_day', 'module': 6, 'tone': 'secondary'},
+    {'label': 'Company settings', 'icon': 'ti-settings', 'url_name': 'settings_page', 'module': 9, 'tone': 'secondary'},
+]
+
+
+def get_quick_actions(user, actions=None, limit=8):
+    """The dashboard shortcuts the signed-in user is allowed to open.
+
+    A shortcut is offered when the user has access to the module that
+    guards the target page. Superusers see every shortcut. The result is
+    sorted so the most frequent tasks come first, then trimmed to ``limit``.
+    """
+    from django.urls import NoReverseMatch, reverse
+
+    if actions is None:
+        actions = QUICK_ACTIONS
+
+    if not user or not getattr(user, 'is_authenticated', False):
+        return []
+
+    allowed = []
+    for action in actions:
+        if not user_has_module_access(user, action['module']):
+            continue
+        try:
+            url = reverse(action['url_name'])
+        except NoReverseMatch:
+            continue
+        allowed.append({**action, 'url': url})
+
+    return allowed[:limit]
+
 

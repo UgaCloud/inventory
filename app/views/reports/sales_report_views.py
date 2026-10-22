@@ -309,25 +309,19 @@ def export_branch_sales_csv(request):
         'Customer',
         'Salesperson',
         'Items Count',
-        'Subtotal',
-        'Discount',
-        'Tax',
         'Total Amount',
         'Payment Method'
     ])
-    
+
     # Write data rows
     for sale in sales:
         writer.writerow([
-            sale.date.strftime('%Y-%m-%d'),
-            sale.receipt_number or f'SALE-{sale.id}',
+            sale.sale_date.strftime('%Y-%m-%d'),
+            sale.receipt_no or f'SALE-{sale.id}',
             sale.store.name if sale.store else 'N/A',
             sale.customer.name if sale.customer else 'Walk-in Customer',
             f'{sale.recorded_by.first_name} {sale.recorded_by.last_name}' if sale.recorded_by.first_name else sale.recorded_by.username,
             sale.items.count(),
-            f'{sale.subtotal:.2f}',
-            # f'{sale.discount_amount:.2f}' if sale.discount_amount else '0.00',
-            # f'{sale.tax_amount:.2f}' if sale.tax_amount else '0.00',
             f'{sale.total_amount:.2f}',
             sale.payment_method or 'Cash'
         ])
@@ -373,9 +367,7 @@ def export_branch_sales_pdf(request):
     summary = sales.aggregate(
         total_sales=Sum('total_amount'),
         total_transactions=Count('id'),
-        total_items_sold=Sum('items__quantity'),
-        total_discount=Sum('discount_amount'),
-        total_tax=Sum('tax_amount')
+        total_items_sold=Sum('items__quantity')
     )
     
     # Create PDF
@@ -412,8 +404,6 @@ def export_branch_sales_pdf(request):
         ['Total Sales:', f'UGX {summary["total_sales"] or 0:,.2f}'],
         ['Total Transactions:', f'{summary["total_transactions"] or 0:,}'],
         ['Total Items Sold:', f'{summary["total_items_sold"] or 0:,}'],
-        ['Total Discount:', f'UGX {summary["total_discount"] or 0:,.2f}'],
-        ['Total Tax:', f'UGX {summary["total_tax"] or 0:,.2f}'],
     ]
     
     summary_table = Table(summary_data, colWidths=[2*72, 2*72])
@@ -440,8 +430,8 @@ def export_branch_sales_pdf(request):
     # Add transaction data (limit to first 50 for PDF)
     for sale in sales[:50]:
         table_data.append([
-            sale.date.strftime('%Y-%m-%d'),
-            sale.receipt_number or f'SALE-{sale.id}',
+            sale.sale_date.strftime('%Y-%m-%d'),
+            sale.receipt_no or f'SALE-{sale.id}',
             (sale.customer.name if sale.customer else 'Walk-in')[:20],  # Truncate long names
             str(sale.items.count()),
             f'UGX {sale.total_amount:,.2f}'
@@ -498,9 +488,10 @@ def branch_comparison_report(request):
     ).annotate(
         total_sales=Sum('sales__total_amount', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj)),
         total_transactions=Count('sales', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj)),
-        average_transaction=Avg('sales__total_amount', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj))
+        average_transaction=Avg('sales__total_amount', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj)),
+        total_items_sold=Sum('sales__items__quantity', filter=Q(sales__sale_date__gte=date_from_obj, sales__sale_date__lte=date_to_obj))
     ).order_by('-total_sales')
-    
+
     # Handle None values
     for branch in branch_performance:
         branch.total_sales = branch.total_sales or 0

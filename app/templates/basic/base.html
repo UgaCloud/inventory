@@ -106,6 +106,9 @@
 
     <!-- Main CSS -->
     <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+
+    <!-- Shared app design-system layer (grids, motion tokens, panels) -->
+    <link rel="stylesheet" href="{% static 'assets/css/app-ui.css' %}" />
   </head>
 
   <body class="menu-horizontal">
@@ -423,7 +426,7 @@
             <!-- /Notifications -->
 
             <li class="nav-item nav-item-box">
-              <a href="{% url 'under_maintenance_page' %}"
+              <a href="{% url 'settings_page' %}"
                 ><i class="ti ti-settings"></i
               ></a>
             </li>
@@ -487,7 +490,7 @@
                 >
                 <a
                   class="dropdown-item"
-                  href="{% url 'under_maintenance_page' %}"
+                  href="{% url 'settings_page' %}"
                   ><i class="ti ti-settings-2 me-2"></i>Settings</a
                 >
                 <hr class="my-2" />
@@ -505,10 +508,7 @@
             <a
               href="javascript:void(0);"
               class="nav-link dropdown-toggle"
-              data-bs-toggle="dropdown"(
-    users_list_view, user_create_view, user_edit_view, user_detail_view,
-    user_delete_view, user_assign_role_view, user_unassign_role_view
-)
+              data-bs-toggle="dropdown"
               aria-expanded="false"
               ><i class="fa fa-ellipsis-v"></i
             ></a>
@@ -675,7 +675,7 @@
 
     <!-- Chart JS -->
     <script src="{% static 'assets/plugins/chartjs/chart.min.js' %}"></script>
-    <script src="{% static 'assets/plugins/chartjs/chart-data.js' %}"></script>
+    <script src="{% static 'assets/plugins/chartjs/chart-data.js' %}?v=2"></script>
 
     <!-- Select2 JS -->
     <script src="{% static 'assets/plugins/select2/js/select2.min.js' %}"></script>
@@ -699,6 +699,9 @@
 
 <!-- Owl JS -->
     <script src="{% static 'assets/plugins/owlcarousel/owl.carousel.min.js' %}"></script>
+
+    <!-- Shared app UI behaviour (tabs, slide-up panels) -->
+    <script src="{% static 'assets/js/app-ui.js' %}"></script>
 
 {% block custom_JS %}{% endblock custom_JS %}
 
@@ -932,44 +935,110 @@ window.showToast = function(message, type, title) {
 // ── Notification Bell System ──
 {% if user.is_authenticated %}
 (function(){
+    var POLL_INTERVAL = 15000;          // how often the panel asks for news
+    var lastUnread = null;              // the unread count of the last poll
+    var knownIds = {};                  // the notifications already shown
+    var panelOpen = false;
+
+    function updateBadge(count){
+        var badge = document.getElementById('notifBadge');
+        if(!badge) return;
+        if(count > 0){
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    function renderList(notifications){
+        var list = document.getElementById('notificationDropdownList');
+        if(!list) return;
+        if(notifications.length === 0){
+            list.innerHTML = '<li class="notification-message text-center py-3"><span class="text-muted">No notifications</span></li>';
+            return;
+        }
+        var html = '';
+        notifications.forEach(function(n){
+            var iconClass = {success:'ti-check text-success',error:'ti-x text-danger',warning:'ti-alert-triangle text-warning',info:'ti-info-circle text-info'}[n.type] || 'ti-info-circle text-info';
+            var nLink = n.link ? sanitizeUrl(n.link) : 'javascript:void(0);';
+            html += '<li class="notification-message'+(n.is_read?'':' bg-light')+'" data-notification-id="'+n.id+'">'+
+                '<a href="'+nLink+'">'+
+                '<div class="media d-flex"><span class="avatar flex-shrink-0 d-flex align-items-center justify-content-center" style="width:36px;height:36px;"><i class="ti '+escapeHtml(iconClass)+'" style="font-size:18px;"></i></span>'+
+                '<div class="flex-grow-1 ms-2"><p class="noti-details mb-0"><span class="noti-title fw-semibold">'+escapeHtml(n.title)+'</span> '+escapeHtml(n.message)+'</p>'+
+                '<p class="noti-time text-muted" style="font-size:11px;">'+escapeHtml(n.created_at)+'</p></div></div></a></li>';
+        });
+        list.innerHTML = html;
+    }
+
+    function announceNew(incoming){
+        // Tell the user about notifications that arrived while they worked.
+        if(!incoming.length) return;
+        if(typeof window.showToast === 'function'){
+            var first = incoming[0];
+            var extra = incoming.length > 1 ? ' (+' + (incoming.length - 1) + ' more)' : '';
+            window.showToast(first.title + (first.message ? ': ' + first.message : '') + extra, 'info', 'New notification');
+        }
+    }
+
     function loadNotifications(){
-        fetch('{% url "notifications_api" %}')
+        return fetch('{% url "notifications_api" %}', {headers: {'X-Requested-With': 'XMLHttpRequest'}})
         .then(function(r){ return r.json(); })
         .then(function(data){
-            var badge = document.getElementById('notifBadge');
-            if(badge){
-                if(data.unread_count > 0){
-                    badge.textContent = data.unread_count;
-                    badge.style.display = 'inline-block';
-                } else {
-                    badge.style.display = 'none';
+            var notifications = data.notifications || [];
+            updateBadge(data.unread_count || 0);
+
+            if(lastUnread === null){
+                // The first poll only fills the panel.
+                notifications.forEach(function(n){ knownIds[n.id] = true; });
+            } else {
+                var incoming = notifications.filter(function(n){ return !knownIds[n.id]; });
+                notifications.forEach(function(n){ knownIds[n.id] = true; });
+                if(incoming.length && !panelOpen){
+                    announceNew(incoming);
                 }
             }
-            var list = document.getElementById('notificationDropdownList');
-            if(!list) return;
-            if(data.notifications.length === 0){
-                list.innerHTML = '<li class="notification-message text-center py-3"><span class="text-muted">No notifications</span></li>';
-                return;
-            }
-            var html = '';
-            data.notifications.forEach(function(n){
-                var iconClass = {success:'ti-check text-success',error:'ti-x text-danger',warning:'ti-alert-triangle text-warning',info:'ti-info-circle text-info'}[n.type] || 'ti-info-circle text-info';
-                var nLink = n.link ? sanitizeUrl(n.link) : 'javascript:void(0);';
-                html += '<li class="notification-message'+(n.is_read?'':' bg-light')+'">'+
-                    '<a href="'+nLink+'">'+
-                    '<div class="media d-flex"><span class="avatar flex-shrink-0 d-flex align-items-center justify-content-center" style="width:36px;height:36px;"><i class="ti '+escapeHtml(iconClass)+'" style="font-size:18px;"></i></span>'+
-                    '<div class="flex-grow-1 ms-2"><p class="noti-details mb-0"><span class="noti-title fw-semibold">'+escapeHtml(n.title)+'</span> '+escapeHtml(n.message)+'</p>'+
-                    '<p class="noti-time text-muted" style="font-size:11px;">'+escapeHtml(n.created_at)+'</p></div></div></a></li>';
-            });
-            list.innerHTML = html;
+            lastUnread = data.unread_count || 0;
+            renderList(notifications);
+            return data;
         }).catch(function(){});
     }
-    // Load on page ready
+
+    function markRead(id){
+        if(!id) return;
+        fetch('{% url "notification_mark_all_read" %}'.replace('/mark-all-read/', '/' + id + '/mark-read/'), {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest'}
+        }).then(function(r){ return r.json(); })
+          .then(function(){ loadNotifications(); });
+    }
+
     document.addEventListener('DOMContentLoaded', function(){
         loadNotifications();
-        // Poll every 30 seconds
-        setInterval(loadNotifications, 30000);
+        // Poll on a timer, but never while the tab is in the background.
+        setInterval(function(){
+            if(!document.hidden) loadNotifications();
+        }, POLL_INTERVAL);
+        // Catch up as soon as the user comes back to the tab.
+        document.addEventListener('visibilitychange', function(){
+            if(!document.hidden) loadNotifications();
+        });
     });
+
+    // Opening the panel is a sign that the user is looking at it.
+    var bell = document.getElementById('notificationBell');
+    if(bell){
+        bell.addEventListener('show.bs.dropdown', function(){ panelOpen = true; });
+        bell.addEventListener('hidden.bs.dropdown', function(){ panelOpen = false; });
+    }
+
+    // A notification that is clicked is read.
+    document.addEventListener('click', function(e){
+        var item = e.target.closest ? e.target.closest('[data-notification-id]') : null;
+        if(!item) return;
+        markRead(item.getAttribute('data-notification-id'));
+    });
+
     // Mark all read
     var markBtn = document.getElementById('markAllReadBtn');
     if(markBtn){
@@ -979,8 +1048,7 @@ window.showToast = function(message, type, title) {
                 headers:{'X-CSRFToken':'{{ csrf_token }}','X-Requested-With':'XMLHttpRequest'}
             }).then(function(r){return r.json();}).then(function(data){
                 if(data.success){
-                    var badge = document.getElementById('notifBadge');
-                    if(badge) badge.style.display='none';
+                    updateBadge(0);
                     loadNotifications();
                 }
             });

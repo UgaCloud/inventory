@@ -1,0 +1,38 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Purchase Order #{{ order.id }} | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Purchase Order #{{ order.id }}</h4>
+            <h6>{{ order.supplier|default:'No supplier' }}</h6>
+        </div>
+        <div class="page-btn">
+            <a href="{% url 'purchase_order_item_list' order.id %}" class="btn btn-primary">
+                <i class="ti ti-list me-1"></i>Items
+            </a>
+            <a href="{% url 'purchase_order_list' %}" class="btn btn-secondary">Back to List</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Supplier</dt>
+                <dd class="col-sm-9">{{ order.supplier|default:'-' }}</dd>
+                <dt class="col-sm-3">Store</dt>
+                <dd class="col-sm-9">{{ order.store|default:'-' }}</dd>
+                <dt class="col-sm-3">Order Date</dt>
+                <dd class="col-sm-9">{{ order.order_date|default:'-' }}</dd>
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9">{{ order.status|default:'-' }}</dd>
+                <dt class="col-sm-3">Total Cost</dt>
+                <dd class="col-sm-9">{{ order.total_cost }}</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

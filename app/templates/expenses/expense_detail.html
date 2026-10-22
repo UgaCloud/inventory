@@ -1,0 +1,76 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Expense Detail | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Expense Detail</h4>
+            <h6>{{ expense }}</h6>
+        </div>
+        <div class="page-btn">
+            <a href="{% url 'edit_expense_page' expense.pk %}" class="btn btn-primary">
+                <i class="ti ti-pencil me-1"></i>Edit
+            </a>
+            <a href="{% url 'delete_expense_page' expense.pk %}" class="btn btn-danger">
+                <i class="ti ti-trash me-1"></i>Delete
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">Details</h5></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Amount</dt>
+                        <dd class="col-sm-8">{{ expense.amount }}</dd>
+                        <dt class="col-sm-4">Category</dt>
+                        <dd class="col-sm-8">{{ expense.category|default:'-' }}</dd>
+                        <dt class="col-sm-4">Store</dt>
+                        <dd class="col-sm-8">{{ expense.store }}</dd>
+                        <dt class="col-sm-4">Date</dt>
+                        <dd class="col-sm-8">{{ expense.date }}</dd>
+                        <dt class="col-sm-4">Payment Method</dt>
+                        <dd class="col-sm-8">{{ expense.payment_method|default:'-' }}</dd>
+                        <dt class="col-sm-4">Reference</dt>
+                        <dd class="col-sm-8">{{ expense.reference|default:'-' }}</dd>
+                        <dt class="col-sm-4">Recorded By</dt>
+                        <dd class="col-sm-8">{{ expense.user|default:'-' }}</dd>
+                        <dt class="col-sm-4">Description</dt>
+                        <dd class="col-sm-8">{{ expense.description|default:'-' }}</dd>
+                        {% if expense.attachment %}
+                        <dt class="col-sm-4">Attachment</dt>
+                        <dd class="col-sm-8"><a href="{{ expense.attachment.url }}">Download</a></dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white"><h5 class="card-title mb-0">Linked Records</h5></div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="ti ti-link me-1"></i>Purchase:
+                            {% if expense.related_purchase %}Order #{{ expense.related_purchase.id }}{% else %}None{% endif %}
+                        </li>
+                        <li class="mb-2">
+                            <i class="ti ti-link me-1"></i>Sale:
+                            {% if expense.related_sale %}{{ expense.related_sale.receipt_no }}{% else %}None{% endif %}
+                        </li>
+                        <li>
+                            <i class="ti ti-link me-1"></i>Cash Flow:
+                            {% if expense.related_cashflow %}{{ expense.related_cashflow }}{% else %}None{% endif %}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

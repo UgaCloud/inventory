@@ -1,0 +1,14 @@
+{% comment %}Shortcuts to the screens that do the work. Usage: {% include 'settings/_links.html' with links=links %}{% endcomment %}
+{% if links %}
+<div class="app-link-list">
+    {% for link in links %}
+    <a class="app-link-row" href="{% url link.url_name %}">
+        <i class="{{ link.icon }}"></i>
+        <span class="flex-grow-1">{{ link.label }}</span>
+        <i class="ti ti-chevron-right text-muted"></i>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted mb-0">No shortcuts are available for your roles.</p>
+{% endif %}

@@ -47,6 +47,47 @@ def return_stock_to_inventory(sale):
                 item.is_cancelled = True
                 item.save()
                 
+            # Return perfume sale component stock (single-ml and mixture sales).
+            # The line-level is_cancelled flag guarantees each component is
+            # restored exactly once, even if cancellation is reprocessed.
+            for line in sale.perfume_lines.select_for_update().filter(is_cancelled=False):
+                for comp in line.components.select_related('product'):
+                    inventory, _ = Inventory.objects.get_or_create(
+                        product=comp.product,
+                        store=sale.store,
+                        defaults={'quantity_in_stock': 0}
+                    )
+
+                    new_quantity = inventory.quantity_in_stock + comp.base_quantity
+                    inventory.quantity_in_stock = new_quantity
+                    inventory.save()
+
+                    StockMovement.objects.create(
+                        product=comp.product,
+                        store=sale.store,
+                        transaction_type='CANCELLATION',
+                        quantity=comp.base_quantity,
+                        transaction_id=sale.id,
+                        note=f"Cancelled sale {sale.receipt_no} (perfume: {comp.quantity_ml}ml)",
+                        units_in_stock=new_quantity,
+                        user=str(sale.cancelled_by or sale.recorded_by)
+                    )
+
+                    # Restore value at the historical cost snapshot, so the
+                    # books keep the cost the stock was sold at.
+                    InventoryBatch.objects.create(
+                        product=comp.product,
+                        store=sale.store,
+                        quantity=comp.base_quantity,
+                        remaining_quantity=comp.base_quantity,
+                        unit_cost=comp.unit_cost,
+                        expiry_date=None,
+                        purchase_order_item=None
+                    )
+
+                line.is_cancelled = True
+                line.save(update_fields=['is_cancelled'])
+                
         return True
     except Exception as e:
         raise Exception(f"Failed to return stock to inventory: {str(e)}")

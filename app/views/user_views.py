@@ -4,68 +4,122 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.http import JsonResponse
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.conf import settings
 from app.models.human_resource import UserProfile, Role, Employee
 from app.forms.user_forms import UserCreateForm, UserEditForm, RoleAssignmentForm
+from app.utils.list_helpers import list_context, options_from_queryset, panel_action, row
 from datetime import date
 
 @login_required
 def users_list_view(request):
     """List all users with pagination and filtering"""
     users = User.objects.all().select_related('profile', 'profile__employee').prefetch_related('groups', 'profile__roles')
-    
+
     # Filtering
-    search_query = request.GET.get('search', '')
-    if search_query:
-        users = users.filter(
-            username__icontains=search_query
-        ) | users.filter(
-            email__icontains=search_query
-        ) | users.filter(
-            first_name__icontains=search_query
-        ) | users.filter(
-            last_name__icontains=search_query
-        )
-    
     status_filter = request.GET.get('status', '')
     if status_filter == 'active':
         users = users.filter(is_active=True)
     elif status_filter == 'inactive':
         users = users.filter(is_active=False)
-    
+
     role_filter = request.GET.get('role', '')
     if role_filter:
         users = users.filter(profile__roles__id=role_filter).distinct()
-    
-    # Statistics
-    total_users = users.count()
-    active_users = users.filter(is_active=True).count()
-    inactive_users = users.filter(is_active=False).count()
-    users_with_roles = users.filter(profile__roles__isnull=False).distinct().count()
-    
-    # Pagination
-    paginator = Paginator(users, 20)  # 20 users per page
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
+
     # Get all roles for filter dropdown
     roles = Role.objects.filter(is_active=True)
-    
-    context = {
-        'users': page_obj,
-        'page_obj': page_obj,
-        'total_users': total_users,
-        'active_users': active_users,
-        'inactive_users': inactive_users,
-        'users_with_roles': users_with_roles,
+
+    context = list_context(
+        request,
+        users,
+        search_fields=('username', 'email', 'first_name', 'last_name'),
+        filters=[
+            {
+                'name': 'status',
+                'label': 'All Status',
+                'options': [
+                    {'value': 'active', 'label': 'Active'},
+                    {'value': 'inactive', 'label': 'Inactive'},
+                ],
+            },
+            {
+                'name': 'role',
+                'label': 'All Roles',
+                'options': options_from_queryset(roles),
+            },
+        ],
+    )
+    context.update({
+        'users': context['page_obj'].object_list,
+        'total_users': users.count(),
+        'active_users': users.filter(is_active=True).count(),
+        'inactive_users': users.filter(is_active=False).count(),
+        'users_with_roles': users.filter(profile__roles__isnull=False).distinct().count(),
         'roles': roles,
-        'search_query': search_query,
         'status_filter': status_filter,
         'role_filter': role_filter,
-    }
+        'search_placeholder': 'Search username, name or email',
+        'toolbar_label': 'users',
+        'empty_title': 'No users found',
+        'empty_text': 'Create a user account to give your team access to this business.',
+        'empty_action_href': reverse('user_create_page'),
+        'empty_action_label': 'Add user',
+        'empty_icon': 'user-plus',
+    })
+
+    rows = []
+    for user in context['users']:
+        profile = getattr(user, 'profile', None)
+        user_roles = list(profile.roles.all()) if profile else []
+        detail_url = reverse('user_detail_page', args=[user.id])
+        panel_id = f'app-panel-user-{user.id}'
+        rows.append(row(
+            user.username,
+            icon='user',
+            category='user',
+            meta=' · '.join([part for part in [user.get_full_name(), user.email] if part]),
+            href=detail_url,
+            badges=(
+                [{'label': 'Active', 'tone': 'success'}]
+                if user.is_active else [{'label': 'Inactive', 'tone': 'danger'}]
+            ),
+            fields=[
+                {
+                    'label': 'Roles',
+                    'value': ', '.join(r.name for r in user_roles) or 'None',
+                },
+                {
+                    'label': 'Employee',
+                    'value': 'Linked' if (profile and profile.employee) else 'Not linked',
+                },
+            ],
+            actions=[
+                panel_action(panel_id),
+                {'label': 'View user', 'icon': 'eye', 'href': detail_url},
+                {'label': 'Edit user', 'icon': 'edit', 'href': reverse('user_edit_page', args=[user.id])},
+                {'label': 'Assign role', 'icon': 'shield', 'href': reverse('user_assign_role_page', args=[user.id])},
+            ],
+            panel_id=panel_id,
+            panel={
+                'title': user.get_full_name() or user.username,
+                'subtitle': user.email or user.username,
+                'fields': [
+                    {'label': 'Username', 'value': user.username},
+                    {'label': 'Email', 'value': user.email or '—'},
+                    {'label': 'Status', 'value': 'Active' if user.is_active else 'Inactive'},
+                    {'label': 'Roles', 'value': ', '.join(r.name for r in user_roles) or 'None'},
+                    {'label': 'Employee', 'value': 'Linked' if (profile and profile.employee) else 'Not linked'},
+                    {'label': 'Last login', 'value': (user.last_login.strftime('%d %b %Y, %H:%M') if user.last_login else '—')},
+                ],
+                'href': detail_url,
+            },
+        ))
+    context['rows'] = rows
+
     return render(request, 'users/users_list.html', context)
 
 @login_required

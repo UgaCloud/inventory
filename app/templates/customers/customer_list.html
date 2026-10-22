@@ -19,64 +19,11 @@
     </div>
 
     <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-            <div class="search-set">
-                <div class="search-input">
-                    <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
-                </div>
-            </div>
-        </div>
+        {% include "includes/app_list_toolbar.html" %}
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table id="customers-table" class="table table-striped table-bordered align-middle datatable">
-                    <thead class="thead-light">
-                        <tr>
-                            <th class="no-sort">
-                                <label class="checkboxs">
-                                    <input type="checkbox" id="select-all">
-                                    <span class="checkmarks"></span>
-                                </label>
-                            </th>
-                            <th>#</th>
-                            <th>Name</th>
-                            <th style="max-width: 180px; min-width: 120px; white-space: normal; word-break: break-word;">Contacts</th>
-                            <th style="max-width: 220px; min-width: 120px; white-space: normal; word-break: break-word;">Company Address</th>
-                            <th>Balance</th>
-                            <th class="no-sort">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if customers %}
-                            {% for customer in customers %}
-                            <tr>
-                                <td>
-                                    <label class="checkboxs">
-                                        <input type="checkbox" class="row-checkbox">
-                                        <span class="checkmarks"></span>
-                                    </label>
-                                </td>
-                                <td>{{forloop.counter}}</td>
-                                <td><a href="{% url 'customer_detail' customer.pk %}">{{ customer.name }}</a></td>
-                                <td style="max-width: 180px; min-width: 120px; white-space: normal; word-break: break-word;">{{ customer.email }} - ({{ customer.phone }})</td>
-                                <td style="max-width: 220px; min-width: 120px; white-space: normal; word-break: break-word;">{{ customer.company }} - ({{ customer.address }})</td>
-                                <td>{{ customer.balance|floatformat:0|intcomma }}/-</td>
-                                <td class="action-table-data">
-                                    <div class="edit-delete-action">
-                                        <a class="me-2 eye-icon p-2" href="{% url 'customer_detail' customer.pk %}">
-                                            <i data-feather="eye" class="feather-eye"></i>
-                                        </a>
-                                        <a class="me-2 edit-icon p-2" href="#" data-bs-toggle="modal" data-bs-target="#edit-modal-{{ customer.pk }}">
-                                            <i data-feather="edit" class="feather-edit"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
+            {% include "includes/app_list.html" with empty_title="No customers yet" empty_text="Add your first customer to start tracking balances, payments and ledger entries." empty_action_href="#" empty_action_target="#add-customer-modal" empty_action_label="Add customer" empty_icon="users" %}
         </div>
+        {% include "includes/app_pagination.html" %}
     </div>
     <!-- Add Customer Modal -->
     <div class="modal fade" id="add-customer-modal">

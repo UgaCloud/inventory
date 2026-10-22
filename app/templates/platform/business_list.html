@@ -1,0 +1,28 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Businesses | Platform Administration{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Businesses</h4>
+            <h6>All registered businesses on the platform</h6>
+        </div>
+        <div class="page-btn">
+            <a href="{% url 'platform_business_create' %}" class="btn btn-primary">
+                <i class="ti ti-plus me-1"></i>Register Business
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        {% include "includes/app_list_toolbar.html" %}
+        <div class="card-body p-0">
+            {% include "includes/app_list.html" %}
+            {% include "includes/app_pagination.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

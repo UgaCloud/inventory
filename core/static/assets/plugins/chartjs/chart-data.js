@@ -658,6 +658,9 @@ var myRadarChart = new Chart(ctx, {
 
 	if($('#top-category').length > 0) {
 		var ctx = document.getElementById('top-category').getContext('2d');
+    // Skip when the page already rendered a (real-data) chart on this
+    // canvas - re-initializing throws "Canvas is already in use".
+    if (!Chart.getChart(ctx.canvas)) {
     var mySemiDonutChart = new Chart(ctx, {
         type: 'doughnut', // Chart type
         data: {
@@ -689,6 +692,7 @@ var myRadarChart = new Chart(ctx, {
 			},
 		  }
     });
+    }
 	}
 
 });

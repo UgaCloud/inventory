@@ -1,0 +1,39 @@
+{% comment %}
+Toolbar for list pages: a debounced search box, optional filter selects and
+a link that clears the current search/filters.
+{% endcomment %}
+<form class="app-list-toolbar" method="get" action="{{ toolbar_action|default:'' }}" data-search-form>
+    <div class="app-list-search">
+        <i data-feather="search"></i>
+        <input type="search" name="{{ search_param|default:'q' }}" value="{{ search_term|default:'' }}"
+               placeholder="{{ search_placeholder|default:'Search…' }}"
+               autocomplete="off" data-search-input
+               aria-label="Search {{ toolbar_label|default:'records' }}">
+    </div>
+
+    {% for filter in list_filters %}
+    <select class="form-select app-list-filter" name="{{ filter.name }}"
+            aria-label="{{ filter.label }}" data-filter-select>
+        <option value="">{{ filter.label }}</option>
+        {% for option in filter.options %}
+        <option value="{{ option.value }}" {% if filter.current == option.value %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+    </select>
+    {% endfor %}
+
+    {% if list_filters %}
+    <button class="btn btn-primary btn-sm" type="submit">
+        <i data-feather="search" class="feather-14 me-1"></i>Search
+    </button>
+    {% endif %}
+
+    {% if search_term or has_active_filters %}
+    <a class="btn btn-light btn-sm" href="{{ clear_url }}">
+        <i data-feather="x" class="feather-14 me-1"></i>Clear
+    </a>
+    {% endif %}
+
+    <span class="app-list-count">
+        {% if is_paginated %}{{ total_count }} record{{ total_count|pluralize }}{% endif %}
+    </span>
+</form>

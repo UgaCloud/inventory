@@ -20,6 +20,14 @@ DASHBOARD_TEMPLATE_MAP: Dict[str, str] = {
     "Stores Dashboard": "basic/dashboards/stores.html",
 }
 
+# Icon shown on the dashboard tab. Keeping it next to the template means the
+# template never has to guess the tab from the dashboard name.
+DASHBOARD_ICON_MAP: Dict[str, str] = {
+    "Admin Dashboard": "ti-shield",
+    "Sales Dashboard": "ti-shopping-cart",
+    "Stores Dashboard": "ti-building-store",
+}
+
 # 2. Function to get dashboards for a given module set
 
 def get_dashboards_for_modules(module_ids: Iterable[int], dashboard_map: Dict[str, Set[int]] = None) -> List[str]:
@@ -40,22 +48,28 @@ def get_dashboards_for_modules(module_ids: Iterable[int], dashboard_map: Dict[st
     return assigned_dashboards
 
 
-def get_dashboard_info_for_modules(module_ids: Iterable[int], dashboard_map: Dict[str, Set[int]] = None, template_map: Dict[str, str] = None) -> List[Dict[str, str]]:
+def get_dashboard_info_for_modules(module_ids: Iterable[int], dashboard_map: Dict[str, Set[int]] = None, template_map: Dict[str, str] = None, icon_map: Dict[str, str] = None) -> List[Dict[str, str]]:
     """
-    Returns list of dicts with 'name' and 'template' for dashboards matching the provided module IDs.
+    Returns list of dicts with 'name', 'template' and 'icon' for dashboards matching the provided module IDs.
     This is suitable for templates that need both display name and template path.
     """
     if dashboard_map is None:
         dashboard_map = DASHBOARD_MODULE_MAP
     if template_map is None:
         template_map = DASHBOARD_TEMPLATE_MAP
+    if icon_map is None:
+        icon_map = DASHBOARD_ICON_MAP
 
     module_set = set(module_ids)
     info = []
     for name, modules in dashboard_map.items():
         if module_set & modules:
             tmpl = template_map.get(name, "dashboards/default.html")
-            info.append({"name": name, "template": tmpl})
+            info.append({
+                "name": name,
+                "template": tmpl,
+                "icon": icon_map.get(name, "ti-dashboard"),
+            })
     return info
 
 

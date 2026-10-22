@@ -1,0 +1,70 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Conversion Debug | Transfer Request #{{ transfer_request.id }}{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Conversion Debug</h4>
+            <h6>Transfer Request #{{ transfer_request.id }} — {{ transfer_request.from_store }} &rarr; {{ transfer_request.to_store }}</h6>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Product</th>
+                            <th>SKU</th>
+                            <th>Requested</th>
+                            <th>Unit</th>
+                            <th>Conversion Factor</th>
+                            <th>Base Qty</th>
+                            <th>Calculation</th>
+                            <th>Available</th>
+                            <th>Can Fulfil</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in debug_info %}
+                        <tr>
+                            <td>{{ row.item_number }}</td>
+                            <td>{{ row.product }}</td>
+                            <td>{{ row.sku }}</td>
+                            <td>{{ row.requested_quantity }}</td>
+                            <td>{{ row.requested_unit|default:'-' }}</td>
+                            <td>{{ row.conversion_factor|default:'-' }}</td>
+                            <td>{{ row.base_quantity }}</td>
+                            <td><code>{{ row.calculation }}</code></td>
+                            <td>{{ row.available_stock }}</td>
+                            <td>
+                                {% if row.can_fulfill %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-danger">No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="10" class="text-center text-muted py-3">No items on this request.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3 mt-3">
+        <div class="card-body">
+            <h6 class="mb-2">Summary</h6>
+            <p class="mb-1"><strong>Total base units requested:</strong> {{ total_base_units }}</p>
+            <p class="mb-0"><strong>Conversion summary:</strong> {{ conversion_summary|default:'-' }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

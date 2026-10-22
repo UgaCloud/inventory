@@ -1,0 +1,22 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Delete Item | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <h5 class="mb-2">Delete item</h5>
+            <p class="text-muted">Are you sure you want to delete <strong>{{ item }}</strong> from purchase order #{{ order.id }}?</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="ti ti-trash me-1"></i>Delete
+                </button>
+                <a href="{% url 'purchase_order_item_list' order.id %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

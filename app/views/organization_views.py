@@ -12,12 +12,15 @@ from app.models.organization import *
 
 
 @login_required
-def settings_page(request):
+def company_settings_page(request):
+    """The company profile on its own page (also a tab of the workspace)."""
     all_currencies = get_all_currencies()
-    organization_settings = OrganizationSetting.load()   
-    
+    organization_settings = OrganizationSetting.load_for(
+        getattr(request, 'business', None)
+    )
+
     organization_settings_form = OrganizationSettingForm(instance=organization_settings)
-    
+
     context = {
         "currencies": all_currencies,
         "organization_settings": organization_settings,
@@ -27,19 +30,30 @@ def settings_page(request):
 
 @login_required
 def update_organization_settings(request):
-    organization_settings = OrganizationSetting.load()
-    count = OrganizationSetting.objects.count()
-    
+    organization_settings = OrganizationSetting.load_for(
+        getattr(request, 'business', None)
+    )
+
     if request.method == 'POST':
         organization_settings_form = OrganizationSettingForm(request.POST, request.FILES, instance=organization_settings)
-        
+
         if organization_settings_form.is_valid():
             organization_settings_form.save()
             messages.success(request, SUCCESS_EDIT_MESSAGE)
+            # The generic model signal records the field diff; this entry
+            # names the change in the words a business would use.
+            from app.services.audit_service import log_event
+            log_event(
+                'update',
+                category='settings',
+                description='Updated the business profile (name, contacts, currency)',
+                obj=organization_settings,
+                request=request,
+            )
         else:
             messages.error(request, FAILURE_MESSAGE)
-    
-    return HttpResponseRedirect(reverse('settings_page'))
+
+    return HttpResponseRedirect(reverse('settings_tab', kwargs={'slug': 'profile'}))
 
 
 @login_required

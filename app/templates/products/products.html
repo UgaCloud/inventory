@@ -25,7 +25,7 @@
                 <a data-bs-toggle="tooltip" data-bs-placement="top" title="Collapse" id="collapse-header"><i class="ti ti-chevron-up"></i></a>
             </li>
         </ul>
-        {% if user.is_superuser or is_admin %}
+        {% if user.is_superuser or can_manage_inventory %}
         <div class="page-btn">
             <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-product"> 
                 <i class="ti ti-circle-plus me-1"></i>
@@ -664,6 +664,9 @@ function renderTableRows(products) {
             <td>${product.sku || ''}</td>
             <td>
                 <div class="d-flex align-items-center">
+                    ${product.image_url ?
+                        `<img src="${product.image_url}" alt="${product.name}" class="rounded-circle me-2" style="width: 36px; height: 36px; object-fit: cover;">` :
+                        `<span class="rounded-circle bg-secondary bg-opacity-25 text-secondary d-inline-flex align-items-center justify-content-center me-2" style="width: 36px; height: 36px;"><i class="ti ti-package"></i></span>`}
                     <a href="/product_details/${product.id}/">${product.name}</a>
                     ${product.unit_count > 0 ? 
                         `<span class="badge bg-info ms-2" title="${product.unit_count} unit${product.unit_count > 1 ? 's' : ''}">
@@ -701,7 +704,7 @@ function renderTableRows(products) {
             </td>
             <td>${statusBadge}</td>
             <td class="action-table-data">
-                {% if user.is_superuser or is_admin %}
+                {% if user.is_superuser or can_manage_inventory %}
                 <div class="edit-delete-action">
                     <a class="me-2 edit-icon p-2" href="/product_details/${product.id}/" title="View Details">
                         <i data-feather="eye" class="feather-eye"></i>

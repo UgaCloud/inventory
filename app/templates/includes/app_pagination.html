@@ -1,0 +1,38 @@
+{% if is_paginated %}
+<nav class="app-pagination" aria-label="Pagination">
+    <span class="app-pagination-summary">
+        Page {{ page_obj.number }} of {{ paginator.num_pages }}
+        <span class="app-pagination-count">· {{ total_count }} record{{ total_count|pluralize }}</span>
+    </span>
+
+    <div class="app-pagination-controls">
+        {% if prev_url %}
+        <a class="btn btn-sm btn-outline-secondary" href="{{ prev_url }}" rel="prev">
+            <i data-feather="chevron-left" class="feather-14 me-1"></i>Previous
+        </a>
+        {% else %}
+        <span class="btn btn-sm btn-outline-secondary disabled">Previous</span>
+        {% endif %}
+
+        {% for page in pages %}
+        <a class="btn btn-sm {% if page.is_current %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+           href="{{ page.url }}"
+           {% if page.is_current %}aria-current="page"{% endif %}>{{ page.number }}</a>
+        {% endfor %}
+
+        {% if next_url %}
+        <a class="btn btn-sm btn-outline-secondary" href="{{ next_url }}" rel="next">
+            Next<i data-feather="chevron-right" class="feather-14 ms-1"></i>
+        </a>
+        {% else %}
+        <span class="btn btn-sm btn-outline-secondary disabled">Next</span>
+        {% endif %}
+    </div>
+</nav>
+{% else %}
+{% if total_count is not None %}
+<nav class="app-pagination app-pagination-single" aria-label="Pagination">
+    <span class="app-pagination-summary">{{ total_count }} record{{ total_count|pluralize }}</span>
+</nav>
+{% endif %}
+{% endif %}

@@ -51,16 +51,8 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="card">
+    </div>    <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-            <div class="search-set">
-                <div class="search-input">
-                    <span class="btn-searchset"><i class="ti ti-search fs-14 feather-search"></i></span>
-                </div>
-            </div>
-            
             <!-- Summary Stats -->
             <div class="d-flex gap-3">
                 {% if not show_cancelled %}
@@ -84,173 +76,13 @@
                 {% endif %}
             </div>
         </div>
+
+        {% include "includes/app_list_toolbar.html" %}
+
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table datatable">
-                    <thead class="thead-light">
-                        <!-- <tr>
-                            <th class="no-sort">
-                                <label class="checkboxs">
-                                    <input type="checkbox" id="select-all">
-                                    <span class="checkmarks"></span>
-                                </label>
-                            </th> -->
-                            <th>ID</th>
-                            <th>Receipt No</th>
-                            <th>Sale Date</th>
-                            <th>Store</th>
-                            <th>Customer</th>
-                            <th>Total Amount</th>
-                            <th>Amount Paid</th>
-                            <th>Balance</th>
-                            <th>Status</th>
-                            <th>Recorded By</th>
-                            <th class="no-sort">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if sales %}
-                            {% for sale in sales %}
-                            <tr class="{% if sale.is_cancelled %}table-danger{% endif %}">
-                                <!-- <td>
-                                    <label class="checkboxs">
-                                        <input type="checkbox">
-                                        <span class="checkmarks"></span>
-                                    </label>
-                                </td> -->
-                                <td>{{ forloop.counter }}</td>
-                                <td>
-                                    <strong>{{ sale.receipt_no }}</strong>
-                                    {% if sale.is_cancelled %}
-                                    <br><small class="text-danger"><i class="ti ti-ban"></i> Cancelled on {{ sale.cancelled_at|date:"M d, Y" }}</small>
-                                    {% endif %}
-                                </td>
-                                <td>{{ sale.sale_date|date:"Y-m-d" }}</td>
-                                <td>{{ sale.store }}</td>
-                                <td>{{ sale.customer|default:"Walk-in" }}</td>
-                                <td>{{ sale.total_amount|intcomma }}/-</td>
-                                <td>{{ sale.amount_paid|intcomma }}/-</td>
-                                <td>
-                                    {% if sale.balance > 0 %}
-                                    <span class="text-danger">{{ sale.balance|intcomma }}/-</span>
-                                    {% else %}
-                                    <span class="text-success">0/-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if sale.is_cancelled %}
-                                    <span class="badge bg-danger">
-                                        <i class="ti ti-ban me-1"></i> CANCELLED
-                                    </span>
-                                    {% else %}
-                                    <span class="badge 
-                                        {% if sale.status == 'FULFILLED' %}bg-success
-                                        {% elif sale.status == 'PARTIALLY_PAID' %}bg-warning text-dark
-                                        {% else %}bg-secondary{% endif %}">
-                                        {{ sale.get_status_display }}
-                                    </span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ sale.recorded_by.get_full_name|default:sale.recorded_by.username }}</td>
-                                <td class="action-table-data">
-                                    <div class="edit-delete-action">
-                                        <a class="me-2 edit-icon p-2" href="{% url 'sales_detail' sale.id %}" title="View Details">
-                                            <i data-feather="eye" class="feather-eye"></i>
-                                        </a>
-                                        
-                                        {% if not sale.is_cancelled and sale.status != 'FULFILLED' %}
-                                        <!-- Edit button (only for non-cancelled sales) -->
-                                        <a class="me-2 edit-icon p-2" href="{% url 'sales_update_view' sale.id %}" title="Edit Sale">
-                                            <i class="ti ti-edit"></i>
-                                        </a>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                        <tr>
-                            <td colspan="12" class="text-center py-5">
-                                {% if show_cancelled %}
-                                <div class="empty-state">
-                                    <i class="ti ti-ban fs-48 text-muted mb-3"></i>
-                                    <h5>No Cancelled Sales Found</h5>
-                                    <p class="text-muted">There are no cancelled sales to display.</p>
-                                    <a href="?show_cancelled=false" class="btn btn-primary">
-                                        <i class="ti ti-shopping-cart me-1"></i> View Active Sales
-                                    </a>
-                                </div>
-                                {% else %}
-                                <div class="empty-state">
-                                    <i class="ti ti-shopping-cart fs-48 text-muted mb-3"></i>
-                                    <h5>No Active Sales Found</h5>
-                                    <p class="text-muted">No active sales records available.</p>
-                                    <a href="{% url 'record_sale' %}" class="btn btn-primary">
-                                        <i class="ti ti-circle-plus me-1"></i> Record New Sale
-                                    </a>
-                                </div>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
+            {% include "includes/app_list.html" %}
+            {% include "includes/app_pagination.html" %}
         </div>
-        
-        <!-- Pagination -->
-        {% if is_paginated %}
-        <div class="card-footer">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <div class="text-muted">
-                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} entries
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <nav aria-label="Page navigation" class="float-end">
-                        <ul class="pagination mb-0">
-                            {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if show_cancelled %}&show_cancelled=true{% endif %}" aria-label="First">
-                                    <span aria-hidden="true">&laquo;&laquo;</span>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if show_cancelled %}&show_cancelled=true{% endif %}" aria-label="Previous">
-                                    <span aria-hidden="true">&laquo;</span>
-                                </a>
-                            </li>
-                            {% endif %}
-
-                            {% for num in page_obj.paginator.page_range %}
-                                {% if page_obj.number == num %}
-                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if show_cancelled %}&show_cancelled=true{% endif %}">{{ num }}</a>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-
-                            {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if show_cancelled %}&show_cancelled=true{% endif %}" aria-label="Next">
-                                    <span aria-hidden="true">&raquo;</span>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if show_cancelled %}&show_cancelled=true{% endif %}" aria-label="Last">
-                                    <span aria-hidden="true">&raquo;&raquo;</span>
-                                </a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 
 {% endblock %}
@@ -331,55 +163,4 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize DataTable if it exists
-        if ($.fn.DataTable) {
-            $('.datatable').DataTable({
-                "pageLength": 25,
-                "order": [[2, "desc"]], // Sort by Receipt No (or change to date column)
-                "columnDefs": [
-                    { "orderable": false, "targets": "no-sort" }
-                ],
-                "language": {
-                    "search": "",
-                    "searchPlaceholder": "Search sales...",
-                    "lengthMenu": "Show _MENU_ entries",
-                    "info": "Showing _START_ to _END_ of _TOTAL_ entries",
-                    "infoEmpty": "Showing 0 to 0 of 0 entries",
-                    "infoFiltered": "(filtered from _MAX_ total entries)"
-                }
-            });
-        }
-        
-        // Select all checkbox
-        const selectAllCheckbox = document.getElementById('select-all');
-        if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', function() {
-                const checkboxes = document.querySelectorAll('table input[type="checkbox"]:not(#select-all)');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = selectAllCheckbox.checked;
-                });
-            });
-        }
-        
-        // Quick search functionality
-        const searchInput = document.querySelector('.search-input input');
-        if (searchInput) {
-            searchInput.addEventListener('keyup', function() {
-                const searchTerm = this.value.toLowerCase();
-                const rows = document.querySelectorAll('.datatable tbody tr');
-                
-                rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    if (text.includes(searchTerm)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-            });
-        }
-    });
-</script>
 {% endblock %}

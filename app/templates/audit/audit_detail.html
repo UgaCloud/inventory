@@ -1,0 +1,105 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Audit entry #{{ entry.pk }} | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-wrapper p-0 m-0">
+    <div class="content">
+        <div class="page-header">
+            <div class="add-item d-flex">
+                <div class="page-title">
+                    <h4>Audit entry</h4>
+                    <h6>{{ entry.timestamp|date:"d M Y, H:i:s" }} &middot; {{ entry.get_category_display }}</h6>
+                </div>
+            </div>
+            <div class="page-btn">
+                <a href="{% url 'audit_log_page' %}" class="btn btn-light">
+                    <i class="ti ti-arrow-left me-1"></i>Back to trail
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3">{{ entry.description }}</h5>
+
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3 text-muted fw-normal">Actor</dt>
+                            <dd class="col-sm-9">
+                                {% if entry.actor %}
+                                    {{ entry.actor_name|default:entry.actor.username }}
+                                {% else %}
+                                    {{ entry.actor_name|default:'System' }}
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-3 text-muted fw-normal">Action</dt>
+                            <dd class="col-sm-9">{{ entry.get_action_display }}</dd>
+
+                            <dt class="col-sm-3 text-muted fw-normal">Record</dt>
+                            <dd class="col-sm-9">
+                                {% if entry.model_name %}{{ entry.model_name }} #{{ entry.object_id }}{% else %}&mdash;{% endif %}
+                            </dd>
+
+                            <dt class="col-sm-3 text-muted fw-normal">Business</dt>
+                            <dd class="col-sm-9">
+                                {% if entry.business %}{{ entry.business.name }}{% else %}<span class="text-muted">Platform-wide</span>{% endif %}
+                            </dd>
+
+                            <dt class="col-sm-3 text-muted fw-normal">Outcome</dt>
+                            <dd class="col-sm-9">
+                                {% if entry.outcome == 'failure' %}
+                                    <span class="badge app-badge-failure">{{ entry.get_outcome_display }}</span>
+                                {% else %}
+                                    <span class="badge app-badge-success">{{ entry.get_outcome_display }}</span>
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-3 text-muted fw-normal">Request ID</dt>
+                            <dd class="col-sm-9"><code>{{ entry.request_id|default:'—' }}</code></dd>
+
+                            <dt class="col-sm-3 text-muted fw-normal">IP address</dt>
+                            <dd class="col-sm-9">{{ entry.ip_address|default:'—' }}</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                {% if entry.changes %}
+                    <div class="card mt-3">
+                        <div class="card-header bg-white fw-semibold">Recorded changes</div>
+                        <div class="card-body p-0">
+                            <div class="app-list">
+                                {% for field, change in entry.changes.items %}
+                                    <div class="app-list-row app-list-row-static">
+                                        <span class="app-list-main">
+                                            <span class="app-list-title">{{ field }}</span>
+                                            <span class="app-list-meta">
+                                                <span class="text-danger">{{ change.from|default:"—" }}</span>
+                                                <i class="ti ti-arrow-right mx-1"></i>
+                                                <span class="text-success">{{ change.to|default:"—" }}</span>
+                                            </span>
+                                        </span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header bg-white fw-semibold">Session</div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">User agent</p>
+                        <p class="small mb-0 text-break">{{ entry.user_agent|default:'—' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

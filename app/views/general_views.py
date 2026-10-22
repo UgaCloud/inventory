@@ -28,8 +28,28 @@ from datetime import datetime
 
 
 
-@login_required
+def landing_view(request):
+    """
+    The public landing page.
+
+    It is deliberately free of any business data: a visitor who is not
+    signed in sees the product and the way to get an account, nothing
+    about the businesses, their staff or their stock.
+    """
+    return render(request, 'public/landing.html')
+
+
 def index_view(request):
+    """
+    The entry point.
+
+    A signed-in user lands on their dashboard; an anonymous visitor is
+    shown the public landing page instead of a login wall, so the first
+    thing they see explains what the platform is.
+    """
+    if not request.user.is_authenticated:
+        return landing_view(request)
+
     from app.selectors.transaction_selectors import get_order_statistics
     from django.core.serializers import serialize
     from django.db.models import QuerySet
@@ -105,14 +125,17 @@ def index_view(request):
             'unit_cost': decimal_to_float(adj.unit_cost) if adj.unit_cost else None,
         })
 
-    # Get recent sales transactions
-    recent_sales_qs = get_recent_sales(user, limit=5)
+    # Get recent sales transactions. The dashboard describes the business,
+    # so the rows are the tenant's own (the managers scope them) and not
+    # only the ones the signed-in user recorded.
+    recent_sales_qs = get_recent_sales(limit=5)
     recent_sales_transactions = []
     for sale in recent_sales_qs:
         recent_sales_transactions.append({
             'id': sale.id,
             'receipt_no': sale.receipt_no,
-            'sale_date': sale.sale_date.isoformat(),
+            # A real date object: the templates format it themselves.
+            'sale_date': sale.sale_date,
             'customer': sale.customer.name if sale.customer else 'Walk-in',
             'customer_id': sale.customer.id if sale.customer else None,
             'status': sale.status,
@@ -177,7 +200,7 @@ def index_view(request):
         })
 
     # Get order statistics
-    order_stats_data = get_order_statistics(days=7, user=user)
+    order_stats_data = get_order_statistics(days=7)
     order_stats = []
     for stat in order_stats_data:
         order_stats.append({
@@ -186,42 +209,25 @@ def index_view(request):
             'total': decimal_to_float(stat['total']),
         })
 
-    # Prepare chart data for sales vs purchases
-    # Get actual data for last 30 days
-    end_date = date.today()
-    start_date = end_date - timedelta(days=30)
-    
-    # You would implement these functions or use existing ones
-    # For now using sample data structure
-    sales_chart_data = {
-        'labels': [],
-        'purchases': [],
-        'sales': [],
-    }
-    
-    # Generate last 30 days labels
-    for i in range(30):
-        current_date = start_date + timedelta(days=i)
-        sales_chart_data['labels'].append(current_date.strftime('%d %b'))
-
-    # Prepare revenue vs expense chart data
-    revenue_chart_data = {
-        'labels': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        'revenue': [],  # Populate with actual monthly revenue
-        'expenses': [], # Populate with actual monthly expenses
-    }
-
     # Prepare top categories chart
     top_categories_chart = {
         'labels': [c['name'] for c in top_categories],
         'data': [c['total_sales'] for c in top_categories],
     }
 
-    # Prepare customer chart data
-    customer_chart_data = {
-        "labels": ["First Time", "Return"],
-        "data": [6500, 4500],
-    }
+    # Real operational data for the charts and the headline cards. The
+    # dashboards used to render placeholder series and fixed percentages.
+    from app.selectors import dashboard_selectors as dashboard_metrics
+
+    sales_chart_data = dashboard_metrics.get_sales_vs_purchases_series(days=30)
+    revenue_chart_data = dashboard_metrics.get_revenue_vs_expenses_series(months=12)
+    customer_chart_data = dashboard_metrics.get_customer_split()
+
+    month_over_month = dashboard_metrics.get_month_over_month()
+    net_profit_change_pct = month_over_month["profit_change_pct"]
+    if net_profit_change_pct is None and not month_over_month["profit"]:
+        net_profit_change_pct = 0
+
 
     context = {
         "organization_details": get_organization_settings(),
@@ -229,24 +235,40 @@ def index_view(request):
 
         # Financials
         "total_sales_per_user": decimal_to_float(get_total_sales_per_user(user)),
+        "todays_sales_total": decimal_to_float(get_total_sales_today()),
         "total_sales": decimal_to_float(get_total_sales()),
         "total_purchases": decimal_to_float(get_total_purchases()),
         "total_expenses": decimal_to_float(get_total_expenses()),
         "net_profit": decimal_to_float((get_total_sales() or 0) - (get_total_expenses() or 0)),
         "net_profit_per_user": decimal_to_float((get_total_sales_per_user(user) or 0) - (get_total_expenses() or 0)),
+        "net_profit_change_pct": net_profit_change_pct,
+        "profit_this_month": month_over_month["profit"],
+        "profit_last_month": month_over_month["prev_profit"],
+        "sales_change_pct": month_over_month["sales_change_pct"],
+        "expenses_change_pct": month_over_month["expenses_change_pct"],
+        "purchases_change_pct": month_over_month["purchases_change_pct"],
+        "returns_total": month_over_month["returns_total"],
         "total_revenue": decimal_to_float(get_total_revenue()),
-        "total_payments_received": decimal_to_float(get_total_payments_received(user)),
+        "total_payments_received": decimal_to_float(get_total_payments_received()),
 
         # Counts
         "total_customers": get_number_of_customers(),
         "total_suppliers": get_number_of_suppliers(),
-        "total_sale_orders": get_all_sales(user).count(),
+        "total_sale_orders": get_all_sales().count(),
 
-        # Today's sales metrics
-        "todays_number_sales": get_todays_number_of_sales(user),
-        "todays_collection_rate": decimal_to_float(get_todays_collection_rate(user)),
-        "todays_fully_paid_sales": get_todays_fully_paid_sales(user),
-        "todays_partially_paid_sales": get_todays_partially_paid_sales(user),
+        # Today's sales metrics. These describe the business (the tenant's
+        # own rows); the personal variants below are kept for the cards that
+        # are explicitly about one person.
+        "todays_number_sales": get_todays_number_of_sales(),
+        "todays_collection_rate": decimal_to_float(get_todays_collection_rate()),
+        "todays_fully_paid_sales": get_todays_fully_paid_sales(),
+        "todays_partially_paid_sales": get_todays_partially_paid_sales(),
+
+        # The signed-in user's own activity.
+        "my_todays_sales": decimal_to_float(get_total_sales_per_user(user)),
+        "my_todays_number_sales": get_todays_number_of_sales(user),
+        "my_todays_collection_rate": decimal_to_float(get_todays_collection_rate(user)),
+        "my_todays_payments_received": decimal_to_float(get_total_payments_received(user)),
 
         # Products
         "recent_sales": recent_sales_transactions,
@@ -287,6 +309,7 @@ def index_view(request):
     # Dashboard modules logic remains the same
     dashboard_templates = []
     dashboard_info = []
+    effective_modules = []
 
     try:
         from app.utils.dashboard_assignment import (
@@ -294,6 +317,7 @@ def index_view(request):
             get_dashboard_info_for_modules,
         )
         modules = user.profile.effective_modules
+        effective_modules = sorted(modules)
         dashboard_info = get_dashboard_info_for_modules(modules)
         dashboard_templates = [item["template"] for item in dashboard_info]
     except (UserProfile.DoesNotExist, AttributeError):
@@ -306,6 +330,7 @@ def index_view(request):
             {"name": name, "template": template}
             for name, template in DASHBOARD_TEMPLATE_MAP.items()
         ]
+        effective_modules = list(range(1, 17))
 
     # Enforce admin dashboard visibility restriction:
     # Only superusers should see the admin dashboard template.
@@ -324,7 +349,19 @@ def index_view(request):
     context.update({
         "dashboard_templates": dashboard_templates,
         "dashboard_info": dashboard_info,
+        "effective_modules": effective_modules,
     })
+
+    # Permission-aware quick actions: only shortcuts the user can open.
+    try:
+        from app.utils.module_mapping import get_quick_actions
+        context["quick_actions"] = get_quick_actions(user)
+    except Exception:
+        context["quick_actions"] = []
+
+    # Real operational metrics for the sales and stores dashboards.
+    context.update(dashboard_metrics.get_sales_dashboard_metrics(user))
+    context.update(dashboard_metrics.get_stores_dashboard_metrics(user))
 
     return render(request, "basic/index.html", context)
 
@@ -337,7 +374,7 @@ def orders_by_date(request):
     date_str = request.GET.get('date')
     if date_str:
         date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        orders = get_all_sales(request.user).filter(sale_date=date)[:10]
+        orders = get_all_sales().filter(sale_date=date)[:10]
         orders_data = [{
             'id': order.id,
             'customer': str(order.customer),
@@ -377,6 +414,10 @@ def login_view(request):
             login(request, user)
             # Clear any timeout warnings from session
             request.session.pop('timeout_warning', None)
+            # Honour ?next= so a deep link survives the sign-in.
+            redirect_to = request.POST.get('next') or request.GET.get('next') or ''
+            if redirect_to and redirect_to.startswith('/') and not redirect_to.startswith('//'):
+                return redirect(redirect_to)
             return redirect(index_view)
     
     else:

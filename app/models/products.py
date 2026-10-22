@@ -4,6 +4,7 @@ from app.models.organization import Branch
 from django.core.exceptions import ValidationError
 import re
 from django.db.models import Sum
+from app.managers import TenantManager
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -44,11 +45,19 @@ class Automotive(models.Model):
 
 
 class Product(models.Model):
+
+    objects = TenantManager()
+
+    business = models.ForeignKey(
+        "app.Business", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="products",
+    )
     name = models.CharField(max_length=255)
     sku = models.CharField(max_length=100, unique=True, blank=True)  
     brand = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     barcode = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    image = models.ImageField(upload_to='products/', blank=True, null=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     compatible_vehicles = models.ManyToManyField(Automotive, blank=True, related_name='products', verbose_name='Compatibility')
     is_active = models.BooleanField(default=True)
@@ -225,6 +234,9 @@ class Product(models.Model):
 
 
 class ProductUnitPrice(models.Model):
+
+    objects = TenantManager()
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="unit_prices")
     unit = models.ForeignKey(UnitOfMeasure, on_delete=models.CASCADE)
     conversion_factor = models.DecimalField(max_digits=10, decimal_places=0, default=1)
@@ -273,6 +285,13 @@ class ProductUnitPrice(models.Model):
 
 
 class StoreLocation(models.Model):
+
+    objects = TenantManager()
+
+    business = models.ForeignKey(
+        "app.Business", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="store_locations",
+    )
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='store_locations', null=True, blank=True)
     name = models.CharField(max_length=100)
     address = models.TextField(blank=True)
@@ -293,6 +312,9 @@ class StoreLocation(models.Model):
 
 
 class Inventory(models.Model):
+
+    objects = TenantManager()
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inventories')
     store = models.ForeignKey(StoreLocation, on_delete=models.CASCADE)
     quantity_in_stock = models.PositiveIntegerField(default=0)  # ALWAYS BASE UNITS

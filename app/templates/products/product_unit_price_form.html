@@ -1,4 +1,34 @@
-<!-- filepath: /Users/abdulhakiim/Me/UGACloud/Projects/inventory/app/templates/products/includes/product_unit_price_form.html -->
-{% load crispy_forms_tags %}
+{% extends 'basic/base.html' %}
+{% load static %}
 
-{{ form|crispy }}
+{% block title %}Add Unit Price | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Add Product Unit Price</h4>
+            <h6>Define a price for a product unit</h6>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">
+                    <i class="ti ti-device-floppy me-1"></i>Save
+                </button>
+                <a href="{% url 'products_page' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

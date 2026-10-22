@@ -1,0 +1,43 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>{{ title }}</h4>
+            <h6>How unit conversion factors work in stock transfers</h6>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <p class="text-muted">
+                Every product has a <strong>base unit</strong> (conversion factor = 1). Other units are
+                defined relative to it: entering 10 sachets when the pack conversion factor is 10 means
+                1 pack. Transfers always move stock in base units behind the scenes.
+            </p>
+
+            <div class="row">
+                {% for example in examples %}
+                <div class="col-md-4 mb-3">
+                    <div class="card border">
+                        <div class="card-body">
+                            <h6 class="mb-2">{{ example.product }}</h6>
+                            <p class="mb-2 small text-muted">Base unit: {{ example.base_unit }}</p>
+                            <ul class="mb-0 small">
+                                {% for conv in example.conversions %}
+                                    <li><strong>{{ conv.unit }}</strong> (CF {{ conv.cf }}): {{ conv.example }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

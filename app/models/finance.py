@@ -2,8 +2,12 @@ from django.db import models
 from datetime import date, timedelta
 
 from app.constants import CASHFLOW_TYPES, TRANSACTION_TYPES
+from app.managers import TenantManager
 
 class CashFlow(models.Model):
+
+    objects = TenantManager()
+
     store = models.ForeignKey('app.StoreLocation', on_delete=models.CASCADE)
     date = models.DateField(auto_now_add=True)
     amount = models.DecimalField(max_digits=12, decimal_places=0)
@@ -29,6 +33,9 @@ class CashFlow(models.Model):
         return f"CashFlow: {self.get_transaction_type_display()} {self.amount} on {self.date} ({self.store})"
 
 class DailyCashSummary(models.Model):
+
+    objects = TenantManager()
+
     store = models.ForeignKey('app.StoreLocation', on_delete=models.CASCADE)
     date = models.DateField()
     opening_balance = models.DecimalField(max_digits=12, decimal_places=0)
@@ -51,6 +58,13 @@ class DailyCashSummary(models.Model):
         return f"DailyCashSummary: {self.store} {self.date} | Opening: {self.opening_balance} | Closing: {self.closing_balance}"
 
 class BankAccount(models.Model):
+
+    objects = TenantManager()
+
+    business = models.ForeignKey(
+        "app.Business", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="bank_accounts",
+    )
     name = models.CharField(max_length=100)
     account_number = models.CharField(max_length=50, unique=True)
     bank_name = models.CharField(max_length=100)
@@ -62,6 +76,9 @@ class BankAccount(models.Model):
         return f"{self.bank_name} - {self.account_number} ({self.name})"
 
 class BankTransaction(models.Model):
+
+    objects = TenantManager()
+
     bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name='transactions')
     store = models.ForeignKey('app.StoreLocation', on_delete=models.CASCADE)
     date = models.DateField(auto_now_add=True)

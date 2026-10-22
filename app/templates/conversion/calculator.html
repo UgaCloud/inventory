@@ -1,0 +1,75 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>{{ title }}</h4>
+            <h6>Look up conversion factors per product unit</h6>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label" for="product-select">Product</label>
+                <select id="product-select" class="form-select">
+                    <option value="">-- Select a product --</option>
+                    {% for product in products %}
+                        <option value="{{ product.id }}">{{ product.name }} ({{ product.sku }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Unit</th>
+                            <th>Conversion Factor</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="conversion-rows">
+                        <tr><td colspan="3" class="text-center text-muted py-3">Select a product to see its conversion factors.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var select = document.getElementById('product-select');
+    var tbody = document.getElementById('conversion-rows');
+
+    select.addEventListener('change', function () {
+        var productId = this.value;
+        if (!productId) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Select a product to see its conversion factors.</td></tr>';
+            return;
+        }
+        fetch("{% url 'product_unit_prices_api' 0 %}".replace('/0/', '/' + productId + '/'))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var prices = data.prices || data.unit_prices || [];
+                if (!prices.length) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No unit prices defined for this product.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = prices.map(function (p) {
+                    return '<tr><td>' + (p.unit_name || p.unit || '-') + '</td><td>' +
+                        (p.conversion_factor || 1) + '</td><td>' + (p.price || '-') + '</td></tr>';
+                }).join('');
+            })
+            .catch(function () {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger py-3">Failed to load conversion factors.</td></tr>';
+            });
+    });
+})();
+</script>
+{% endblock %}

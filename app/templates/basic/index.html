@@ -1,60 +1,42 @@
-{% extends 'basic/base.html' %} 
-{% load static %} 
+{% extends 'basic/base.html' %}
+{% load static %}
 {% load crispy_forms_tags %}
-{% load humanize %} 
+{% load humanize %}
+
+{% comment %}
+Dashboard shell.
+
+The tabs are derived from the modules the signed-in user actually has, so a
+team member only ever sees the dashboards their roles unlock. The markup
+uses the shared `.app-tabs` primitive (assets/js/app-ui.js), which handles
+the active state, the hash deep-link and the accessible tab semantics.
+{% endcomment %}
 
 {% block content %}
   {% if dashboard_templates %}
     {% if dashboard_templates|length > 1 %}
-      <!-- Multiple dashboards: Show tabs -->
-      <div class="card">
-        <div class="card-header border-0 pb-0">
-          <ul class="nav nav-tabs nav-tabs-line" role="tablist">
-            {% if dashboard_info %}
-              {% for info in dashboard_info %}
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link {% if forloop.first %}active{% endif %}" id="dashboard-tab-{{ forloop.counter0 }}" 
-                    data-bs-toggle="tab" data-bs-target="#dashboard-pane-{{ forloop.counter0 }}" type="button" role="tab">
-                    {% if 'Admin' in info.name %}
-                      <i class="ti ti-shield me-1"></i>{{ info.name }}
-                    {% elif 'Sales' in info.name %}
-                      <i class="ti ti-shopping-cart me-1"></i>{{ info.name }}
-                    {% elif 'Stores' in info.name %}
-                      <i class="ti ti-building-store me-1"></i>{{ info.name }}
-                    {% else %}
-                      <i class="ti ti-dashboard me-1"></i>{{ info.name }}
-                    {% endif %}
-                  </button>
-                </li>
-              {% endfor %}
-            {% else %}
-              {% for dashboard in dashboard_templates %}
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link {% if forloop.first %}active{% endif %}" 
-                    id="dashboard-tab-{{ forloop.counter0 }}" data-bs-toggle="tab" data-bs-target="#dashboard-pane-{{ forloop.counter0 }}" type="button" role="tab">
-                    {% if 'admin' in dashboard|lower %}
-                      <i class="ti ti-shield me-1"></i>Admin Dashboard
-                    {% elif 'sales' in dashboard|lower %}
-                      <i class="ti ti-shopping-cart me-1"></i>Sales Dashboard
-                    {% elif 'stores' in dashboard|lower %}
-                      <i class="ti ti-building-store me-1"></i>Stores Dashboard
-                    {% else %}
-                      <i class="ti ti-dashboard me-1"></i>Dashboard {{ forloop.counter }}
-                    {% endif %}
-                  </button>
-                </li>
-              {% endfor %}
-            {% endif %}
-          </ul>
-        </div>
+      <div class="card app-rise-in">
         <div class="card-body">
-          <div class="tab-content">
+          <div class="app-tabs" data-tabs role="tablist" aria-label="Dashboards">
+            {% for info in dashboard_info %}
+              <button class="app-tab" type="button" role="tab"
+                      id="dashboard-tab-{{ forloop.counter0 }}"
+                      data-tab-target="dashboard-pane-{{ forloop.counter0 }}"
+                      aria-controls="dashboard-pane-{{ forloop.counter0 }}"
+                      aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+                <i class="ti {{ info.icon|default:"ti-dashboard" }}"></i>{{ info.name }}
+              </button>
+            {% endfor %}
+          </div>
+
+          <div class="dashboard-panes">
             {% for dashboard in dashboard_templates %}
-              <div 
-                class="tab-pane fade {% if forloop.first %}show active{% endif %}" 
-                id="dashboard-pane-{{ forloop.counter0 }}" 
-                role="tabpanel"
-              >
+              <div class="app-tab-panel"
+                   data-tab-panel="dashboard-pane-{{ forloop.counter0 }}"
+                   id="dashboard-pane-{{ forloop.counter0 }}"
+                   role="tabpanel"
+                   aria-labelledby="dashboard-tab-{{ forloop.counter0 }}"
+                   {% if not forloop.first %}hidden{% endif %}>
                 {% include dashboard %}
               </div>
             {% endfor %}
@@ -62,17 +44,41 @@
         </div>
       </div>
     {% else %}
-      <!-- Single dashboard: Show directly -->
-      {% for dashboard in dashboard_templates %}
-        {% include dashboard %}
-      {% endfor %}
+      <!-- Single dashboard: show directly -->
+      <div class="app-rise-in">
+        {% for dashboard in dashboard_templates %}
+          {% include dashboard %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if quick_actions %}
+      <div class="card mt-3">
+        <div class="card-header bg-white">
+          <h5 class="card-title mb-0">Quick actions</h5>
+        </div>
+        <div class="card-body">
+          <div class="app-link-list">
+            {% for action in quick_actions %}
+              <a class="app-link-row" href="{{ action.url }}">
+                <i class="{{ action.icon }}"></i>
+                <span class="flex-grow-1">{{ action.label }}</span>
+                <i class="ti ti-chevron-right text-muted"></i>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
     {% endif %}
   {% else %}
     <!-- Fallback for users without dashboard-enabled modules -->
-    <div class="alert alert-warning">
-      <h4>No Dashboard Access Yet</h4>
-      <p>Your current roles do not include any dashboard modules.</p>
-      <p>Please contact an administrator to update your role assignments.</p>
+    <div class="app-empty-state app-rise-in">
+      <span class="app-empty-icon"><i class="ti ti-lock"></i></span>
+      <span class="app-empty-title">No Dashboard Access Yet</span>
+      <span class="app-empty-text">
+        Your current roles do not include any dashboard modules. Ask an administrator
+        to grant you a role that unlocks a dashboard.
+      </span>
     </div>
   {% endif %}
 {% endblock %}

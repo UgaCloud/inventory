@@ -16,4 +16,7 @@ class AppConfig(AppConfig):
         import app.signals.human_resource_signals
         import app.signals.user_signals
         import app.signals.customers_signals
+        import app.signals.tenancy_signals
+        import app.signals.audit_signals
+        import app.signals.notification_signals
 

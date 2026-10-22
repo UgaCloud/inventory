@@ -1,0 +1,31 @@
+{% comment %}Sales and purchasing: customers, suppliers and trading defaults.{% endcomment %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        {% include 'settings/_cards.html' with cards=cards %}
+
+        <h6 class="fw-semibold mb-3">
+            <i class="ti ti-receipt me-1 text-primary"></i>Where to manage it
+        </h6>
+        {% include 'settings/_links.html' with links=links %}
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3">
+                    <i class="ti ti-coin me-1 text-primary"></i>Trading defaults
+                </h6>
+                <dl class="row mb-0 small">
+                    <dt class="col-5 text-muted fw-normal">Currency</dt>
+                    <dd class="col-7">{{ organization.currency }}</dd>
+                    <dt class="col-5 text-muted fw-normal">Business</dt>
+                    <dd class="col-7">{{ business.name|default:"Platform wide" }}</dd>
+                    <dt class="col-5 text-muted fw-normal">Branches</dt>
+                    <dd class="col-7">{{ organization.city|default:"-" }}</dd>
+                </dl>
+                <a href="{% url 'settings_tab' slug='profile' %}" class="btn btn-sm btn-outline-primary mt-3">
+                    <i class="ti ti-pencil me-1"></i>Edit in the business profile
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

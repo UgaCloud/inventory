@@ -174,6 +174,77 @@
             </div>
             <!-- End Items Table -->
 
+            {% if perfume_lines %}
+            <!-- Perfume (ml) Sales Section -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">
+                                <i class="ti ti-flask-2 me-2"></i>Perfume Sale (ml)
+                            </h5>
+                            {% for line in perfume_lines %}
+                            {% if line.is_mixture %}
+                            <span class="badge bg-white text-info">Mixture of {{ line.component_count }} perfumes</span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="card-body">
+                            {% for line in perfume_lines %}
+                            <div class="mb-4 {% if not forloop.last %}border-bottom pb-3{% endif %}">
+                                <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                                    <h6 class="fw-bold mb-0">
+                                        {% if line.is_mixture %}Mixture{% else %}Perfume{% endif %}
+                                        &mdash; {{ line.total_quantity_ml|floatformat:0 }} ml
+                                    </h6>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <span class="fw-semibold">Price: UGX {{ line.selling_price|intcomma }}</span>
+                                        <span class="text-muted">Cost: UGX {{ line.total_cost|intcomma }}</span>
+                                        <span class="fw-bold {% if line.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                            Gross profit: UGX {{ line.gross_profit|intcomma }}
+                                        </span>
+                                        {% if line.is_cancelled %}
+                                        <span class="badge bg-danger">Stock restored</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Perfume</th>
+                                            <th class="text-center">Quantity Consumed</th>
+                                            <th class="text-center">Unit Cost</th>
+                                            <th class="text-center">Component Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for comp in line.components.all %}
+                                        <tr>
+                                            <td>{{ comp.product.name }}</td>
+                                            <td class="text-center">{{ comp.quantity_ml|floatformat:0 }} ml</td>
+                                            <td class="text-center">{{ comp.unit_cost|intcomma }}</td>
+                                            <td class="text-center">{{ comp.component_cost|intcomma }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="table-light">
+                                            <td class="text-end fw-bold">Total:</td>
+                                            <td class="text-center fw-bold">{{ line.total_quantity_ml|floatformat:0 }} ml</td>
+                                            <td></td>
+                                            <td class="text-center fw-bold">{{ line.total_cost|intcomma }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Perfume Sales Section -->
+            {% endif %}
+
             {% if sale.is_cancelled %}
             <!-- Stock Return Information Section -->
             <div class="row mt-4">

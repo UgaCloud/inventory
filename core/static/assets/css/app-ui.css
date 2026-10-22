@@ -1,0 +1,1088 @@
+/* ==========================================================================
+   App UI — shared design-system layer
+   --------------------------------------------------------------------------
+   Loaded after assets/css/style.css. Everything in here is additive: it
+   introduces shared primitives (grids, motion tokens, lists, panels) so
+   feature templates do not each invent their own spacing/animation rules.
+
+   Contents
+     1. Design tokens
+     2. Motion utilities (fade / slide-up, reduced-motion aware)
+     3. Grid utilities (.grid-2, .grid-3)
+     4. Form field primitives
+     5. Record-sale items + payment summary
+     6. Empty states
+     7. Contextual slide-up panels
+     8. Compact record lists (the table replacement used across the app)
+     9. Tab bars (settings workspace, panel sections)
+    10. Badges and status pills
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Design tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* Motion — one consistent easing/duration scale for the whole app */
+  --app-motion-duration-fast: 140ms;
+  --app-motion-duration: 220ms;
+  --app-motion-duration-slow: 320ms;
+  --app-motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --app-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Surfaces */
+  --app-surface-muted: #f8fafc;
+  --app-surface-sunken: #f1f5f9;
+  --app-border: #e2e8f0;
+  --app-border-strong: #cbd5e1;
+
+  /* Brand-aligned accents (match the primary used across the app shell) */
+  --app-primary: #3b82f6;
+  --app-primary-soft: #eff6ff;
+  --app-danger: #dc2626;
+  --app-danger-soft: #fef2f2;
+  --app-success: #16a34a;
+  --app-success-soft: #f0fdf4;
+  --app-warning: #d97706;
+  --app-warning-soft: #fffbeb;
+
+  /* Elevation */
+  --app-radius-sm: 8px;
+  --app-radius: 12px;
+  --app-radius-lg: 16px;
+  --app-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --app-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --app-shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+/* --------------------------------------------------------------------------
+   2. Motion utilities
+   -------------------------------------------------------------------------- */
+@keyframes app-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes app-rise-in {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.app-fade-in {
+  animation: app-fade-in var(--app-motion-duration) var(--app-motion-ease) both;
+}
+
+.app-rise-in {
+  animation: app-rise-in var(--app-motion-duration-slow) var(--app-motion-ease-out) both;
+}
+
+/* Staggered children — used by dashboards and list panels so content
+   appears in a calm sequence instead of all at once. */
+.app-stagger > * {
+  animation: app-rise-in var(--app-motion-duration-slow) var(--app-motion-ease-out) both;
+}
+.app-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.app-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.app-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.app-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.app-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.app-stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+/* Interactive affordances */
+.app-hoverable {
+  transition:
+    transform var(--app-motion-duration) var(--app-motion-ease),
+    box-shadow var(--app-motion-duration) var(--app-motion-ease),
+    background-color var(--app-motion-duration) var(--app-motion-ease);
+}
+.app-hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--app-shadow);
+}
+
+/* Respect the OS "reduce motion" preference everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   3. Grid utilities
+   -------------------------------------------------------------------------- */
+.grid-2,
+.grid-3 {
+  display: grid;
+  gap: 1rem 1.25rem;
+  align-items: start;
+}
+
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+@media (max-width: 991.98px) {
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 575.98px) {
+  .grid-2,
+  .grid-3 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --------------------------------------------------------------------------
+   4. Form field primitives
+   -------------------------------------------------------------------------- */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.form-field > .form-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.form-field .form-control,
+.form-field .form-select {
+  width: 100%;
+}
+
+/* Read-only computed value that lines up with the inputs above it. */
+.form-value {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface-muted);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   5. Record-sale items + payment summary
+   -------------------------------------------------------------------------- */
+.sale-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sale-items-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.formset-row {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: #fff;
+  padding: 1rem 1.15rem 1.15rem;
+  transition:
+    border-color var(--app-motion-duration) var(--app-motion-ease),
+    background-color var(--app-motion-duration) var(--app-motion-ease),
+    box-shadow var(--app-motion-duration) var(--app-motion-ease);
+}
+
+.formset-row:hover {
+  border-color: var(--app-border-strong);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.formset-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px dashed var(--app-border);
+}
+
+.formset-row-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.formset-row-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.formset-row.stock-warning-row { background: var(--app-warning-soft); border-color: #fde68a; }
+.formset-row.stock-error-row { background: var(--app-danger-soft); border-color: #fecaca; }
+
+.form-field-actions {
+  align-items: flex-start;
+}
+
+.available-stock-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+}
+
+.sale-items-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.sale-items-total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sale-items-total .text-primary {
+  font-size: 1.35rem;
+}
+
+.sale-items-validation {
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #fecaca;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
+  font-size: 0.875rem;
+}
+
+/* Payment summary */
+.payment-summary {
+  gap: 0;
+}
+
+.payment-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--app-border);
+  min-width: 0;
+}
+
+/* Two columns => horizontal rule between the columns only on the first row
+   of each pair. Using :nth-child keeps the grid borders tidy. */
+.payment-summary-item:nth-child(odd) {
+  border-right: 1px solid var(--app-border);
+}
+
+.payment-summary-item:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.payment-summary-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.payment-summary-item .form-control,
+.payment-summary-item .form-control-plaintext,
+.payment-summary-item .form-select {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   6. Empty states
+   -------------------------------------------------------------------------- */
+.app-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  border: 1px dashed var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: var(--app-surface-muted);
+  color: #64748b;
+}
+
+.app-empty-state .app-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--app-border);
+  color: var(--app-primary);
+  font-size: 1.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.app-empty-state .app-empty-title {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.98rem;
+}
+
+.app-empty-state .app-empty-text {
+  font-size: 0.88rem;
+  max-width: 46ch;
+}
+
+/* --------------------------------------------------------------------------
+   7. Contextual slide-up panels
+   -------------------------------------------------------------------------- */
+.app-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--app-motion-duration) var(--app-motion-ease),
+              visibility var(--app-motion-duration) var(--app-motion-ease);
+  z-index: 1050;
+}
+
+.app-panel-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* The panel is anchored to the bottom of the viewport but stops above the
+   app's fixed bottom navigation, so the nav is never covered. */
+.app-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--app-panel-nav-offset, 0px);
+  z-index: 1060;
+  display: flex;
+  flex-direction: column;
+  max-height: min(78vh, 720px);
+  background: #fff;
+  border-radius: var(--app-radius-lg) var(--app-radius-lg) 0 0;
+  box-shadow: var(--app-shadow-lg);
+  transform: translate3d(0, 100%, 0);
+  transition: transform var(--app-motion-duration-slow) var(--app-motion-ease-out);
+  visibility: hidden;
+  overflow: hidden;
+}
+
+.app-panel.is-open {
+  transform: none;
+  visibility: visible;
+}
+
+.app-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--app-border);
+  background: #fff;
+}
+
+.app-panel-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.app-panel-heading {
+  min-width: 0;
+}
+
+.app-panel-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.app-panel-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-panel-footer {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+/* Sub-navigation inside a panel */
+.app-panel-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1.25rem 0;
+  border-bottom: 1px solid var(--app-border);
+  overflow-x: auto;
+}
+
+.app-panel-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--app-motion-duration) var(--app-motion-ease),
+              border-color var(--app-motion-duration) var(--app-motion-ease);
+}
+
+.app-panel-tab:hover { color: #334155; }
+
+.app-panel-tab.is-active {
+  color: var(--app-primary);
+  border-bottom-color: var(--app-primary);
+}
+
+@media (max-width: 575.98px) {
+  .app-panel { max-height: 86vh; }
+}
+
+/* --------------------------------------------------------------------------
+   8. Compact record lists
+   --------------------------------------------------------------------------
+   A responsive replacement for wide data tables. Every row keeps the same
+   information a table row had, but the layout is a grid that collapses to
+   a stacked, labelled row on small screens — so nothing scrolls sideways. */
+.app-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--app-border);
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--app-motion-duration-fast) var(--app-motion-ease);
+}
+
+.app-list-row:last-child { border-bottom: 0; }
+
+a.app-list-row:hover,
+.app-list-row.app-hoverable:hover {
+  background: var(--app-surface-muted);
+  color: inherit;
+}
+
+.app-list-row:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: -2px;
+}
+
+.app-list-row-static { cursor: default; }
+
+.app-list-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-size: 1.05rem;
+}
+
+.app-list-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.app-list-title {
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-list-meta {
+  font-size: 0.8rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-list-side {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: right;
+}
+
+/* Optional labelled column, e.g. "Total  1,250" */
+.app-list-field {
+  flex: 0 0 auto;
+  min-width: 92px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-list-field-label {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.app-list-field-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.app-list-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Per-category accent for the leading icon */
+.app-cat-auth    { background: #eef2ff; color: #4f46e5; }
+.app-cat-user    { background: #ecfdf5; color: #059669; }
+.app-cat-role    { background: #fef2f2; color: #dc2626; }
+.app-cat-settings{ background: #f1f5f9; color: #475569; }
+.app-cat-product { background: #eff6ff; color: #2563eb; }
+.app-cat-inventory { background: #fffbeb; color: #d97706; }
+.app-cat-sales   { background: #ecfeff; color: #0891b2; }
+.app-cat-purchase{ background: #f5f3ff; color: #7c3aed; }
+.app-cat-customer{ background: #fdf2f8; color: #db2777; }
+.app-cat-finance { background: #f0fdf4; color: #16a34a; }
+.app-cat-platform{ background: #1e293b; color: #f8fafc; }
+.app-cat-data    { background: #f8fafc; color: #64748b; }
+
+@media (max-width: 767.98px) {
+  .app-list-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 0.85rem 0.9rem;
+  }
+
+  .app-list-title,
+  .app-list-meta { white-space: normal; }
+
+  .app-list-side,
+  .app-list-field {
+    margin-left: calc(36px + 0.85rem);
+    text-align: left;
+    min-width: 0;
+  }
+
+  .app-list-field { flex: 1 1 auto; }
+
+  .app-list-actions { margin-left: auto; }
+}
+
+/* --------------------------------------------------------------------------
+   9. Tab bars
+   -------------------------------------------------------------------------- */
+.app-tabs {
+  display: flex;
+  gap: 0.15rem;
+  border-bottom: 1px solid var(--app-border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* Variant for the settings workspace: the tabs wrap instead of scrolling,
+   so every group stays reachable without a horizontal scroll. */
+.app-tabs-wrap {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  row-gap: 0;
+}
+
+.app-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color var(--app-motion-duration) var(--app-motion-ease),
+              border-color var(--app-motion-duration) var(--app-motion-ease),
+              background var(--app-motion-duration) var(--app-motion-ease);
+}
+
+.app-tab:hover { color: #334155; background: var(--app-surface-muted); }
+
+.app-tab.is-active {
+  color: var(--app-primary);
+  border-bottom-color: var(--app-primary);
+}
+
+.app-tab-panel { animation: app-fade-in var(--app-motion-duration) var(--app-motion-ease) both; }
+
+/* Segmented (pill) variant for small screens */
+.app-tabs-segmented {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 0.2rem;
+  background: var(--app-surface-muted);
+  gap: 0.15rem;
+}
+
+.app-tabs-segmented .app-tab {
+  border-radius: 6px;
+  border-bottom: 0;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.app-tabs-segmented .app-tab.is-active {
+  background: #fff;
+  color: var(--app-primary);
+  box-shadow: var(--app-shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+   10. Badges and status pills
+   -------------------------------------------------------------------------- */
+.app-badge-success,
+.app-badge-create,
+.app-badge-login,
+.app-badge-approve {
+  background: var(--app-success-soft);
+  color: var(--app-success);
+}
+
+.app-badge-failure,
+.app-badge-delete,
+.app-badge-login_failed {
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
+}
+
+.app-badge-update,
+.app-badge-status {
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+}
+
+.app-badge-cancel,
+.app-badge-reject,
+.app-badge-export {
+  background: var(--app-warning-soft);
+  color: var(--app-warning);
+}
+
+/* --------------------------------------------------------------------------
+   11. Settings workspace
+   -------------------------------------------------------------------------- */
+.app-stat-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.app-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-stat-card:hover {
+  border-color: var(--app-border-strong);
+  color: inherit;
+}
+
+.app-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-size: 1.2rem;
+}
+
+.app-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: #1e293b;
+}
+
+.app-stat-label {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.app-link-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.app-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color var(--app-motion-duration-fast) var(--app-motion-ease),
+    background var(--app-motion-duration-fast) var(--app-motion-ease);
+}
+
+.app-link-row:hover {
+  border-color: var(--app-border-strong);
+  background: var(--app-surface-muted);
+  color: inherit;
+}
+
+.app-link-row i {
+  color: var(--app-primary);
+  font-size: 1.05rem;
+}
+
+.app-switch-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-switch-row:last-child { border-bottom: 0; }
+
+.app-switch-label { font-weight: 600; }
+
+.app-switch-text { font-size: 0.83rem; color: #64748b; }
+
+.app-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 1.25rem;
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--app-border);
+}
+
+/* ---------------------------------------------------------------------------
+   12. Profile page
+   --------------------------------------------------------------------------- */
+.app-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: #fff;
+  box-shadow: var(--app-shadow-sm);
+}
+
+.app-avatar {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: var(--app-shadow);
+}
+
+.app-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.85rem;
+  letter-spacing: 0.02em;
+}
+
+.app-profile-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.app-profile-name {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.app-profile-handle {
+  margin-top: 0.2rem;
+  color: #64748b;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.app-profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--app-surface-sunken);
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.app-chip i { width: 14px; height: 14px; }
+
+.app-chip-primary { background: var(--app-primary-soft); color: var(--app-primary); }
+.app-chip-success { background: var(--app-success-soft); color: var(--app-success); }
+.app-chip-danger  { background: var(--app-danger-soft);  color: var(--app-danger); }
+.app-chip-warning { background: var(--app-warning-soft); color: var(--app-warning); }
+
+.app-profile-stats {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  min-width: 280px;
+}
+
+.app-profile-stat {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+}
+
+.app-profile-stat-label {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.app-profile-stat-value {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+/* Read-only label/value pairs (personal details) */
+.app-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.app-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.app-field-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.app-field-value {
+  color: #1e293b;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.app-field-empty { color: #94a3b8; font-weight: 400; font-style: italic; }
+
+@media (max-width: 991.98px) {
+  .app-profile-hero { flex-wrap: wrap; }
+  .app-profile-stats { width: 100%; min-width: 0; }
+}
+
+@media (max-width: 575.98px) {
+  .app-profile-hero { padding: 1.1rem; gap: 1rem; }
+  .app-avatar { width: 68px; height: 68px; }
+  .app-avatar-fallback { font-size: 1.3rem; }
+  .app-profile-stats { grid-template-columns: minmax(0, 1fr); }
+  .app-field-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Panels: the page behind must not scroll while a sheet is open */
+body.app-panel-open { overflow: hidden; }
+
+.app-panel:focus { outline: none; }
+
+/* ---------------------------------------------------------------------------
+   13. List pages (toolbar, rows, pagination)
+   --------------------------------------------------------------------------- */
+.app-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--app-border);
+  background: #fff;
+}
+
+.app-list-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.app-list-search svg,
+.app-list-search i {
+  position: absolute;
+  left: 0.7rem;
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.app-list-search input {
+  width: 100%;
+  padding: 0.45rem 0.75rem 0.45rem 2.15rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+
+.app-list-search input:focus {
+  outline: none;
+  border-color: var(--app-primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.app-list-filter {
+  width: auto;
+  min-width: 150px;
+  font-size: 0.88rem;
+}
+
+.app-list-count {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.app-list-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.app-list-row[role="link"] { cursor: pointer; }
+
+.app-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.app-pagination-single { justify-content: flex-start; }
+
+.app-pagination-summary { font-size: 0.84rem; color: #64748b; }
+.app-pagination-count { color: #94a3b8; }
+
+.app-pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.app-pagination .btn { min-width: 36px; }
+
+@media (max-width: 575.98px) {
+  .app-list-count { margin-left: 0; width: 100%; }
+  .app-pagination { justify-content: center; }
+}

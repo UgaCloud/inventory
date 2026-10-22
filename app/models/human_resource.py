@@ -8,6 +8,28 @@ from django.db.models import Sum
 import datetime
 
 from app.constants import GENDERS
+from app.managers import TenantManager
+
+
+class UserProfileManager(TenantManager):
+    """Tenant-aware manager that keeps ``user.profile`` in sync.
+
+    ``UserProfile.objects.get_or_create(user=...)`` returns a freshly loaded
+    instance, but Django caches the *first* profile object on the user
+    relation. Without this the user keeps pointing at a stale object, so a
+    later ``user.profile.business`` (or ``user.profile.roles``) would report
+    the values the row had when it was first created.
+    """
+
+    def get_or_create(self, defaults=None, **kwargs):
+        profile, created = super().get_or_create(defaults=defaults, **kwargs)
+        user = kwargs.get('user')
+        if user is None:
+            user = profile.user
+        if user is not None and hasattr(user, '_state'):
+            user._state.fields_cache['profile'] = profile
+        return profile, created
+
 
 # Department and Designation models (your existing code)
 class Department(models.Model):
@@ -46,6 +68,9 @@ class Designation(models.Model):
 
 # Employee model (your existing code)
 class Employee(models.Model):
+
+    objects = TenantManager()
+
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='employee_profile')
     gender = models.CharField(max_length=10, choices=GENDERS)
     contact = models.CharField(max_length=20)
@@ -81,8 +106,15 @@ class Employee(models.Model):
 
 # Role System Models (Integrated with your Employee system)
 class Role(models.Model):
+
     """Application Role backed by Django Group for permissions."""
-    name = models.CharField(max_length=150, unique=True)
+    objects = TenantManager()
+    business = models.ForeignKey(
+        "app.Business", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="roles",
+        help_text="Tenant this role belongs to (NULL = platform-level role)",
+    )
+    name = models.CharField(max_length=150)
     description = models.TextField(blank=True, default='')
     
     # Django permission fields
@@ -126,20 +158,56 @@ class Role(models.Model):
         ordering = ['name']
         verbose_name = "Role"
         verbose_name_plural = "Roles"
+        constraints = [
+            # A role name is unique inside one business. Platform roles
+            # (business = NULL) are shared templates and keep a global name.
+            models.UniqueConstraint(
+                fields=['business', 'name'],
+                condition=models.Q(business__isnull=False),
+                name='uniq_role_name_per_business',
+            ),
+            models.UniqueConstraint(
+                fields=['name'],
+                condition=models.Q(business__isnull=True),
+                name='uniq_platform_role_name',
+            ),
+        ]
 
     def __str__(self):
         return self.name
 
+    def group_name(self):
+        """Name of the backing Django group, scoped to the owning business.
+
+        Django groups are global, so a shared group name would leak the
+        permissions of one business into another one. Prefixing the group
+        with the tenant keeps every role's permissions private.
+        """
+        prefix = self.business.slug if self.business_id else 'platform'
+        return f'{prefix}:{self.name}'[:150]
+
     def save(self, *args, **kwargs):
         # Ensure backing Group exists and is kept in sync
         if not self.group:
-            grp, _ = Group.objects.get_or_create(name=self.name)
+            grp = None
+            for suffix in range(5):
+                candidate = self.group_name() if not suffix else f'{self.group_name()}-{suffix}'
+                existing = Group.objects.filter(name=candidate).first()
+                if existing is None:
+                    grp = Group.objects.create(name=candidate)
+                    break
+                # Re-use the group only when no other role owns it.
+                if not Role.objects.filter(group=existing).exclude(pk=self.pk).exists():
+                    grp = existing
+                    break
+            if grp is None:  # pragma: no cover - defensive
+                grp = Group.objects.create(name=f'{self.group_name()}-{self.pk or "new"}')
             self.group = grp
         else:
-            if self.group.name != self.name:
-                self.group.name = self.name
+            if self.group.name != self.group_name():
+                self.group.name = self.group_name()
                 self.group.save(update_fields=['name'])
-        
+
         # Sync Django permissions to the group if needed
         self._sync_permissions_to_group()
         
@@ -336,9 +404,11 @@ class Role(models.Model):
 
 
 class RoleModule(models.Model):
+
     """
     Connects a Role with the modules it has access to.
     """
+    objects = TenantManager()
     role = models.ForeignKey('Role', on_delete=models.CASCADE, related_name='modules')
     module_id = models.PositiveIntegerField()
     module_name = models.CharField(max_length=100)
@@ -354,6 +424,9 @@ class RoleModule(models.Model):
 
 
 class RoleDeletionLog(models.Model):
+
+    objects = TenantManager()
+
     role = models.ForeignKey(
         'Role',
         on_delete=models.SET_NULL,
@@ -411,13 +484,26 @@ class RoleDeletionLog(models.Model):
 
 # Updated UserProfile model that integrates with both Employee and Role systems (RBAC 2.0)
 class UserProfile(models.Model):
+
     """
     Extends the Django User model with role, department, and module access information.
     Integrates with Employee model for comprehensive user management.
     RBAC 2.0: Supports multiple roles per user with composite permissions.
     """
+    objects = UserProfileManager()
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    
+
+    # Multi-tenancy: which business this user belongs to, and whether the user
+    # is a platform Super Administrator (manages all businesses).
+    business = models.ForeignKey(
+        "app.Business", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="user_profiles",
+    )
+    is_platform_admin = models.BooleanField(
+        default=False,
+        help_text="Platform Super Administrator: can manage all businesses",
+    )
+
     # RBAC 2.0: Multiple roles per user (ManyToMany)
     roles = models.ManyToManyField(
         'Role', 
@@ -636,6 +722,7 @@ def initialize_system_roles():
     for role_data in system_roles:
         role, created = Role.objects.get_or_create(
             name=role_data['name'],
+            business__isnull=True,
             defaults={
                 'description': role_data['description'],
                 'is_staff': role_data['is_staff'],

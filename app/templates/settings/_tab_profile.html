@@ -1,0 +1,29 @@
+{% comment %}Business profile: the company details of this tenant.{% endcomment %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        {% include 'organization/_company_profile_form.html' %}
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3">
+                    <i class="ti ti-info-circle me-1 text-primary"></i>About this business
+                </h6>
+                <dl class="row mb-0 small">
+                    <dt class="col-5 text-muted fw-normal">Tenant</dt>
+                    <dd class="col-7">{{ business.name|default:"Platform wide" }}</dd>
+                    <dt class="col-5 text-muted fw-normal">Reference</dt>
+                    <dd class="col-7 text-break">{{ business.slug|default:"-" }}</dd>
+                    <dt class="col-5 text-muted fw-normal">Status</dt>
+                    <dd class="col-7">
+                        {% if business %}{{ business.get_status_display }}{% else %}Platform{% endif %}
+                    </dd>
+                    <dt class="col-5 text-muted fw-normal">Currency</dt>
+                    <dd class="col-7">{{ organization.currency }}</dd>
+                    <dt class="col-5 text-muted fw-normal">Country</dt>
+                    <dd class="col-7">{{ organization.country }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,37 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Ledger Entry | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Customer Ledger Entry</h4>
+            <h6>{{ customer.name }}</h6>
+        </div>
+        <div class="page-btn">
+            <a href="{% url 'customer_ledger_list' %}" class="btn btn-secondary">Back to Ledgers</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Date</dt>
+                <dd class="col-sm-9">{{ ledger_entry.date|date:'Y-m-d H:i' }}</dd>
+                <dt class="col-sm-3">Type</dt>
+                <dd class="col-sm-9">{{ ledger_entry.get_transaction_type_display }}</dd>
+                <dt class="col-sm-3">Description</dt>
+                <dd class="col-sm-9">{{ ledger_entry.description|default:'-' }}</dd>
+                <dt class="col-sm-3">Debit</dt>
+                <dd class="col-sm-9">{{ ledger_entry.debit }}</dd>
+                <dt class="col-sm-3">Credit</dt>
+                <dd class="col-sm-9">{{ ledger_entry.credit }}</dd>
+                <dt class="col-sm-3">Note</dt>
+                <dd class="col-sm-9">{{ ledger_entry.note|default:'-' }}</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

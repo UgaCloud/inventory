@@ -67,8 +67,7 @@ def approve_transfer_request(tr_id, approver):
                 stock_transfer=st,
                 product=item.product,
                 quantity=item.quantity,
-                units=item.units,
-                transfer_request_item=item
+                units=item.units
             )
 
         return st

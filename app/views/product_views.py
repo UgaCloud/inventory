@@ -24,13 +24,38 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 
 
+def _product_price_info(product):
+    """Return (cost_price, selling_price, unit_name) for API payloads.
+
+    Products store prices per unit in ProductUnitPrice (selling) and the
+    latest landed cost lives on the most recent inventory batch.
+    """
+    from app.models.products import ProductUnitPrice
+    from app.models.transactions import InventoryBatch
+
+    base_price = (product.unit_prices.filter(conversion_factor=1).first()
+                  or product.unit_prices.first())
+    selling_price = float(base_price.price) if base_price else 0
+    unit_name = base_price.unit.name if base_price else 'Piece'
+
+    latest_batch = (InventoryBatch.objects.filter(product=product)
+                    .order_by('-received_date', '-id').first())
+    cost_price = float(latest_batch.unit_cost) if latest_batch else selling_price
+
+    return cost_price, selling_price, unit_name
+
+
 
 @login_required
 def manage_product_view(request):
+    from app.models.tenancy import business_scope
     product_form = ProductForm()
 
-    # Get all products with filtering support
-    products = Product.objects.select_related('category').all().order_by('id')
+    # Get all products with filtering support (tenant-scoped)
+    products = business_scope(
+        request.user,
+        Product.objects.select_related('category').all(),
+    ).order_by('id')
     
     # Apply filters from query parameters
     category_id = request.GET.get('category')
@@ -103,6 +128,7 @@ def manage_product_view(request):
             'name': product.name,
             'sku': product.sku or '',
             'brand': product.brand or '',
+            'image_url': product.image.url if product.image else None,
             'is_active': product.is_active,
             'default_price': float(product.default_price) if product.default_price else 0,
             'default_unit': str(product.default_unit) if product.default_unit else '',
@@ -444,8 +470,8 @@ def add_product_unit_price_view(request):
             messages.error(request, form.errors)
             
             return redirect(product_details_view, request.POST.get('product'))
-    else:
-        pass
+
+    return render(request, 'products/product_unit_price_form.html', {'form': ProductUnitPriceForm()})
 
 def update_product_unit_price_view(request, pup_id):
     pup = get_object_or_404(ProductUnitPrice, id=pup_id)
@@ -484,8 +510,13 @@ def add_inventory_view(request):
 
         if form.is_valid():
             form.save()
-  
-    return redirect(product_details_view, request.POST.get('product'))
+            product_id = request.POST.get('product')
+            if product_id:
+                return redirect(product_details_view, product_id)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+
+    return redirect('products_page')
 
 @login_required
 def store_view(request):
@@ -885,8 +916,9 @@ def all_stores_inventory_view(request):
     Overview of inventory across all stores with InventoryBatch-based calculations.
     Useful for managers to see stock levels across locations.
     """
+    from app.models.tenancy import business_scope
    
-    stores = StoreLocation.objects.all().order_by('name')
+    stores = business_scope(request.user, StoreLocation.objects.all()).order_by('name')
     stores_data = []
     
     for store in stores:
@@ -1012,7 +1044,7 @@ def store_low_stock_api(request, store_id):
     include_values = request.GET.get('include_values', 'false').lower() == 'true'
     
     # Get low stock products for this store
-    low_stock_items = get_low_stock_products(limit=limit).filter(store_id=store_id)
+    low_stock_items = get_low_stock_products(limit=None).filter(store_id=store_id)[:limit]
     
     results = []
     for item in low_stock_items:
@@ -1330,14 +1362,15 @@ def products_by_category_api(request, category_id):
     
     results = []
     for product in products:
+        cost_price, selling_price, unit_name = _product_price_info(product)
         results.append({
             'id': product.id,
             'name': product.name,
             'sku': product.sku,
             'brand': product.brand or '',
-            'cost_price': float(product.cost_price or 0),
-            'selling_price': float(product.selling_price or 0),
-            'unit': product.unit or 'Piece',
+            'cost_price': cost_price,
+            'selling_price': selling_price,
+            'unit': unit_name,
         })
     
     return JsonResponse({
@@ -1390,14 +1423,16 @@ def product_suggestions_api(request):
     
     results = []
     for product in products:
+        cost_price, selling_price, unit_name = _product_price_info(product)
         product_data = {
             'id': product.id,
             'name': product.name,
             'sku': product.sku,
             'brand': product.brand or '',
             'category': product.category.name if product.category else '',
-            'cost_price': float(product.cost_price or 0),
-            'unit': product.unit or 'Piece',
+            'cost_price': cost_price,
+            'selling_price': selling_price,
+            'unit': unit_name,
         }
         
         # Add stock info if store specified

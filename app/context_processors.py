@@ -8,7 +8,9 @@ from app.utils.module_mapping import user_has_module_access, get_module_id_for_u
 
 
 def organization_setting(request):
-    settings = OrganizationSetting.load()
+    # Every business owns its own company profile; the platform wide row is
+    # used for anonymous visitors and for platform administrators.
+    settings = OrganizationSetting.load_for(getattr(request, 'business', None))
     
     user_roles = []
     user = request.user
@@ -21,6 +23,9 @@ def organization_setting(request):
     return {
         'organization': settings,
         'is_admin': is_admin(user),
+        'can_manage_inventory': can_manage_inventory(user),
+        'can_manage_stock': can_manage_stock(user),
+        'can_manage_users': can_manage_users(user),
         'is_manager': is_manager(user),
         'is_accountant': is_accountant(user),
         'is_sales': is_sales(user),
@@ -34,20 +39,39 @@ def organization_setting(request):
 def is_superuser(user):
     return user.is_authenticated and user.is_superuser
 
+def _has_module(user, *module_ids):
+    """True when the user holds any of the given modules (RBAC 2.0)."""
+    if not user.is_authenticated:
+        return False
+    return any(user_has_module_access(user, module_id) for module_id in module_ids)
+
 def is_admin(user):
-    return user.is_authenticated and (user.is_superuser or user.groups.filter(name='Admin').exists())
+    """Can administer users and roles (User Management / Role Management)."""
+    return _has_module(user, 7, 15)
+
+def can_manage_inventory(user):
+    """Can maintain the product catalogue, categories and stores."""
+    return _has_module(user, 2)
+
+def can_manage_stock(user):
+    """Can maintain stock: purchases, transfers and adjustments."""
+    return _has_module(user, 3)
+
+def can_manage_users(user):
+    """Can manage employees, user accounts and role assignments."""
+    return _has_module(user, 5, 7, 15)
 
 def is_manager(user):
-    return user.is_authenticated and user.groups.filter(name='Manager').exists()
+    return _has_module(user, 8, 16)
 
 def is_accountant(user):
-    return user.is_authenticated and user.groups.filter(name='Accountant').exists()
+    return _has_module(user, 6, 16)
 
 def is_sales(user):
-    return user.is_authenticated and user.groups.filter(name='Sales').exists()
+    return _has_module(user, 4)
 
 def is_stores(user):
-    return user.is_authenticated and user.groups.filter(name='Stores').exists()
+    return _has_module(user, 2, 3)
 
 # New context processor: builds a menu structure and filters it per user module access
 def app_menu(request):
@@ -180,7 +204,9 @@ def app_menu(request):
             'label': 'Settings',
             'icon': 'ti ti-settings fs-16 me-2',
             'children': [
-                {'label': 'Company Profile', 'url_name': 'settings_page'},
+                {'label': 'Settings workspace', 'url_name': 'settings_page'},
+                {'label': 'Company Profile', 'url_name': 'company_settings_page'},
+                {'label': 'Audit Trail', 'url_name': 'audit_log_page'},
             ],
         },
     ]
@@ -227,6 +253,20 @@ def app_menu(request):
         return out
 
     filtered = filter_menu(raw_menu)
+
+    # Platform Super Administrator section (multi-tenancy). Shown only to
+    # platform admins; business users never see these entries.
+    from app.models.tenancy import user_is_platform_admin
+    if user.is_authenticated and user_is_platform_admin(user):
+        filtered.append({
+            'label': 'Platform',
+            'icon': 'ti ti-building-skyscraper fs-16 me-2',
+            'children': [
+                {'label': 'Platform Overview', 'url_name': 'platform_dashboard'},
+                {'label': 'Businesses', 'url_name': 'platform_business_list'},
+                {'label': 'Register Business', 'url_name': 'platform_business_create'},
+            ],
+        })
 
     return {
         'app_menu': filtered,

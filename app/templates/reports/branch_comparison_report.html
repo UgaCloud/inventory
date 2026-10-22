@@ -1,0 +1,46 @@
+{% extends 'basic/base.html' %}
+{% load static %}
+
+{% block title %}Branch Comparison | Inventory Management{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="page-header">
+        <div class="page-title">
+            <h4>Branch Comparison</h4>
+            <h6>Sales performance by store — {{ date_from }} to {{ date_to }}</h6>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Store</th>
+                            <th>Total Sales</th>
+                            <th>Transactions</th>
+                            <th>Items Sold</th>
+                            <th>Avg. Transaction</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for branch in branch_performance %}
+                        <tr>
+                            <td>{{ branch.name }}</td>
+                            <td>{{ branch.total_sales }}</td>
+                            <td>{{ branch.total_transactions }}</td>
+                            <td>{{ branch.total_items_sold }}</td>
+                            <td>{{ branch.average_transaction|floatformat:0 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center text-muted py-3">No store data available.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

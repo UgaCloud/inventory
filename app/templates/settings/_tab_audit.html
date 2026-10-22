@@ -1,0 +1,80 @@
+{% comment %}Audit: what happened in this business, and who did it.{% endcomment %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-semibold mb-0">
+                        <i class="ti ti-history me-1 text-primary"></i>Latest entries
+                    </h6>
+                    <a href="{% url 'audit_log_page' %}" class="btn btn-sm btn-outline-primary">
+                        <i class="ti ti-list me-1"></i>Full audit trail
+                    </a>
+                </div>
+
+                {% if entries %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>Who</th>
+                                <th>What</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in entries %}
+                            <tr>
+                                <td class="text-nowrap text-muted">{{ entry.timestamp|date:"d M, H:i" }}</td>
+                                <td class="text-nowrap">{{ entry.actor_name|default:"System" }}</td>
+                                <td>
+                                    <a href="{% url 'audit_log_detail' pk=entry.pk %}" class="text-reset">
+                                        {{ entry.description|default:entry.get_action_display }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Nothing has been recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3">
+                    <i class="ti ti-chart-pie me-1 text-primary"></i>Entries by category
+                </h6>
+                {% if by_category %}
+                <ul class="list-unstyled mb-0">
+                    {% for row in by_category %}
+                    <li class="d-flex justify-content-between align-items-center py-1">
+                        <span class="text-capitalize">{{ row.category|default:"other" }}</span>
+                        <span class="badge bg-soft-primary text-primary">{{ row.total }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted mb-0">Nothing has been recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <span>
+                    <span class="app-stat-value d-block">{{ total_entries }}</span>
+                    <span class="app-stat-label">entries in total</span>
+                </span>
+                <a href="{% url 'audit_log_export' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-download me-1"></i>Export
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

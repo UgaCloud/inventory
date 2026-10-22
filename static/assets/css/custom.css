@@ -10559,6 +10559,12 @@ table.table-bordered thead tr th p {
   min-width: 100% !important;
   z-index: 99;
 }
+/* The open dropdown wrapper is appended to <body> by select2; the
+   min-width:100% above would resolve it against the viewport and give
+   every opened dropdown full page width (horizontal scrollbar). */
+body > .select2-container {
+  min-width: 0 !important;
+}
 .select2-container .select2-selection--single {
   height: 40px;
 }

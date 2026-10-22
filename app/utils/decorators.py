@@ -85,3 +85,56 @@ def require_url_access(url_name):
         return _wrapped_view
     return decorator
 
+
+
+def require_audit_access(view_func):
+    """
+    Restrict a view to people who may read the audit trail.
+
+    Platform Super Administrators always pass. Inside a business the audit
+    trail is readable by holders of the Settings module (9) or the
+    Role Management module (15) - the same people who may change users,
+    roles or company settings.
+    """
+    from app.models.tenancy import user_is_platform_admin
+    from app.utils.module_mapping import user_has_module_access
+
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        user = request.user
+        if not user.is_authenticated:
+            messages.error(request, 'You must be logged in to access this page.')
+            return redirect('login_page')
+        if user_is_platform_admin(user):
+            return view_func(request, *args, **kwargs)
+        allowed = any(
+            user_has_module_access(user, module_id)
+            for module_id in (9, 15)
+        )
+        if not allowed:
+            raise Http404("You do not have permission to view the audit trail.")
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+
+
+def require_platform_admin(view_func):
+    """
+    Restrict a view to the platform Super Administrator.
+
+    Platform admins are Django superusers or users whose UserProfile carries
+    is_platform_admin=True. Business administrators never pass this gate.
+    """
+    from app.models.tenancy import user_is_platform_admin
+
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        user = request.user
+        if not user.is_authenticated:
+            messages.error(request, 'You must be logged in to access this page.')
+            return redirect('login_page')
+        if not user_is_platform_admin(user):
+            # Deliberately indistinguishable from a missing page for non-platform users
+            raise Http404("Page not found.")
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+

@@ -14,18 +14,30 @@ from app.selectors.sales_selectors import *
 from app.models.transactions import *
 from app.models.products import *
 from app.models.customers import *
+from app.views.perfume_views import record_sale_page_context
+from app.utils.list_helpers import list_context, panel_action
+from django.urls import reverse
 
 @login_required
 def sales_list_view(request):
     # Get filter parameter - default to False (show active sales)
     show_cancelled = request.GET.get('show_cancelled', 'false') == 'true'
 
-    # Use improved selector logic
-    sales = get_all_sales(is_cancelled=show_cancelled)
+    # Use improved selector logic (tenant-scoped by store's business)
+    from app.models.tenancy import business_scope
+    sales = business_scope(
+        request.user,
+        get_all_sales(is_cancelled=show_cancelled),
+        field='store__business',
+    )
 
     # Get counts for statistics
-    active_count = Sales.objects.filter(is_cancelled=False).count()
-    cancelled_count = Sales.objects.filter(is_cancelled=True).count()
+    active_count = business_scope(
+        request.user, Sales.objects.filter(is_cancelled=False), field='store__business',
+    ).count()
+    cancelled_count = business_scope(
+        request.user, Sales.objects.filter(is_cancelled=True), field='store__business',
+    ).count()
 
     # Calculate statistics for current view
     total_sales_amount = sales.aggregate(total=Sum('total_amount'))['total'] or 0
@@ -35,21 +47,110 @@ def sales_list_view(request):
     else:
         fulfilled_count = 0
 
-    # Add pagination
-    paginator = Paginator(sales, 25)  # Show 25 sales per page
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    status_filter = request.GET.get('status', '').strip()
+    if status_filter:
+        sales = sales.filter(status=status_filter)
 
-    context = {
-        'sales': page_obj.object_list,  # Use current page objects
-        'page_obj': page_obj,
+    context = list_context(
+        request,
+        sales,
+        search_fields=('receipt_no', 'customer__name', 'store__name', 'note'),
+        filters=[
+            {
+                'name': 'status',
+                'label': 'All Status',
+                'options': [
+                    {'value': 'PENDING', 'label': 'Pending'},
+                    {'value': 'PARTIALLY_PAID', 'label': 'Partially paid'},
+                    {'value': 'FULFILLED', 'label': 'Fulfilled'},
+                ],
+            },
+        ],
+    )
+
+    context.update({
+        'sales': context['page_obj'].object_list,
         'show_cancelled': show_cancelled,
         'total_sales_amount': total_sales_amount,
         'fulfilled_count': fulfilled_count,
         'cancelled_count': cancelled_count,
         'active_count': active_count,
-        'is_paginated': paginator.count > 25,
-    }
+        'search_placeholder': 'Search receipt, customer or store',
+        'toolbar_label': 'sales',
+        'empty_title': 'No cancelled sales found' if show_cancelled else 'No sales found',
+        'empty_text': (
+            'Cancelled sales will appear here once a sale is cancelled.'
+            if show_cancelled else
+            'Record a sale to start tracking receipts, balances and fulfilment.'
+        ),
+        'empty_action_href': '?show_cancelled=false' if show_cancelled else reverse('record_sale'),
+        'empty_action_label': 'View active sales' if show_cancelled else 'Record sale',
+        'empty_icon': 'ban' if show_cancelled else 'shopping-cart',
+    })
+
+    rows = []
+    for sale in context['sales']:
+        detail_url = reverse('sales_detail', args=[sale.id])
+        if sale.is_cancelled:
+            badges = [{'label': 'Cancelled', 'tone': 'danger'}]
+        elif sale.status == 'FULFILLED':
+            badges = [{'label': 'Fulfilled', 'tone': 'success'}]
+        elif sale.status == 'PARTIALLY_PAID':
+            badges = [{'label': 'Partially paid', 'tone': 'warning'}]
+        else:
+            badges = [{'label': sale.get_status_display(), 'tone': 'default'}]
+
+        meta_parts = [sale.sale_date.strftime('%d %b %Y') if sale.sale_date else '']
+        if sale.store:
+            meta_parts.append(str(sale.store))
+        meta_parts.append(str(sale.customer) if sale.customer else 'Walk-in')
+        if sale.perfume_total_ml:
+            meta_parts.append(f'{sale.perfume_total_ml:.0f} ml perfume')
+
+        actions = [{'label': 'View sale', 'icon': 'eye', 'href': detail_url}]
+        if not sale.is_cancelled and sale.status != 'FULFILLED':
+            actions.append({
+                'label': 'Edit sale',
+                'icon': 'edit',
+                'href': reverse('sales_update_view', args=[sale.id]),
+            })
+
+        panel_id = f'app-panel-sale-{sale.id}'
+        actions.insert(0, panel_action(panel_id))
+
+        rows.append({
+            'icon': 'shopping-cart',
+            'category': 'sale',
+            'title': sale.receipt_no,
+            'meta': ' · '.join(part for part in meta_parts if part),
+            'href': detail_url,
+            'badges': badges,
+            'fields': [
+                {'label': 'Total', 'value': f'{sale.total_amount:,.0f}'},
+                {'label': 'Paid', 'value': f'{sale.amount_paid:,.0f}'},
+                {
+                    'label': 'Balance',
+                    'value': f'{sale.balance:,.0f}' if sale.balance and sale.balance > 0 else '0',
+                },
+            ],
+            'actions': actions,
+            'panel_id': panel_id,
+            'panel': {
+                'title': f'Sale {sale.receipt_no}',
+                'subtitle': sale.sale_date.strftime('%d %b %Y') if sale.sale_date else '',
+                'fields': [
+                    {'label': 'Total', 'value': f'{sale.total_amount:,.0f}'},
+                    {'label': 'Paid', 'value': f'{sale.amount_paid:,.0f}'},
+                    {'label': 'Balance', 'value': f'{sale.balance:,.0f}' if sale.balance and sale.balance > 0 else '0'},
+                    {'label': 'Store', 'value': str(sale.store) if sale.store else '—'},
+                    {'label': 'Customer', 'value': str(sale.customer) if sale.customer else 'Walk-in'},
+                    {'label': 'Payment', 'value': str(sale.payment_method) if sale.payment_method else '—'},
+                ],
+                'note': sale.note or '',
+                'href': detail_url,
+            },
+        })
+    context['rows'] = rows
 
     return render(request, 'sales/sales_list.html', context)
 
@@ -101,6 +202,7 @@ def record_sales_view(request):
                     'formset': formset,
                     'products': Product.objects.filter(is_active=True).order_by('name'),
                     'units': UnitOfMeasure.objects.all().order_by('name'),
+                    **record_sale_page_context(request),
                 })
 
             try:
@@ -146,6 +248,7 @@ def record_sales_view(request):
                     'formset': formset,
                     'products': Product.objects.filter(is_active=True).order_by('name'),
                     'units': UnitOfMeasure.objects.all().order_by('name'),
+                    **record_sale_page_context(request),
                 })
 
             messages.success(
@@ -177,6 +280,7 @@ def record_sales_view(request):
         'formset': formset,
         'products': Product.objects.filter(is_active=True).order_by('name'),
         'units': UnitOfMeasure.objects.all().order_by('name'),
+        **record_sale_page_context(request),
     })
 
 
@@ -266,6 +370,7 @@ def sales_detail_view(request, pk):
         'sale': sale,
         'items': items,
         'stock_movements': stock_movements,
+        'perfume_lines': sale.perfume_lines.prefetch_related('components__product'),
     }
     return render(request, 'sales/sales_detail.html', context)
 
@@ -433,6 +538,17 @@ def cancel_sale_view(request, pk):
             
             if success:
                 messages.success(request, message)
+                # A cancellation is a business decision, not a field edit:
+                # it is recorded as its own kind of event with the reason.
+                from app.services.audit_service import log_event
+                log_event(
+                    'cancel',
+                    category='sales',
+                    description=f'Cancelled sale #{sale.receipt_no}: {reason}',
+                    obj=sale,
+                    request=request,
+                    changes={'reason': reason},
+                )
             else:
                 messages.error(request, message)
                 

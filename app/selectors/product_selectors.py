@@ -15,6 +15,7 @@ def get_top_categories_by_sales(limit=3):
     )
 from app.models.products import Product, Category, UnitOfMeasure, ProductUnitPrice, Inventory, StoreLocation
 from django.db import models
+from django.shortcuts import get_object_or_404
 from app.models.transactions import InventoryBatch
 from django.db.models import Sum, F
 
@@ -23,11 +24,16 @@ def get_all_products():
     return Product.objects.select_related('category').all()
 
 def get_product_by_id(product_id):
-    return Product.objects.select_related('category').prefetch_related('compatible_vehicles').get(id=product_id)
+    # ``get_object_or_404`` keeps cross-tenant ids a clean 404 instead of a
+    # 500: the tenant-aware manager hides rows of other businesses.
+    return get_object_or_404(
+        Product.objects.select_related('category').prefetch_related('compatible_vehicles'),
+        id=product_id,
+    )
 
 #category selectors
 def get_category_by_id(category_id):
-    return Category.objects.get(id = category_id)
+    return get_object_or_404(Category, id=category_id)
 
 def get_all_categories():
     return Category.objects.all()
@@ -37,7 +43,7 @@ def get_all_units_of_measurement():
     return UnitOfMeasure.objects.all()
 
 def get_unit_of_measurement_by_id(unit_id):
-    return UnitOfMeasure.objects.get(id = unit_id)
+    return get_object_or_404(UnitOfMeasure, id=unit_id)
 
 def get_all_product_unit_prices():
     return ProductUnitPrice.objects.all()
